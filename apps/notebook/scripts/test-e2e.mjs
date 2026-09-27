@@ -61,7 +61,11 @@ try {
   const cell = page.locator(".cell-schematic").last();  // added at the end of the notebook
   await cell.scrollIntoViewIfNeeded();
   const grid = cell.locator(".canvas");
-  const at = async (gx, gy) => { const b = await grid.boundingBox(); return [b.x + gx * 20, b.y + gy * 20]; };
+  // grid point → screen point, through the board's camera
+  const at = (gx, gy) => grid.evaluate((svg, [x, y]) => {
+    const p = new DOMPoint(x, y).matrixTransform(svg.getScreenCTM());
+    return [p.x, p.y];
+  }, [gx * 20, gy * 20]);
   const click = async (gx, gy) => { const [x, y] = await at(gx, gy); await page.mouse.click(x, y); };
   const code = async () => {
     await cell.getByRole("button", { name: "Kod", exact: true }).click();
@@ -75,6 +79,15 @@ try {
   await cell.getByTitle("Źródło napięcia").click(); await click(4, 6);
   await cell.getByTitle("Rezystor").click(); await click(12, 3);
   check("new elements show open pins", (await grid.locator(".open-pin").count()) === 4);
+
+  // the element library: search, Enter, place — and it joins the recent elements on the toolbar
+  await cell.getByRole("button", { name: "Elementy" }).click();
+  await page.keyboard.type("kond");
+  await page.keyboard.press("Enter");
+  await click(24, 3);
+  check("library search places an element", (await grid.locator(".element").count()) === 3
+    && (await cell.locator(".island.tools").getByTitle("Kondensator").count()) === 1);
+  await page.keyboard.press("Delete");  // keep the circuit a simple loop for what follows
   const [x1, y1] = await at(8, 6); const [x2, y2] = await at(12, 3);
   await page.mouse.move(x1, y1); await page.mouse.down(); await page.mouse.move(x2, y2, { steps: 8 }); await page.mouse.up();
   await cell.getByRole("button", { name: "Przewód" }).click();
@@ -88,6 +101,16 @@ try {
   // drag the bottom segment of the loop's return wire two squares down: still the same circuit
   const [sx, sy] = await at(12, 10); const [tx, ty] = await at(12, 12);
   await page.mouse.move(sx, sy); await page.mouse.down(); await page.mouse.move(tx, ty, { steps: 6 }); await page.mouse.up();
+  // the view pans by dragging empty space; the drawing itself does not move
+  const pinBefore = await at(4, 6);
+  const [ex, ey] = await at(26, 8);  // empty space inside the view
+  await page.mouse.move(ex, ey); await page.mouse.down(); await page.mouse.move(ex - 120, ey - 60, { steps: 6 }); await page.mouse.up();
+  const pinAfter = await at(4, 6);
+  check("dragging empty space pans the view", Math.round(pinBefore[0] - pinAfter[0]) === 120 && Math.round(pinBefore[1] - pinAfter[1]) === 60
+    && (await code()) === "uklad = loop(VoltageSource(), Resistor())");
+  await cell.getByRole("button", { name: "Dopasuj widok" }).click();
+  check("fit shows the whole drawing", (await grid.locator(".element").count()) === 2);
+
   check("moving a wire segment keeps connections", (await code()) === "uklad = loop(VoltageSource(), Resistor())"
     && (await grid.locator(".open-pin").count()) === 0);
 

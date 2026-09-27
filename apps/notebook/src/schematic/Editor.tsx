@@ -1,17 +1,18 @@
 // Grid editor for a schematic cell. Symbols come from the Python symbol library,
 // so the editor and the rendered report look the same.
 //
-// The canvas is drawn 1:1 (one grid unit = library.grid px) from a fixed origin and only
-// grows to the right/bottom, so nothing ever jumps under the cursor.
+// The drawing lives on an endless plane; the board shows it through a camera (a viewBox
+// that pans and zooms), like Excalidraw. Nothing moves under the cursor unless you pan.
 import { useEffect, useId, useRef, useState, type PointerEvent as ReactPointerEvent, type ReactNode } from "react";
-import { Help, Minus, Plus, Pointer, Redo, Undo, WireIcon } from "../icons";
+import { Expand, Grid, Hand, Help, Minus, Plus, Pointer, Redo, Search, Shrink, Undo, WireIcon } from "../icons";
 import type { ElementData, ElementResult, Point, SchematicData, SymbolLibrary, WireData } from "../types";
 import {
-  KINDS, MARGIN, attach, bounds, elbow, hasValue, isComponent, isConnectionPoint, junctions, kindInfo, nextId, normalized,
+  KINDS, attach, bounds, elbow, searchKinds, hasValue, isComponent, isConnectionPoint, junctions, kindInfo, nextId,
   moveSegment, openPins, pins, rotatedAbout, same, simplify, updateElement,
 } from "./model";
 
-type Tool = { type: "select" } | { type: "wire" } | { type: "place"; kind: string };
+type Tool = { type: "select" } | { type: "hand" } | { type: "wire" } | { type: "place"; kind: string };
+type Camera = { x: number; y: number; zoom: number }; // top-left corner of the view, in drawing px
 type Selection = { type: "element"; id: string } | { type: "wire"; index: number } | null;
 type Gesture =
   | { type: "move"; id: string; start: Point; origin: Point; snapshot: SchematicData; moved: boolean }
@@ -27,11 +28,29 @@ interface Props {
   topRight?: ReactNode;
 }
 
-const clampZoom = (z: number) => Math.min(2.5, Math.max(0.4, z));
+const clampZoom = (z: number) => Math.min(3, Math.max(0.25, z));
 
-const MIN_W = 30;
-const MIN_H = 15;
+const RECENT_KEY = "electro-recent-elements";
+const DEFAULT_RECENT = ["resistor", "voltage_source", "ground"];
+
+function loadRecent(): string[] {
+  try {
+    const saved = JSON.parse(localStorage.getItem(RECENT_KEY) ?? "null");
+    if (Array.isArray(saved) && saved.every((k) => typeof k === "string")) return saved.slice(0, 3);
+  } catch {
+    // private mode or broken value
+  }
+  return DEFAULT_RECENT;
+}
+
 const HISTORY = 100;
+
+/** Start with the drawing near the top-left, below the toolbar. */
+function startCamera(sch: SchematicData, lib: SymbolLibrary): Camera {
+  if (!sch.elements.length && !sch.wires.length) return { x: -40, y: -100, zoom: 1 };
+  const [x0, y0] = bounds(sch, lib);
+  return { x: x0 * lib.grid - 80, y: y0 * lib.grid - 110, zoom: 1 };
+}
 
 export function SchematicEditor({ value, onChange, library, results, topLeft, topRight }: Props) {
   const G = library.grid;
@@ -43,21 +62,74 @@ export function SchematicEditor({ value, onChange, library, results, topLeft, to
   const [draft, setDraft] = useState<Point[] | null>(null);
   const [gesture, setGesture] = useState<Gesture | null>(null);
   const history = useRef<{ past: SchematicData[]; future: SchematicData[] }>({ past: [], future: [] });
-  const scrollRef = useRef<HTMLDivElement>(null);
-  const [zoom, setZoom] = useState(1);
+  const viewRef = useRef<HTMLDivElement>(null);
   const [help, setHelp] = useState(false);
-  const [panning, setPanning] = useState(false);
-  const pan = useRef<{ x: number; y: number; left: number; top: number } | null>(null);
+  const [libraryOpen, setLibraryOpen] = useState(false);
+  const [query, setQuery] = useState("");
+  const [recent, setRecent] = useState<string[]>(loadRecent);
+  const [full, setFull] = useState(false);
+  const [spaceHeld, setSpaceHeld] = useState(false);
+  const [cam, setCam] = useState<Camera>(() => startCamera(value, library));
+  const pan = useRef<{ x: number; y: number; cam: Camera; moved: boolean; click: boolean } | null>(null);
 
-  // drawings made elsewhere (auto-layout, files) may start at negative coordinates
+  // the size of the board on screen: the camera shows view.w × view.h screen px
+  const [view, setView] = useState({ w: 800, h: 480 });
   useEffect(() => {
-    const moved = normalized(value, library);
-    if (moved !== value) onChange(moved);
-  }, [value, library, onChange]);
+    const el = viewRef.current;
+    if (!el) return;
+    const observer = new ResizeObserver(() => setView({ w: el.clientWidth, h: el.clientHeight }));
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
+  // in the notebook the board is as tall as the drawing needs (fixed after opening, so it never jumps)
+  const [boardHeight] = useState(() => {
+    const [, y0, , y1] = bounds(value, library);
+    return Math.min(640, Math.max(380, (y1 - y0) * G + 240));
+  });
 
-  const [, , maxX, maxY] = bounds(value, library);
-  const width = Math.max(MIN_W, maxX + 8);
-  const height = Math.max(MIN_H, maxY + 6);
+  /** A camera that shows the whole drawing. */
+  const fitted = (): Camera => {
+    if (!value.elements.length && !value.wires.length) return startCamera(value, library);
+    const [x0, y0, x1, y1] = bounds(value, library);
+    const w = (x1 - x0) * G + 160;
+    const h = (y1 - y0) * G + 140;
+    const zoom = clampZoom(Math.min(1.5, view.w / w, (view.h - 120) / h));
+    return { x: ((x0 + x1) / 2) * G - view.w / 2 / zoom, y: ((y0 + y1) / 2) * G - (view.h + 40) / 2 / zoom, zoom };
+  };
+  const fit = useRef(fitted);
+  fit.current = fitted;
+  // printing shows the board as it is on screen, so show the whole drawing first
+  useEffect(() => {
+    const before = () => setCam(fit.current());
+    window.addEventListener("beforeprint", before);
+    return () => window.removeEventListener("beforeprint", before);
+  }, []);
+
+  const zoomAround = (factor: number, px = view.w / 2, py = view.h / 2) =>
+    setCam((c) => {
+      const zoom = clampZoom(c.zoom * factor);
+      return { x: c.x + px / c.zoom - px / zoom, y: c.y + py / c.zoom - py / zoom, zoom };
+    });
+
+  // wheel / trackpad: pinch or ⌘/Ctrl zooms around the cursor; scrolling pans — but only once the
+  // board is in use (clicked, or full screen), so that the notebook page still scrolls past it
+  const [active, setActive] = useState(false);
+  useEffect(() => {
+    const el = viewRef.current;
+    if (!el) return;
+    const onWheel = (event: WheelEvent) => {
+      const zooming = event.ctrlKey || event.metaKey;
+      if (!zooming && !active && !full) return;
+      event.preventDefault();
+      const rect = el.getBoundingClientRect();
+      // a trackpad pinch sends small steps, a mouse wheel big ones: cap a step at ~28%
+      const step = Math.max(-25, Math.min(25, event.deltaY));
+      if (zooming) zoomAround(Math.exp(-step * 0.01), event.clientX - rect.left, event.clientY - rect.top);
+      else setCam((c) => ({ ...c, x: c.x + event.deltaX / c.zoom, y: c.y + event.deltaY / c.zoom }));
+    };
+    el.addEventListener("wheel", onWheel, { passive: false });
+    return () => el.removeEventListener("wheel", onWheel);
+  });
 
   // ------------------------------------------------------------------ changes and history
 
@@ -80,14 +152,6 @@ export function SchematicEditor({ value, onChange, library, results, topLeft, to
     onChange(next);
   };
 
-  /** Keep every pin at least MARGIN grid units inside the canvas. */
-  const clamped = (e: ElementData): ElementData => {
-    const ps = pins(e, library);
-    const dx = Math.max(0, MARGIN - Math.min(...ps.map((p) => p[0])));
-    const dy = Math.max(0, MARGIN - Math.min(...ps.map((p) => p[1])));
-    return dx || dy ? { ...e, at: [e.at[0] + dx, e.at[1] + dy] } : e;
-  };
-
   const selectedElement =
     selection?.type === "element" ? value.elements.find((e) => e.id === selection.id) ?? null : null;
 
@@ -99,8 +163,6 @@ export function SchematicEditor({ value, onChange, library, results, topLeft, to
   const rotateSelected = () => {
     if (!selectedElement) return;
     const rotation = (selectedElement.rotation + 90) % 360;
-    // no clamping here: that would shift the element off its middle and 180° would not land
-    // back on the wires; near the edge the whole drawing is shifted instead (normalized)
     const at = rotatedAbout(selectedElement, library, rotation);
     commit({ ...value, elements: value.elements.map((e) => (e.id === selectedElement.id ? { ...e, rotation, at } : e)) });
   };
@@ -147,15 +209,21 @@ export function SchematicEditor({ value, onChange, library, results, topLeft, to
     svgRef.current?.focus({ preventScroll: true });
     const p = toGrid(event);
     if (tool.type === "place") {
-      const element = clamped({
+      const element: ElementData = {
         id: nextId(value, tool.kind), kind: tool.kind, at: p, rotation: 0,
         value: null, text: tool.kind === "label" ? "A" : null,
-      });
+      };
       commit(attach({ ...value, elements: [...value.elements, element] }, library, element.id));
       setSelection({ type: "element", id: element.id });
       setTool({ type: "select" });
     } else if (tool.type === "wire") addDraftPoint(p);
-    else setSelection(null);
+  };
+
+  /** Drag the view. From empty space in select mode a click without dragging deselects. */
+  const startPan = (event: ReactPointerEvent, click: boolean) => {
+    svgRef.current?.focus({ preventScroll: true });
+    pan.current = { x: event.clientX, y: event.clientY, cam, moved: false, click };
+    svgRef.current?.setPointerCapture(event.pointerId);
   };
 
   const onElementDown = (event: ReactPointerEvent, e: ElementData) => {
@@ -180,7 +248,7 @@ export function SchematicEditor({ value, onChange, library, results, topLeft, to
     if (!cursor || !same(cursor, p)) setCursor(p);
     if (gesture?.type === "move") {
       const e = gesture.snapshot.elements.find((x) => x.id === gesture.id)!;
-      const at = clamped({ ...e, at: [gesture.origin[0] + p[0] - gesture.start[0], gesture.origin[1] + p[1] - gesture.start[1]] }).at;
+      const at: Point = [e.at[0] + p[0] - gesture.start[0], e.at[1] + p[1] - gesture.start[1]];
       if (!same(at, value.elements.find((x) => x.id === gesture.id)!.at)) {
         onChange(updateElement(gesture.snapshot, library, gesture.id, { at }));
         if (!gesture.moved) setGesture({ ...gesture, moved: true });
@@ -218,6 +286,8 @@ export function SchematicEditor({ value, onChange, library, results, topLeft, to
     else if (mod && event.key.toLowerCase() === "y") redo();
     else if (event.key === "Escape") {
       if (draft) setDraft(null);
+      else if (libraryOpen) setLibraryOpen(false);
+      else if (full && tool.type === "select" && !selection) setFull(false);
       else {
         setTool({ type: "select" });
         setSelection(null);
@@ -227,11 +297,14 @@ export function SchematicEditor({ value, onChange, library, results, topLeft, to
       setDraft(null);
     } else if ((event.key === "r" || event.key === "R") && !mod) rotateSelected();
     else if ((event.key === "v" || event.key === "V") && !mod) { setTool({ type: "select" }); setDraft(null); }
+    else if ((event.key === "h" || event.key === "H") && !mod) { setTool({ type: "hand" }); setDraft(null); }
     else if ((event.key === "w" || event.key === "W") && !mod) setTool({ type: "wire" });
     else if (/^[0-9]$/.test(event.key) && !mod) {
       const k = KINDS[(Number(event.key) + 9) % 10];
-      if (k) { setTool({ type: "place", kind: k.kind }); setDraft(null); }
+      if (k) choose(k.kind);
     }
+    else if ((event.key === "k" || event.key === "K" || event.key === "/") && !mod) openLibrary();
+    else if ((event.key === "f" || event.key === "F") && !mod) setFull((f) => !f);
     else if (event.key === "Delete" || event.key === "Backspace") removeSelected();
     else return;
     event.preventDefault();
@@ -250,74 +323,103 @@ export function SchematicEditor({ value, onChange, library, results, topLeft, to
   const hint =
     tool.type === "place" ? `Kliknij na siatce, żeby postawić: ${kindInfo(tool.kind)?.name ?? tool.kind}. Esc — anuluj.`
     : tool.type === "wire" ? "Klikaj kolejne punkty; przewód kończy się sam na pinie albo innym przewodzie. Esc — przerwij."
-    : "Przeciągnij element, żeby go przesunąć · od końcówki, żeby poprowadzić przewód · R obraca · spacja + przeciągnij przesuwa widok";
+    : tool.type === "hand" ? "Przeciągnij, żeby przesunąć widok · ⌘/Ctrl + kółko albo szczypanie powiększa"
+    : "Przeciągnij element, żeby go przesunąć · od końcówki — przewód · puste miejsce — przesuwa widok · R obraca";
+
+  /** Pick an element to place; it becomes one of the (three) recent ones on the toolbar. */
+  function choose(kind: string) {
+    setTool({ type: "place", kind });
+    setDraft(null);
+    setLibraryOpen(false);
+    const next = [kind, ...recent.filter((k) => k !== kind)].slice(0, 3);
+    setRecent(next);
+    try {
+      localStorage.setItem(RECENT_KEY, JSON.stringify(next));
+    } catch {
+      // not remembered across visits — fine
+    }
+    svgRef.current?.focus({ preventScroll: true });
+  }
+
+  function openLibrary() {
+    setQuery("");
+    setLibraryOpen(true);
+  }
+
+  const symbolIcon = (kind: string) =>
+    isComponent(kind) || kind === "ground"
+      ? (
+        <svg viewBox={kind === "ground" ? "-14 -4 28 26" : "-6 -26 92 52"} width="30" height="22" className="tool-symbol">
+          <g className="w" dangerouslySetInnerHTML={{ __html: library.kinds[kind].svg }} />
+        </svg>
+      )
+      : <span className="tool-text">A</span>;
+  const shortcut = (kind: string) => {
+    const i = KINDS.findIndex((k) => k.kind === kind);
+    return i >= 0 && i < 10 ? String((i + 1) % 10) : "";
+  };
 
   const tools: { tool: Tool; label: string; key: string; icon: ReactNode }[] = [
     { tool: { type: "select" }, label: "Zaznacz", key: "V", icon: <Pointer /> },
+    { tool: { type: "hand" }, label: "Rączka — przesuwanie widoku", key: "H", icon: <Hand /> },
     { tool: { type: "wire" }, label: "Przewód", key: "W", icon: <WireIcon /> },
-    ...KINDS.map((k, i) => ({
-      tool: { type: "place", kind: k.kind } as Tool,
-      label: k.name,
-      key: i < 10 ? String((i + 1) % 10) : "",
-      icon: isComponent(k.kind) || k.kind === "ground"
-        ? (
-          <svg viewBox={k.kind === "ground" ? "-14 -4 28 26" : "-6 -26 92 52"} width="30" height="22" className="tool-symbol">
-            <g className="w" dangerouslySetInnerHTML={{ __html: library.kinds[k.kind].svg }} />
-          </svg>
-        )
-        : <span className="tool-text">A</span>,
+    ...recent.filter((kind) => kindInfo(kind)).map((kind) => ({
+      tool: { type: "place", kind } as Tool,
+      label: kindInfo(kind)!.name,
+      key: shortcut(kind),
+      icon: symbolIcon(kind),
     })),
   ];
+  const found = searchKinds(query);
+  const groups = [...new Set(found.map((k) => k.group))];
   const isActive = (t: Tool) => t.type === tool.type && (t.type !== "place" || (tool.type === "place" && t.kind === tool.kind));
 
   return (
     <div
-      className={`board ${panning ? "panning" : ""}`}
-      // tall enough for the drawing plus the islands above and below it (the rest scrolls)
-      style={{ height: Math.min(720, Math.max(380, (maxY + MARGIN) * G * zoom + 150)) }}
+      className={`board ${spaceHeld || tool.type === "hand" ? "panning" : ""} ${full ? "fullscreen" : ""} ${active ? "active" : ""}`}
+      style={full ? undefined : { height: boardHeight }}
+      onPointerDownCapture={() => setActive(true)}
+      onBlur={(event) => { if (!event.currentTarget.contains(event.relatedTarget as Node)) setActive(false); }}
     >
-      <div
-        className="board-scroll"
-        ref={scrollRef}
-        onWheel={(event) => {
-          if (!(event.ctrlKey || event.metaKey)) return;
-          event.preventDefault();
-          setZoom((z) => clampZoom(z * (event.deltaY < 0 ? 1.1 : 1 / 1.1)));
-        }}
-      >
+      <div className="board-view" ref={viewRef}>
         <svg
           ref={svgRef}
           className={`canvas tool-${tool.type} ${wiring ? "wiring" : ""}`}
-          viewBox={`0 0 ${width * G} ${height * G}`}
-          width={width * G * zoom}
-          height={height * G * zoom}
+          viewBox={`${cam.x} ${cam.y} ${view.w / cam.zoom} ${view.h / cam.zoom}`}
+          width="100%"
+          height="100%"
           tabIndex={0}
           onPointerDown={(event) => {
-            if (panning) {
-              const el = scrollRef.current!;
-              pan.current = { x: event.clientX, y: event.clientY, left: el.scrollLeft, top: el.scrollTop };
-              svgRef.current?.setPointerCapture(event.pointerId);
-              return;
-            }
-            onCanvasDown(event);
+            if (spaceHeld || tool.type === "hand" || event.button === 1) startPan(event, false);
+            else if (tool.type === "select") startPan(event, true); // empty space: drag pans, click deselects
+            else onCanvasDown(event);
           }}
           onPointerMove={(event) => {
-            if (pan.current) {
-              const el = scrollRef.current!;
-              el.scrollLeft = pan.current.left - (event.clientX - pan.current.x);
-              el.scrollTop = pan.current.top - (event.clientY - pan.current.y);
+            const p = pan.current;
+            if (p) {
+              const [dx, dy] = [event.clientX - p.x, event.clientY - p.y];
+              if (Math.abs(dx) + Math.abs(dy) > 3) p.moved = true;
+              if (p.moved) setCam({ ...p.cam, x: p.cam.x - dx / p.cam.zoom, y: p.cam.y - dy / p.cam.zoom });
               return;
             }
             onMove(event);
           }}
-          onPointerUp={() => { pan.current = null; onUp(); }}
+          onPointerUp={() => {
+            const p = pan.current;
+            if (p) {
+              if (p.click && !p.moved) setSelection(null);
+              pan.current = null;
+              return;
+            }
+            onUp();
+          }}
           onPointerLeave={() => setCursor(null)}
           onDoubleClick={() => { if (draft) { addWire(draft); setDraft(null); } }}
           onKeyDown={(event) => {
-            if (event.key === " ") { setPanning(true); event.preventDefault(); return; }
+            if (event.key === " ") { setSpaceHeld(true); event.preventDefault(); return; }
             onKey(event);
           }}
-          onKeyUp={(event) => { if (event.key === " ") setPanning(false); }}
+          onKeyUp={(event) => { if (event.key === " ") setSpaceHeld(false); }}
         >
           <style>{library.style}</style>
           <defs>
@@ -325,7 +427,9 @@ export function SchematicEditor({ value, onChange, library, results, topLeft, to
               <circle cx={G / 2} cy={G / 2} r="1" className="grid-dot" />
             </pattern>
           </defs>
-          <rect className="grid no-print" width={width * G} height={height * G} fill={`url(#${CSS.escape(gridId)})`} />
+          {/* the grid covers exactly what the camera sees, so it never ends */}
+          <rect className="grid no-print" x={cam.x} y={cam.y} width={view.w / cam.zoom} height={view.h / cam.zoom}
+                fill={`url(#${CSS.escape(gridId)})`} />
 
           {value.wires.map((w, i) => (
             <g key={i}>
@@ -378,16 +482,58 @@ export function SchematicEditor({ value, onChange, library, results, topLeft, to
         {tools.map(({ tool: t, label, key, icon }, i) => (
           <button
             key={label}
-            className={`tool ${isActive(t) ? "active" : ""} ${i === 1 ? "sep-after" : ""}`}
+            className={`tool ${isActive(t) ? "active" : ""} ${i === 2 ? "sep-after" : ""}`}
             title={`${label}${key ? ` (${key})` : ""}`}
             aria-label={label}
-            onClick={() => { setTool(t); setDraft(null); svgRef.current?.focus({ preventScroll: true }); }}
+            onClick={() => (t.type === "place" ? choose(t.kind) : (setTool(t), setDraft(null), svgRef.current?.focus({ preventScroll: true })))}
           >
             {icon}
             {key && <span className="key">{key}</span>}
           </button>
         ))}
+        <span className="sep" />
+        <button
+          className={`tool library-button ${libraryOpen ? "active" : ""}`}
+          title="Wszystkie elementy (K)"
+          aria-label="Elementy"
+          onClick={() => (libraryOpen ? setLibraryOpen(false) : openLibrary())}
+        >
+          <Grid /> <span>Elementy</span>
+          <span className="key">K</span>
+        </button>
       </div>
+      {libraryOpen && (
+        <div className="island library no-print" role="dialog" aria-label="Biblioteka elementów">
+          <label className="library-search">
+            <Search />
+            <input
+              autoFocus
+              value={query}
+              placeholder="Szukaj: opornik, bateria, masa…"
+              onChange={(e) => setQuery(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && found[0]) choose(found[0].kind);
+                if (e.key === "Escape") { setLibraryOpen(false); svgRef.current?.focus({ preventScroll: true }); }
+              }}
+            />
+          </label>
+          {groups.map((group) => (
+            <section key={group}>
+              <h5>{group}</h5>
+              <div className="library-grid">
+                {found.filter((k) => k.group === group).map((k) => (
+                  <button key={k.kind} className="library-item" title={k.name} onClick={() => choose(k.kind)}>
+                    {symbolIcon(k.kind)}
+                    <span>{k.name}</span>
+                    {shortcut(k.kind) && <kbd>{shortcut(k.kind)}</kbd>}
+                  </button>
+                ))}
+              </div>
+            </section>
+          ))}
+          {!found.length && <p className="muted">Nic nie pasuje do „{query}”.</p>}
+        </div>
+      )}
       <div className="board-hint no-print">{hint}</div>
       <div className="island top-right no-print">{topRight}</div>
       {(selectedElement || selection?.type === "wire") && (
@@ -407,14 +553,18 @@ export function SchematicEditor({ value, onChange, library, results, topLeft, to
         />
       )}
       <div className="island bottom-left no-print">
-        <button className="icon" title="Pomniejsz" aria-label="Pomniejsz" onClick={() => setZoom((z) => clampZoom(z / 1.2))}><Minus /></button>
-        <button className="zoom" title="100%" onClick={() => setZoom(1)}>{Math.round(zoom * 100)}%</button>
-        <button className="icon" title="Powiększ" aria-label="Powiększ" onClick={() => setZoom((z) => clampZoom(z * 1.2))}><Plus /></button>
+        <button className="icon" title="Pomniejsz" aria-label="Pomniejsz" onClick={() => zoomAround(1 / 1.2)}><Minus /></button>
+        <button className="zoom" title="Pokaż cały schemat" aria-label="Dopasuj widok" onClick={() => setCam(fitted())}>
+          {Math.round(cam.zoom * 100)}%
+        </button>
+        <button className="icon" title="Powiększ" aria-label="Powiększ" onClick={() => zoomAround(1.2)}><Plus /></button>
         <span className="sep" />
         <button className="icon" title="Cofnij (Ctrl/Cmd+Z)" aria-label="Cofnij" onClick={undo}><Undo /></button>
         <button className="icon" title="Ponów (Ctrl/Cmd+Shift+Z)" aria-label="Ponów" onClick={redo}><Redo /></button>
       </div>
       <div className="island bottom-right no-print">
+        <button className="icon" title={full ? "Zamknij pełny ekran (F)" : "Pełny ekran (F)"} aria-label="Pełny ekran"
+                onClick={() => setFull((f) => !f)}>{full ? <Shrink /> : <Expand />}</button>
         <button className="icon" title="Skróty klawiszowe" aria-label="Pomoc" onClick={() => setHelp((h) => !h)}><Help /></button>
       </div>
       {help && (
@@ -423,13 +573,18 @@ export function SchematicEditor({ value, onChange, library, results, topLeft, to
           <dl>
             <dt>V</dt><dd>zaznacz / przesuń</dd>
             <dt>W</dt><dd>przewód</dd>
-            <dt>1–0</dt><dd>elementy z paska</dd>
+            <dt>K lub /</dt><dd>biblioteka elementów (z wyszukiwaniem)</dd>
+            <dt>1–0</dt><dd>elementy w kolejności z biblioteki</dd>
+            <dt>F</dt><dd>pełny ekran</dd>
             <dt>R</dt><dd>obróć o 90° (dwa razy = odwróć)</dd>
             <dt>Del</dt><dd>usuń zaznaczone</dd>
             <dt>Esc</dt><dd>przerwij / odznacz</dd>
             <dt>⌘/Ctrl Z</dt><dd>cofnij (⇧ — ponów)</dd>
-            <dt>spacja</dt><dd>+ przeciągnij: przesuń widok</dd>
-            <dt>⌘/Ctrl kółko</dt><dd>powiększenie</dd>
+            <dt>H</dt><dd>rączka: przesuwanie widoku</dd>
+            <dt>przeciągnij tło</dt><dd>przesuń widok (też spacja, środkowy przycisk)</dd>
+            <dt>kółko</dt><dd>przesuń widok (po kliknięciu w schemat)</dd>
+            <dt>⌘/Ctrl kółko</dt><dd>powiększ wokół kursora (też szczypanie)</dd>
+            <dt>klik w %</dt><dd>pokaż cały schemat</dd>
           </dl>
           <p>Czerwona kropka = zacisk niepodłączony. Przewody łączą się tylko końcami.</p>
         </div>

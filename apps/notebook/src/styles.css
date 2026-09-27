@@ -276,8 +276,10 @@ main > .add-row { justify-content: center; }
   overflow: hidden;
 }
 .board.loading { display: grid; place-items: center; color: var(--muted); }
-.board-scroll { position: absolute; inset: 0; overflow: auto; scrollbar-width: thin; padding: 76px 16px 64px; }  /* room for the islands */
-.board.panning .board-scroll, .board.panning .canvas { cursor: grab; }
+.board-view { position: absolute; inset: 0; overflow: hidden; }
+.board.active { border-color: var(--primary); }
+.board.panning .canvas { cursor: grab; }
+.board.panning .canvas:active { cursor: grabbing; }
 .canvas { display: block; color: var(--text); touch-action: none; user-select: none; -webkit-user-select: none; }
 .canvas:focus { outline: none; }
 .canvas .grid-dot { fill: var(--faint); opacity: 0.5; }
@@ -325,6 +327,33 @@ main > .add-row { justify-content: center; }
 .island.tools .key { position: absolute; right: 3px; bottom: 1px; font-size: 9px; color: var(--faint); }
 .island.tools .tool-symbol { color: currentColor; }
 .island.tools .tool-text { font: italic 600 14px ui-sans-serif, system-ui; }
+.island.tools .library-button { width: auto; padding: 0 12px 0 10px; gap: 6px; }
+
+/* element library: a panel under the toolbar, with search and sections */
+.island.library {
+  top: 60px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 6;
+  width: min(420px, calc(100% - 24px));
+  max-height: calc(100% - 80px);
+  overflow-y: auto;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 4px;
+  padding: 10px;
+}
+.library-search { display: flex; align-items: center; gap: 6px; padding: 0 8px; border: 1px solid var(--line); border-radius: 8px; color: var(--faint); }
+.library-search input { flex: 1; border: none; outline: none; background: transparent; padding: 7px 0; }
+.library-search:focus-within { border-color: var(--primary); }
+.island.library h5 { margin: 8px 4px 2px; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); }
+.library-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 2px; }
+.island .library-item { justify-content: flex-start; gap: 10px; padding: 6px 8px; text-align: left; }
+.library-item span { flex: 1; }
+.library-item kbd { color: var(--faint); }
+.library-item .tool-symbol { color: var(--text); flex: none; }
+
+.board.fullscreen { position: fixed; inset: 12px; z-index: 100; height: auto; box-shadow: 0 10px 40px rgba(0, 0, 0, 0.25); }
 .island.top-left { top: 12px; left: 12px; padding: 4px 8px; }
 .island.top-right { top: 12px; right: 12px; }
 .island.bottom-left { bottom: 12px; left: 12px; }
@@ -393,9 +422,8 @@ kbd { font: 11px ui-monospace, monospace; border: 1px solid var(--line); border-
   main { max-width: none; padding: 0; }
   .cell { border: none !important; box-shadow: none !important; padding: 0; margin-bottom: 10pt; break-inside: avoid; }
   .markdown-view, .schematic-cell { padding-left: 0; }
-  .board { height: auto; border: none; overflow: visible; }
-  .board-scroll { position: static; overflow: visible; padding: 0; }
-  .canvas { max-width: 100%; height: auto; }
+  .board { border: none; }
+  .board { height: 420px !important; }
   .hide-code-in-print .code-editor { display: none; }
   .code-editor .cm-gutters { display: none; }
 }

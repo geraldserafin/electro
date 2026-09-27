@@ -3,19 +3,36 @@
 // to Python; connectivity and solving stay on the Python side.
 import type { ElementData, Point, SchematicData, SymbolLibrary, WireData } from "../types";
 
-export const KINDS: { kind: string; name: string; prefix: string; unit?: string }[] = [
-  { kind: "resistor", name: "Rezystor", prefix: "R", unit: "Ω" },
-  { kind: "voltage_source", name: "Źródło napięcia", prefix: "E", unit: "V" },
-  { kind: "current_source", name: "Źródło prądu", prefix: "J", unit: "A" },
-  { kind: "capacitor", name: "Kondensator", prefix: "C", unit: "F" },
-  { kind: "inductor", name: "Cewka", prefix: "L", unit: "H" },
-  { kind: "ammeter", name: "Amperomierz", prefix: "A" },
-  { kind: "voltmeter", name: "Woltomierz", prefix: "V" },
-  { kind: "hole", name: "Nieznany element", prefix: "X" },
-  { kind: "opamp", name: "Wzmacniacz op.", prefix: "OA" },
-  { kind: "ground", name: "Masa", prefix: "gnd" },
-  { kind: "label", name: "Etykieta węzła", prefix: "lbl" },
+export interface KindInfo {
+  kind: string;
+  name: string;
+  prefix: string;
+  group: string; // section of the element library
+  words: string; // other names, for the library search
+  unit?: string;
+}
+
+export const KINDS: KindInfo[] = [
+  { kind: "resistor", name: "Rezystor", prefix: "R", unit: "Ω", group: "Pasywne", words: "opornik opor R" },
+  { kind: "capacitor", name: "Kondensator", prefix: "C", unit: "F", group: "Pasywne", words: "pojemnosc C" },
+  { kind: "inductor", name: "Cewka", prefix: "L", unit: "H", group: "Pasywne", words: "indukcyjnosc dlawik L" },
+  { kind: "voltage_source", name: "Źródło napięcia", prefix: "E", unit: "V", group: "Źródła", words: "bateria akumulator zasilanie SEM E" },
+  { kind: "current_source", name: "Źródło prądu", prefix: "J", unit: "A", group: "Źródła", words: "pradowe J" },
+  { kind: "ammeter", name: "Amperomierz", prefix: "A", group: "Mierniki", words: "miernik prad" },
+  { kind: "voltmeter", name: "Woltomierz", prefix: "V", group: "Mierniki", words: "miernik napiecie" },
+  { kind: "ground", name: "Masa", prefix: "gnd", group: "Połączenia", words: "GND ziemia uziemienie" },
+  { kind: "label", name: "Etykieta węzła", prefix: "lbl", group: "Połączenia", words: "nazwa wezla net label" },
+  { kind: "hole", name: "Nieznany element", prefix: "X", group: "Inne", words: "dziura hole ?" },
+  { kind: "opamp", name: "Wzmacniacz op.", prefix: "OA", group: "Inne", words: "operacyjny opamp" },
 ];
+
+/** Case- and accent-insensitive: "zrodlo" finds "Źródło napięcia". */
+export const plain = (text: string) => text.normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/ł/g, "l").toLowerCase();
+
+export function searchKinds(query: string): KindInfo[] {
+  const q = plain(query.trim());
+  return q ? KINDS.filter((k) => plain(`${k.name} ${k.words} ${k.group}`).includes(q)) : KINDS;
+}
 
 export const kindInfo = (kind: string) => KINDS.find((k) => k.kind === kind);
 export const hasValue = (kind: string) => kindInfo(kind)?.unit !== undefined;
@@ -203,22 +220,6 @@ export function rotatedAbout(e: ElementData, lib: SymbolLibrary, rotation: numbe
   const [bx, by] = middle(e);
   const [ax, ay] = middle({ ...e, rotation });
   return [e.at[0] + Math.round(bx - ax), e.at[1] + Math.round(by - ay)];
-}
-
-/** The same drawing moved so that nothing sits left of / above ``margin`` (the canvas starts at 0, 0). */
-export const MARGIN = 3;
-
-export function normalized(sch: SchematicData, lib: SymbolLibrary, margin = MARGIN): SchematicData {
-  if (!sch.elements.length && !sch.wires.length) return sch;
-  const [x0, y0] = bounds(sch, lib);
-  const dx = Math.max(0, margin - x0);
-  const dy = Math.max(0, margin - y0);
-  if (!dx && !dy) return sch;
-  const shift = ([x, y]: Point): Point => [x + dx, y + dy];
-  return {
-    elements: sch.elements.map((e) => ({ ...e, at: shift(e.at) })),
-    wires: sch.wires.map((w) => ({ points: w.points.map(shift) })),
-  };
 }
 
 /** The L-shaped path from a to b (horizontal first). */
