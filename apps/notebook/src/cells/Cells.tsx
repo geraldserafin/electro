@@ -1,9 +1,10 @@
 import { python } from "@codemirror/lang-python";
 import CodeMirror from "@uiw/react-codemirror";
-import { useState } from "react";
-import { CodeIcon, Play } from "../icons";
-import { SchematicEditor } from "../schematic/Editor";
-import type { Cell, SymbolLibrary } from "../types";
+import { useEffect, useState } from "react";
+import { CodeIcon, Play, SchematicIcon } from "../icons";
+import { kernel } from "../python/kernel";
+import { PrintDrawing, SchematicEditor } from "../schematic/Editor";
+import type { Cell, SchematicData, SymbolLibrary } from "../types";
 import { Markdown } from "./Markdown";
 import { Outputs } from "./Outputs";
 
@@ -83,40 +84,159 @@ export function CodeCell({ cell, update, run, running }: {
   );
 }
 
-export function SchematicCell({ cell, update, library, showCode, simulate, running }: {
+/** Schemat | Kod: the two views of a schematic cell. */
+function ViewSwitch({ view, onSwitch, busy }: { view: "schematic" | "code"; onSwitch: (v: "schematic" | "code") => void; busy: boolean }) {
+  return (
+    <div className="view-switch" role="tablist" aria-label="Widok komórki">
+      <button role="tab" aria-selected={view === "schematic"} className={view === "schematic" ? "on" : ""}
+              disabled={busy} onClick={() => onSwitch("schematic")} title="Rysunek schematu">
+        <SchematicIcon /> Schemat
+      </button>
+      <button role="tab" aria-selected={view === "code"} className={view === "code" ? "on" : ""}
+              disabled={busy} onClick={() => onSwitch("code")} title="Ten sam układ jako kod electro — można go edytować">
+        <CodeIcon /> Kod
+      </button>
+    </div>
+  );
+}
+
+export function SchematicCell({ cell, update, library, toCell, simulate, running }: {
   cell: Extract<Cell, { type: "schematic" }>;
   update: Update;
   library: SymbolLibrary;
-  showCode: () => void;
-  simulate: () => void;
+  toCell: (source: string) => void;
+  simulate: (schematic?: SchematicData) => void;
   running: boolean;
 }) {
   const empty = !cell.schematic.elements.length;
+  const view = cell.view ?? "schematic";
+  // the code view: `generated` is the drawing as code, `source` what is in the editor now
+  const [source, setSource] = useState<string | null>(null);
+  const [generated, setGenerated] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  const load = async () => {
+    const code = await kernel.code(cell.schematic, cell.name);
+    setSource(code);
+    setGenerated(code);
+    setError(null);
+  };
+  // opened in the code view (saved like that): show the code once Python is up
+  useEffect(() => {
+    if (view === "code" && source === null) kernel.ready.then(load).catch((e) => setError(String(e)));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [view]);
+
+  /** The drawing, with the edited code applied (null: the code has an error, shown). */
+  const applied = async (): Promise<SchematicData | null> => {
+    if (source === null || source === generated) return cell.schematic;
+    const back = await kernel.fromCode(source, cell.name, cell.schematic);
+    if ("error" in back) {
+      setError(back.error);
+      return null;
+    }
+    setError(null);
+    update({ schematic: back.schematic, ...(cell.results ? { stale: true } : {}) });
+    return back.schematic;
+  };
+
+  const switchTo = async (next: "schematic" | "code") => {
+    if (next === view || busy) return;
+    setBusy(true);
+    try {
+      await kernel.ready;
+      if (next === "code") {
+        await load();
+        update({ view: "code" });
+      } else if (await applied()) {
+        setSource(null);
+        update({ view: "schematic" });
+      }
+    } catch (e) {
+      setError(String(e));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const run = async () => {
+    if (view === "schematic") return simulate();
+    setBusy(true);
+    try {
+      const schematic = await applied();
+      if (schematic) {
+        const code = await kernel.code(schematic, cell.name); // the code as the new drawing writes it
+        setSource(code);
+        setGenerated(code);
+        simulate(schematic);
+      }
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const name = (
+    <label className="schematic-name" title="Pod tą nazwą kod widzi schemat: schemat(&quot;…&quot;)">
+      <code>schemat("</code>
+      <input value={cell.name} onChange={(e) => update({ name: e.target.value })} spellCheck={false} />
+      <code>")</code>
+    </label>
+  );
+  const actions = (
+    <>
+      <ViewSwitch view={view} onSwitch={switchTo} busy={busy} />
+      <button className="primary" onClick={run} disabled={(empty && view === "schematic") || running || busy}
+              title="Policz prądy i napięcia">
+        <Play /> {running ? "Liczę…" : "Symuluj"}
+      </button>
+    </>
+  );
+
   return (
     <div className="schematic-cell">
-      <SchematicEditor
-        value={cell.schematic}
-        onChange={(schematic) => update({ schematic, ...(cell.results ? { stale: true } : {}) })}
-        library={library}
-        results={cell.stale ? undefined : cell.results}
-        topLeft={
-          <label className="schematic-name" title="Pod tą nazwą kod widzi schemat: schemat(&quot;…&quot;)">
-            <code>schemat("</code>
-            <input value={cell.name} onChange={(e) => update({ name: e.target.value })} spellCheck={false} />
-            <code>")</code>
-          </label>
-        }
-        topRight={
-          <>
-            <button className="ghost" onClick={showCode} disabled={empty} title="Wstaw pod spodem komórkę z kodem electro tego schematu">
-              <CodeIcon /> Kod
+      {view === "schematic" ? (
+        <SchematicEditor
+          value={cell.schematic}
+          onChange={(schematic) => update({ schematic, ...(cell.results ? { stale: true } : {}) })}
+          library={library}
+          results={cell.stale ? undefined : cell.results}
+          topLeft={name}
+          topRight={actions}
+        />
+      ) : (
+        <div className="board code-view">
+          <div className="code-view-bar">
+            <div className="island static">{name}</div>
+            <span className="spacer" />
+            <button className="ghost" onClick={() => source && toCell(source)} disabled={!source}
+                    title="Wstaw ten kod pod spodem jako zwykłą komórkę z kodem">
+              Kopiuj do komórki
             </button>
-            <button className="primary" onClick={simulate} disabled={empty || running} title="Policz prądy i napięcia">
-              <Play /> {running ? "Liczę…" : "Symuluj"}
-            </button>
-          </>
-        }
-      />
+            <div className="island static">{actions}</div>
+          </div>
+          <div className="code-editor"
+               onKeyDownCapture={(e) => {
+                 if (e.key === "Enter" && e.shiftKey) {
+                   e.preventDefault();
+                   e.stopPropagation();
+                   run();
+                 }
+               }}>
+            {source === null
+              ? <p className="code-view-wait">Zamieniam schemat na kod…</p>
+              : <CodeMirror value={source} extensions={[python()]} basicSetup={{ foldGutter: false, highlightActiveLine: false }}
+                            onChange={setSource} />}
+          </div>
+          {error
+            ? <pre className="output-error code-view-note">{error}</pre>
+            : <p className="code-view-note">
+                Zmiany w kodzie wracają na schemat po przełączeniu na „Schemat” (albo Symuluj / Shift+Enter) —
+                wtedy schemat układa się na nowo.
+              </p>}
+        </div>
+      )}
+      <PrintDrawing value={cell.schematic} library={library} results={cell.stale ? undefined : cell.results} />
       <div className="sim-bar no-print">
         <label>
           Dane pomiarowe
@@ -125,7 +245,7 @@ export function SchematicCell({ cell, update, library, showCode, simulate, runni
             placeholder="dla niewiadomych, np. I_A_1 = 0; U_R_2 = 4"
             spellCheck={false}
             onChange={(e) => update({ data: e.target.value, ...(cell.results ? { stale: true } : {}) })}
-            onKeyDown={(e) => e.key === "Enter" && simulate()}
+            onKeyDown={(e) => e.key === "Enter" && run()}
           />
         </label>
       </div>

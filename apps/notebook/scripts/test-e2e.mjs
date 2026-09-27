@@ -32,6 +32,16 @@ try {
   check("no error outputs", (await page.locator(".output-error").count()) === 0);
   await page.screenshot({ path: `${shots}/notebook.png`, fullPage: true });
 
+  // a schematic cell's code, through its Kod view (and back to the drawing)
+  const codeOf = async (cellLocator) => {
+    await cellLocator.getByRole("tab", { name: "Kod" }).click();
+    await cellLocator.locator(".cm-content").waitFor();
+    const text = await cellLocator.locator(".cm-content").innerText();
+    await cellLocator.getByRole("tab", { name: "Schemat" }).click();
+    await cellLocator.locator(".board .canvas").waitFor();
+    return text;
+  };
+
   // "Symuluj" on the drawing, with a measurement for the unknown
   const bridge = page.locator(".cell-schematic").first();
   await bridge.locator(".sim-bar input").fill("I_A_1 = 0");
@@ -39,35 +49,27 @@ try {
   await bridge.locator(".outputs table").waitFor({ timeout: 30_000 });
   check("simulation: table and values on the drawing",
     (await bridge.locator(".outputs table").innerText()).includes("200 Ω")
-    && (await bridge.locator(".canvas .label.solved").allTextContents()).join(" ").includes("200"));
+    && (await bridge.locator(".board .canvas .label.solved").allTextContents()).join(" ").includes("200"));
 
   // the same measurement typed as the ammeter's reading instead of in "Dane pomiarowe"
-  await bridge.locator('.canvas .element[data-id="A_1"]').click();
+  await bridge.locator('.board .canvas .element[data-id="A_1"]').click();
   await bridge.locator(".inspector input").nth(1).fill("0");
   await bridge.locator(".sim-bar input").fill("");
   await bridge.getByRole("button", { name: "Symuluj" }).click();
   await bridge.locator(".stale").waitFor({ state: "detached", timeout: 30_000 });
   await page.waitForTimeout(300);
   check("ammeter reading is a measurement",
-    (await bridge.locator(".canvas .label.solved").allTextContents()).join(" ").includes("200")
-    && (await bridge.locator(".canvas").textContent()).includes("A1 = 0 A"));
+    (await bridge.locator(".board .canvas .label.solved").allTextContents()).join(" ").includes("200")
+    && (await bridge.locator(".board .canvas").textContent()).includes("A1 = 0 A"));
 
   // moving part of the bridge as a group keeps every connection (edge wires stretch or follow)
   {
-    const grid = bridge.locator(".canvas");
+    const grid = bridge.locator(".board .canvas");
     const at = (gx, gy) => grid.evaluate((svg, [x, y]) => {
       const p = new DOMPoint(x, y).matrixTransform(svg.getScreenCTM());
       return [p.x, p.y];
     }, [gx * 20, gy * 20]);
-    const bridgeCode = async () => {
-      await bridge.getByRole("button", { name: "Kod", exact: true }).click();
-      const inserted = bridge.locator("xpath=following-sibling::section[1]");
-      await inserted.locator(".cm-content").waitFor();
-      const text = await inserted.locator(".cm-content").innerText();
-      await inserted.hover();
-      await inserted.getByTitle("Usuń komórkę").click();
-      return text;
-    };
+    const bridgeCode = () => codeOf(bridge);
     const before = await bridgeCode();
     const [x0, y0] = await at(12, -1); const [x1, y1] = await at(21, 15);
     await page.keyboard.down("Shift");
@@ -79,13 +81,33 @@ try {
       && (await grid.locator(".open-pin").count()) === 0);
   }
 
-  // "show code" turns the drawing into plain electro code in a new cell
-  await page.getByRole("button", { name: "Kod", exact: true }).first().click();
-  await page.getByText("mostek = net(").waitFor({ timeout: 30_000 });
-  check("schematic → code cell", true);
+  // Schemat | Kod: a value changed in the code comes back to the same drawing
+  {
+    const places = () => bridge.locator(".board .canvas .element").evaluateAll((els) => els.map((e) => [e.querySelector(".hit").getAttribute("x"), e.querySelector(".hit").getAttribute("y")]));
+    const before = await places();
+    await bridge.getByRole("tab", { name: "Kod" }).click();
+    await bridge.locator(".cm-content").waitFor();
+    const text = await bridge.locator(".cm-content").innerText();
+    await bridge.locator(".cm-content").click();
+    await page.keyboard.press("Meta+a");
+    await page.keyboard.insertText(text.replace("Resistor(50)", "Resistor(60)"));
+    await bridge.getByRole("tab", { name: "Schemat" }).click();
+    await bridge.locator(".board .canvas").waitFor();
+    check("code view: a new value keeps the drawing", text.startsWith("mostek = net(")
+      && (await bridge.locator('.board .element[data-id="R_3"]').textContent()).includes("60")
+      && JSON.stringify(await places()) === JSON.stringify(before));
+  }
+
+  // the PDF: the drawing cropped to what is drawn, without the editor (and its selection)
+  await bridge.locator('.board .element[data-id="R_1"]').click();
+  await page.emulateMedia({ media: "print" });
+  const printed = bridge.locator(".print-drawing svg");
+  check("print shows the drawing, not the editor", await printed.isVisible() && !(await bridge.locator(".board").isVisible())
+    && (await printed.locator(".selected").count()) === 0 && (await printed.boundingBox()).height < 500);
+  await page.emulateMedia({ media: "screen" });
 
   // editor: place a resistor on the bridge canvas
-  const canvas = page.locator(".canvas").first();
+  const canvas = page.locator(".board .canvas").first();
   const before = await canvas.locator(".element").count();
   const box = await canvas.boundingBox();
   await page.mouse.click(box.x + box.width * 0.6, box.y + box.height * 0.85); // deselect: the inspector would cover the spot
@@ -99,22 +121,14 @@ try {
   await page.locator(".cellbar").getByRole("button", { name: "+ Schemat" }).click();
   const cell = page.locator(".cell-schematic").last();  // added at the end of the notebook
   await cell.scrollIntoViewIfNeeded();
-  const grid = cell.locator(".canvas");
+  const grid = cell.locator(".board .canvas");
   // grid point → screen point, through the board's camera
   const at = (gx, gy) => grid.evaluate((svg, [x, y]) => {
     const p = new DOMPoint(x, y).matrixTransform(svg.getScreenCTM());
     return [p.x, p.y];
   }, [gx * 20, gy * 20]);
   const click = async (gx, gy) => { const [x, y] = await at(gx, gy); await page.mouse.click(x, y); };
-  const code = async () => {
-    await cell.getByRole("button", { name: "Kod", exact: true }).click();
-    const inserted = cell.locator("xpath=following-sibling::section[1]");  // the new cell right below
-    await inserted.locator(".cm-content").waitFor();
-    const text = await inserted.locator(".cm-content").innerText();
-    await inserted.hover();
-    await inserted.getByTitle("Usuń komórkę").click();
-    return text;
-  };
+  const code = () => codeOf(cell);
   await cell.getByTitle("Źródło napięcia").click(); await click(4, 6);
   await cell.getByTitle("Rezystor").click(); await click(12, 3);
   check("new elements show open pins", (await grid.locator(".open-pin").count()) === 4);

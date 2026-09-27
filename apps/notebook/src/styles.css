@@ -60,12 +60,12 @@ body {
   margin: 0;
   background: var(--bg);
   color: var(--text);
-  font: 14px/1.55 "Google Sans", Roboto, ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  font: 16px/1.6 "Google Sans", Roboto, ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
 }
 
 button {
   font: inherit;
-  font-size: 13px;
+  font-size: 14px;
   color: var(--text);
   background: transparent;
   border: 1px solid transparent;
@@ -115,7 +115,7 @@ input:focus, textarea:focus { outline: 2px solid var(--accent-soft); border-colo
   display: block;
   width: 100%;
   max-width: 640px;
-  font-size: 18px;
+  font-size: 20px;
   border: 1px solid transparent;
   background: transparent;
   padding: 2px 6px;
@@ -140,12 +140,12 @@ input:focus, textarea:focus { outline: 2px solid var(--accent-soft); border-colo
 }
 .menu-items > button { justify-content: flex-start; border-radius: 0; padding: 7px 16px; }
 .menu-items hr { border: none; border-top: 1px solid var(--line); margin: 6px 0; width: 100%; }
-.menu-items .check { display: flex; gap: 8px; align-items: center; padding: 6px 16px; font-size: 13px; color: var(--muted); }
+.menu-items .check { display: flex; gap: 8px; align-items: center; padding: 6px 16px; font-size: 14px; color: var(--muted); }
 .status {
   display: flex;
   align-items: center;
   gap: 6px;
-  font-size: 12px;
+  font-size: 13px;
   color: var(--muted);
   border: 1px solid var(--line);
   border-radius: 999px;
@@ -217,7 +217,7 @@ main {
 }
 .add-row:hover { opacity: 1; }
 .add-row .line { width: 48px; height: 1px; background: var(--line); }
-.add-row button { font-size: 12px; padding: 1px 10px; border: 1px solid var(--line); border-radius: 999px; background: var(--paper); }
+.add-row button { font-size: 13px; padding: 1px 10px; border: 1px solid var(--line); border-radius: 999px; background: var(--paper); }
 /* only in the middle, so it never covers the next cell's tools on the right */
 .cell > .add-row { position: absolute; left: 50%; transform: translateX(-50%); bottom: -17px; z-index: 4; }
 main > .add-row { justify-content: center; }
@@ -228,12 +228,12 @@ main > .add-row { justify-content: center; }
 .markdown > :last-child { margin-bottom: 0; }
 .markdown h1, .markdown h2, .markdown h3 { font-weight: 500; }
 .markdown .katex-display { overflow-x: auto; overflow-y: hidden; }
-.markdown table { border-collapse: collapse; font-size: 13px; }
+.markdown table { border-collapse: collapse; font-size: 15px; }
 .markdown th, .markdown td { border-bottom: 1px solid var(--line); padding: 4px 14px 4px 0; text-align: left; }
 .markdown th { color: var(--muted); font-weight: 500; }
 .markdown code { background: var(--code-bg); border-radius: 4px; padding: 0 4px; }
 .markdown-edit { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; padding-left: 48px; }
-.markdown-source { width: 100%; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 13px; resize: vertical; background: var(--code-bg); }
+.markdown-source { width: 100%; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 14px; resize: vertical; background: var(--code-bg); }
 .markdown-preview { padding-top: 4px; }
 
 /* code */
@@ -252,19 +252,36 @@ main > .add-row { justify-content: center; }
 .gutter .run.running { animation: pulse 0.8s ease-in-out infinite alternate; }
 .gutter .execution { font: 11px ui-monospace, monospace; color: var(--faint); }
 .cell-body { flex: 1; min-width: 0; }
-.code-editor .cm-editor { background: var(--code-bg); border-radius: 6px; font-size: 13px; }
+.code-editor .cm-editor { background: var(--code-bg); border-radius: 6px; font-size: 14px; }
 .code-editor .cm-gutters { background: var(--code-bg); border: none; color: var(--faint); }
 .code-editor .cm-editor.cm-focused { outline: 1px solid var(--line); }
 
 .outputs { margin-top: 8px; display: grid; gap: 8px; }
-.output-text, .output-error { margin: 0; padding: 6px 10px; border-radius: 6px; font-size: 13px; overflow-x: auto; white-space: pre-wrap; }
+.output-text, .output-error { margin: 0; padding: 6px 10px; border-radius: 6px; font-size: 14px; overflow-x: auto; white-space: pre-wrap; }
 .output-text { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
 .output-error { background: var(--err-bg); color: var(--danger); }
-.output-warning { background: var(--warn-bg); color: var(--warn); padding: 6px 10px; border-radius: 6px; font-size: 13px; }
+.output-warning { background: var(--warn-bg); color: var(--warn); padding: 6px 10px; border-radius: 6px; font-size: 14px; }
 .output-svg { overflow-x: auto; }
 .output-svg svg { max-width: 100%; height: auto; }
 
 /* ---------------------------------------------------------------- schematic board (Excalidraw-like) */
+
+/* the drawing for the PDF: laid out (so it can measure itself) but not seen on screen */
+.print-drawing { position: absolute; visibility: hidden; width: 0; height: 0; overflow: hidden; pointer-events: none; }
+
+/* Schemat | Kod */
+.view-switch { display: flex; gap: 2px; padding: 2px; border-radius: 8px; background: var(--hover); }
+.view-switch button { padding: 4px 10px; border-radius: 6px; color: var(--muted); }
+.view-switch button.on { background: var(--paper); color: var(--text); box-shadow: 0 1px 2px rgba(0, 0, 0, 0.15); }
+.island .view-switch button { padding: 4px 10px; }
+.board.code-view { height: auto; min-height: 200px; padding: 10px; display: flex; flex-direction: column; gap: 10px; }
+.code-view-bar { display: flex; align-items: center; gap: 8px; }
+.code-view-bar .spacer { flex: 1; }
+.island.static { position: static; }
+.code-view .code-editor .cm-editor { min-height: 120px; }
+.code-view-wait { color: var(--muted); margin: 8px; }
+.code-view-note { margin: 0; font-size: 13px; color: var(--muted); }
+pre.code-view-note { color: var(--danger); }
 
 .schematic-cell { padding-left: 48px; }
 .board {
@@ -371,8 +388,8 @@ main > .add-row { justify-content: center; }
   white-space: nowrap;
   pointer-events: none;
 }
-.schematic-name { display: flex; align-items: center; gap: 1px; font-size: 12px; color: var(--muted); }
-.schematic-name input { width: 96px; padding: 2px 6px; font-size: 13px; border-color: transparent; background: transparent; }
+.schematic-name { display: flex; align-items: center; gap: 1px; font-size: 13px; color: var(--muted); }
+.schematic-name input { width: 96px; padding: 2px 6px; font-size: 14px; border-color: transparent; background: transparent; }
 .schematic-name input:hover { border-color: var(--line); }
 
 .island.inspector {  /* on the right: drawings start top-left, so this side is usually free */
@@ -399,10 +416,10 @@ main > .add-row { justify-content: center; }
 .island.help-panel p { margin: 8px 0 0; color: var(--muted); font-size: 12px; }
 
 .sim-bar { display: flex; margin-top: 8px; }
-.sim-bar label { flex: 1; display: flex; align-items: center; gap: 10px; font-size: 12px; color: var(--muted); }
-.sim-bar input { flex: 1; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 13px; }
+.sim-bar label { flex: 1; display: flex; align-items: center; gap: 10px; font-size: 13px; color: var(--muted); }
+.sim-bar input { flex: 1; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 14px; }
 .stale > .outputs { opacity: 0.5; }
-.stale-note { margin: 8px 0 0; font-size: 12px; color: var(--warn); }
+.stale-note { margin: 8px 0 0; font-size: 13px; color: var(--warn); }
 
 kbd { font: 11px ui-monospace, monospace; border: 1px solid var(--line); border-radius: 4px; padding: 0 4px; }
 .muted { color: var(--muted); }
@@ -423,8 +440,12 @@ kbd { font: 11px ui-monospace, monospace; border: 1px solid var(--line); border-
   main { max-width: none; padding: 0; }
   .cell { border: none !important; box-shadow: none !important; padding: 0; margin-bottom: 10pt; break-inside: avoid; }
   .markdown-view, .schematic-cell { padding-left: 0; }
-  .board { border: none; }
-  .board { height: 420px !important; }
+  .schematic-cell .board { display: none; } /* the editor; PrintDrawing prints the drawing */
+  .print-drawing { position: static !important; visibility: visible !important; width: auto !important; height: auto !important;
+                   display: flex; justify-content: center; margin: 4pt 0 8pt; break-inside: avoid; }
+  .print-drawing svg { max-width: 100%; height: auto; }
+  .canvas .label.solved { fill: #000; }
+  .stale { display: none; } /* results of an older drawing */
   .hide-code-in-print .code-editor { display: none; }
   .code-editor .cm-gutters { display: none; }
 }

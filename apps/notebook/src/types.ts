@@ -53,6 +53,7 @@ export type Cell =
       results?: Record<string, ElementResult>;
       outputs?: Output[];
       stale?: boolean; // the drawing changed since the last simulation
+      view?: "schematic" | "code"; // which side of the cell is shown
     };
 
 export type CellType = Cell["type"];

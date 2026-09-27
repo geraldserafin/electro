@@ -105,12 +105,13 @@ export function App() {
     });
   };
 
-  const simulate = (id: string) => {
+  /** ``schematic``: the drawing to simulate, when it was just changed (the cell's state lags behind). */
+  const simulate = (id: string, schematic?: SchematicData) => {
     const cell = latest.current.cells.find((c) => c.id === id);
     if (!cell || cell.type !== "schematic") return Promise.resolve();
     return busy(id, async () => {
       try {
-        const { results, outputs } = await kernel.simulate(cell.schematic, cell.data ?? "");
+        const { results, outputs } = await kernel.simulate(schematic ?? cell.schematic, cell.data ?? "");
         update(id, { results, outputs, stale: false });
       } catch (error) {
         update(id, { results: {}, outputs: [{ type: "error", data: String(error) }], stale: false });
@@ -131,15 +132,11 @@ export function App() {
     setCells((cells) => cells.map((c) => (c.type === "code" ? { ...c, outputs: [], execution: undefined } : c)));
   };
 
-  const showCode = async (index: number, cell: Extract<Cell, { type: "schematic" }>) => {
-    try {
-      const source = await kernel.code(cell.schematic, cell.name);
-      const code = { ...newCell("code"), source } as Cell;
-      setCells((cells) => [...cells.slice(0, index + 1), code, ...cells.slice(index + 1)]);
-      setFocused(code.id);
-    } catch (error) {
-      alert(`Nie udało się zamienić schematu na kod: ${error}`);
-    }
+  /** A schematic's code view → an ordinary code cell under it. */
+  const toCell = (index: number, source: string) => {
+    const code = { ...newCell("code"), source } as Cell;
+    setCells((cells) => [...cells.slice(0, index + 1), code, ...cells.slice(index + 1)]);
+    setFocused(code.id);
   };
 
   const open = async (file: File | undefined) => {
@@ -223,7 +220,7 @@ export function App() {
             )}
             {cell.type === "schematic" && (
               <SchematicCell cell={cell} update={(p) => update(cell.id, p)} library={library}
-                             showCode={() => showCode(index, cell)} simulate={() => simulate(cell.id)}
+                             toCell={(source) => toCell(index, source)} simulate={(s) => simulate(cell.id, s)}
                              running={running.has(cell.id)} />
             )}
             <AddRow onAdd={(type) => insert(index + 1, type)} />

@@ -90,3 +90,38 @@ def test_simulate_reports_problems():
     assert json.loads(kernel.simulate(drawing, "I_R_1 = 0,5"))["results"]["R_1"]["value"] == "24 Ω"
     assert "Nie rozumiem" in json.loads(kernel.simulate(drawing, "I_R_1 0,5"))["outputs"][0]["data"]
     assert json.loads(kernel.simulate(drawing, "I_R_9 = 1"))["outputs"][0]["type"] == "error"
+
+
+def test_code_view_round_trip():
+    from electro import Ammeter, Resistor, VoltageSource, loop
+    from electro_schematic import Schematic, layout
+
+    drawing = layout(loop(VoltageSource(12), Resistor(4) + Ammeter())).to_json()
+    source = kernel.code(drawing, "uklad").replace("Resistor(4)", "Resistor(6)")
+    back = Schematic.from_json(json.dumps(json.loads(kernel.from_code(source, "uklad"))["schematic"]))
+    assert back.to_code("uklad") == source
+    # no variable called like the schematic: the last circuit the code defines
+    assert "schematic" in json.loads(kernel.from_code("a = Resistor(1)\nb = loop(VoltageSource(1), a)", "x"))
+
+
+def test_code_view_errors_name_the_line():
+    assert json.loads(kernel.from_code("x = 1\nuklad = Resistr(1)", "uklad"))["error"].startswith("linia 2: NameError")
+    assert "przypisz go do zmiennej" in json.loads(kernel.from_code("x = 1", "uklad"))["error"]
+
+
+def test_code_view_keeps_the_drawing_when_only_values_change():
+    import sys
+    from pathlib import Path
+
+    sys.path.insert(0, str(Path(__file__).parents[3] / "packages/electro-schematic/tests"))
+    from test_schematic import bridge
+
+    old = bridge()
+    source = kernel.code(old.to_json(), "mostek")
+    changed = source.replace("Resistor(100)", "Resistor(150)", 1)
+    back = json.loads(kernel.from_code(changed, "mostek", old.to_json()))["schematic"]
+    assert [e["at"] for e in back["elements"]] == [list(e.at) for e in old.elements]
+    assert "150" in [e["value"] for e in back["elements"]]
+    # a new element in a net(...) (no automatic layout for it): says to add elements on the drawing
+    grown = source.replace("Resistor(100)", "Resistor(100) + Resistor(1)", 1)
+    assert "elementy dodawaj na schemacie" in json.loads(kernel.from_code(grown, "mostek", old.to_json()))["error"]

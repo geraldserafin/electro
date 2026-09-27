@@ -3,7 +3,7 @@
 //
 // The drawing lives on an endless plane; the board shows it through a camera (a viewBox
 // that pans and zooms), like Excalidraw. Nothing moves under the cursor unless you pan.
-import { useEffect, useId, useRef, useState, type PointerEvent as ReactPointerEvent, type ReactNode } from "react";
+import { useEffect, useId, useLayoutEffect, useRef, useState, type PointerEvent as ReactPointerEvent, type ReactNode } from "react";
 import { Expand, Grid, Hand, Help, Minus, Plus, Pointer, Redo, Search, Shrink, Undo, WireIcon } from "../icons";
 import type { ElementData, ElementResult, Point, SchematicData, SymbolLibrary, WireData } from "../types";
 import {
@@ -102,14 +102,6 @@ export function SchematicEditor({ value, onChange, library, results, topLeft, to
     const zoom = clampZoom(Math.min(1.5, view.w / w, (view.h - 120) / h));
     return { x: ((x0 + x1) / 2) * G - view.w / 2 / zoom, y: ((y0 + y1) / 2) * G - (view.h + 40) / 2 / zoom, zoom };
   };
-  const fit = useRef(fitted);
-  fit.current = fitted;
-  // printing shows the board as it is on screen, so show the whole drawing first
-  useEffect(() => {
-    const before = () => setCam(fit.current());
-    window.addEventListener("beforeprint", before);
-    return () => window.removeEventListener("beforeprint", before);
-  }, []);
 
   const zoomAround = (factor: number, px = view.w / 2, py = view.h / 2) =>
     setCam((c) => {
@@ -638,6 +630,46 @@ export function SchematicEditor({ value, onChange, library, results, topLeft, to
           <p>Czerwona kropka = zacisk niepodłączony. Przewody łączą się tylko końcami.</p>
         </div>
       )}
+    </div>
+  );
+}
+
+const PRINT_SCALE = 1.1; // drawing px → CSS px on paper: labels come out about as big as the text
+const PRINT_PAD = 6;
+
+/**
+ * The drawing for the PDF: cropped to what is drawn (texts included), no grid, no selection,
+ * the same scale whatever the zoom on screen. Hidden on screen but laid out (not display:none),
+ * so it can measure itself.
+ */
+export function PrintDrawing({ value, library, results }: {
+  value: SchematicData; library: SymbolLibrary; results?: Record<string, ElementResult>;
+}) {
+  const G = library.grid;
+  const content = useRef<SVGGElement>(null);
+  const [box, setBox] = useState<[number, number, number, number] | null>(null);
+  useLayoutEffect(() => {
+    const b = content.current?.getBBox();
+    if (!b || !b.width) return;
+    const next: [number, number, number, number] = [b.x - PRINT_PAD, b.y - PRINT_PAD, b.width + 2 * PRINT_PAD, b.height + 2 * PRINT_PAD];
+    if (!box || next.some((v, i) => Math.abs(v - box[i]) > 0.5)) setBox(next);
+  });
+  if (!value.elements.length && !value.wires.length) return null;
+  const pointsOf = (ps: Point[]) => ps.map(([x, y]) => `${x * G},${y * G}`).join(" ");
+  const [x, y, w, h] = box ?? [0, 0, 1, 1];
+  return (
+    <div className="print-drawing" aria-hidden>
+      <svg className="canvas" viewBox={`${x} ${y} ${w} ${h}`} width={w * PRINT_SCALE} height={h * PRINT_SCALE}>
+        <style>{library.style}</style>
+        <g ref={content}>
+          {value.wires.map((wire, i) => <polyline key={i} className="w wire" points={pointsOf(wire.points)} />)}
+          {junctions(value, library).map(([jx, jy]) => <circle key={`j${jx},${jy}`} className="dot" cx={jx * G} cy={jy * G} r="3" />)}
+          {value.elements.map((e) => (
+            <ElementView key={e.id} element={e} library={library} wires={value.wires} result={results?.[e.id]}
+                         selected={false} onPointerDown={() => {}} />
+          ))}
+        </g>
+      </svg>
     </div>
   );
 }

@@ -45,6 +45,62 @@ def code(schematic_json: str, name: str) -> str:
     return Schematic.from_json(schematic_json).to_code(variable)
 
 
+def from_code(source: str, name: str, old_json: str = "") -> str:
+    """The code view edited back into a drawing: run ``source`` and lay out its circuit.
+
+    The circuit is the variable called like the schematic (``uklad``), else the last one the
+    code defines. When only values changed, the old drawing (``old_json``) keeps its layout
+    with the new values; otherwise the circuit is laid out anew.
+    Returns JSON ``{"schematic": ...}`` or ``{"error": "..."}``.
+    """
+    from electro import Circuit
+    from electro_schematic import layout
+    from electro_schematic.layout import Unsupported
+
+    variable = name if name.isidentifier() else "uklad"
+    scope: dict = {}
+    exec(PRELUDE, scope)
+    prelude = set(scope)
+    try:
+        exec(compile(source, CELL, "exec"), scope)
+        found = scope.get(variable)
+        if not isinstance(found, Circuit):
+            defined = [v for k, v in scope.items() if k not in prelude and isinstance(v, Circuit)]
+            if not defined:
+                raise ValueError(f"W kodzie nie ma układu — przypisz go do zmiennej, np. {variable} = loop(...)")
+            found = defined[-1]
+        kept = _same_but_values(Schematic.from_json(old_json), found, variable) if old_json else None
+        if kept is not None:
+            return json.dumps({"schematic": json.loads(kept.to_json())}, ensure_ascii=False)
+        try:
+            fresh = layout(found)
+        except Unsupported as err:
+            raise ValueError(f"{err} Tu zmieniaj w kodzie tylko wartości, a elementy dodawaj na schemacie.") from None
+        return json.dumps({"schematic": json.loads(fresh.to_json())}, ensure_ascii=False)
+    except Exception as err:  # noqa: BLE001 — any mistake in the code is shown to the user
+        return json.dumps({"error": _error(err)}, ensure_ascii=False)
+
+
+def _same_but_values(old: Schematic, circuit, variable: str) -> Schematic | None:
+    """``old`` with the values from ``circuit``, if that makes it the same circuit (else None)."""
+    from electro.codegen import code
+    from electro.semantics import compile_circuit
+    from electro.values import UNKNOWN, to_text
+
+    parts = compile_circuit(circuit).parts
+    ids = {e.id for e in old.elements}
+    if not set(parts) <= ids:
+        return None
+    for e in old.elements:
+        if e.id in parts:
+            c = parts[e.id].component
+            e.value = to_text(c.value) if c.has_value and c.value is not UNKNOWN else None
+    try:
+        return old if old.to_code(variable) == code(circuit, variable) else None
+    except Exception:  # noqa: BLE001 — an unfinished old drawing: lay out the new circuit instead
+        return None
+
+
 def _parse_data(text: str) -> dict[str, str]:
     """``"I_R_1 = 0,5; U_R_2 = 4"`` (``;`` or new lines between entries) → keyword arguments for solve()."""
     given = {}

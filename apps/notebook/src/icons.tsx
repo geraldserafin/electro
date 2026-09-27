@@ -27,4 +27,5 @@ export const Grid = () => <Icon><rect x="4" y="4" width="6.5" height="6.5" rx="1
 export const Expand = () => <Icon><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5" /></Icon>;
 export const Shrink = () => <Icon><path d="M9 4v5H4M15 4v5h5M9 20v-5H4M15 20v-5h5" /></Icon>;
 export const Search = () => <Icon size={16}><circle cx="11" cy="11" r="6" /><path d="M16 16l4 4" /></Icon>;
+export const SchematicIcon = () => <Icon><path d="M3 12h4l1.5-3 3 6 3-6 1.5 3h5" /></Icon>;
 export const Chevron = () => <Icon size={14}><path d="M6 9l6 6 6-6" /></Icon>;

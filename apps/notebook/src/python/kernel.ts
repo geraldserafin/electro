@@ -42,6 +42,12 @@ class Kernel {
     return (await this.call("code", { schematic: JSON.stringify(schematic), name })) as string;
   }
 
+  /** Code edited in a schematic's code view, laid out back into a drawing (or the error in it). */
+  async fromCode(source: string, name: string, old: SchematicData):
+    Promise<{ schematic: SchematicData } | { error: string }> {
+    return JSON.parse((await this.call("fromCode", { source, name, old: JSON.stringify(old) })) as string);
+  }
+
   /** The "Symuluj" button: every element's values, plus a table / warnings for under the drawing. */
   async simulate(schematic: SchematicData, data: string):
     Promise<{ results: Record<string, ElementResult>; outputs: Output[] }> {
