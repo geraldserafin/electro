@@ -50,10 +50,17 @@ export function App() {
       });
   }, []);
 
+  // save at most 400 ms after a change — not 400 ms after the last one, which never comes while
+  // "run all" keeps adding outputs
+  const saving = useRef<number | null>(null);
   useEffect(() => {
-    const timer = setTimeout(() => save(notebook), 400);
-    return () => clearTimeout(timer);
+    if (saving.current === null)
+      saving.current = window.setTimeout(() => {
+        saving.current = null;
+        save(latest.current);
+      }, 400);
   }, [notebook]);
+  useEffect(() => () => { if (saving.current !== null) save(latest.current); }, []);
 
   const setCells = (fn: (cells: Cell[]) => Cell[]) => setNotebook((nb) => ({ ...nb, cells: fn(nb.cells) }));
   const update = (id: string, patch: Partial<Cell>) =>

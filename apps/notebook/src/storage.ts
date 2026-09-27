@@ -23,8 +23,9 @@ export function load(): Notebook {
 export function save(notebook: Notebook) {
   try {
     localStorage.setItem(KEY, JSON.stringify(notebook));
-  } catch {
+  } catch (error) {
     // storage full or blocked: the file export still works
+    console.warn("Nie udało się zapisać notatnika w przeglądarce:", error);
   }
 }
 

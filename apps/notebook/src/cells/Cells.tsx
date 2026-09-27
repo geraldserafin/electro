@@ -5,37 +5,20 @@ import { PrintDrawing, SchematicEditor, type Camera } from "../schematic/Editor"
 import type { Cell, ElementResult, Problem, SchematicData, SymbolLibrary } from "../types";
 import { CodeEditor } from "./CodeEditor";
 import { Markdown } from "./Markdown";
+import { RichText } from "./RichText";
 import { Outputs } from "./Outputs";
 
 type Update = (patch: Partial<Cell>) => void;
 
 export function MarkdownCell({ cell, update }: { cell: Extract<Cell, { type: "markdown" }>; update: Update }) {
-  const [editing, setEditing] = useState(cell.source === "");
-  if (!editing)
-    return (
-      <div className="markdown-view" onDoubleClick={() => setEditing(true)} title="Dwuklik, żeby edytować">
-        <Markdown source={cell.source || "*Pusty tekst — kliknij dwukrotnie, żeby pisać.*"} />
-      </div>
-    );
   return (
-    <div className="markdown-edit">
-      <textarea
-        className="markdown-source"
-        autoFocus
-        value={cell.source}
-        rows={Math.max(3, cell.source.split("\n").length + 1)}
-        placeholder="Tekst w Markdown, wzory w $...$ — Shift+Enter kończy edycję"
-        onChange={(e) => update({ source: e.target.value })}
-        onBlur={() => setEditing(false)}
-        onKeyDown={(e) => {
-          if (e.key === "Enter" && e.shiftKey) {
-            e.preventDefault();
-            setEditing(false);
-          }
-        }}
-      />
-      <div className="markdown-preview"><Markdown source={cell.source} /></div>
-    </div>
+    <>
+      <div className="markdown-cell no-print">
+        <RichText value={cell.source} onChange={(source) => update({ source })} autoFocus={cell.source === ""} />
+      </div>
+      {/* the PDF: the same Markdown, set as a page (no editor handles or menus) */}
+      <div className="markdown-view print-only"><Markdown source={cell.source} /></div>
+    </>
   );
 }
 

@@ -242,9 +242,22 @@ try {
   await page.getByRole("button", { name: "Przykład: Przykłady: niewiadome i dziury" }).click();
   await page.getByRole("button", { name: "Uruchom wszystko" }).click();
   await page.locator(".cell-code").last().locator(".outputs").waitFor({ timeout: 60_000 });
+  check("text cells: formulas from $…$ are typeset in the editor",
+    (await page.locator(".markdown-cell .milkdown .katex").count()) > 5);
   check("examples run without errors", (await page.locator(".output-error").count()) === 0
     && (await page.locator(".cell-code .outputs").count()) === (await page.locator(".cell-code").count()));
 
+  {
+    const text = page.locator(".markdown-cell .ProseMirror").first();
+    await text.click();
+    await page.keyboard.press("Meta+ArrowDown");
+    await page.keyboard.press("Enter");
+    await page.keyboard.type("Nowe zdanie z **pogrubieniem** i wzorem $U = R I$ ");
+    await page.waitForTimeout(1000); // the editor reports after ~200 ms, saving follows within 400 ms
+    const stored = await page.evaluate(() => JSON.parse(localStorage.getItem("electro-notebook")).cells[0].source);
+    check("text cells: edited in place, stored as Markdown", stored.endsWith("Nowe zdanie z **pogrubieniem** i wzorem $U = R I$")
+      && (await text.locator("strong").last().innerText()) === "pogrubieniem");
+  }
   check("no page errors", errors.length === 0);
   if (errors.length) console.log(errors);
   await browser.close();

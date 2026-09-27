@@ -246,7 +246,48 @@ main {
 main > .add-row { justify-content: center; }
 
 /* text */
-.markdown-view { cursor: text; min-height: 1.5em; padding: 4px 8px 4px 48px; }
+.markdown-view { padding: 4px 8px 4px 48px; }
+.print-only { display: none; }
+
+/* text cells: edited in place (Milkdown Crepe), in the notebook's own colours and type */
+.markdown-cell { padding-left: 48px; }
+.rich-text .milkdown {
+  --crepe-color-background: transparent;
+  --crepe-color-on-background: var(--text);
+  --crepe-color-surface: var(--island);
+  --crepe-color-surface-low: var(--hover);
+  --crepe-color-on-surface: var(--text);
+  --crepe-color-on-surface-variant: var(--muted);
+  --crepe-color-outline: var(--faint);
+  --crepe-color-primary: var(--primary);
+  --crepe-color-secondary: var(--tool-active);
+  --crepe-color-on-secondary: var(--tool-active-text);
+  --crepe-color-inverse: var(--text);
+  --crepe-color-on-inverse: var(--bg);
+  --crepe-color-inline-code: var(--text);
+  --crepe-color-error: var(--danger);
+  --crepe-color-hover: var(--hover);
+  --crepe-color-selected: var(--tool-active);
+  --crepe-color-inline-area: var(--code-bg);
+  --crepe-base-font-size: 18px;
+  --crepe-font-title: var(--sans);
+  --crepe-font-default: var(--sans);
+  --crepe-font-code: var(--mono);
+  --crepe-shadow-1: var(--island-shadow);
+  --crepe-shadow-2: var(--island-shadow);
+  background: transparent;
+}
+.rich-text .milkdown .ProseMirror { padding: 4px 8px; line-height: 1.6; }
+.rich-text .milkdown .ProseMirror > :first-child { margin-top: 0; }
+.rich-text .milkdown .ProseMirror h1 { font-size: 2em; font-weight: 500; margin-top: 16px; line-height: 1.25; }
+.rich-text .milkdown .ProseMirror h2 { font-size: 1.5em; font-weight: 500; margin-top: 14px; line-height: 1.3; }
+.rich-text .milkdown .ProseMirror h3 { font-size: 1.25em; font-weight: 500; margin-top: 12px; }
+.rich-text .milkdown .ProseMirror h4, .rich-text .milkdown .ProseMirror h5, .rich-text .milkdown .ProseMirror h6 { font-size: 1.05em; font-weight: 600; margin-top: 10px; }
+.rich-text .milkdown .ProseMirror p { padding: 3px 0; }
+.rich-text .milkdown .ProseMirror code { background: var(--code-bg); border-radius: 4px; padding: 0 4px; font-size: 0.9em; }
+.rich-text .milkdown .ProseMirror a { color: var(--accent); }
+.rich-text .milkdown .ProseMirror blockquote { border-left: 3px solid var(--line); padding-left: 14px; color: var(--muted); }
+.rich-text .milkdown .ProseMirror table { font-size: 17px; }
 .markdown > :first-child { margin-top: 0; }
 .markdown > :last-child { margin-bottom: 0; }
 .markdown h1, .markdown h2, .markdown h3 { font-weight: 500; }
@@ -255,9 +296,6 @@ main > .add-row { justify-content: center; }
 .markdown th, .markdown td { border-bottom: 1px solid var(--line); padding: 4px 14px 4px 0; text-align: left; }
 .markdown th { color: var(--muted); font-weight: 500; }
 .markdown code { background: var(--code-bg); border-radius: 4px; padding: 0 4px; }
-.markdown-edit { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; padding-left: 48px; }
-.markdown-source { width: 100%; font-family: var(--mono); font-size: 16px; line-height: 1.6; padding: 10px 12px; resize: vertical; background: var(--code-bg); }
-.markdown-preview { padding-top: 4px; }
 
 /* code */
 .code-cell { display: flex; gap: 8px; align-items: flex-start; }
@@ -485,6 +523,8 @@ kbd { font: 11px ui-monospace, monospace; border: 1px solid var(--line); border-
   .canvas .label.solved { fill: #000; }
   .hide-code-in-print .code-editor { display: none; }
   .code-editor .cm-gutters { display: none; }
+  .print-only { display: block; }
+  .markdown-view.print-only { padding: 0; }
   .cm-line { white-space: pre-wrap; word-break: break-word; } /* long lines wrap instead of being cut off */
 }
 
