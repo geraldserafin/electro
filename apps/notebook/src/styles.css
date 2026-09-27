@@ -230,78 +230,51 @@ main {
 .cell:hover .cell-tools, .cell.focused .cell-tools { opacity: 1; pointer-events: auto; }
 .cell-tools button { padding: 4px; color: var(--muted); }
 
+/* "+ Kod  + Tekst  + Schemat", as in Colab: pills on the edge between cells, shown on hover */
 .add-row {
   display: flex;
   align-items: center;
-  gap: 6px;
-  height: 22px;
+  justify-content: center;
+  gap: 8px;
+  height: 36px;
   opacity: 0;
   transition: opacity 0.12s;
 }
-.add-row:hover { opacity: 1; }
-.add-row .line { width: 48px; height: 1px; background: var(--line); }
-.add-row button { font-size: 13px; padding: 1px 10px; border: 1px solid var(--line); border-radius: 999px; background: var(--paper); }
+.add-row:hover, .cell:hover > .add-row, .cell.focused > .add-row { opacity: 1; }
+.add-row button {
+  gap: 4px;
+  padding: 4px 14px 4px 10px;
+  font-size: 15px;
+  font-weight: 500;
+  color: var(--text);
+  border: 1px solid var(--faint);
+  border-radius: 999px;
+  background: var(--bg);
+}
+.add-row button:hover { background: var(--hover); border-color: var(--muted); }
 /* only in the middle, so it never covers the next cell's tools on the right */
-.cell > .add-row { position: absolute; left: 50%; transform: translateX(-50%); bottom: -17px; z-index: 4; }
+.cell > .add-row { position: absolute; left: 50%; transform: translateX(-50%); bottom: -24px; z-index: 4; }
 main > .add-row { justify-content: center; }
 
 /* text */
-.markdown-view { padding: 4px 8px 4px 48px; }
 .print-only { display: none; }
 
-/* text cells: edited in place (Milkdown Crepe), in the notebook's own colours and type */
-.markdown-cell { padding-left: 48px; }
-.rich-text .milkdown {
-  --crepe-color-background: transparent;
-  --crepe-color-on-background: var(--text);
-  --crepe-color-surface: var(--island);
-  --crepe-color-surface-low: var(--hover);
-  --crepe-color-on-surface: var(--text);
-  --crepe-color-on-surface-variant: var(--muted);
-  --crepe-color-outline: var(--faint);
-  --crepe-color-primary: var(--primary);
-  --crepe-color-secondary: var(--tool-active);
-  --crepe-color-on-secondary: var(--tool-active-text);
-  --crepe-color-inverse: var(--text);
-  --crepe-color-on-inverse: var(--bg);
-  --crepe-color-inline-code: var(--text);
-  --crepe-color-error: var(--danger);
-  --crepe-color-hover: var(--hover);
-  --crepe-color-selected: var(--tool-active);
-  --crepe-color-inline-area: var(--code-bg);
-  --crepe-base-font-size: 18px;
-  --crepe-font-title: var(--sans);
-  --crepe-font-default: var(--sans);
-  --crepe-font-code: var(--mono);
-  --crepe-shadow-1: var(--island-shadow);
-  --crepe-shadow-2: var(--island-shadow);
-  background: transparent;
+/* text cells: the rendered text, or its Markdown while editing; a mode button on the side */
+.markdown-cell { display: flex; gap: 8px; align-items: flex-start; }
+.markdown-cell .markdown-view { padding: 4px 8px; cursor: text; min-height: 1.6em; border-radius: 8px; }
+.markdown-cell .gutter .mode {
+  width: 30px; height: 30px; padding: 0; justify-content: center; border-radius: 8px;
+  color: var(--faint); opacity: 0; transition: opacity 0.15s;
 }
-.rich-text .milkdown .ProseMirror { padding: 4px 8px; line-height: 1.6; }
-/* Crepe's own "+" and drag handle: replaced by ours (inside the cell, with a menu) */
-.rich-text .milkdown .milkdown-block-handle { display: none !important; }
-.rich-text { position: relative; }
-.block-handle { position: absolute; left: -40px; z-index: 5; padding-top: 5px; }
-.block-handle .grip { width: 26px; height: 26px; padding: 0; justify-content: center; color: var(--faint); border-radius: 6px; }
-.block-handle .grip:hover, .block-handle .grip[aria-expanded="true"] { color: var(--text); background: var(--hover); }
-.block-menu {
-  position: absolute; top: 30px; left: 0; z-index: 9; min-width: 200px;
-  display: grid; padding: 4px; border-radius: 10px; background: var(--island); box-shadow: var(--island-shadow);
+.cell:hover .markdown-cell .gutter .mode, .cell.focused .markdown-cell .gutter .mode, .markdown-cell .gutter .mode[aria-pressed="true"] { opacity: 1; }
+.markdown-cell .gutter .mode:hover { color: var(--text); background: var(--hover); }
+.markdown-cell .gutter .mode[aria-pressed="true"] { color: var(--tool-active-text); background: var(--tool-active); }
+.markdown-source {
+  display: block; width: 100%; resize: none; overflow: hidden;
+  font-family: var(--mono); font-size: 16px; line-height: 1.6; padding: 10px 12px;
+  background: var(--code-bg); border: none; border-radius: 8px;
 }
-.block-menu button { justify-content: flex-start; gap: 10px; padding: 6px 10px; font-size: 14px; border-radius: 6px; }
-.block-menu button kbd { margin-left: auto; color: var(--faint); }
-.block-menu button.danger:hover { background: var(--err-bg); }
-.block-menu hr { width: 100%; border: none; border-top: 1px solid var(--line); margin: 4px 0; }
-.rich-text .milkdown .ProseMirror > :first-child { margin-top: 0; }
-.rich-text .milkdown .ProseMirror h1 { font-size: 2em; font-weight: 500; margin-top: 16px; line-height: 1.25; }
-.rich-text .milkdown .ProseMirror h2 { font-size: 1.5em; font-weight: 500; margin-top: 14px; line-height: 1.3; }
-.rich-text .milkdown .ProseMirror h3 { font-size: 1.25em; font-weight: 500; margin-top: 12px; }
-.rich-text .milkdown .ProseMirror h4, .rich-text .milkdown .ProseMirror h5, .rich-text .milkdown .ProseMirror h6 { font-size: 1.05em; font-weight: 600; margin-top: 10px; }
-.rich-text .milkdown .ProseMirror p { padding: 3px 0; }
-.rich-text .milkdown .ProseMirror code { background: var(--code-bg); border-radius: 4px; padding: 0 4px; font-size: 0.9em; }
-.rich-text .milkdown .ProseMirror a { color: var(--accent); }
-.rich-text .milkdown .ProseMirror blockquote { border-left: 3px solid var(--line); padding-left: 14px; color: var(--muted); }
-.rich-text .milkdown .ProseMirror table { font-size: 17px; }
+.markdown-source:focus { outline: 1px solid var(--line); }
 .markdown > :first-child { margin-top: 0; }
 .markdown > :last-child { margin-bottom: 0; }
 .markdown h1, .markdown h2, .markdown h3 { font-weight: 500; }
@@ -541,7 +514,7 @@ kbd { font: 11px ui-monospace, monospace; border: 1px solid var(--line); border-
   .hide-code-in-print .code-editor { display: none; }
   .code-editor .cm-gutters { display: none; }
   .print-only { display: block; }
-  .markdown-view.print-only { padding: 0; }
+  .markdown-view.print-only, .markdown-cell .markdown-view { padding: 0; }
   .cm-line { white-space: pre-wrap; word-break: break-word; } /* long lines wrap instead of being cut off */
 }
 

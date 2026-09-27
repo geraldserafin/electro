@@ -1,24 +1,66 @@
-import { useEffect, useRef, useState } from "react";
-import { CodeIcon, Play, SchematicIcon, WarningIcon } from "../icons";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { CodeIcon, Eye, Pencil, Play, SchematicIcon, WarningIcon } from "../icons";
 import { kernel } from "../python/kernel";
 import { PrintDrawing, SchematicEditor, type Camera } from "../schematic/Editor";
 import type { Cell, ElementResult, Problem, SchematicData, SymbolLibrary } from "../types";
 import { CodeEditor } from "./CodeEditor";
 import { Markdown } from "./Markdown";
-import { RichText } from "./RichText";
 import { Outputs } from "./Outputs";
 
 type Update = (patch: Partial<Cell>) => void;
 
+/**
+ * A text cell: the rendered text, or — while editing — its plain Markdown. Clicking the text (or
+ * the pencil on the side) edits it; leaving the field (or the eye, Esc, Shift+Enter) shows it.
+ */
 export function MarkdownCell({ cell, update }: { cell: Extract<Cell, { type: "markdown" }>; update: Update }) {
+  const [editing, setEditing] = useState(cell.source === "");
+  const field = useRef<HTMLTextAreaElement>(null);
+  // the field grows with the text, so the page scrolls, not the field
+  useLayoutEffect(() => {
+    const el = field.current;
+    if (!el) return;
+    el.style.height = "auto";
+    el.style.height = `${el.scrollHeight + 2}px`;
+  }, [editing, cell.source]);
+  const toggle = editing ? "Pokaż tekst (Esc)" : "Edytuj Markdown";
   return (
-    <>
-      <div className="markdown-cell no-print">
-        <RichText value={cell.source} onChange={(source) => update({ source })} autoFocus={cell.source === ""} />
+    <div className="markdown-cell">
+      <div className="gutter no-print">
+        {/* mouse down would take the focus from the field (and show the text) before the click */}
+        <button className="mode" onMouseDown={(e) => e.preventDefault()} onClick={() => setEditing(!editing)}
+                title={toggle} aria-label={toggle} aria-pressed={editing}>
+          {editing ? <Eye /> : <Pencil />}
+        </button>
       </div>
-      {/* the PDF: the same Markdown, set as a page (no editor handles or menus) */}
-      <div className="markdown-view print-only"><Markdown source={cell.source} /></div>
-    </>
+      <div className="cell-body">
+        {editing ? (
+          <textarea
+            ref={field}
+            className="markdown-source no-print"
+            autoFocus
+            value={cell.source}
+            spellCheck={false}
+            placeholder="Tekst w Markdown: # nagłówek, **pogrubienie**, - lista, wzory w $…$"
+            onChange={(e) => update({ source: e.target.value })}
+            onBlur={() => setEditing(false)}
+            onKeyDown={(e) => {
+              if (e.key === "Escape" || (e.key === "Enter" && e.shiftKey)) {
+                e.preventDefault();
+                setEditing(false);
+              }
+            }}
+          />
+        ) : (
+          <div className="markdown-view" onClick={(e) => (e.target as HTMLElement).closest("a") || setEditing(true)}
+               title="Kliknij, żeby edytować">
+            <Markdown source={cell.source || "*Pusty tekst — kliknij, żeby pisać.*"} />
+          </div>
+        )}
+        {/* the PDF always shows the text, even when the cell is being edited */}
+        {editing && <div className="markdown-view print-only"><Markdown source={cell.source} /></div>}
+      </div>
+    </div>
   );
 }
 

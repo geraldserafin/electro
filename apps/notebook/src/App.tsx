@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { CodeCell, MarkdownCell, SchematicCell } from "./cells/Cells";
-import { Bolt, Chevron, Down, Play, Trash, Up } from "./icons";
+import { Bolt, Chevron, Down, Play, Plus, Trash, Up } from "./icons";
 import { kernel } from "./python/kernel";
 import { download, load, newCell, save, upload } from "./storage";
 import symbols from "./schematic/symbols.json";
@@ -269,11 +269,9 @@ function Menu({ label, children }: { label: string; children: ReactNode }) {
 function AddRow({ onAdd }: { onAdd: (type: CellType) => void }) {
   return (
     <div className="add-row no-print">
-      <span className="line" />
-      <button onClick={() => onAdd("code")}>+ Kod</button>
-      <button onClick={() => onAdd("markdown")}>+ Tekst</button>
-      <button onClick={() => onAdd("schematic")}>+ Schemat</button>
-      <span className="line" />
+      <button onClick={() => onAdd("code")} title="Dodaj komórkę z kodem"><Plus /> Kod</button>
+      <button onClick={() => onAdd("markdown")} title="Dodaj komórkę z tekstem"><Plus /> Tekst</button>
+      <button onClick={() => onAdd("schematic")} title="Dodaj schemat"><Plus /> Schemat</button>
     </div>
   );
 }

@@ -257,44 +257,29 @@ try {
   await page.getByRole("button", { name: "Przykład: Przykłady: niewiadome i dziury" }).click();
   await page.getByRole("button", { name: "Uruchom wszystko" }).click();
   await page.locator(".cell-code").last().locator(".outputs").waitFor({ timeout: 60_000 });
-  check("text cells: formulas from $…$ are typeset in the editor",
-    (await page.locator(".markdown-cell .milkdown .katex").count()) > 5);
   check("examples run without errors", (await page.locator(".output-error").count()) === 0
     && (await page.locator(".cell-code .outputs").count()) === (await page.locator(".cell-code").count()));
 
-  {
-    const text = page.locator(".markdown-cell .ProseMirror").first();
-    await text.click();
-    await page.keyboard.press("Meta+ArrowDown");
-    await page.keyboard.press("Enter");
-    await page.keyboard.type("Nowe zdanie z **pogrubieniem** i wzorem $U = R I$ ");
-    await page.waitForTimeout(1000); // the editor reports after ~200 ms, saving follows within 400 ms
-    const stored = await page.evaluate(() => JSON.parse(localStorage.getItem("electro-notebook")).cells[0].source);
-    check("text cells: edited in place, stored as Markdown", stored.endsWith("Nowe zdanie z **pogrubieniem** i wzorem $U = R I$")
-      && (await text.locator("strong").last().innerText()) === "pogrubieniem");
-  }
-  // the block handle (inside the cell): move a paragraph up — moved, not copied — then delete it
+  // text cells: rendered; a click shows the plain Markdown; leaving it renders it again
   {
     const cell = page.locator(".markdown-cell").first();
-    const blocks = cell.locator(".ProseMirror > p");
-    const before = await blocks.count();
-    const stored = () => page.evaluate(() => JSON.parse(localStorage.getItem("electro-notebook")).cells[0].source);
-    await blocks.nth(1).hover();
-    await cell.locator(".block-handle .grip").click();
-    await cell.getByRole("menuitem", { name: /W górę/ }).click();
-    await page.waitForTimeout(1000);
-    const moved = await stored();
-    check("block handle: moved up, not copied", (await blocks.count()) === before
-      && (await blocks.first().innerText()).startsWith("Nowe zdanie") && moved.startsWith("Nowe zdanie")
-      && moved.split("Nowe zdanie").length === 2);
-    await blocks.first().hover();
-    const box = await cell.locator(".block-handle").boundingBox();
-    const cellBox = await page.locator(".cell-markdown").first().boundingBox();
-    await cell.locator(".block-handle .grip").click();
-    await cell.getByRole("menuitem", { name: /Usuń/ }).click();
-    await page.waitForTimeout(1000);
-    check("block handle: inside the cell, deletes a block", box.x > cellBox.x && (await blocks.count()) === before - 1
-      && !(await stored()).includes("Nowe zdanie"));
+    const rendered = (await cell.locator(".markdown-view").first().innerText());
+    await cell.locator(".markdown-view").first().click();
+    const field = cell.locator("textarea.markdown-source");
+    const source = await field.inputValue();
+    await field.press("Meta+ArrowDown");
+    await page.keyboard.insertText("\n\nNowe zdanie z **pogrubieniem** i wzorem $U = R I$");
+    await page.locator(".appbar .title").click(); // leave the field
+    const view = cell.locator(".markdown-view").first();
+    check("text cells: click edits the Markdown, leaving renders it",
+      source.includes("**▶ Uruchom wszystko**") && !rendered.includes("**")
+      && (await view.locator("strong").last().innerText()) === "pogrubieniem" && (await view.locator(".katex").count()) > 0);
+    // the button on the side: pencil ↔ eye
+    await cell.getByRole("button", { name: "Edytuj Markdown" }).click();
+    const editing = await field.isVisible();
+    await cell.getByRole("button", { name: /Pokaż tekst/ }).click();
+    check("text cells: the side button switches edit / view", editing && !(await field.isVisible())
+      && await cell.locator(".markdown-view").first().isVisible());
   }
 
   check("no page errors", errors.length === 0);
