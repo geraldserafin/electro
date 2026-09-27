@@ -8,6 +8,7 @@ import { Back } from "../icons";
 import { fromDocument, getNote } from "../notes/atoms";
 import { failure } from "../notes/sync";
 import { Notebook } from "../Notebook";
+import { NoteSkeleton } from "../Skeletons";
 import type { Notebook as NotebookData } from "../types";
 
 type Loaded =
@@ -62,13 +63,21 @@ export function NotePage() {
       />
     );
   }
+  if (loaded.kind === "loading")
+    return (
+      <div className="notebook">
+        <div className="float top-left no-print">
+          <Link className="icon-button" to="/" title="Wszystkie notatki" aria-label="Wszystkie notatki"><Back /></Link>
+        </div>
+        <NoteSkeleton />
+      </div>
+    );
   return (
     <div className="notebook">
       <div className="float top-left no-print">
         <Link className="icon-button" to="/" title="Wszystkie notatki" aria-label="Wszystkie notatki"><Back /></Link>
       </div>
       <div className="page-message">
-        {loaded.kind === "loading" && <p className="muted">Wczytuję notatkę…</p>}
         {loaded.kind === "missing" && (
           <>
             <h1>Nie ma takiej notatki</h1>

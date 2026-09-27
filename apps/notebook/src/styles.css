@@ -425,6 +425,15 @@ main > .add-row { justify-content: center; }
 /* the drawing for the PDF: laid out (so it can measure itself) but not seen on screen */
 .print-drawing { position: absolute; visibility: hidden; width: 0; height: 0; overflow: hidden; pointer-events: none; }
 
+/* a schematic not being worked on: the drawing alone, as the document (the PDF) has it */
+.schematic-doc { padding: 8px 0; border-radius: 12px; cursor: pointer; }
+.schematic-doc .print-drawing.on-screen {
+  position: static; visibility: visible; width: auto; height: auto; overflow: visible; pointer-events: none;
+  display: flex; justify-content: center;
+}
+.schematic-doc .print-drawing.on-screen svg { max-width: 100%; height: auto; }
+.schematic-doc-empty { margin: 0; padding: 28px; text-align: center; color: var(--muted); border: 1.5px dashed var(--line); border-radius: 12px; }
+
 /* Schemat | Kod */
 .view-switch { display: flex; gap: 2px; padding: 2px; border-radius: 8px; background: var(--hover); }
 .view-switch button { padding: 4px 10px; border-radius: 6px; color: var(--muted); }
@@ -691,3 +700,24 @@ kbd { font: 11px ui-monospace, monospace; border: 1px solid var(--line); border-
 .notice button { padding: 5px 12px; border-radius: 8px; border: 1px solid var(--line); font-size: 14px; }
 .notice button:hover { background: var(--selected); }
 @keyframes notice-in { from { opacity: 0; transform: translate(-50%, 8px); } }
+
+/* ---------------------------------------------------------------- loading: skeletons, then the content fades in */
+
+.skeleton {
+  display: block; border-radius: 6px;
+  background: linear-gradient(90deg, var(--selected) 25%, var(--hover) 45%, var(--selected) 65%);
+  background-size: 300% 100%; animation: shimmer 1.4s ease-in-out infinite;
+}
+@keyframes shimmer { from { background-position: 100% 0; } to { background-position: 0 0; } }
+.card-skeleton { gap: 4px; animation-delay: calc(var(--i, 0) * 80ms); }
+.card-skeleton .thumb.skeleton { /* over the white paper of a real thumbnail */
+  box-shadow: none; background: linear-gradient(90deg, var(--selected) 25%, var(--hover) 45%, var(--selected) 65%);
+  background-size: 300% 100%;
+}
+.note-skeleton .note-nav { opacity: 1; visibility: visible; transform: none; }
+.note-skeleton main { padding-top: 88px; }
+@media (max-width: 900px) { .note-skeleton .note-nav { display: none; } }
+/* backwards, not both: no transform stays behind (it would trap position: fixed inside, e.g. a full screen board) */
+.appear { animation: appear 0.35s cubic-bezier(0.2, 0.8, 0.2, 1) backwards; animation-delay: calc(var(--i, 0) * 40ms); }
+@keyframes appear { from { opacity: 0; transform: translateY(6px); } }
+@media (prefers-reduced-motion: reduce) { .skeleton, .appear { animation: none; } }

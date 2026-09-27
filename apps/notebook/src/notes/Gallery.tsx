@@ -1,7 +1,7 @@
 // Notes as cards (like Figma's files): a thumbnail of the first page, as the PDF would show it,
 // and the title under it.
 import type { NotePreview } from "@electro/notes-api";
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { Link } from "react-router";
 import { Markdown } from "../cells/Markdown";
 import { More } from "../icons";
@@ -18,7 +18,8 @@ export const when = (iso: string) => {
 };
 
 /** A card: a link to the note (or a button, for an example), with actions under "⋯". */
-export function Card({ to, onClick, id, title, meta, preview, library, actions }: {
+export function Card({ to, onClick, id, title, meta, preview, library, actions, index = 0 }: {
+  index?: number; // its place in the list: the cards come in one after another
   to?: string;
   onClick?: () => void;
   id?: string;
@@ -44,7 +45,7 @@ export function Card({ to, onClick, id, title, meta, preview, library, actions }
     </>
   );
   return (
-    <div className="card" data-id={id} ref={ref}>
+    <div className="card appear" data-id={id} ref={ref} style={{ "--i": Math.min(index, 12) } as CSSProperties}>
       {to ? <Link className="card-open" to={to}>{body}</Link> : <button className="card-open" onClick={onClick}>{body}</button>}
       {actions && actions.length > 0 && (
         <>

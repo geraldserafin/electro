@@ -58,10 +58,13 @@ export type Cell =
       results?: Record<string, ElementResult>; // from the last run
       problems?: Problem[]; // why the last run could not find everything
       stale?: boolean; // the drawing changed since the last run
-      view?: "schematic" | "code"; // which side of the cell is shown
+      view?: SchematicView; // which side of the cell is shown
     };
 
 export type CellType = Cell["type"];
+
+/** A schematic cell, while it is edited: as the board, or as code. */
+export type SchematicView = "schematic" | "code";
 
 /** A notebook file (*.electro.json), version 2 — see format.ts / electro_notes. */
 export interface Notebook {

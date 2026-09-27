@@ -2,7 +2,7 @@ import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "re
 import { CodeIcon, Eye, Flash, Pencil, Play, SchematicIcon, WarningIcon } from "../icons";
 import { kernel } from "../python/kernel";
 import { PrintDrawing, SchematicEditor, type Camera } from "../schematic/Editor";
-import type { Cell, ElementResult, Problem, SchematicData, SymbolLibrary } from "../types";
+import type { Cell, ElementResult, Problem, SchematicData, SchematicView, SymbolLibrary } from "../types";
 import { CodeEditor } from "./CodeEditor";
 import { Markdown } from "./Markdown";
 import { Outputs } from "./Outputs";
@@ -107,7 +107,7 @@ export function CodeCell({ cell, update, run, running }: {
 }
 
 /** Schemat | Kod: the two views of a schematic cell. */
-function ViewSwitch({ view, onSwitch, busy }: { view: "schematic" | "code"; onSwitch: (v: "schematic" | "code") => void; busy: boolean }) {
+function ViewSwitch({ view, onSwitch, busy }: { view: SchematicView; onSwitch: (v: SchematicView) => void; busy: boolean }) {
   return (
     <div className="view-switch" role="tablist" aria-label="Widok komórki">
       <button role="tab" aria-selected={view === "schematic"} className={view === "schematic" ? "on" : ""}
@@ -122,15 +122,24 @@ function ViewSwitch({ view, onSwitch, busy }: { view: "schematic" | "code"; onSw
   );
 }
 
-export function SchematicCell({ cell, update, library, simulate, running }: {
+/**
+ * A schematic: while the cell is not being worked on, the drawing alone, as the PDF has it; once
+ * it is (focused), the board to edit it — or its code.
+ */
+export function SchematicCell({ cell, update, library, simulate, running, focused }: {
   cell: Extract<Cell, { type: "schematic" }>;
   update: Update;
   library: SymbolLibrary;
   simulate: (schematic?: SchematicData) => void;
   running: boolean;
+  focused: boolean;
 }) {
   const empty = !cell.schematic.elements.length;
-  const view = cell.view ?? "schematic";
+  const view: SchematicView = cell.view === "code" ? "code" : "schematic";
+  // just clicked into: the board takes the keyboard at once (its shortcuts work without another click)
+  const wasFocused = useRef(focused);
+  const justFocused = focused && !wasFocused.current;
+  wasFocused.current = focused;
   // the code view: `generated` is the drawing as code, `source` what is in the editor now
   const [source, setSource] = useState<string | null>(null);
   const [generated, setGenerated] = useState<string | null>(null);
@@ -173,7 +182,7 @@ export function SchematicCell({ cell, update, library, simulate, running }: {
     return back.schematic;
   };
 
-  const switchTo = async (next: "schematic" | "code") => {
+  const switchTo = async (next: SchematicView) => {
     if (next === view || busy) return;
     setBusy(true);
     try {
@@ -181,7 +190,7 @@ export function SchematicCell({ cell, update, library, simulate, running }: {
       if (next === "code") {
         await load();
         update({ view: "code" });
-      } else if (await applied()) {
+      } else if (await applied()) { // leaving the code: what was edited there first
         focusBoard.current = true;
         update({ view: "schematic" });
       }
@@ -191,6 +200,12 @@ export function SchematicCell({ cell, update, library, simulate, running }: {
       setBusy(false);
     }
   };
+
+  // leaving the cell with the code edited: the drawing takes it (the cell shows the drawing now)
+  useEffect(() => {
+    if (!focused && view === "code" && source !== null && source !== generated) void applied();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [focused]);
 
   const run = async () => {
     if (view === "schematic") return simulate();
@@ -215,7 +230,14 @@ export function SchematicCell({ cell, update, library, simulate, running }: {
       <RunButton run={run} running={running || busy} done={done || empty} icon={<Flash />}
                  label="Policz prądy i napięcia (Shift+Enter w kodzie)" />
       <div className="cell-body">
-      {view === "schematic" ? (
+      {!focused ? (
+        // not being worked on: the drawing as the document (the PDF) has it; a click edits it
+        <div className="schematic-doc no-print" title="Kliknij, żeby edytować">
+          {empty
+            ? <p className="schematic-doc-empty">Pusty schemat — kliknij, żeby rysować.</p>
+            : <PrintDrawing value={cell.schematic} library={library} onScreen />}
+        </div>
+      ) : view === "schematic" ? (
         <SchematicEditor
           value={cell.schematic}
           onChange={(schematic) => update({ schematic, ...(cell.results ? { stale: true } : {}) })}
@@ -225,7 +247,7 @@ export function SchematicCell({ cell, update, library, simulate, running }: {
           topRight={actions}
           status={problems}
           camera={camera}
-          autoFocus={focusBoard.current}
+          autoFocus={focusBoard.current || justFocused}
         />
       ) : (
         <div className="board code-view">
@@ -252,7 +274,7 @@ export function SchematicCell({ cell, update, library, simulate, running }: {
       )}
       {/* the PDF shows the circuit as drawn; results belong to code cells: schematic(układ1, sol) */}
       <PrintDrawing value={cell.schematic} library={library} />
-      {cell.results && Object.keys(cell.results).length > 0 && (
+      {focused && cell.results && Object.keys(cell.results).length > 0 && (
         <ResultsTable results={cell.results} stale={!!cell.stale} />
       )}
       </div>

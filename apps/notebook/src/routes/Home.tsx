@@ -10,6 +10,7 @@ import { library } from "../Notebook";
 import { notesAtom, NOTES, removeNote, toDocument } from "../notes/atoms";
 import { useCreateNote } from "../notes/create";
 import { Card, when } from "../notes/Gallery";
+import { CardSkeletons } from "../Skeletons";
 import { upload } from "../storage";
 
 export function Home() {
@@ -52,10 +53,10 @@ export function Home() {
             <span className="card-title">Nowa notatka</span>
           </button>
           {Result.builder(notes)
-            .onInitial(() => null)
+            .onInitial(() => <CardSkeletons />)
             .onFailure(() => null)
-            .onSuccess((list) => list.map((note) => (
-              <Card key={note.id} id={note.id} to={`/notes/${note.slug}`} title={note.title || "Bez tytułu"}
+            .onSuccess((list) => list.map((note, i) => (
+              <Card key={note.id} index={i} id={note.id} to={`/notes/${note.slug}`} title={note.title || "Bez tytułu"}
                     meta={when(note.modified)} preview={note.preview} library={library}
                     actions={[{
                       label: "Usuń notatkę",

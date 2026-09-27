@@ -101,6 +101,17 @@ try {
     && (await bridge.locator(".board .canvas .label.solved").allTextContents()).join(" ").includes("200")
     && await runBridge.isDisabled());
 
+  // not being worked on, a schematic is its drawing, as in the PDF; a click brings the board back
+  {
+    await page.mouse.click(4, 600); // outside every cell
+    await bridge.locator(".schematic-doc svg").waitFor();
+    const docOnly = (await bridge.locator(".board").count()) === 0 && (await bridge.locator("table.results").count()) === 0;
+    await bridge.locator(".schematic-doc").click();
+    await bridge.locator(".board .canvas").waitFor();
+    check("a schematic: its drawing when left, the board when clicked", docOnly
+      && await bridge.locator(".board .canvas").evaluate((svg) => document.activeElement === svg));
+  }
+
   // no reading: not enough data — a warning sign on the board, unfolding into LaTeX
   await reading("");
   check("a change turns the run button back on", !(await runBridge.isDisabled())

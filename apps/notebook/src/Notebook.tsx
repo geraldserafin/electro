@@ -118,7 +118,11 @@ export function Notebook({ initial, revision, reload, onSaved }: {
 
 
   return (
-    <div className={`notebook ${notebook.settings.codeInPdf ? "" : "hide-code-in-print"}`}>
+    <div className={`notebook ${notebook.settings.codeInPdf ? "" : "hide-code-in-print"}`}
+         // a click outside every cell (and the app's islands) leaves the cell being worked on
+         onPointerDownCapture={(e) => {
+           if (!(e.target as Element).closest(".cell, .float, .float-group, .note-nav, .notice, .menu-items")) setFocused(null);
+         }}>
       {/* left: the way back and the app (as on the home screen), under it a sidebar — the note's
           title and its sections; right: run, PDF */}
       <div className="float-group top-left no-print">
@@ -147,7 +151,7 @@ export function Notebook({ initial, revision, reload, onSaved }: {
       </div>
       <SyncNotice state={sync.state} onKeepMine={sync.keepMine} onTakeTheirs={sync.takeTheirs} />
 
-      <main className={outline ? "with-nav" : ""}>
+      <main className={`appear ${outline ? "with-nav" : ""}`}>
         {/* the title is the note's first heading too (and the PDF's) */}
         <input className="doc-title no-print" value={notebook.title} placeholder="Bez tytułu" aria-label="Tytuł"
                spellCheck={false} onChange={(e) => setTitle(e.target.value)} />
@@ -174,7 +178,7 @@ export function Notebook({ initial, revision, reload, onSaved }: {
             {cell.type === "schematic" && (
               <SchematicCell cell={cell} update={(p) => update(cell.id, p)} library={library}
                              simulate={(s) => simulate(cell.id, s)}
-                             running={running.has(cell.id)} />
+                             running={running.has(cell.id)} focused={focused === cell.id} />
             )}
             <AddRow onAdd={(type) => insert(index + 1, type)} />
           </section>

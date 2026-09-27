@@ -69,8 +69,10 @@ export function SchematicEditor({ value, onChange, library, results, topLeft, to
   useEffect(() => { if (camera) camera.current = cam; }, [cam, camera]);
   useEffect(() => { // eslint-disable-line react-hooks/exhaustive-deps
     if (!autoFocus) return;
-    svgRef.current?.focus({ preventScroll: true });
+    // a frame later: a click that brought the board moves the focus itself when it ends
+    const frame = requestAnimationFrame(() => svgRef.current?.focus({ preventScroll: true }));
     setActive(true); // as if clicked: keys and the wheel go to the board
+    return () => cancelAnimationFrame(frame);
   }, []);
   const pan = useRef<{ x: number; y: number; cam: Camera; moved: boolean; click: boolean; k: number } | null>(null);
   /** Screen px per CSS px of the board (not 1 when the page is scaled, e.g. CSS zoom). */
@@ -655,8 +657,9 @@ const PRINT_PAD = 6;
  * the same scale whatever the zoom on screen. Hidden on screen but laid out (not display:none),
  * so it can measure itself.
  */
-export function PrintDrawing({ value, library, results }: {
+export function PrintDrawing({ value, library, results, onScreen = false }: {
   value: SchematicData; library: SymbolLibrary; results?: Record<string, ElementResult>;
+  onScreen?: boolean; // shown in the page too (a schematic's "document" view), not only printed
 }) {
   const G = library.grid;
   const content = useRef<SVGGElement>(null);
@@ -671,7 +674,7 @@ export function PrintDrawing({ value, library, results }: {
   const pointsOf = (ps: Point[]) => ps.map(([x, y]) => `${x * G},${y * G}`).join(" ");
   const [x, y, w, h] = box ?? [0, 0, 1, 1];
   return (
-    <div className="print-drawing" aria-hidden>
+    <div className={`print-drawing ${onScreen ? "on-screen" : ""}`} aria-hidden={!onScreen}>
       <svg className="canvas" viewBox={`${x} ${y} ${w} ${h}`} width={w * PRINT_SCALE} height={h * PRINT_SCALE}>
         <style>{library.style}</style>
         <g ref={content}>
