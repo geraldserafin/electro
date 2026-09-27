@@ -258,21 +258,23 @@ input:focus, textarea:focus { outline: 2px solid var(--accent-soft); border-colo
 
 /* a note's sidebar, under the app's island: the title, the sections under it; the note beside it */
 .note-nav {
-  position: fixed; top: 80px; left: 12px; bottom: 12px; z-index: 20; width: 300px; /* under the app's islands */
+  position: fixed; top: 68px; left: 12px; bottom: 12px; z-index: 20; width: 300px; /* under the app's islands */
+  opacity: 0; visibility: hidden; transform: translateX(-12px);
+  transition: opacity 0.2s ease, transform 0.25s cubic-bezier(0.2, 0.8, 0.2, 1), visibility 0s linear 0.25s;
   display: flex; flex-direction: column; padding: 4px;
   overflow: hidden; border-radius: 12px; background: var(--surface); border: 1px solid var(--line);
 }
+.note-nav.open { opacity: 1; visibility: visible; transform: none;
+  transition: opacity 0.2s ease, transform 0.25s cubic-bezier(0.2, 0.8, 0.2, 1), visibility 0s; }
 .note-nav-head { flex: none; display: flex; align-items: center; gap: 2px; height: 36px; min-width: 0; }
 .note-nav-head .title-box { flex: 1; }
 .note-nav-head .icon-button { border-radius: 8px; }
 .outline { flex: 1; min-height: 0; overflow-y: auto; margin-top: 10px; padding: 0 0 8px; font-size: 14px; }
+main { transition: padding-left 0.25s cubic-bezier(0.2, 0.8, 0.2, 1), max-width 0.25s cubic-bezier(0.2, 0.8, 0.2, 1); }
 main.with-nav { max-width: calc(1120px + 312px); padding-left: calc(24px + 312px); }
-/* narrow: no room for both — the title alone */
-@media (max-width: 900px) {
-  .note-nav { bottom: auto; width: auto; max-width: calc(100vw - 24px); }
-  .note-nav .outline { display: none; }
-  main.with-nav { padding-left: 24px; max-width: none; }
-}
+/* narrow: no room for both — the sidebar covers the note while open */
+@media (max-width: 900px) { main.with-nav { padding-left: 24px; max-width: none; } }
+@media (prefers-reduced-motion: reduce) { .note-nav, .note-nav.open, main { transition: none; } }
 /* the title, the note's first heading (in the PDF too) */
 input.doc-title {
   display: block; width: 100%; margin: 0 0 4px; padding: 4px 8px 4px 65px; border: none; border-radius: 8px; /* in line with the cells' text */

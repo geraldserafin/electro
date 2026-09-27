@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router";
 import { CodeCell, MarkdownCell, SchematicCell } from "./cells/Cells";
-import { Back, Bolt, Down, Export, Plus, RunAll, Trash, Up } from "./icons";
+import { Back, Bolt, Down, Export, OutlineIcon, Plus, RunAll, Trash, Up } from "./icons";
 import { SyncNotice } from "./notes/SyncNotice";
 import { useNoteSync } from "./notes/sync";
 import { Outline } from "./Outline";
@@ -35,6 +35,7 @@ export function Notebook({ initial, revision, reload, onSaved }: {
   const latest = useRef(notebook);
   latest.current = notebook;
   const ready = python.kind === "ready";
+  const [outline, setOutline] = useOutlineOpen();
   const setTitle = (title: string) => setNotebook({ ...latest.current, title });
 
   // each note starts with a clean Python: variables of another note do not leak into this one
@@ -126,8 +127,12 @@ export function Notebook({ initial, revision, reload, onSaved }: {
           <span className="brand"><Bolt /></span>
           <span className="app-name">electro</span>
         </div>
+        <button className={`float icon-button ${outline ? "open" : ""}`} onClick={() => setOutline(!outline)} aria-pressed={outline}
+                title={outline ? "Schowaj spis treści" : "Spis treści"} aria-label="Spis treści">
+          <OutlineIcon />
+        </button>
       </div>
-      <aside className="note-nav no-print">
+      <aside className={`note-nav no-print ${outline ? "open" : ""}`} inert={!outline}>
         <div className="note-nav-head">
           <TitleBox title={notebook.title} onChange={setTitle} />
         </div>
@@ -142,7 +147,7 @@ export function Notebook({ initial, revision, reload, onSaved }: {
       </div>
       <SyncNotice state={sync.state} onKeepMine={sync.keepMine} onTakeTheirs={sync.takeTheirs} />
 
-      <main className="with-nav">
+      <main className={outline ? "with-nav" : ""}>
         {/* the title is the note's first heading too (and the PDF's) */}
         <input className="doc-title no-print" value={notebook.title} placeholder="Bez tytułu" aria-label="Tytuł"
                spellCheck={false} onChange={(e) => setTitle(e.target.value)} />
@@ -178,6 +183,30 @@ export function Notebook({ initial, revision, reload, onSaved }: {
       </main>
     </div>
   );
+}
+
+const OUTLINE_KEY = "electro-outline";
+
+/** Is the table of contents open: as last left in this browser; at first, on wide screens. */
+function useOutlineOpen(): [boolean, (open: boolean) => void] {
+  const [open, setOpen] = useState(() => {
+    try {
+      const saved = localStorage.getItem(OUTLINE_KEY);
+      if (saved !== null) return saved === "1";
+    } catch {
+      // no storage: the default
+    }
+    return window.innerWidth >= 1200;
+  });
+  const set = (next: boolean) => {
+    setOpen(next);
+    try {
+      localStorage.setItem(OUTLINE_KEY, next ? "1" : "0");
+    } catch {
+      // not remembered — fine
+    }
+  };
+  return [open, set];
 }
 
 /** "Układ 1", "Układ 2", …: the first name no schematic has yet. */

@@ -303,7 +303,9 @@ try {
   {
     await page.setViewportSize({ width: 1700, height: 900 });
     const outline = page.locator("nav.outline");
-    await outline.waitFor(); // always there, under the title
+    const toggle = page.getByRole("button", { name: "Spis treści" });
+    if (!(await outline.isVisible())) await toggle.click(); // open (it is, at first, on wide screens)
+    await outline.waitFor();
     const entries = await outline.locator("a").allInnerTexts();
     await outline.getByRole("link", { name: "5. Za mało danych" }).click();
     await page.waitForTimeout(800);
@@ -311,6 +313,10 @@ try {
     check("table of contents: headings, a click scrolls there, the section is marked",
       entries.includes("1. Nieznany opór z pomiaru napięcia") && top > 40 && top < 140
       && (await outline.locator("a.active").innerText()) === "5. Za mało danych");
+    await toggle.click();
+    await page.waitForTimeout(400); // it slides away
+    check("table of contents: its switch hides it", !(await outline.isVisible()));
+    await toggle.click();
     await page.setViewportSize({ width: 1440, height: 900 });
   }
 
