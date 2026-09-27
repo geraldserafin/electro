@@ -1,0 +1,10 @@
+.devenv/
+.devenv.flake.nix
+.direnv/
+__pycache__/
+*.egg-info/
+.pytest_cache/
+.venv/
+uv.lock
+node_modules/
+dist/

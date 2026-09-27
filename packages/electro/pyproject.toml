@@ -1,0 +1,17 @@
+[project]
+name = "electro"
+version = "0.1.0"
+description = "Obwody elektryczne jako morfizmy kategorii hipergrafowej + solver krok po kroku"
+requires-python = ">=3.10"
+dependencies = ["sympy>=1.12"]
+
+[project.optional-dependencies]
+test = ["pytest"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]

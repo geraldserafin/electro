@@ -1,0 +1,25 @@
+# Monorepo root: a uv workspace of Python packages (apps/ will hold the web notebook).
+[project]
+name = "electro-workspace"
+version = "0.0.0"
+requires-python = ">=3.10"
+dependencies = ["electro", "electro-schematic", "electro-render"]
+
+[tool.uv]
+package = false
+
+[tool.uv.workspace]
+members = ["packages/*"]
+
+[tool.uv.sources]
+electro = { workspace = true }
+electro-schematic = { workspace = true }
+electro-render = { workspace = true }
+
+[dependency-groups]
+dev = ["pytest"]
+
+[tool.pytest.ini_options]
+testpaths = ["packages/electro/tests", "packages/electro-schematic/tests", "packages/electro-render/tests"]
+pythonpath = ["packages/electro/src", "packages/electro-schematic/src", "packages/electro-render/src"]
+addopts = "--import-mode=importlib"
