@@ -54,6 +54,27 @@ export const NotebookDocument = Schema.Struct(
 ).annotations({ identifier: "NotebookDocument" })
 export type NotebookDocument = typeof NotebookDocument.Type
 
+/**
+ * The start of a note, enough to draw a thumbnail of its first page: the first few cells, cut
+ * short (the server makes it when saving, so a list of notes needs no documents).
+ */
+export const PreviewCell = Schema.Union(
+  Schema.Struct({ type: Schema.Literal("markdown"), source: Schema.String }),
+  Schema.Struct({ type: Schema.Literal("code"), source: Schema.String }),
+  Schema.Struct({
+    type: Schema.Literal("schematic"),
+    name: Schema.String,
+    schematic: Schema.Struct({ elements: Schema.Array(Schema.Unknown), wires: Schema.Array(Schema.Unknown) }),
+  }),
+)
+export type PreviewCell = typeof PreviewCell.Type
+
+export const NotePreview = Schema.Struct({
+  codeInPdf: Schema.Boolean, // the page shows code cells only when the PDF does
+  cells: Schema.Array(PreviewCell),
+}).annotations({ identifier: "NotePreview" })
+export type NotePreview = typeof NotePreview.Type
+
 /** What a list of notes shows, without the documents themselves. */
 export const NoteSummary = Schema.Struct({
   id: NoteId,
@@ -63,6 +84,7 @@ export const NoteSummary = Schema.Struct({
   revision: Schema.Int,
   cells: Schema.Int,
   schematics: Schema.Int,
+  preview: NotePreview,
 }).annotations({ identifier: "NoteSummary" })
 export type NoteSummary = typeof NoteSummary.Type
 

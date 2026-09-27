@@ -189,36 +189,69 @@ input:focus, textarea:focus { outline: 2px solid var(--accent-soft); border-colo
 .status.error .dot { background: var(--danger); }
 @keyframes pulse { to { opacity: 0.3; } }
 
-/* notes on the server: the side panel, and the save sign in the bar */
-.library-panel {
-  position: fixed;
-  top: 52px;
-  left: 0;
-  bottom: 0;
-  z-index: 15;
-  width: 280px;
-  display: flex;
-  flex-direction: column;
-  border-right: 1px solid var(--line);
-  background: var(--bg);
+/* all notes: a gallery of first pages (like Figma's files) */
+.gallery { max-width: 1240px; margin: 0 auto; padding: 28px 32px 96px; }
+.gallery h1 { margin: 0 0 20px; font-size: 22px; font-weight: 500; }
+.gallery-grid { display: grid; grid-template-columns: repeat(auto-fill, 212px); gap: 28px 24px; }
+.gallery-note { margin-top: 24px; color: var(--muted); font-size: 14px; }
+.card { position: relative; display: grid; }
+.card-open, button.card.new { all: unset; cursor: pointer; display: grid; gap: 2px; align-content: start; }
+.card-open:focus-visible .thumb, button.card.new:focus-visible .thumb { outline: 2px solid var(--accent); outline-offset: 2px; }
+.card .thumb {
+  display: grid; place-items: center; width: 212px; aspect-ratio: 794 / 1123; overflow: hidden;
+  border-radius: 6px; background: #fff; box-shadow: 0 0 0 1px var(--line); margin-bottom: 8px;
+  transition: box-shadow 0.12s, transform 0.12s;
 }
-.library-panel header { display: flex; align-items: center; justify-content: space-between; padding: 12px 12px 8px 16px; }
-.library-panel h2 { margin: 0; font-size: 13px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); }
-.library-panel .new-note { gap: 4px; padding: 4px 12px 4px 8px; font-size: 14px; border: 1px solid var(--line); border-radius: 999px; }
-.library-panel ul { list-style: none; margin: 0; padding: 0 8px 16px; overflow-y: auto; }
-.library-panel li { position: relative; display: flex; border-radius: 8px; }
-.library-panel li:hover, .library-panel li.current { background: var(--hover); }
-.library-panel li.current { box-shadow: inset 3px 0 0 var(--accent); }
-.library-panel .open { flex: 1; min-width: 0; display: grid; gap: 1px; justify-items: start; padding: 8px 36px 8px 12px; text-align: left; }
-.library-panel .open:hover { background: transparent; }
-.library-panel .note-title { max-width: 100%; font-size: 15px; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.library-panel .meta { font-size: 12px; color: var(--muted); }
-.library-panel .delete { position: absolute; right: 4px; top: 50%; transform: translateY(-50%); padding: 6px; color: var(--muted); opacity: 0; }
-.library-panel li:hover .delete { opacity: 1; }
-.library-panel .delete:hover { color: var(--danger); background: var(--err-bg); }
-.muted.pad { padding: 8px 16px; font-size: 14px; }
-main.beside-library { margin-left: 280px; }
-@media (max-width: 900px) { main.beside-library { margin-left: auto; } } /* narrow: the panel covers */
+.card:hover .thumb { box-shadow: 0 0 0 1px var(--faint), 0 6px 18px rgba(0, 0, 0, 0.12); }
+.card.current .thumb { box-shadow: 0 0 0 2px var(--accent); }
+.card.new .thumb { background: transparent; box-shadow: none; border: 1.5px dashed var(--faint); color: var(--muted); }
+.card.new .thumb svg { width: 28px; height: 28px; }
+.card.new:hover .thumb { border-color: var(--text); color: var(--text); }
+.card-title { font-size: 15px; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 212px; }
+.card-meta { font-size: 13px; color: var(--muted); }
+.card-menu {
+  position: absolute; top: 8px; right: 8px; width: 30px; height: 30px; padding: 0; justify-content: center;
+  border-radius: 8px; background: var(--island); box-shadow: var(--island-shadow); color: var(--text);
+  opacity: 0; transition: opacity 0.12s;
+}
+.card:hover .card-menu, .card-menu[aria-expanded="true"] { opacity: 1; }
+.card-actions { top: 42px; left: auto; right: 8px; min-width: 180px; }
+
+/* a first page as the PDF has it: A4 at 96 dpi, white paper whatever the theme, scaled to the card */
+.page {
+  --bg: #fff; --paper: #fff; --board: #fff; --text: #1f1f1f; --muted: #5f6368; --line: #e0e0e0; --code-bg: #f5f5f5;
+  --primary: #1f1f1f; color-scheme: light;
+  align-self: start; justify-self: start;
+  width: 794px; min-height: 1123px; padding: 68px 60px; box-sizing: border-box;
+  transform: scale(0.267); transform-origin: top left; /* 212 / 794 */
+  background: #fff; color: var(--text); font-size: 15px; line-height: 1.55; pointer-events: none;
+}
+.page .markdown-view { padding: 0; }
+.page .page-code { font: 13px/1.5 var(--mono); background: var(--code-bg); border-radius: 6px; padding: 10px 12px; white-space: pre-wrap; }
+.page .print-drawing { position: static; visibility: visible; width: auto; height: auto; overflow: visible;
+                       display: flex; justify-content: center; margin: 8px 0 12px; }
+.page .print-drawing svg { max-width: 100%; height: auto; }
+
+/* the table of contents: in the right margin, on screens wide enough to have one */
+.outline { display: none; }
+@media (min-width: 1560px) {
+  .outline {
+    display: block; position: fixed; top: 84px; right: 28px; width: 190px; max-height: calc(100vh - 120px);
+    overflow-y: auto; font-size: 14px;
+  }
+}
+.outline h2 { margin: 0 0 8px; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: var(--faint); }
+.outline ul { list-style: none; margin: 0; padding: 0; border-left: 1px solid var(--line); }
+.outline li { margin: 0; }
+.outline a {
+  display: flex; align-items: center; gap: 6px; margin-left: -1px; padding: 4px 0 4px 12px;
+  border-left: 2px solid transparent; color: var(--muted); text-decoration: none; line-height: 1.35;
+}
+.outline a:hover { color: var(--text); }
+.outline a.active { color: var(--text); font-weight: 500; border-left-color: var(--accent); }
+.outline a svg { flex: none; width: 14px; height: 14px; }
+.cell, .cell .markdown-view :is(h1, h2, h3) { scroll-margin-top: 72px; } /* below the sticky bar */
+.spacer-title { flex: 1; }
 
 .sync { position: relative; }
 .sync.saving .icon-button { animation: pulse 0.8s ease-in-out infinite alternate; }

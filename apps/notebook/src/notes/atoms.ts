@@ -28,23 +28,5 @@ export const removeNote = NotesClient.mutation("notes", "remove");
 export const toDocument = (notebook: Notebook) => notebook as unknown as NotebookDocument;
 export const fromDocument = (document: NotebookDocument) => document as unknown as Notebook;
 
-const LIBRARY_KEY = "electro-library-open";
-
-/** Is the side panel with the notes open (remembered in this browser). */
-export const libraryOpenAtom = Atom.writable(
-  () => {
-    try {
-      return localStorage.getItem(LIBRARY_KEY) === "1";
-    } catch {
-      return false;
-    }
-  },
-  (ctx, open: boolean) => {
-    try {
-      localStorage.setItem(LIBRARY_KEY, open ? "1" : "0");
-    } catch {
-      // not remembered — fine
-    }
-    ctx.setSelf(open);
-  },
-).pipe(Atom.keepAlive);
+/** What the page shows: the open notebook, or all notes (the gallery). */
+export const viewAtom = Atom.make<"notebook" | "notes">("notebook").pipe(Atom.keepAlive);

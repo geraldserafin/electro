@@ -4,9 +4,10 @@
  */
 import { SqlClient, SqlSchema } from "@effect/sql"
 import {
-  Note, NoteNotFound, NoteSummary, NotebookDocument, RevisionConflict, type NoteId, type Saved,
+  Note, NoteNotFound, NotePreview, NoteSummary, NotebookDocument, RevisionConflict, type NoteId, type Saved,
 } from "@electro/notes-api"
 import { DateTime, Effect, Option, Schema } from "effect"
+import { preview } from "./preview.js"
 
 const Row = Schema.Struct({
   id: Schema.String,
@@ -17,6 +18,7 @@ const Row = Schema.Struct({
   saved_at: Schema.String,
   cells: Schema.Int,
   schematics: Schema.Int,
+  preview: Schema.parseJson(NotePreview),
 })
 
 const DocumentJson = Schema.parseJson(NotebookDocument)
@@ -39,7 +41,7 @@ export class NotesRepo extends Effect.Service<NotesRepo>()("NotesRepo", {
     const list = summaries().pipe(
       Effect.map((rows) => rows.map((r): NoteSummary => ({
         id: r.id, title: r.title, modified: r.modified, savedAt: r.saved_at, revision: r.revision,
-        cells: r.cells, schematics: r.schematics,
+        cells: r.cells, schematics: r.schematics, preview: r.preview,
       }))),
       Effect.orDie, // a broken database is a server error, not something the client can act on
       Effect.withSpan("NotesRepo.list"),
@@ -74,6 +76,7 @@ export class NotesRepo extends Effect.Service<NotesRepo>()("NotesRepo", {
           id: document.id, title: document.title, document: json, revision, modified: document.modified,
           saved_at: savedAt, cells: document.cells.length,
           schematics: document.cells.filter((c) => c.type === "schematic").length,
+          preview: JSON.stringify(preview(document)),
         }
         yield* (Option.isSome(stored)
           ? sql`UPDATE notes SET ${sql.update(row, ["id"])} WHERE id = ${document.id}`

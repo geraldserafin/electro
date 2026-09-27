@@ -1,0 +1,74 @@
+// The table of contents on the right: the headings of the text cells and the schematics, in
+// order. A click scrolls there; the section being read is marked. Shown on wide screens only,
+// in the margin next to the notebook, so it never covers or pushes anything.
+import { useEffect, useMemo, useState } from "react";
+import { SchematicIcon } from "./icons";
+import type { Cell } from "./types";
+
+type Entry = { key: string; cell: string; nth: number; level: number; text: string; schematic?: boolean };
+
+/** "## Wyniki **R**" → level 2, "Wyniki R"; headings inside ``` blocks are code, not headings. */
+function headings(cell: Cell): Entry[] {
+  if (cell.type === "schematic") return [{ key: cell.id, cell: cell.id, nth: 0, level: 3, text: cell.name, schematic: true }];
+  if (cell.type !== "markdown") return [];
+  const out: Entry[] = [];
+  let fenced = false;
+  cell.source.split("\n").forEach((line, i) => {
+    if (/^\s*(```|~~~)/.test(line)) fenced = !fenced;
+    const m = !fenced && line.match(/^(#{1,3})\s+(.+?)\s*#*\s*$/);
+    if (m) out.push({ key: `${cell.id}:${i}`, cell: cell.id, nth: out.length, level: m[1].length, text: plain(m[2]) });
+  });
+  return out;
+}
+
+/** Where an entry is on the page: its heading in the rendered text, else its cell. */
+function place(e: Entry): HTMLElement | null {
+  const cell = document.getElementById(`cell-${e.cell}`);
+  if (!cell || e.schematic) return cell;
+  const found = cell.querySelectorAll<HTMLElement>(".markdown-view:not(.print-only) :is(h1, h2, h3)");
+  return found[e.nth] ?? cell;
+}
+
+const plain = (s: string) => s.replace(/[*_`$]/g, "").replace(/\[(.*?)\]\(.*?\)/g, "$1").replace(/\\,/g, " ");
+
+export function Outline({ cells }: { cells: Cell[] }) {
+  const entries = useMemo(() => cells.flatMap(headings), [cells]);
+  const [active, setActive] = useState<string | null>(null);
+
+  // the section being read: the last entry whose cell starts above a line under the app bar
+  useEffect(() => {
+    const onScroll = () => {
+      let current: string | null = null;
+      for (const e of entries) {
+        const el = place(e);
+        if (el && el.getBoundingClientRect().top < 140) current = e.key;
+      }
+      setActive(current ?? entries[0]?.key ?? null);
+    };
+    onScroll();
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
+  }, [entries]);
+
+  if (entries.length < 2) return null;
+  const top = Math.min(...entries.map((e) => e.level));
+  return (
+    <nav className="outline no-print" aria-label="Spis treści">
+      <h2>Spis treści</h2>
+      <ul>
+        {entries.map((e) => (
+          <li key={e.key} style={{ paddingLeft: (e.level - top) * 12 }}>
+            <a href={`#cell-${e.cell}`} className={active === e.key ? "active" : ""}
+               onClick={(event) => {
+                 event.preventDefault();
+                 place(e)?.scrollIntoView({ behavior: "smooth", block: "start" });
+               }}>
+              {e.schematic && <SchematicIcon />}
+              {e.text}
+            </a>
+          </li>
+        ))}
+      </ul>
+    </nav>
+  );
+}

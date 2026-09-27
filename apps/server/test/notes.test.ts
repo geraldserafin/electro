@@ -36,9 +36,26 @@ describe("notes API", () => {
       expect(saved.revision).toBe(1)
       const [summary] = yield* api.notes.list()
       expect(summary).toMatchObject({ id: "n1", title: "Sprawozdanie", revision: 1, cells: 3, schematics: 1 })
+      // the first page, for a thumbnail: text, the drawing, the code (it is in the PDF)
+      expect(summary!.preview).toEqual({ codeInPdf: true, cells: [
+        { type: "markdown", source: "# Cel" },
+        { type: "schematic", name: "Układ 1", schematic: { elements: [], wires: [] } },
+        { type: "code", source: "układ1.solve()" },
+      ] })
       const note = yield* api.notes.get({ path: { id: "n1" } })
       expect(note.revision).toBe(1)
       expect(note.document).toEqual(doc("n1")) // outputs, results and all: stored as sent
+    }).pipe(Effect.provide(TestServer)))
+
+  it.effect("the preview is short, and without code when the PDF has none", () =>
+    Effect.gen(function* () {
+      const api = yield* client
+      const long = { id: "m", type: "markdown" as const, source: "x".repeat(5000) }
+      const document = { ...doc("n3"), settings: { codeInPdf: false }, cells: [long, ...doc("n3").cells, long] }
+      yield* api.notes.save({ path: { id: "n3" }, payload: { document, baseRevision: null } })
+      const [summary] = yield* api.notes.list()
+      expect(summary!.preview.cells.map((c) => c.type)).toEqual(["markdown"])
+      expect((summary!.preview.cells[0] as { source: string }).source.length).toBe(1600)
     }).pipe(Effect.provide(TestServer)))
 
   it.effect("keys the contract does not name pass through", () =>

@@ -8,8 +8,9 @@ import { Config, Effect, Layer } from "effect"
 import { mkdirSync } from "node:fs"
 import { dirname } from "node:path"
 import notes from "./migrations/0001_notes.js"
+import preview from "./migrations/0002_preview.js"
 
-const migrations = SqliteMigrator.fromRecord({ "0001_notes": notes })
+const migrations = SqliteMigrator.fromRecord({ "0001_notes": notes, "0002_preview": preview })
 
 /** SQLite at `filename`, migrated to the current schema. */
 export const layer = (filename: string) => {

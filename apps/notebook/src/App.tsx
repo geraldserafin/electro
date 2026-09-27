@@ -3,8 +3,10 @@ import { CodeCell, MarkdownCell, SchematicCell } from "./cells/Cells";
 import { Bolt, Down, Export, More, Notes, Plus, RunAll, Trash, Up } from "./icons";
 import { useAtom } from "@effect-atom/atom-react";
 import { copyOf } from "./format";
-import { libraryOpenAtom } from "./notes/atoms";
-import { Library, SyncStatus } from "./notes/Library";
+import { viewAtom } from "./notes/atoms";
+import { Gallery } from "./notes/Gallery";
+import { SyncStatus } from "./notes/SyncStatus";
+import { Outline } from "./Outline";
 import { useNotesSync } from "./notes/sync";
 import { kernel } from "./python/kernel";
 import { download, load, newCell, save, upload } from "./storage";
@@ -44,7 +46,8 @@ export function App() {
     executions.current = 0;
     setNotebook(next);
   });
-  const [libraryOpen, setLibraryOpen] = useAtom(libraryOpenAtom);
+  const [view, setView] = useAtom(viewAtom);
+  const gallery = view === "notes";
   const fileInput = useRef<HTMLInputElement>(null);
   const latest = useRef(notebook);
   latest.current = notebook;
@@ -169,48 +172,61 @@ export function App() {
     <div className={`notebook ${notebook.settings.codeInPdf ? "" : "hide-code-in-print"}`}>
       {/* one line: logo, title — Python's state, run all, PDF, and the rest under "⋯" */}
       <header className="appbar no-print">
-        <button className={`icon-button ${libraryOpen ? "open" : ""}`} onClick={() => setLibraryOpen(!libraryOpen)}
-                title="Notatki" aria-label="Notatki" aria-expanded={libraryOpen}><Notes /></button>
+        <button className={`icon-button ${gallery ? "open" : ""}`} onClick={() => setView(gallery ? "notebook" : "notes")}
+                title={gallery ? "Wróć do notatki" : "Wszystkie notatki"} aria-label="Notatki" aria-pressed={gallery}>
+          <Notes />
+        </button>
         <div className="brand" title="electro — notatnik elektroniki"><Bolt /></div>
-        <input className="title" value={notebook.title} placeholder="Bez tytułu" aria-label="Tytuł notatnika"
-               onChange={(e) => setNotebook({ ...notebook, title: e.target.value })} />
+        {gallery
+          ? <span className="title spacer-title" />
+          : <input className="title" value={notebook.title} placeholder="Bez tytułu" aria-label="Tytuł notatnika"
+                   onChange={(e) => setNotebook({ ...notebook, title: e.target.value })} />}
         <SyncStatus state={sync.state} onKeepMine={sync.keepMine} onTakeTheirs={sync.takeTheirs} />
         <div className={`status ${status}`} title={statusText} role="status" aria-label={statusText}>
           <span className="dot" /> Python
         </div>
-        <button className="icon-button" onClick={runAll} disabled={status !== "ready"}
-                title="Uruchom wszystko" aria-label="Uruchom wszystko"><RunAll /></button>
-        <button className="icon-button" onClick={() => window.print()} title="Eksport do PDF" aria-label="Eksport PDF">
-          <Export />
-        </button>
-        <Menu label={<More />} title="Więcej" right>
-          <button onClick={() => fileInput.current?.click()}>Otwórz plik…</button>
-          <button onClick={() => download(notebook)}>Zapisz plik</button>
-          <hr />
-          {EXAMPLES.map((example, i) => (
-            <button key={i} onClick={() => openExample(example)}>Przykład: {example.title}</button>
-          ))}
-          <hr />
-          <label className="check">
-            <input type="checkbox" checked={notebook.settings.codeInPdf}
-                   onChange={(e) => setNotebook({ ...notebook, settings: { ...notebook.settings, codeInPdf: e.target.checked } })} />
-            pokazuj kod w PDF
-          </label>
-          <button onClick={resetKernel} disabled={status !== "ready"}>Wyczyść pamięć Pythona</button>
-        </Menu>
+        {/* the notebook's own actions: not in the gallery */}
+        {!gallery && (
+          <>
+            <button className="icon-button" onClick={runAll} disabled={status !== "ready"}
+                    title="Uruchom wszystko" aria-label="Uruchom wszystko"><RunAll /></button>
+            <button className="icon-button" onClick={() => window.print()} title="Eksport do PDF" aria-label="Eksport PDF">
+              <Export />
+            </button>
+            <Menu label={<More />} title="Więcej" right>
+              <button onClick={() => fileInput.current?.click()}>Otwórz plik…</button>
+              <button onClick={() => download(notebook)}>Zapisz plik</button>
+              <hr />
+              {EXAMPLES.map((example, i) => (
+                <button key={i} onClick={() => openExample(example)}>Przykład: {example.title}</button>
+              ))}
+              <hr />
+              <label className="check">
+                <input type="checkbox" checked={notebook.settings.codeInPdf}
+                       onChange={(e) => setNotebook({ ...notebook, settings: { ...notebook.settings, codeInPdf: e.target.checked } })} />
+                pokazuj kod w PDF
+              </label>
+              <button onClick={resetKernel} disabled={status !== "ready"}>Wyczyść pamięć Pythona</button>
+            </Menu>
+          </>
+        )}
         <input ref={fileInput} type="file" accept=".json" hidden onChange={(e) => open(e.target.files?.[0])} />
       </header>
 
-      {libraryOpen && (
-        <Library currentId={notebook.id} onOpen={sync.open} onCreate={sync.create}
+      {gallery && (
+        <Gallery currentId={notebook.id} library={library}
+                 onOpen={(id) => { setView("notebook"); if (id !== notebook.id) void sync.open(id); }}
+                 onCreate={() => { setView("notebook"); void sync.create(); }}
                  onDelete={(note) => confirm(`Usunąć notatkę „${note.title || "Bez tytułu"}”? Tego nie da się cofnąć.`)
                    && sync.destroy(note.id)} />
       )}
-      <main className={libraryOpen ? "beside-library" : ""}>
+      {!gallery && <Outline cells={notebook.cells} />}
+      <main hidden={gallery}>
         <AddRow onAdd={(type) => insert(0, type)} />
         {notebook.cells.map((cell, index) => (
           <section
             key={cell.id}
+            id={`cell-${cell.id}`}
             className={`cell cell-${cell.type} ${focused === cell.id ? "focused" : ""}`}
             onFocusCapture={() => setFocused(cell.id)}
             onPointerDownCapture={() => setFocused(cell.id)}

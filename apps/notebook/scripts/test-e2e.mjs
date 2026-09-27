@@ -282,6 +282,22 @@ try {
   check("examples run without errors", (await page.locator(".output-error").count()) === 0
     && (await page.locator(".cell-code .outputs").count()) === (await page.locator(".cell-code").count()));
 
+  // the table of contents: on a wide screen, headings of the text cells; a click scrolls there
+  {
+    await page.setViewportSize({ width: 1700, height: 900 });
+    const outline = page.locator("nav.outline");
+    await outline.waitFor();
+    const entries = await outline.locator("a").allInnerTexts();
+    await outline.getByRole("link", { name: "5. Za mało danych" }).click();
+    await page.waitForTimeout(800);
+    const top = await page.locator("h2", { hasText: "5. Za mało danych" }).evaluate((h) => h.getBoundingClientRect().top);
+    check("table of contents: headings, a click scrolls there, the section is marked",
+      entries.includes("1. Nieznany opór z pomiaru napięcia") && top > 40 && top < 140
+      && (await outline.locator("a.active").innerText()) === "5. Za mało danych");
+    await page.setViewportSize({ width: 1100, height: 900 });
+  }
+
+
   // text cells: rendered; a click shows the plain Markdown; leaving it renders it again
   {
     const cell = page.locator(".markdown-cell").first();
@@ -343,29 +359,37 @@ try {
       && saved.title === "Stary notatnik" && !("data" in saved.cells[1]) && typeof saved.id === "string");
   }
 
-  // notes on the server: the open notebook saves itself; a second note; switching; a conflict
+  // notes on the server: the open notebook saves itself; the gallery; a second note; a conflict
   {
-    const library = page.locator(".library-panel");
     const title = page.locator(".appbar .title");
     const savedSign = page.locator(".sync.saved");
-    await page.getByRole("button", { name: "Notatki" }).click();
-    await library.locator("li.current").waitFor({ timeout: 10_000 });
+    const gallery = page.locator(".gallery");
+    const cards = gallery.locator(".card:not(.new)");
+    const toGallery = async () => {
+      await page.getByRole("button", { name: "Notatki" }).click();
+      await gallery.waitFor();
+    };
+    await savedSign.waitFor({ timeout: 10_000 });
     const firstTitle = await title.inputValue();
-    check("the open notebook is on the server", (await library.locator("li.current .note-title").innerText()) === firstTitle);
+    await toGallery();
+    await gallery.locator(".card.current").waitFor({ timeout: 10_000 });
+    check("the gallery: the open note, with its first page as a thumbnail",
+      (await gallery.locator(".card.current .card-title").innerText()) === firstTitle
+      && (await gallery.locator(".card.current .page").innerText()).includes("wersji 1") && !(await page.locator("main").isVisible()));
+    const id = await gallery.locator(".card.current").getAttribute("data-id");
 
-    const count = () => library.locator("li").count();
-    const waitForCount = (n) => page.waitForFunction((n) => document.querySelectorAll(".library-panel li").length === n, n, { timeout: 10_000 });
-    const before = await count();
-    await library.getByRole("button", { name: /Nowa/ }).click();
+    const before = await cards.count();
+    await gallery.getByRole("button", { name: "Nowa notatka" }).click();
     await title.fill("Druga notatka");
-    await waitForCount(before + 1);
-    await library.locator("li", { hasText: firstTitle }).locator(".open").click();
-    await page.waitForFunction((t) => document.querySelector(".appbar .title").value === t, firstTitle, { timeout: 10_000 });
-    check("a second note; switching back opens the first", (await count()) === before + 1
-      && (await page.locator(".cell").count()) > 1);
+    await page.locator(".sync.saved").waitFor({ timeout: 10_000 });
+    await page.waitForTimeout(1200); // the next save, with the title
+    await toGallery();
+    await page.waitForFunction((n) => document.querySelectorAll(".gallery .card:not(.new)").length === n, before + 1, { timeout: 10_000 });
+    await gallery.locator(`.card[data-id="${id}"] .card-open`).click();
+    await page.waitForFunction((t) => document.querySelector(".appbar .title")?.value === t, firstTitle, { timeout: 10_000 });
+    check("a second note; opening the first from the gallery", (await page.locator(".cell").count()) > 1);
 
     // someone saves the same note elsewhere (a direct call, as another tab would)
-    const id = await library.locator("li.current").getAttribute("data-id");
     await savedSign.waitFor();
     const note = await (await fetch(`${notesUrl}/api/notes/${id}`)).json();
     await fetch(`${notesUrl}/api/notes/${id}`, { method: "PUT", headers: { "content-type": "application/json" },
@@ -377,9 +401,13 @@ try {
     await page.waitForFunction(() => document.querySelector(".appbar .title").value === "Zmienione gdzie indziej", null, { timeout: 10_000 });
     check("a conflict is shown and resolved by taking the server's version", await savedSign.isVisible());
 
+    await toGallery();
+    const second = gallery.locator(".card", { hasText: "Druga notatka" });
+    await second.hover();
+    await second.getByRole("button", { name: "Więcej" }).click();
     page.once("dialog", (d) => d.accept());
-    await library.locator("li", { hasText: "Druga notatka" }).locator(".delete").click({ force: true });
-    await waitForCount(before);
+    await second.getByRole("menuitem", { name: "Usuń notatkę" }).click();
+    await page.waitForFunction((n) => document.querySelectorAll(".gallery .card:not(.new)").length === n, before, { timeout: 10_000 });
     check("a note is deleted", (await (await fetch(`${notesUrl}/api/notes`)).json()).length === before);
   }
 
