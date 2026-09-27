@@ -24,7 +24,8 @@ async function start(bundleUrl: string): Promise<Kernel> {
   const { loadPyodide } = await import(/* @vite-ignore */ `${PYODIDE}pyodide.mjs`);
   const py: PyodideAPI = await loadPyodide({ indexURL: PYODIDE });
   await py.loadPackage(["sympy"]);
-  const bundle: Record<string, string> = await (await fetch(bundleUrl)).json();
+  // no-cache: after the Python sources change, a reload must not get the old bundle
+  const bundle: Record<string, string> = await (await fetch(bundleUrl, { cache: "no-cache" })).json();
   for (const [path, source] of Object.entries(bundle)) {
     const full = `/home/pyodide/lib/${path}`;
     py.FS.mkdirTree(full.slice(0, full.lastIndexOf("/")));

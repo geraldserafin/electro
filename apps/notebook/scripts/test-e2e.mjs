@@ -5,7 +5,7 @@ import { tmpdir } from "node:os";
 import { webkit } from "playwright";
 
 const port = 4174;
-const server = spawn("pnpm", ["exec", "vite", "preview", "--port", String(port), "--strictPort"], { stdio: "ignore" });
+const server = spawn("pnpm", ["exec", "vite", "preview", "--port", String(port), "--strictPort"], { stdio: "ignore", detached: true });  // own process group, see the end
 const shots = process.env.SHOTS ?? tmpdir();  // screenshots, for looking at by hand
 let failed = false;
 const check = (name, ok) => {
@@ -178,6 +178,6 @@ try {
   if (errors.length) console.log(errors);
   await browser.close();
 } finally {
-  server.kill();
+  process.kill(-server.pid);  // pnpm and the vite it started
 }
 process.exit(failed ? 1 : 0);
