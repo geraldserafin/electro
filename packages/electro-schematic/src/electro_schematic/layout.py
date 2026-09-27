@@ -240,8 +240,9 @@ def _parallel(c: ct.Par, frame: Frame, ctx: _Context, outer: bool = True) -> Blo
     if outer:
         block.wire((0, 0), (STUB, 0))
         block.wire((STUB + inner, 0), (inner + 2 * STUB, 0))
-    block.wire((STUB, 0), (STUB, last))
-    block.wire((STUB + inner, 0), (STUB + inner, last))
+    for a, b in zip(offsets, offsets[1:]):  # bus split at every branch, so each branch meets a wire end
+        block.wire((STUB, a), (STUB, b))
+        block.wire((STUB + inner, a), (STUB + inner, b))
     return block
 
 
@@ -252,7 +253,8 @@ def _shunt(c: ct.Shunt, frame: Frame, ctx: _Context) -> Block:
     node = max(1, math.ceil(vmax + 0.4))
     block = Block(frame, node + max(1, math.ceil(-vmin + 0.4)))
     block.place(child, Transform(0, -1, 1, 0, node, 0))
-    block.wire((0, 0), (block.length, 0))
+    block.wire((0, 0), (node, 0))
+    block.wire((node, 0), (block.length, 0))
     block.items.append(Item("ground", [(node, child.length)], frame.box(-0.6, 0.6, 0, 1)))
     return block
 

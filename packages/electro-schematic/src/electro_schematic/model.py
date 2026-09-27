@@ -2,6 +2,8 @@
 
 This is one more syntax for a circuit: two pins (or wire ends) on the same grid point
 are connected, exactly like two terminals with the same node name in ``net(...)``.
+Wires connect only with their ends (as in KiCad): a wire merely passing over a pin
+or crossing another wire does not connect to it.
 Gluing by coordinates is the same colimit as gluing by names, so ``to_circuit`` just
 builds a netlist and the core solves it like any other circuit.
 """
@@ -131,39 +133,57 @@ class Schematic:
 
     # ------------------------------------------------------------------ connectivity
 
-    def nodes(self) -> dict[Point, Point]:
-        """Grid point → representative point of its node (union–find over pins and wires)."""
-        parent: dict[Point, Point] = {}
+    def nodes(self) -> dict[Point, object]:
+        """Grid point → its node (a representative), for every pin and wire point.
 
-        def find(p):
-            parent.setdefault(p, p)
-            while parent[p] != p:
-                parent[p] = parent[parent[p]]
-                p = parent[p]
-            return p
+        What connects (as in KiCad): pins on the same point; a wire end on a pin; a wire
+        end that is *not* on a pin touching another wire (its end, corner or middle — a
+        T-junction). A wire merely passing over a pin, or crossing another wire, does not.
+        """
+        parent: dict = {}
+
+        def find(x):
+            parent.setdefault(x, x)
+            while parent[x] != x:
+                parent[x] = parent[parent[x]]
+                x = parent[x]
+            return x
 
         def union(a, b):
             parent[find(a)] = find(b)
 
-        pins = [p for e in self.elements for p in e.pins()]
-        ends = [p for w in self.wires for p in (w.points[0], w.points[-1])]
-        for p in pins:
-            find(p)
-        for w in self.wires:
-            for a, b in w.segments():
-                union(a, b)
-                for p in pins + ends:  # T-junctions and pins touching a wire
-                    if on_segment(p, a, b):
-                        union(p, a)
-        by_label: dict[str, Point] = {}
+        pin_at: dict[Point, list] = {}
+        for e in self.elements:
+            for i, p in enumerate(e.pins()):
+                pin_at.setdefault(p, []).append(("pin", e.id, i))
+        for keys in pin_at.values():
+            for k in keys:
+                union(k, keys[0])
+        for i, w in enumerate(self.wires):
+            find(("wire", i))
+            for end in (w.points[0], w.points[-1]):
+                if end in pin_at:
+                    union(("wire", i), pin_at[end][0])
+        for i, w in enumerate(self.wires):
+            for end in (w.points[0], w.points[-1]):
+                if end in pin_at:
+                    continue  # an end on a pin belongs to that pin
+                for j, v in enumerate(self.wires):
+                    if j != i and (end in v.points or any(on_segment(end, a, b) for a, b in v.segments())):
+                        union(("wire", i), ("wire", j))
+        by_label: dict[str, object] = {}
         for e in self.elements:
             name = "GND" if e.kind == "ground" else e.text if e.kind == "label" else None
             if name:
-                p = e.pins()[0]
+                key = pin_at[e.pins()[0]][0]
                 if name in by_label:
-                    union(p, by_label[name])
-                by_label.setdefault(name, p)
-        return {p: find(p) for p in list(parent)}
+                    union(key, by_label[name])
+                by_label.setdefault(name, key)
+        result = {p: find(keys[0]) for p, keys in pin_at.items()}
+        for i, w in enumerate(self.wires):
+            for p in w.points:
+                result.setdefault(p, find(("wire", i)))
+        return result
 
     def to_circuit(self) -> ct.Circuit:
         """The circuit this drawing shows, as a netlist (element ids become labels)."""
@@ -208,11 +228,21 @@ class Schematic:
         self._drag(dict(zip(old, e.pins())))
 
     def rotate(self, id: str, by: int = 90) -> None:
-        """Rotate an element about its first pin; attached wires follow."""
+        """Rotate an element about its middle; wires stay where they are.
+
+        After 90° its pins come off their wires; after 180° they land on the same wire
+        ends, swapped — the element is reversed in place (e.g. a source's polarity).
+        """
         e = self.element(id)
-        old = e.pins()
+
+        def middle():
+            ps = e.pins()
+            return (sum(p[0] for p in ps) / len(ps), sum(p[1] for p in ps) / len(ps))
+
+        bx, by_ = middle()
         e.rotation = (e.rotation + by) % 360
-        self._drag(dict(zip(old, e.pins())))
+        ax, ay = middle()
+        e.at = (e.at[0] + round(bx - ax), e.at[1] + round(by_ - ay))
 
     def _drag(self, moved: dict[Point, Point]) -> None:
         for w in self.wires:
@@ -220,13 +250,14 @@ class Schematic:
                 target = moved.get(w.points[end])
                 if target is None or target == w.points[end]:
                     continue
-                pts = w.points if end == -1 else w.points[::-1]
-                if len(pts) == 1:
-                    pts = [target]
-                else:
-                    prev = pts[-2]
-                    elbow = (prev[0], target[1]) if prev[0] == pts[-1][0] else (target[0], prev[1])
-                    pts = pts[:-1] + [elbow, target]
+                pts = list(w.points if end == -1 else w.points[::-1])
+                prev, last = pts[-2], pts[-1]
+                if len(pts) >= 3:  # slide the last segment along with the pin (no overlaps)
+                    pts[-2] = (prev[0], target[1]) if prev[1] == last[1] else (target[0], prev[1])
+                    pts[-1] = target
+                else:  # a single segment: add a corner
+                    corner = (target[0], prev[1])
+                    pts = [prev, corner, target]
                 w.points = _simplify(pts if end == -1 else pts[::-1])
 
     # ------------------------------------------------------------------ JSON

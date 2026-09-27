@@ -113,24 +113,23 @@ def _tspans(text: str) -> str:
 # --------------------------------------------------------------------------- drawing
 
 def _junctions(sch: Schematic) -> list[tuple[int, int]]:
-    """Grid points where three or more wires/pins meet."""
+    """Grid points where three or more connected wires/pins meet (same rules as Schematic.nodes)."""
     count: Counter = Counter()
-    pins = [p for e in sch.elements if e.kind != "label" for p in e.pins()]
-    ends = []
+    pins = {p for e in sch.elements if e.kind != "label" for p in e.pins()}
+    for e in sch.elements:
+        if e.kind != "label":
+            for p in e.pins():
+                count[p] += 1
+    free_ends = set()
     for w in sch.wires:
-        ends += [w.points[0], w.points[-1]]
-        count[w.points[0]] += 1
-        count[w.points[-1]] += 1
-        for p in w.points[1:-1]:
-            count[p] += 2
-    for p in pins:
-        count[p] += 1
-    touching = set(ends + pins)
-    for w in sch.wires:
-        for a, b in w.segments():
-            for p in touching:
-                if on_segment(p, a, b):
-                    count[p] += 2
+        for end in (w.points[0], w.points[-1]):
+            count[end] += 1
+            if end not in pins:
+                free_ends.add(end)
+    for w in sch.wires:  # a free end on another wire's corner or middle: that wire counts twice
+        for p in free_ends:
+            if p in w.points[1:-1] or any(on_segment(p, a, b) for a, b in w.segments()):
+                count[p] += 2
     return [p for p, n in count.items() if n >= 3]
 
 

@@ -46,6 +46,33 @@ try {
   check("inspector shows the new label", (await page.locator(".inspector input").first().inputValue()) === "R_5");
   await canvas.screenshot({ path: `${shots}/editor.png` });
 
+  // wiring by hand in a fresh schematic: drag from a pin, then the wire tool; rotation
+  await page.locator("main > .add-row").getByRole("button", { name: "+ Schemat" }).click();
+  const cell = page.locator(".cell-schematic").first();
+  const grid = cell.locator(".canvas");
+  const at = async (gx, gy) => { const b = await grid.boundingBox(); return [b.x + gx * 20, b.y + gy * 20]; };
+  const click = async (gx, gy) => { const [x, y] = await at(gx, gy); await page.mouse.click(x, y); };
+  const code = async () => {
+    await cell.getByRole("button", { name: "Pokaż kod" }).click();
+    await page.waitForTimeout(800);
+    const text = await page.locator(".cell-code .cm-content").first().innerText();
+    await page.locator(".cell-code").first().getByTitle("Usuń komórkę").click();
+    return text;
+  };
+  await cell.getByTitle("Źródło napięcia").click(); await click(4, 6);
+  await cell.getByTitle("Rezystor").click(); await click(12, 3);
+  check("new elements show open pins", (await grid.locator(".open-pin").count()) === 4);
+  const [x1, y1] = await at(8, 6); const [x2, y2] = await at(12, 3);
+  await page.mouse.move(x1, y1); await page.mouse.down(); await page.mouse.move(x2, y2, { steps: 8 }); await page.mouse.up();
+  await cell.getByRole("button", { name: "Przewód" }).click();
+  for (const p of [[16, 3], [20, 3], [20, 10], [4, 10], [4, 6]]) await click(...p);  // ends on a pin by itself
+  await page.keyboard.press("Escape");
+  check("wired into a loop", (await code()) === "uklad = loop(VoltageSource(), Resistor())");
+  await click(14, 3); await page.keyboard.press("r");
+  check("rotating 90° disconnects", (await grid.locator(".open-pin").count()) === 2);
+  await click(14, 3); await page.keyboard.press("r");
+  check("rotating 180° reverses in place", (await code()) === "uklad = loop(VoltageSource(), Resistor())");
+
   check("no page errors", errors.length === 0);
   if (errors.length) console.log(errors);
   await browser.close();

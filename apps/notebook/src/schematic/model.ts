@@ -52,7 +52,7 @@ export function nextId(sch: SchematicData, kind: string): string {
   return `${prefix}${sep}${Math.max(0, ...used) + 1}`;
 }
 
-function simplify(points: Point[]): Point[] {
+export function simplify(points: Point[]): Point[] {
   const out: Point[] = [];
   for (const p of points) {
     if (out.length && same(out[out.length - 1], p)) continue;
@@ -68,7 +68,10 @@ function simplify(points: Point[]): Point[] {
   return out;
 }
 
-/** Wires whose ends sat on a moved pin follow it, with an elbow to stay horizontal/vertical. */
+/**
+ * Wires whose ends sat on a moved pin follow it. The last segment slides along with the
+ * pin (as in CAD tools), so dragging never folds a wire back over itself or another wire.
+ */
 function drag(wires: WireData[], moved: Map<string, Point>): WireData[] {
   return wires.map((w) => {
     let pts = w.points;
@@ -77,10 +80,13 @@ function drag(wires: WireData[], moved: Map<string, Point>): WireData[] {
       const target = moved.get(key(at));
       if (!target || same(target, at)) continue;
       const path = end === -1 ? [...pts] : [...pts].reverse();
-      const last = path[path.length - 1];
-      const prev = path[path.length - 2];
-      const elbow: Point = prev[0] === last[0] ? [prev[0], target[1]] : [target[0], prev[1]];
-      const next = simplify([...path.slice(0, -1), elbow, target]);
+      const n = path.length;
+      const [prev, last] = [path[n - 2], path[n - 1]];
+      if (n >= 3) {
+        path[n - 2] = prev[1] === last[1] ? [prev[0], target[1]] : [target[0], prev[1]];
+        path[n - 1] = target;
+      } else path.splice(n - 1, 1, [target[0], prev[1]], target);
+      const next = simplify(path);
       pts = end === -1 ? next : next.reverse();
     }
     return { points: pts };
@@ -102,24 +108,104 @@ export function updateElement(
   };
 }
 
-/** Grid points where three or more wires/pins meet (drawn as dots). */
-export function junctions(sch: SchematicData, lib: SymbolLibrary): Point[] {
+/**
+ * Connection rules (same as electro_schematic.Schematic.nodes): pins on the same point;
+ * a wire end on a pin; a wire end that is not on a pin touching another wire (T-junction).
+ * A wire passing over a pin, or crossing another wire, does not connect.
+ */
+function freeEnds(sch: SchematicData, lib: SymbolLibrary): Point[] {
+  const pinKeys = new Set(sch.elements.filter((e) => e.kind !== "label").flatMap((e) => pins(e, lib)).map(key));
+  return sch.wires.flatMap((w) => [w.points[0], w.points[w.points.length - 1]]).filter((p) => !pinKeys.has(key(p)));
+}
+
+const touchesWire = (p: Point, w: WireData) =>
+  w.points.slice(1, -1).some((q) => same(q, p)) || w.points.slice(1).some((q, i) => onSegment(p, w.points[i], q));
+
+/** How many connected things meet at each grid point (a wire counts twice where it passes). */
+export function connections(sch: SchematicData, lib: SymbolLibrary): Map<string, number> {
   const count = new Map<string, number>();
   const bump = (p: Point, n: number) => count.set(key(p), (count.get(key(p)) ?? 0) + n);
-  const pinPoints = sch.elements.filter((e) => e.kind !== "label").flatMap((e) => pins(e, lib));
-  const ends: Point[] = [];
-  for (const w of sch.wires) {
-    ends.push(w.points[0], w.points[w.points.length - 1]);
-    bump(w.points[0], 1);
-    bump(w.points[w.points.length - 1], 1);
-    w.points.slice(1, -1).forEach((p) => bump(p, 2));
+  sch.elements.filter((e) => e.kind !== "label").flatMap((e) => pins(e, lib)).forEach((p) => bump(p, 1));
+  sch.wires.forEach((w) => [w.points[0], w.points[w.points.length - 1]].forEach((p) => bump(p, 1)));
+  for (const p of new Map(freeEnds(sch, lib).map((q) => [key(q), q])).values())
+    for (const w of sch.wires) if (touchesWire(p, w)) bump(p, 2);
+  return count;
+}
+
+/** Grid points where three or more wires/pins meet (drawn as dots). */
+export function junctions(sch: SchematicData, lib: SymbolLibrary): Point[] {
+  return [...connections(sch, lib).entries()].filter(([, n]) => n >= 3).map(([k]) => k.split(",").map(Number) as Point);
+}
+
+/** Pins with nothing attached (shown in red, so it is obvious what is not connected yet). */
+export function openPins(sch: SchematicData, lib: SymbolLibrary): Point[] {
+  const count = connections(sch, lib);
+  return sch.elements
+    .filter((e) => isComponent(e.kind))
+    .flatMap((e) => pins(e, lib))
+    .filter((p) => (count.get(key(p)) ?? 0) <= 1);
+}
+
+/**
+ * A pin dropped onto the middle of a wire connects to it: the wire is split there.
+ * Wires already attached to this element (dragged along with it) are left alone,
+ * so they never short the element by running over its other pin.
+ */
+export function attach(sch: SchematicData, lib: SymbolLibrary, id: string): SchematicData {
+  const element = sch.elements.find((e) => e.id === id);
+  if (!element) return sch;
+  const own = pins(element, lib);
+  let wires = sch.wires;
+  for (const p of own) {
+    wires = wires.flatMap((w) => {
+      const ends = [w.points[0], w.points[w.points.length - 1]];
+      if (ends.some((end) => own.some((q) => same(q, end)))) return [w];
+      for (let i = 0; i + 1 < w.points.length; i++)
+        if (onSegment(p, w.points[i], w.points[i + 1]))
+          return [{ points: [...w.points.slice(0, i + 1), p] }, { points: [p, ...w.points.slice(i + 1)] }];
+      return [w];
+    });
   }
-  pinPoints.forEach((p) => bump(p, 1));
-  const touching = [...new Map([...ends, ...pinPoints].map((p) => [key(p), p])).values()];
-  for (const w of sch.wires)
-    for (let i = 0; i + 1 < w.points.length; i++)
-      for (const p of touching) if (onSegment(p, w.points[i], w.points[i + 1])) bump(p, 2);
-  return [...count.entries()].filter(([, n]) => n >= 3).map(([k]) => k.split(",").map(Number) as Point);
+  return wires === sch.wires ? sch : { ...sch, wires };
+}
+
+/** Is there something to connect to at p (a pin, a wire corner or end, or a wire body)? */
+export function isConnectionPoint(sch: SchematicData, lib: SymbolLibrary, p: Point): boolean {
+  if (sch.elements.some((e) => pins(e, lib).some((q) => same(q, p)))) return true;
+  return sch.wires.some((w) => w.points.some((q) => same(q, p))
+    || w.points.slice(1).some((q, i) => onSegment(p, w.points[i], q)));
+}
+
+/** Where to put an element so that it rotates about its middle instead of its first pin. */
+export function rotatedAbout(e: ElementData, lib: SymbolLibrary, rotation: number): Point {
+  const middle = (el: ElementData) => {
+    const ps = pins(el, lib);
+    return [ps.reduce((s, p) => s + p[0], 0) / ps.length, ps.reduce((s, p) => s + p[1], 0) / ps.length];
+  };
+  const [bx, by] = middle(e);
+  const [ax, ay] = middle({ ...e, rotation });
+  return [e.at[0] + Math.round(bx - ax), e.at[1] + Math.round(by - ay)];
+}
+
+/** The same drawing moved so that nothing sits left of / above ``margin`` (the canvas starts at 0, 0). */
+export const MARGIN = 2;
+
+export function normalized(sch: SchematicData, lib: SymbolLibrary, margin = MARGIN): SchematicData {
+  if (!sch.elements.length && !sch.wires.length) return sch;
+  const [x0, y0] = bounds(sch, lib);
+  const dx = Math.max(0, margin - x0);
+  const dy = Math.max(0, margin - y0);
+  if (!dx && !dy) return sch;
+  const shift = ([x, y]: Point): Point => [x + dx, y + dy];
+  return {
+    elements: sch.elements.map((e) => ({ ...e, at: shift(e.at) })),
+    wires: sch.wires.map((w) => ({ points: w.points.map(shift) })),
+  };
+}
+
+/** The L-shaped path from a to b (horizontal first). */
+export function elbow(a: Point, b: Point): Point[] {
+  return a[0] === b[0] || a[1] === b[1] ? [a, b] : [a, [b[0], a[1]], b];
 }
 
 export function bounds(sch: SchematicData, lib: SymbolLibrary): [number, number, number, number] {

@@ -27,8 +27,8 @@ sol = Schematic.from_json(text).to_circuit().solve(I_A_1=0, find="R_2")
 ## Zasady połączeń
 
 - Piny i końce przewodów w tym samym punkcie są połączone.
-- Koniec przewodu (albo pin) leżący na środku innego przewodu to rozgałęzienie typu T.
-- Przewody, które się tylko krzyżują, **nie** są połączone.
+- Koniec przewodu leżący na środku innego przewodu to rozgałęzienie typu T.
+- Przewód łączy się **tylko końcami**. Przewód, który jedynie przechodzi przez pin albo krzyżuje inny przewód, nie jest z nim połączony (tak jak w KiCadzie).
 - `ground` to masa, a `label` łączy węzły po nazwie.
 
 `KINDS` mówi tylko o pinach i o tym, który element z `electro` stoi za danym rodzajem.

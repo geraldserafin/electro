@@ -67,7 +67,8 @@ export function example(): Notebook {
             { id: "gnd1", kind: "ground", at: [0, 12], rotation: 0, value: null, text: null },
           ],
           wires: [
-            { points: [[0, 8], [0, 0], [14, 0]] }, { points: [[4, 4], [4, 6]] }, { points: [[14, 4], [14, 6]] },
+            { points: [[0, 8], [0, 0], [4, 0]] }, { points: [[4, 0], [14, 0]] }, { points: [[4, 4], [4, 6]] },
+            { points: [[14, 4], [14, 6]] },
             { points: [[4, 5], [7, 5]] }, { points: [[11, 5], [14, 5]] }, { points: [[4, 10], [4, 12]] },
             { points: [[14, 10], [14, 12]] }, { points: [[0, 12], [14, 12]] },
           ],
