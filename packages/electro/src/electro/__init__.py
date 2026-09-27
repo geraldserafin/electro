@@ -10,6 +10,7 @@
 from sympy import Eq, Symbol, symbols
 
 from .analysis import Relation, Thevenin, blackbox, equivalent, resistance
+from .codegen import code
 from .circuit import (
     GROUND, Circuit, ground, join, loop, net, node, open_end, parallel, series, shunt, spider,
     split, swap, wire, wires,
@@ -26,7 +27,7 @@ __all__ = [
     "shunt", "spider", "split", "swap", "wire", "wires",
     "Ammeter", "Capacitor", "Component", "CurrentSource", "Hole", "Inductor", "Law", "Model", "NoValue",
     "OpAmp", "Resistor", "TwoTerminal", "VoltageSource", "Voltmeter", "supply",
-    "Relation", "Thevenin", "blackbox", "equivalent", "resistance",
+    "Relation", "Thevenin", "blackbox", "code", "equivalent", "resistance",
     "Ambiguous", "CircuitError", "Contradiction", "Diagnosis", "MissingData", "I", "P", "U", "V", "Solution", "solve",
     "fmt", "parse", "Eq", "Symbol", "symbols",
 ]

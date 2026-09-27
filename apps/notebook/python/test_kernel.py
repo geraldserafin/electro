@@ -45,5 +45,14 @@ def test_schematic_cells_are_available_by_name():
     assert "Nie ma schematu" in run('schemat("inny")', petla=drawing)[0]["data"]
 
 
+def test_code_of_a_drawing():
+    from electro import Resistor, VoltageSource, loop
+    from electro_schematic import layout
+
+    drawing = layout(loop(VoltageSource(12), Resistor(4))).to_json()
+    assert kernel.code(drawing, "petla") == "petla = loop(VoltageSource(12), Resistor(4))"
+    assert kernel.code(drawing, "nie nazwa") .startswith("uklad = ")
+
+
 def test_symbols_for_the_editor():
     assert "resistor" in json.loads(kernel.symbols())["kinds"]

@@ -8,10 +8,12 @@ type Request =
   | { id: number; type: "init"; bundleUrl: string }
   | { id: number; type: "symbols" }
   | { id: number; type: "run"; code: string; schematics: string }
+  | { id: number; type: "code"; schematic: string; name: string }
   | { id: number; type: "reset" };
 
 interface Kernel {
   run(code: string, schematics: string): string;
+  code(schematic: string, name: string): string;
   symbols(): string;
   reset(): void;
 }
@@ -45,6 +47,7 @@ self.onmessage = async (event: MessageEvent<Request>) => {
     const k = await kernel;
     const result =
       request.type === "run" ? k.run(request.code, request.schematics)
+      : request.type === "code" ? k.code(request.schematic, request.name)
       : request.type === "symbols" ? k.symbols()
       : (k.reset(), null);
     self.postMessage({ id: request.id, ok: true, result });

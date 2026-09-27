@@ -65,8 +65,8 @@ export function CodeCell({ cell, update, run, running }: {
   );
 }
 
-export function SchematicCell({ cell, update, library }: {
-  cell: Extract<Cell, { type: "schematic" }>; update: Update; library: SymbolLibrary | null;
+export function SchematicCell({ cell, update, library, showCode }: {
+  cell: Extract<Cell, { type: "schematic" }>; update: Update; library: SymbolLibrary | null; showCode: () => void;
 }) {
   return (
     <div className="schematic-cell">
@@ -74,6 +74,11 @@ export function SchematicCell({ cell, update, library }: {
         Schemat <code>schemat("</code>
         <input value={cell.name} onChange={(e) => update({ name: e.target.value })} />
         <code>")</code>
+        <span className="spacer" />
+        <button onClick={showCode} disabled={!library || !cell.schematic.elements.length}
+                title="Wstaw pod spodem komórkę z kodem electro tego schematu">
+          Pokaż kod
+        </button>
       </div>
       {library
         ? <SchematicEditor value={cell.schematic} onChange={(schematic) => update({ schematic })} library={library} />

@@ -37,6 +37,12 @@ def symbols() -> str:
     return json.dumps(symbol_library(), ensure_ascii=False)
 
 
+def code(schematic_json: str, name: str) -> str:
+    """A drawing as plain electro code, for the "show code" button."""
+    variable = name if name.isidentifier() else "uklad"
+    return Schematic.from_json(schematic_json).to_code(variable)
+
+
 def to_output(obj) -> dict:
     for method, kind in (("_repr_svg_", "svg"), ("_repr_markdown_", "markdown"), ("_repr_latex_", "markdown")):
         data = getattr(obj, method, lambda: None)()  # sympy defines some of these and returns None

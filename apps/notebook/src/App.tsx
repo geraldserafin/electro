@@ -77,6 +77,15 @@ export function App() {
     for (const cell of latest.current.cells) if (cell.type === "code") await run(cell.id);
   };
 
+  const showCode = async (index: number, cell: Extract<Cell, { type: "schematic" }>) => {
+    try {
+      const source = await kernel.code(cell.schematic, cell.name);
+      setCells((cells) => [...cells.slice(0, index + 1), { ...newCell("code"), source } as Cell, ...cells.slice(index + 1)]);
+    } catch (error) {
+      alert(`Nie udało się zamienić schematu na kod: ${error}`);
+    }
+  };
+
   const resetKernel = async () => {
     await kernel.reset();
     setCells((cells) => cells.map((c) => (c.type === "code" ? { ...c, outputs: [] } : c)));
@@ -126,7 +135,8 @@ export function App() {
                         running={running.has(cell.id)} />
             )}
             {cell.type === "schematic" && (
-              <SchematicCell cell={cell} update={(p) => update(cell.id, p)} library={library} />
+              <SchematicCell cell={cell} update={(p) => update(cell.id, p)} library={library}
+                             showCode={() => showCode(index, cell)} />
             )}
             <AddRow onAdd={(type) => insert(index + 1, type)} />
           </section>

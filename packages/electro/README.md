@@ -118,6 +118,17 @@ więc dziura ma dwie niewiadome: E i Z ≥ 0. Jeden punkt pracy (jedno U i jedno
 najpierw rezystor (E = 0), potem źródło (Z = 0). Przyjęte założenie widać w `explain()`.
 Z = 0 i E = 0 daje przewód. Rozwarcia (Z = ∞) ta postać nie wyraża.
 
+### Obwód → kod: `code()`
+
+```python
+code(uklad)          # czysty kod electro, który buduje ten sam obwód
+sch.to_code()        # to samo dla rysunku z electro-schematic
+```
+
+Układy szeregowo-równoległe wracają jako `+` / `|`. Obwód z jednym źródłem wraca jako `loop(...)`,
+a kilka gałęzi ze źródłami jako gałęzie. Resztę (mostek, wzmacniacz) generator zapisuje jako `net(...)`.
+Etykiety pisze tylko tam, gdzie automatyczna numeracja dałaby inne.
+
 ## Teoria, czyli co jest czym
 
 Trzy warstwy połączone funktorami:

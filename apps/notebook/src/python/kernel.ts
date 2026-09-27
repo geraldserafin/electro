@@ -41,6 +41,11 @@ class Kernel {
     return JSON.parse(text);
   }
 
+  /** The drawing as plain electro code (`+`/`|` when possible, else `net(...)`). */
+  async code(schematic: SchematicData, name: string): Promise<string> {
+    return (await this.call("code", { schematic: JSON.stringify(schematic), name })) as string;
+  }
+
   async reset(): Promise<void> {
     await this.call("reset");
   }

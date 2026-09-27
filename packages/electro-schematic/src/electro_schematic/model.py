@@ -192,6 +192,12 @@ class Schematic:
             raise ValueError("Schemat nie ma żadnych elementów.")
         return ct.net(*items)
 
+    def to_code(self, name: str = "uklad") -> str:
+        """The drawing as plain ``electro`` code (``+``/``|`` when possible, else ``net(...)``)."""
+        from electro.codegen import code
+
+        return code(self.to_circuit(), name)
+
     # ------------------------------------------------------------------ editing
 
     def move(self, id: str, to: Point) -> None:

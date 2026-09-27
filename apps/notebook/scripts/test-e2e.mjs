@@ -31,7 +31,12 @@ try {
   check("no error outputs", (await page.locator(".output-error").count()) === 0);
   await page.screenshot({ path: `${shots}/notebook.png`, fullPage: true });
 
-  // editor: place a resistor on the bridge canvas and drag it
+  // "show code" turns the drawing into plain electro code in a new cell
+  await page.getByRole("button", { name: "Pokaż kod" }).first().click();
+  await page.getByText("mostek = net(").waitFor({ timeout: 30_000 });
+  check("schematic → code cell", true);
+
+  // editor: place a resistor on the bridge canvas
   const canvas = page.locator(".canvas").first();
   const before = await canvas.locator(".element").count();
   await page.getByTitle("Rezystor").first().click();

@@ -158,6 +158,8 @@ main > .add-row { opacity: 0.6; }
 
 .schematic-name { font-size: 13px; color: var(--muted); display: flex; align-items: center; gap: 2px; margin-bottom: 8px; }
 .schematic-name input { width: 120px; padding: 1px 6px; }
+.schematic-name .spacer { flex: 1; }
+.schematic-name { padding-right: 84px; } /* room for the cell tools (↑ ↓ ✕) */
 .palette { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 8px; align-items: center; }
 .palette .sep { width: 8px; }
 .palette button { padding: 2px 4px; }
