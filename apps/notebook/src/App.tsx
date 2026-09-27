@@ -6,13 +6,23 @@ import type { Cell, CellType, Notebook, SchematicData, SymbolLibrary } from "./t
 
 type Status = "loading" | "ready" | "error";
 
-/** Every notebook in examples/ shows up in the "Przykłady" menu. */
-const EXAMPLES = Object.values(
-  import.meta.glob<Notebook>("../examples/*.electro.json", { eager: true, import: "default" }),
-);
+/** Every notebook in examples/ shows up in the "Przykłady" menu (and opens with ?przyklad=<name>). */
+const EXAMPLE_FILES = import.meta.glob<Notebook>("../examples/*.electro.json", { eager: true, import: "default" });
+const EXAMPLES = Object.values(EXAMPLE_FILES);
+
+/** ?przyklad=nieznane-i-dziury replaces the current notebook with that example. */
+function fromAddress(): Notebook | null {
+  const params = new URLSearchParams(location.search);
+  const name = params.get("przyklad");
+  if (!name) return null;
+  params.delete("przyklad");
+  history.replaceState(null, "", location.pathname + (params.size ? `?${params}` : ""));
+  const found = Object.entries(EXAMPLE_FILES).find(([path]) => path.endsWith(`/${name}.electro.json`));
+  return found ? structuredClone(found[1]) : null;
+}
 
 export function App() {
-  const [notebook, setNotebook] = useState<Notebook>(load);
+  const [notebook, setNotebook] = useState<Notebook>(() => fromAddress() ?? load());
   const [library, setLibrary] = useState<SymbolLibrary | null>(null);
   const [status, setStatus] = useState<Status>("loading");
   const [statusText, setStatusText] = useState("Ładowanie Pythona (Pyodide)…");

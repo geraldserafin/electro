@@ -11,7 +11,8 @@ Notatnik w przeglądarce, trochę jak Colab, ale pod elektronikę. Python dział
 
 Notatnik zapisuje się automatycznie w przeglądarce. „Zapisz plik” i „Otwórz…” obsługują pliki `.electro.json`.
 
-**Przykłady** (menu w pasku) to pliki z `examples/`. `nieznane-i-dziury.electro.json` to 17 przypadków brzegowych:
+**Przykłady** (menu w pasku) to pliki z `examples/`. Otwierają się z zapisanymi wynikami.
+Link `http://localhost:5190/?przyklad=nieznane-i-dziury` zastępuje bieżący notatnik tym przykładem. `nieznane-i-dziury.electro.json` to 17 przypadków brzegowych:
 - niewiadome elementy i źródła, ujemny wynik oznaczający odwrotną polaryzację, znak pomiaru zależny od kierunku elementu;
 - za mało danych, dane bez nowej informacji, dane sprzeczne, dwa rozwiązania;
 - wynik literowy, mostek;

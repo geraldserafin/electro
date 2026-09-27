@@ -202,6 +202,15 @@ sol = loop(VoltageSource(12), Resistor(), Hole()).solve(I_E_1=1, U_R_1=4)
 sol
 """)
 
+# run every cell (like "Uruchom wszystko") and keep the outputs, so the example opens with its results
+from electro_notebook import kernel
+
+kernel.reset()
+schematics = {c["name"]: json.dumps(c["schematic"]) for c in cells if c["type"] == "schematic"}
+for cell in cells:
+    if cell["type"] == "code":
+        cell["outputs"] = json.loads(kernel.run(cell["source"], json.dumps(schematics)))
+
 notebook = {"version": 1, "title": "Przykłady: niewiadome i dziury", "codeInPdf": True, "cells": cells}
 path = "apps/notebook/examples/nieznane-i-dziury.electro.json"
 with open(path, "w", encoding="utf-8") as f:
