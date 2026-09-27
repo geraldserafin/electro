@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Link } from "react-router";
 import { CodeCell, MarkdownCell, SchematicCell } from "./cells/Cells";
-import { Bolt, Down, Export, More, Notes, Plus, RunAll, Trash, Up } from "./icons";
+import { Back, Bolt, Down, Export, More, OutlineIcon, Plus, RunAll, Trash, Up } from "./icons";
 import { SyncStatus } from "./notes/SyncStatus";
 import { useNoteSync } from "./notes/sync";
 import { Outline } from "./Outline";
@@ -34,6 +34,7 @@ export function Notebook({ initial, revision, reload, onDelete, onSaved }: {
   const latest = useRef(notebook);
   latest.current = notebook;
   const ready = python.kind === "ready";
+  const [outline, setOutline] = useOutlineOpen();
 
   // each note starts with a clean Python: variables of another note do not leak into this one
   useEffect(() => {
@@ -122,7 +123,7 @@ export function Notebook({ initial, revision, reload, onDelete, onSaved }: {
     <div className={`notebook ${notebook.settings.codeInPdf ? "" : "hide-code-in-print"}`}>
       {/* one line: all notes, title — saved?, Python, run all, PDF, and the rest under "⋯" */}
       <header className="appbar no-print">
-        <Link className="icon-button" to="/" title="Wszystkie notatki" aria-label="Notatki"><Notes /></Link>
+        <Link className="icon-button" to="/" title="Wszystkie notatki" aria-label="Wszystkie notatki"><Back /></Link>
         <div className="brand" title="electro — notatnik elektroniki"><Bolt /></div>
         <input className="title" value={notebook.title} placeholder="Bez tytułu" aria-label="Tytuł notatnika"
                onChange={(e) => setNotebook({ ...notebook, title: e.target.value })} />
@@ -130,6 +131,10 @@ export function Notebook({ initial, revision, reload, onDelete, onSaved }: {
         <div className={`status ${python.kind}`} title={python.text} role="status" aria-label={python.text}>
           <span className="dot" /> Python
         </div>
+        <button className={`icon-button ${outline ? "open" : ""}`} onClick={() => setOutline(!outline)}
+                title={outline ? "Ukryj spis treści" : "Spis treści"} aria-label="Spis treści" aria-pressed={outline}>
+          <OutlineIcon />
+        </button>
         <button className="icon-button" onClick={runAll} disabled={!ready}
                 title="Uruchom wszystko" aria-label="Uruchom wszystko"><RunAll /></button>
         <button className="icon-button" onClick={() => window.print()} title="Eksport do PDF" aria-label="Eksport PDF">
@@ -148,8 +153,8 @@ export function Notebook({ initial, revision, reload, onDelete, onSaved }: {
         </Menu>
       </header>
 
-      <Outline cells={notebook.cells} />
-      <main>
+      {outline && <Outline cells={notebook.cells} />}
+      <main className={outline ? "beside-outline" : ""}>
         <AddRow onAdd={(type) => insert(0, type)} />
         {notebook.cells.map((cell, index) => (
           <section
@@ -181,6 +186,30 @@ export function Notebook({ initial, revision, reload, onDelete, onSaved }: {
       </main>
     </div>
   );
+}
+
+const OUTLINE_KEY = "electro-outline";
+
+/** Is the table of contents open: as last left in this browser; at first, on wide screens. */
+function useOutlineOpen(): [boolean, (open: boolean) => void] {
+  const [open, setOpen] = useState(() => {
+    try {
+      const saved = localStorage.getItem(OUTLINE_KEY);
+      if (saved !== null) return saved === "1";
+    } catch {
+      // no storage: the default
+    }
+    return window.innerWidth >= 1400;
+  });
+  const set = (next: boolean) => {
+    setOpen(next);
+    try {
+      localStorage.setItem(OUTLINE_KEY, next ? "1" : "0");
+    } catch {
+      // not remembered — fine
+    }
+  };
+  return [open, set];
 }
 
 /** "Układ 1", "Układ 2", …: the first name no schematic has yet. */

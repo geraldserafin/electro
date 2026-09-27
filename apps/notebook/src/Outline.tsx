@@ -1,6 +1,6 @@
-// The table of contents on the right: the headings of the text cells and the schematics, in
-// order. A click scrolls there; the section being read is marked. Shown on wide screens only,
-// in the margin next to the notebook, so it never covers or pushes anything.
+// The table of contents: a panel on the right (opened from the app bar) with the headings of the
+// text cells and the schematics, in order — one tile each, indented by level. A click scrolls
+// there; the section being read is lit.
 import { useEffect, useMemo, useState } from "react";
 import { SchematicIcon } from "./icons";
 import type { Cell } from "./types";
@@ -50,15 +50,16 @@ export function Outline({ cells }: { cells: Cell[] }) {
     return () => window.removeEventListener("scroll", onScroll);
   }, [entries]);
 
-  if (entries.length < 2) return null;
   const top = Math.min(...entries.map((e) => e.level));
   return (
     <nav className="outline no-print" aria-label="Spis treści">
       <h2>Spis treści</h2>
+      {entries.length === 0 && <p className="outline-empty">Nagłówki z tekstu (<code># Tytuł</code>) i schematy pojawią się tutaj.</p>}
       <ul>
         {entries.map((e) => (
-          <li key={e.key} style={{ paddingLeft: (e.level - top) * 12 }}>
-            <a href={`#cell-${e.cell}`} className={active === e.key ? "active" : ""}
+          <li key={e.key}>
+            <a href={`#cell-${e.cell}`} className={`depth-${e.level - top} ${active === e.key ? "active" : ""}`}
+               style={{ paddingLeft: 12 + (e.level - top) * 16 }}
                onClick={(event) => {
                  event.preventDefault();
                  place(e)?.scrollIntoView({ behavior: "smooth", block: "start" });
