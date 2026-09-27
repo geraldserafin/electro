@@ -4,7 +4,7 @@
 // The drawing lives on an endless plane; the board shows it through a camera (a viewBox
 // that pans and zooms), like Excalidraw. Nothing moves under the cursor unless you pan.
 import { useEffect, useId, useLayoutEffect, useRef, useState, type PointerEvent as ReactPointerEvent, type ReactNode } from "react";
-import { Expand, Grid, Hand, Help, Minus, Plus, Pointer, Redo, Search, Shrink, Undo, WireIcon } from "../icons";
+import { Expand, Grid, Hand, Help, Minus, Plus, Pointer, Redo, Rotate, Search, Shrink, Trash, Undo, WireIcon } from "../icons";
 import type { ElementData, ElementResult, Point, SchematicData, SymbolLibrary, WireData } from "../types";
 import {
   KINDS, attach, bounds, elbow, inBox, moveGroup, searchKinds, hasValue, isComponent, isConnectionPoint, junctions, kindInfo, nextId,
@@ -364,7 +364,11 @@ export function SchematicEditor({ value, onChange, library, results, topLeft, to
           <g className="w" dangerouslySetInnerHTML={{ __html: library.kinds[kind].svg }} />
         </svg>
       )
-      : <span className="tool-text">A</span>;
+      : ( // a node label: a tag
+        <svg viewBox="0 0 30 22" width="30" height="22" className="tool-symbol">
+          <path d="M4 11h5l4-5h13v10H13l-4-5" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" />
+        </svg>
+      );
   const shortcut = (kind: string) => {
     const i = KINDS.findIndex((k) => k.kind === kind);
     return i >= 0 && i < 10 ? String((i + 1) % 10) : "";
@@ -526,7 +530,7 @@ export function SchematicEditor({ value, onChange, library, results, topLeft, to
             <input
               autoFocus
               value={query}
-              placeholder="Szukaj: opornik, bateria, masa…"
+              placeholder="Szukaj…"
               onChange={(e) => setQuery(e.target.value)}
               onKeyDown={(e) => {
                 if (e.key === "Enter" && found[0]) choose(found[0].kind);
@@ -534,6 +538,7 @@ export function SchematicEditor({ value, onChange, library, results, topLeft, to
               }}
             />
           </label>
+          <div className="library-list">
           {groups.map((group) => (
             <section key={group}>
               <h5>{group}</h5>
@@ -550,6 +555,7 @@ export function SchematicEditor({ value, onChange, library, results, topLeft, to
             </section>
           ))}
           {!found.length && <p className="muted">Nic nie pasuje do „{query}”.</p>}
+          </div>
         </div>
       )}
       <div className="island top-right no-print">{topRight}</div>
@@ -567,6 +573,7 @@ export function SchematicEditor({ value, onChange, library, results, topLeft, to
           }}
           onRotate={rotateSelected}
           onRemove={removeSelected}
+          icon={selectedElement ? symbolIcon(selectedElement.kind) : null}
         />
       )}
       <div className="island bottom-left no-print">
@@ -738,7 +745,7 @@ function ElementView({ element: e, library, wires, result, selected, onPointerDo
   );
 }
 
-function Inspector({ selection, element, taken, onChange, onRename, onRotate, onRemove }: {
+function Inspector({ selection, element, taken, onChange, onRename, onRotate, onRemove, icon }: {
   selection: Selection;
   element: ElementData | null;
   taken: string[];
@@ -746,21 +753,25 @@ function Inspector({ selection, element, taken, onChange, onRename, onRotate, on
   onRename: (id: string) => void;
   onRotate: () => void;
   onRemove: () => void;
+  icon: ReactNode;
 }) {
   const [id, setId] = useState(element?.id ?? "");
-  if (selection?.type === "group")
+  const remove = (
+    <button className="icon danger" onClick={onRemove} title="Usuń (Del)" aria-label="Usuń"><Trash /></button>
+  );
+  if (selection?.type === "group" || selection?.type === "wire")
     return (
       <div className="island inspector no-print">
-        <h4>Zaznaczone</h4>
-        <p className="muted">{selection.ids.length} el., {selection.wires.length} przew. — przeciągnij, żeby przesunąć razem</p>
-        <button className="danger" onClick={onRemove}>Usuń (Del)</button>
-      </div>
-    );
-  if (selection?.type === "wire")
-    return (
-      <div className="island inspector no-print">
-        <h4>Przewód</h4>
-        <button className="danger" onClick={onRemove}>Usuń (Del)</button>
+        <header>
+          <div className="title">
+            <h4>{selection.type === "group" ? "Zaznaczenie" : "Przewód"}</h4>
+            {selection.type === "group" && (
+              <span className="subtitle">{selection.ids.length} el. · {selection.wires.length} przew.</span>
+            )}
+          </div>
+          <div className="actions">{remove}</div>
+        </header>
+        {selection.type === "group" && <p className="hint">Przeciągnij, żeby przesunąć wszystko razem.</p>}
       </div>
     );
   if (!element) return null;
@@ -772,33 +783,41 @@ function Inspector({ selection, element, taken, onChange, onRename, onRotate, on
   };
   return (
     <div className="island inspector no-print">
-      <h4>{info?.name ?? element.kind}</h4>
+      <header>
+        <span className="kind-icon">{icon}</span>
+        <div className="title">
+          <h4>{info?.name ?? element.kind}</h4>
+          {isComponent(element.kind) && <span className="subtitle">{element.id}</span>}
+        </div>
+        <div className="actions">
+          <button className="icon" onClick={onRotate} title="Obróć (R)" aria-label="Obróć"><Rotate /></button>
+          {remove}
+        </div>
+      </header>
       {isComponent(element.kind) && (
-        <label>
-          Etykieta
-          <input value={id} onChange={(e) => setId(e.target.value)} onBlur={commitId}
+        <label className="field">
+          <span>Etykieta</span>
+          <input value={id} spellCheck={false} onChange={(e) => setId(e.target.value)} onBlur={commitId}
                  onKeyDown={(e) => e.key === "Enter" && commitId()} />
         </label>
       )}
       {hasValue(element.kind) && (
-        <label>
-          {info?.meter
-            ? <>Odczyt <small>({info.unit}; wpisz pomiar z zadania, puste = policz)</small></>
-            : <>Wartość {info?.unit && <small>({info.unit}; puste = niewiadoma, litera = symbol)</small>}</>}
-          <input value={element.value ?? ""} placeholder={info?.meter ? "brak pomiaru" : "?"}
-                 onChange={(e) => onChange({ value: e.target.value.trim() === "" ? null : e.target.value })} />
+        <label className="field">
+          <span>{info?.meter ? "Odczyt" : "Wartość"}</span>
+          <span className="with-unit">
+            <input value={element.value ?? ""} spellCheck={false} placeholder={info?.meter ? "brak" : "?"}
+                   onChange={(e) => onChange({ value: e.target.value.trim() === "" ? null : e.target.value })} />
+            {info?.unit && <span className="unit">{info.unit}</span>}
+          </span>
+          <small>{info?.meter ? "Pomiar z zadania. Puste — solver go policzy." : "Puste — niewiadoma. Litera — symbol."}</small>
         </label>
       )}
       {element.kind === "label" && (
-        <label>
-          Nazwa węzła
-          <input value={element.text ?? ""} onChange={(e) => onChange({ text: e.target.value })} />
+        <label className="field">
+          <span>Nazwa węzła</span>
+          <input value={element.text ?? ""} spellCheck={false} onChange={(e) => onChange({ text: e.target.value })} />
         </label>
       )}
-      <div className="row">
-        <button onClick={onRotate}>Obróć (R)</button>
-        <button className="danger" onClick={onRemove}>Usuń</button>
-      </div>
     </div>
   );
 }

@@ -112,8 +112,14 @@ export function SchematicCell({ cell, update, library, toCell, simulate, running
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
+  // the drawing `source` describes: the code is written anew only after the drawing was edited
+  // on the board — never just because it ran, so the way someone wrote it stays
+  const writtenFor = useRef<SchematicData | null>(null);
+
   const load = async () => {
+    if (source !== null && writtenFor.current === cell.schematic) return;
     const code = await kernel.code(cell.schematic, cell.name);
+    writtenFor.current = cell.schematic;
     setSource(code);
     setGenerated(code);
     setError(null);
@@ -133,6 +139,8 @@ export function SchematicCell({ cell, update, library, toCell, simulate, running
       return null;
     }
     setError(null);
+    writtenFor.current = back.schematic;
+    setGenerated(source); // applied: the code in the editor is what the drawing is now
     update({ schematic: back.schematic, ...(cell.results ? { stale: true } : {}) });
     return back.schematic;
   };
@@ -146,7 +154,6 @@ export function SchematicCell({ cell, update, library, toCell, simulate, running
         await load();
         update({ view: "code" });
       } else if (await applied()) {
-        setSource(null);
         update({ view: "schematic" });
       }
     } catch (e) {
@@ -161,12 +168,7 @@ export function SchematicCell({ cell, update, library, toCell, simulate, running
     setBusy(true);
     try {
       const schematic = await applied();
-      if (schematic) {
-        const code = await kernel.code(schematic, cell.name); // the code as the new drawing writes it
-        setSource(code);
-        setGenerated(code);
-        simulate(schematic);
-      }
+      if (schematic) simulate(schematic);
     } finally {
       setBusy(false);
     }

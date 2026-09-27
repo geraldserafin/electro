@@ -307,7 +307,7 @@ main > .add-row { justify-content: center; }
 .code-view-bar { display: flex; align-items: center; gap: 8px; }
 .code-view-bar .spacer { flex: 1; }
 .island.static { position: static; }
-.code-view .code-editor .cm-editor { min-height: 120px; }
+.code-view .code-editor .cm-scroller { min-height: 120px; } /* the scroller fills it: its scrollbar sits at the bottom */
 .code-view-wait { color: var(--muted); margin: 8px; }
 .code-view-note { margin: 0; font-size: 14px; color: var(--muted); }
 pre.code-view-note { color: var(--danger); }
@@ -383,14 +383,15 @@ pre.code-view-note { color: var(--danger); }
   bottom: 64px;
   z-index: 6;
   width: 236px;
-  overflow-y: auto;
   flex-direction: column;
   align-items: stretch;
-  gap: 4px;
+  gap: 8px;
   padding: 10px;
+  overflow: hidden; /* the list scrolls, the header and the search stay put */
 }
-.library-search { display: flex; align-items: center; gap: 6px; padding: 0 8px; border: 1px solid var(--line); border-radius: 8px; color: var(--faint); }
-.library-search input { flex: 1; border: none; outline: none; background: transparent; padding: 7px 0; }
+.library-list { flex: 1; min-height: 0; overflow-y: auto; overflow-x: hidden; margin: 0 -6px; padding: 0 6px; }
+.library-search { flex: none; display: flex; align-items: center; gap: 6px; padding: 0 8px; border: 1px solid var(--line); border-radius: 8px; color: var(--faint); }
+.library-search input { flex: 1; min-width: 0; border: none; outline: none; background: transparent; padding: 7px 0; }
 .library-search:focus-within { border-color: var(--primary); }
 .island.library h5 { margin: 8px 4px 2px; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); }
 .library-head { display: flex; align-items: center; justify-content: space-between; padding: 0 2px 4px 4px; }
@@ -399,7 +400,8 @@ pre.code-view-note { color: var(--danger); }
 .library-grid { display: grid; grid-template-columns: 1fr; gap: 1px; }
 .island .library-item.active { background: var(--tool-active); color: var(--tool-active-text); }
 .island .library-item { justify-content: flex-start; gap: 10px; padding: 6px 8px; text-align: left; }
-.library-item span { flex: 1; }
+.island .library-item { width: 100%; min-width: 0; }
+.library-item span { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .library-item kbd { color: var(--faint); }
 .library-item .tool-symbol { color: var(--text); flex: none; }
 
@@ -419,18 +421,34 @@ pre.code-view-note { color: var(--danger); }
 .island.inspector {  /* on the right: drawings start top-left, so this side is usually free */
   top: 64px;
   right: 12px;
-  width: 220px;
+  width: 248px;
   flex-direction: column;
   align-items: stretch;
-  gap: 8px;
+  gap: 12px;
   padding: 12px;
-  font-size: 13px;
+  font-size: 14px;
 }
-.island.inspector h4 { margin: 0; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); }
-.island.inspector label { display: grid; gap: 3px; }
-.island.inspector small { color: var(--faint); }
-.island.inspector .row { display: flex; gap: 6px; }
-.island.inspector .row button { border: 1px solid var(--line); }
+.inspector header { display: flex; align-items: center; gap: 10px; }
+.inspector .kind-icon {
+  flex: none; width: 40px; height: 40px; display: grid; place-items: center;
+  border-radius: 10px; background: var(--hover); color: var(--text);
+}
+.inspector .kind-icon .tool-symbol { color: var(--text); }
+.inspector .title { flex: 1; min-width: 0; display: grid; }
+.inspector h4 { margin: 0; font-size: 12px; font-weight: 500; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.inspector .subtitle { font-size: 16px; font-weight: 600; }
+.inspector .actions { display: flex; gap: 2px; }
+.inspector .actions button { padding: 6px; }
+.inspector .actions .danger:hover { background: var(--err-bg); }
+.inspector .field { display: grid; gap: 4px; }
+.inspector .field > span:first-child { font-size: 12px; font-weight: 500; color: var(--muted); }
+.inspector input { width: 100%; padding: 7px 10px; border-radius: 8px; background: var(--hover); border-color: transparent; font-size: 15px; }
+.inspector input:focus { background: var(--paper); }
+.inspector .with-unit { position: relative; display: block; }
+.inspector .with-unit input { padding-right: 34px; }
+.inspector .unit { position: absolute; right: 10px; top: 50%; transform: translateY(-50%); color: var(--muted); pointer-events: none; }
+.inspector small { font-size: 12px; color: var(--faint); line-height: 1.35; }
+.inspector .hint { margin: 0; font-size: 13px; color: var(--muted); }
 
 .island.help-panel { bottom: 60px; right: 12px; width: 300px; flex-direction: column; align-items: stretch; padding: 12px 14px; font-size: 13px; }
 .island.help-panel h4 { margin: 0 0 6px; }

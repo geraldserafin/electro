@@ -112,6 +112,25 @@ try {
       && JSON.stringify(await places()) === JSON.stringify(before));
   }
 
+  // running from the code view keeps the code as written (a comment, the layout of the lines)
+  {
+    await bridge.getByRole("tab", { name: "Kod" }).click();
+    await bridge.locator(".cm-content").waitFor();
+    await bridge.locator(".cm-content").click();
+    await page.keyboard.press("Meta+ArrowUp");
+    await page.keyboard.insertText("# mój komentarz\n");
+    await bridge.locator(".gutter .run").click();
+    await bridge.locator("table.results:not(.stale)").waitFor({ timeout: 30_000 });
+    const afterRun = await bridge.locator(".cm-content").innerText();
+    await bridge.getByRole("tab", { name: "Schemat" }).click();
+    await bridge.getByRole("tab", { name: "Kod" }).click();
+    await bridge.locator(".cm-content").waitFor();
+    check("running the code does not reformat it", afterRun.startsWith("# mój komentarz")
+      && (await bridge.locator(".cm-content").innerText()).startsWith("# mój komentarz"));
+    await bridge.getByRole("tab", { name: "Schemat" }).click();
+    await bridge.locator(".board .canvas").waitFor();
+  }
+
   // the PDF: the drawing cropped to what is drawn, without the editor (and its selection)
   await bridge.locator('.board .element[data-id="R_1"]').click();
   await page.emulateMedia({ media: "print" });
