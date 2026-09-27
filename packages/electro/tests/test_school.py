@@ -204,3 +204,16 @@ def test_hole_can_be_a_plain_wire():
 def test_unknown_resistor_cannot_be_negative():
     with pytest.raises(Contradiction):
         (supply(12) + Resistor(10) + Resistor() + ground).solve(I_R_1=-0.5)
+
+
+def test_unknown_source_can_come_out_positive():
+    sol = loop(VoltageSource(), Resistor(10)).solve(I_R_1=5)
+    assert sol["E_1"].value == 50
+
+
+def test_contradiction_names_the_clashing_data():
+    with pytest.raises(Contradiction) as err:
+        loop(VoltageSource(12), Resistor(10)).solve(I_R_1=5)
+    message = str(err.value)
+    assert message.startswith("Sprzeczne dane:") and "E_1 = 12 V" in message and "I_R_1 = 5 A" in message
+    assert "\n" not in message  # one line, not a dump of the equations

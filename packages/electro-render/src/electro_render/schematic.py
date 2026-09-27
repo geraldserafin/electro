@@ -133,9 +133,34 @@ def _junctions(sch: Schematic) -> list[tuple[int, int]]:
     return [p for p, n in count.items() if n >= 3]
 
 
+def _text_box(side: Vec, lines) -> tuple[float, float, float, float]:
+    """Box of a text block placed on ``side`` of its anchor, relative to the anchor."""
+    w = max(CHAR * len(t.replace("_", "")) + 4 for t, _ in lines)
+    h = LINE * len(lines)
+    return {
+        DOWN: (-w / 2, w / 2, 4, 4 + h), UP: (-w / 2, w / 2, -4 - h, -4),
+        RIGHT: (6, 6 + w, -h / 2, h / 2), LEFT: (-6 - w, -6, -h / 2, h / 2),
+    }[side]
+
+
+def _hits(box, segments, boxes=()) -> int:
+    """How many segments (wires, element bodies) and texts already placed an absolute box overlaps."""
+    x0, x1, y0, y1 = box
+    count = 0
+    for (ax, ay), (bx, by) in segments:
+        if min(ax, bx) <= x1 and max(ax, bx) >= x0 and min(ay, by) <= y1 and max(ay, by) >= y0:
+            count += 1
+    for bx0, bx1, by0, by1 in boxes:
+        if bx0 < x1 and bx1 > x0 and by0 < y1 and by1 > y0:
+            count += 2  # text on text is worse than text on a wire
+    return count
+
+
 class _Canvas:
     def __init__(self):
         self.items: list[str] = []
+        self.cards: list[str] = []  # drawn under all texts, so no card hides another text
+        self.texts: list[str] = []
         self.xs: list[float] = []
         self.ys: list[float] = []
 
@@ -146,16 +171,14 @@ class _Canvas:
     def text(self, x, y, side: Vec, lines: list[tuple[str, str]]):
         if not lines:
             return
-        w = max(CHAR * len(t.replace("_", "")) + 4 for t, _ in lines)
-        h = LINE * len(lines)
-        x0, x1, y0, y1 = {
-            DOWN: (-w / 2, w / 2, 4, 4 + h), UP: (-w / 2, w / 2, -4 - h, -4),
-            RIGHT: (6, 6 + w, -h / 2, h / 2), LEFT: (-6 - w, -6, -h / 2, h / 2),
-        }[side]
+        x0, x1, y0, y1 = _text_box(side, lines)
         anchor, tx = {DOWN: ("middle", x), UP: ("middle", x), RIGHT: ("start", x + x0), LEFT: ("end", x + x1)}[side]
+        # a background-coloured card under the text keeps it readable where a wire runs behind it
+        self.cards.append(f'<rect class="halo" x="{x + x0:g}" y="{y + y0 + 1:g}" width="{x1 - x0:g}" '
+                          f'height="{y1 - y0 - 1:g}" rx="2"/>')
         for i, (text, cls) in enumerate(lines):
             ty = y + y0 + 12 + i * LINE
-            self.items.append(f'<text class="{cls}" x="{tx:g}" y="{ty:g}" text-anchor="{anchor}" '
+            self.texts.append(f'<text class="{cls}" x="{tx:g}" y="{ty:g}" text-anchor="{anchor}" '
                               f'xml:space="preserve">{_tspans(text)}</text>')
         self.grow(x + x0, y + y0)
         self.grow(x + x1, y + y1)
@@ -172,6 +195,13 @@ def _draw(sch: Schematic, solution) -> Svg:
     for px, py in _junctions(sch):
         canvas.items.append(f'<circle class="dot" cx="{px * GRID}" cy="{py * GRID}" r="3"/>')
 
+    # everything a text should not cover: wires and the bodies of elements
+    obstacles = [((a[0] * GRID, a[1] * GRID), (b[0] * GRID, b[1] * GRID)) for w in sch.wires for a, b in w.segments()]
+    for e in sch.elements:
+        ps = [(px * GRID, py * GRID) for px, py in e.pins()]
+        obstacles += list(zip(ps, ps[1:]))
+
+    placed: list[tuple] = []  # boxes of texts already on the page
     for e in sch.elements:
         x, y = e.at[0] * GRID, e.at[1] * GRID
         rotation = 0 if e.kind in UPRIGHT else e.rotation
@@ -190,16 +220,32 @@ def _draw(sch: Schematic, solution) -> Svg:
             canvas.items.append(f'<text class="letter" x="{cx:g}" y="{cy:g}">{LETTERS[e.kind]}</text>')
         axis = {0: RIGHT, 90: DOWN, 180: LEFT, 270: UP}[e.rotation]
         label_side, result_side = label_sides(axis)
-        canvas.text(cx + label_side[0] * BODY, cy + label_side[1] * BODY, label_side, _label_lines(e, solution))
-        if solution is not None:
-            canvas.text(cx + result_side[0] * BODY, cy + result_side[1] * BODY, result_side,
-                        _result_lines(e, solution, axis))
+        label = _label_lines(e, solution)
+        results = _result_lines(e, solution, axis) if solution is not None else []
+        own = list(zip(pins, pins[1:]))  # the element's own body is not in the way of its texts
+        others = [s for s in obstacles if s not in own]
+
+        def boxes(label_at: Vec, results_at: Vec):
+            for side, lines in ((label_at, label), (results_at, results)):
+                if lines:
+                    ax, ay = cx + side[0] * BODY, cy + side[1] * BODY
+                    x0, x1, y0, y1 = _text_box(side, lines)
+                    yield (ax + x0, ax + x1, ay + y0, ay + y1)
+
+        def clashes(label_at: Vec, results_at: Vec) -> int:
+            return sum(_hits(b, others, placed) for b in boxes(label_at, results_at))
+
+        if clashes(result_side, label_side) < clashes(label_side, result_side):  # swap sides if that is clearer
+            label_side, result_side = result_side, label_side
+        placed.extend(boxes(label_side, result_side))
+        canvas.text(cx + label_side[0] * BODY, cy + label_side[1] * BODY, label_side, label)
+        canvas.text(cx + result_side[0] * BODY, cy + result_side[1] * BODY, result_side, results)
 
     margin = 12
     left, top = min(canvas.xs) - margin, min(canvas.ys) - margin
     width = max(canvas.xs) - min(canvas.xs) + 2 * margin
     height = max(canvas.ys) - min(canvas.ys) + 2 * margin
-    body = f'<path class="w" d="{"".join(paths)}"/>' + "".join(canvas.items)
+    body = f'<path class="w" d="{"".join(paths)}"/>' + "".join(canvas.items + canvas.cards + canvas.texts)
     return Svg(
         f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="{left:g} {top:g} {width:g} {height:g}" '
         f'width="{width:g}" height="{height:g}"><style>{STYLE}</style>{body}</svg>'

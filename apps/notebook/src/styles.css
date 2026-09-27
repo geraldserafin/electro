@@ -173,6 +173,8 @@ main > .add-row { opacity: 0.6; }
 .canvas .grid-dot { fill: var(--muted); opacity: 0.45; }
 .canvas .hit { fill: transparent; stroke: transparent; stroke-width: 10; }
 .canvas .element { cursor: grab; }
+.canvas.tool-select .segment-h { cursor: ns-resize; }
+.canvas.tool-select .segment-v { cursor: ew-resize; }
 .canvas .element.selected .w, .canvas .wire.selected { stroke: var(--accent); }
 .canvas .element.selected .letter { fill: var(--accent); }
 .canvas .draft { stroke: var(--accent); stroke-dasharray: 5 4; pointer-events: none; }
@@ -182,7 +184,7 @@ main > .add-row { opacity: 0.6; }
 .canvas:not(.tool-select) .pin-handle { pointer-events: none; }
 .canvas .snap { fill: none; stroke: #059669; stroke-width: 2; pointer-events: none; }
 .canvas .ghost { opacity: 0.4; pointer-events: none; }
-.canvas .label { font-size: 13px; }
+.canvas .label { font-size: 13px; paint-order: stroke; stroke: var(--paper); stroke-width: 4px; stroke-linejoin: round; }
 .canvas .label .sub { font-size: 10px; }
 .inspector { width: 220px; flex: none; display: grid; gap: 8px; font-size: 13px; }
 .inspector h4 { margin: 0; }

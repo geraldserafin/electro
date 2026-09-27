@@ -14,6 +14,7 @@ import json
 import traceback
 import warnings
 
+from electro import CircuitError
 from electro_render import symbol_library
 from electro_schematic import Schematic
 
@@ -55,6 +56,8 @@ def _error(err: BaseException) -> str:
     """The exception, plus the line of the cell it came from (not the library internals)."""
     lines = [frame.lineno for frame in traceback.extract_tb(err.__traceback__) if frame.filename == CELL]
     where = f"linia {lines[-1]}: " if lines else ""
+    if isinstance(err, CircuitError):  # our own messages already say what is wrong
+        return f"{where}{err}"
     return f"{where}{type(err).__name__}: {err}"
 
 

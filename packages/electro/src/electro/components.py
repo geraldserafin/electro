@@ -65,7 +65,8 @@ class Component(Circuit):
             return None
         if isinstance(self.value, sp.Symbol):
             return self.value
-        return sp.Symbol(label, positive=self.positive)
+        # positive=False in sympy would mean "not positive", so plain real symbols for sources
+        return sp.Symbol(label, positive=True) if self.positive else sp.Symbol(label, real=True)
 
     def build(self, label: str, V: dict[str, sp.Expr], param, ctx: Context) -> Model:
         raise NotImplementedError

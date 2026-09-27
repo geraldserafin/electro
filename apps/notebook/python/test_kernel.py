@@ -25,7 +25,7 @@ def test_rich_outputs():
 def test_errors_point_at_the_cell_line():
     kernel.reset()
     [out] = run("a = 1\nloop(VoltageSource(12), Resistor(10)).solve(I_R_1=5)")
-    assert out["type"] == "error" and out["data"].startswith("linia 2: Contradiction")
+    assert out["type"] == "error" and out["data"].startswith("linia 2: Sprzeczne dane:")
 
 
 def test_warnings_are_shown():

@@ -105,3 +105,12 @@ def test_invalid_input_is_rejected():
         Element("X", "transistor", (0, 0))
     with pytest.raises(Unsupported):
         layout(net((Resistor(1), "A", "B")))
+
+
+def test_moving_a_wire_segment_keeps_its_ends():
+    sch = bridge()
+    sch.move_segment(0, 1, -1)  # top rail's horizontal part (0,0)-(4,0) moved up by one
+    assert sch.wires[0] == Wire([(0, 8), (0, -1), (4, -1), (4, 0)])
+    assert sch.to_circuit().solve(I_A_1=0, find="R_2").answers == {"R_2": 200}
+    sch.move_segment(4, 0, 2)  # the single straight wire (4,5)-(6,5) bent down
+    assert sch.wires[4] == Wire([(4, 5), (4, 7), (6, 7), (6, 5)])

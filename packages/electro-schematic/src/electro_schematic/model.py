@@ -244,6 +244,15 @@ class Schematic:
         ax, ay = middle()
         e.at = (e.at[0] + round(bx - ax), e.at[1] + round(by_ - ay))
 
+    def move_segment(self, wire: int, index: int, by: int) -> None:
+        """Move segment ``index`` of a wire sideways by ``by``; its ends stay (corners are added)."""
+        w = self.wires[wire]
+        a, b = w.points[index], w.points[index + 1]
+        shift = (lambda p: (p[0], p[1] + by)) if a[1] == b[1] else (lambda p: (p[0] + by, p[1]))
+        moved = [shift(p) if i in (index, index + 1) else p for i, p in enumerate(w.points)]
+        path = ([w.points[0]] if index == 0 else []) + moved + ([w.points[-1]] if index + 2 == len(w.points) else [])
+        w.points = _simplify(path)
+
     def _drag(self, moved: dict[Point, Point]) -> None:
         for w in self.wires:
             for end in (0, -1):

@@ -4,17 +4,18 @@
 // The canvas is drawn 1:1 (one grid unit = library.grid px) from a fixed origin and only
 // grows to the right/bottom, so nothing ever jumps under the cursor.
 import { useEffect, useId, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
-import type { ElementData, Point, SchematicData, SymbolLibrary } from "../types";
+import type { ElementData, Point, SchematicData, SymbolLibrary, WireData } from "../types";
 import {
   KINDS, MARGIN, attach, bounds, elbow, hasValue, isComponent, isConnectionPoint, junctions, kindInfo, nextId, normalized,
-  openPins, pins, rotatedAbout, same, simplify, updateElement,
+  moveSegment, openPins, pins, rotatedAbout, same, simplify, updateElement,
 } from "./model";
 
 type Tool = { type: "select" } | { type: "wire" } | { type: "place"; kind: string };
 type Selection = { type: "element"; id: string } | { type: "wire"; index: number } | null;
 type Gesture =
   | { type: "move"; id: string; start: Point; origin: Point; snapshot: SchematicData; moved: boolean }
-  | { type: "wire"; from: Point };
+  | { type: "wire"; from: Point }
+  | { type: "segment"; wire: number; index: number; start: Point; snapshot: SchematicData; moved: boolean };
 
 interface Props {
   value: SchematicData;
@@ -174,10 +175,28 @@ export function SchematicEditor({ value, onChange, library }: Props) {
         if (!gesture.moved) setGesture({ ...gesture, moved: true });
       }
     }
+    if (gesture?.type === "segment") {
+      const w = gesture.snapshot.wires[gesture.wire];
+      const [a, b] = [w.points[gesture.index], w.points[gesture.index + 1]];
+      const by = a[1] === b[1] ? p[1] - gesture.start[1] : p[0] - gesture.start[0];
+      const wires = gesture.snapshot.wires.map((x, i) => (i === gesture.wire ? moveSegment(x, gesture.index, by) : x));
+      onChange({ ...gesture.snapshot, wires });
+      if (by && !gesture.moved) setGesture({ ...gesture, moved: true });
+    }
+  };
+
+  const onSegmentDown = (event: ReactPointerEvent, wire: number, index: number) => {
+    if (tool.type !== "select") return;
+    event.stopPropagation();
+    svgRef.current?.focus({ preventScroll: true });
+    setSelection({ type: "wire", index: wire });
+    setGesture({ type: "segment", wire, index, start: toGrid(event), snapshot: value, moved: false });
+    svgRef.current?.setPointerCapture(event.pointerId);
   };
 
   const onUp = () => {
     if (gesture?.type === "move" && gesture.moved) commit(attach(value, library, gesture.id), gesture.snapshot);
+    if (gesture?.type === "segment" && gesture.moved) commit(value, gesture.snapshot);
     if (gesture?.type === "wire" && cursor && !same(cursor, gesture.from)) addWire(elbow(gesture.from, cursor));
     setGesture(null);
   };
@@ -267,23 +286,23 @@ export function SchematicEditor({ value, onChange, library }: Props) {
               <g key={i}>
                 <polyline className={`w wire ${selection?.type === "wire" && selection.index === i ? "selected" : ""}`}
                           points={pointsOf(w.points)} />
-                <polyline
-                  className="hit"
-                  points={pointsOf(w.points)}
-                  onPointerDown={(event) => {
-                    if (tool.type !== "select") return;
-                    event.stopPropagation();
-                    svgRef.current?.focus({ preventScroll: true });
-                    setSelection({ type: "wire", index: i });
-                  }}
-                />
+                {w.points.slice(1).map((q, j) => (
+                  <polyline
+                    key={j}
+                    className={`hit ${w.points[j][1] === q[1] ? "segment-h" : "segment-v"}`}
+                    points={pointsOf([w.points[j], q])}
+                    onPointerDown={(event) => onSegmentDown(event, i, j)}
+                  >
+                    <title>Przeciągnij, żeby przesunąć ten odcinek</title>
+                  </polyline>
+                ))}
               </g>
             ))}
             {junctions(value, library).map(([x, y]) => (
               <circle key={`j${x},${y}`} className="dot" cx={x * G} cy={y * G} r="3" />
             ))}
             {value.elements.map((e) => (
-              <ElementView key={e.id} element={e} library={library}
+              <ElementView key={e.id} element={e} library={library} wires={value.wires}
                            selected={selection?.type === "element" && selection.id === e.id}
                            onPointerDown={(event) => onElementDown(event, e)} />
             ))}
@@ -327,7 +346,16 @@ export function SchematicEditor({ value, onChange, library }: Props) {
   );
 }
 
-function Label({ text, x, y, anchor }: { text: string; x: number; y: number; anchor: "middle" | "end" }) {
+/** The text next to an element: "R_1 = 100 Ω", "A_1", or a net label's name. */
+function label_(e: ElementData): string {
+  const unit = kindInfo(e.kind)?.unit ?? "";
+  if (e.kind === "label") return e.text ?? "";
+  if (!isComponent(e.kind)) return "";
+  if (!hasValue(e.kind)) return e.id;
+  return `${e.id} = ${e.value ?? "?"}${e.value && /\d$/.test(e.value) ? ` ${unit}` : ""}`;
+}
+
+function Label({ text, x, y, anchor }: { text: string; x: number; y: number; anchor: "middle" | "end" | "start" }) {
   const parts = text.match(/^([A-Za-z]+)_(\w+)(.*)$/);
   return (
     <text x={x} y={y} textAnchor={anchor} className="label">
@@ -342,8 +370,9 @@ function Label({ text, x, y, anchor }: { text: string; x: number; y: number; anc
   );
 }
 
-function ElementView({ element: e, library, selected, onPointerDown }: {
-  element: ElementData; library: SymbolLibrary; selected: boolean; onPointerDown: (event: ReactPointerEvent) => void;
+function ElementView({ element: e, library, wires, selected, onPointerDown }: {
+  element: ElementData; library: SymbolLibrary; wires: WireData[]; selected: boolean;
+  onPointerDown: (event: ReactPointerEvent) => void;
 }) {
   const G = library.grid;
   const symbol = library.kinds[e.kind];
@@ -353,11 +382,21 @@ function ElementView({ element: e, library, selected, onPointerDown }: {
   const xs = ps.map((p) => p[0]);
   const ys = ps.map((p) => p[1]);
   const vertical = e.rotation % 180 !== 0;
-  const unit = kindInfo(e.kind)?.unit ?? "";
-  const label = e.kind === "label" ? e.text ?? ""
-    : !isComponent(e.kind) ? ""
-    : hasValue(e.kind) ? `${e.id} = ${e.value ?? "?"}${e.value && /\d$/.test(e.value) ? ` ${unit}` : ""}`
-    : e.id;
+  // label left of a vertical element (above a horizontal one), unless a wire runs through there
+  const labelWidth = 7.4 * (label_(e).replace("_", "").length) + 6;
+  const crosses = (x0: number, x1: number, y0: number, y1: number) =>
+    wires.some((w) => w.points.slice(1).some((q, i) => {
+      const [ax, ay] = [w.points[i][0] * G, w.points[i][1] * G];
+      const [bx, by] = [q[0] * G, q[1] * G];
+      return Math.min(ax, bx) <= x1 && Math.max(ax, bx) >= x0 && Math.min(ay, by) <= y1 && Math.max(ay, by) >= y0;
+    }));
+  // …or unless it would not fit on the canvas (which starts at 0, 0)
+  const flip = vertical
+    ? (crosses(cx - 20 - labelWidth, cx - 20, cy - 8, cy + 8) || cx - 20 - labelWidth < 0)
+      && !crosses(cx + 20, cx + 20 + labelWidth, cy - 8, cy + 8)
+    : (crosses(cx - labelWidth / 2, cx + labelWidth / 2, cy - 32, cy - 16) || cy - 32 < 0)
+      && !crosses(cx - labelWidth / 2, cx + labelWidth / 2, cy + 16, cy + 32);
+  const label = label_(e);
   return (
     <g className={`element ${selected ? "selected" : ""}`} onPointerDown={onPointerDown}>
       <rect
@@ -370,7 +409,9 @@ function ElementView({ element: e, library, selected, onPointerDown }: {
       {symbol.letter && <text className="letter" x={cx} y={cy}>{symbol.letter}</text>}
       {label && (e.kind === "label"
         ? <text x={cx + 4} y={cy - 6} className="node">{label}</text>
-        : <Label text={label} x={vertical ? cx - 20 : cx} y={vertical ? cy + 4 : cy - 20} anchor={vertical ? "end" : "middle"} />)}
+        : vertical
+          ? <Label text={label} x={flip ? cx + 20 : cx - 20} y={cy + 4} anchor={flip ? "start" : "end"} />
+          : <Label text={label} x={cx} y={flip ? cy + 30 : cy - 20} anchor="middle" />)}
     </g>
   );
 }
@@ -400,7 +441,7 @@ function Inspector({ selection, element, taken, onChange, onRename, onRotate, on
           <li>Kliknij symbol na pasku, potem miejsce na siatce.</li>
           <li><b>Połącz:</b> przeciągnij od końcówki elementu do drugiej końcówki (albo narzędzie <i>Przewód</i>: klikaj kolejne punkty).</li>
           <li>Czerwona kropka = zacisk jeszcze niepodłączony.</li>
-          <li>Przeciągnij element, żeby go przesunąć — przewody idą za nim.</li>
+          <li>Przeciągnij element, żeby go przesunąć — przewody idą za nim. Odcinek przewodu też można przeciągnąć.</li>
           <li>Obrót nie rusza przewodów: po 90° trzeba podłączyć na nowo, dwa obroty (180°) odwracają element w miejscu.</li>
         </ol>
         <p><kbd>R</kbd> obrót · <kbd>Del</kbd> usuń · <kbd>Esc</kbd> przerwij · <kbd>⌘/Ctrl Z</kbd> cofnij</p>

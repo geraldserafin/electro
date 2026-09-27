@@ -72,6 +72,11 @@ try {
   check("rotating 90° disconnects", (await grid.locator(".open-pin").count()) === 2);
   await click(14, 3); await page.keyboard.press("r");
   check("rotating 180° reverses in place", (await code()) === "uklad = loop(VoltageSource(), Resistor())");
+  // drag the bottom segment of the loop's return wire two squares down: still the same circuit
+  const [sx, sy] = await at(12, 10); const [tx, ty] = await at(12, 12);
+  await page.mouse.move(sx, sy); await page.mouse.down(); await page.mouse.move(tx, ty, { steps: 6 }); await page.mouse.up();
+  check("moving a wire segment keeps connections", (await code()) === "uklad = loop(VoltageSource(), Resistor())"
+    && (await grid.locator(".open-pin").count()) === 0);
 
   check("no page errors", errors.length === 0);
   if (errors.length) console.log(errors);

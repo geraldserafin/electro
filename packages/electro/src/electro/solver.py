@@ -23,7 +23,11 @@ class CircuitError(Exception):
 
 
 class Contradiction(CircuitError):
-    """The givens are inconsistent with the circuit."""
+    """The givens are inconsistent with the circuit. ``.details``: the equation that failed."""
+
+    def __init__(self, message: str, details: str = ""):
+        super().__init__(message)
+        self.details = details
 
 
 class Ambiguous(CircuitError):
@@ -267,10 +271,7 @@ class Solution:
 
     # presentation
     def unit(self, s: sp.Symbol) -> str:
-        for p in self.system.parts.values():
-            if s == p.model.param:
-                return p.component.unit
-        return {"U": "V", "V": "V", "I": "A", "P": "W", "E": "V", "Z": "Ω"}.get(s.name.split("_")[0], "")
+        return _unit(self.system, s)
 
     @property
     def data(self) -> dict[sp.Symbol, sp.Expr]:
@@ -396,6 +397,50 @@ def _admissible(var: sp.Symbol, value: sp.Expr) -> bool:
     return not (var.is_nonnegative and value.is_nonnegative is False)
 
 
+def _unit(system: System, s: sp.Symbol) -> str:
+    for p in system.parts.values():
+        if s == p.model.param:
+            return p.component.unit
+    return {"U": "V", "V": "V", "I": "A", "P": "W", "E": "V", "Z": "Ω"}.get(s.name.split("_")[0], "")
+
+
+def _data_items(system: System, laws: list[Law]) -> list[tuple[tuple, str]]:
+    """Every single piece of data, as (key for _solve's ``drop``, how to show it)."""
+    items = [(("param", s.name), f"{s.name} = {fmt(v, _unit(system, s))}")
+             for s, v in system.known.items() if not s.name.startswith("V_")]
+    for i, law in enumerate(laws):
+        free = list(law.expr.free_symbols)
+        if len(free) == 1 and sp.diff(law.expr, free[0]) == 1:
+            text = f"{free[0].name} = {fmt(free[0] - law.expr, _unit(system, free[0]))}"
+        else:
+            text = f"{_str(law.expr)} = 0"
+        items.append((("given", i), text))
+    return items
+
+
+def _explain_contradiction(circuit, equations, omega, find, given, err: Contradiction) -> Contradiction:
+    """Which data clash: those whose removal alone makes everything else consistent."""
+    ctx = Context(None if omega is None else parse(omega))
+    system = compile_circuit(circuit, ctx=ctx)
+    conditions, values = [], []  # culprits: given conditions / component values
+    for key, text in _data_items(system, _given_laws(equations, given, system)):
+        try:
+            _solve(circuit, equations, omega, find, given, {}, drop=frozenset([key]))
+        except CircuitError:
+            continue
+        (conditions if key[0] == "given" else values).append(text)
+    if conditions and values:
+        message = (f"Sprzeczne dane: {', '.join(conditions)} — tego nie da się uzyskać przy "
+                   f"{', '.join(values)}. Zmień jedną z tych wartości.")
+    elif values:
+        message = f"Sprzeczne dane: elementy {', '.join(values)} wykluczają się. Zmień jedną z tych wartości."
+    elif conditions:
+        message = f"Sprzeczne dane: warunki {', '.join(conditions)} wykluczają się nawzajem."
+    else:
+        message = "Sprzeczne dane: tych warunków nie da się spełnić naraz (żadna pojedyncza zmiana tego nie naprawia)."
+    return Contradiction(message, str(err))
+
+
 def _check_zero(expr, law: Law, known):
     rest = sp.simplify(expr.xreplace(known))
     if rest != 0:
@@ -411,7 +456,10 @@ def solve(circuit: Circuit, *equations, omega=None, find=None, **given) -> Solut
     A ``Hole`` the data does not pin down is filled with the simplest element that fits:
     a resistor (E = 0), else a source (Z = 0).
     """
-    solution = _solve(circuit, equations, omega, find, given, {})
+    try:
+        solution = _solve(circuit, equations, omega, find, given, {})
+    except Contradiction as err:
+        raise _explain_contradiction(circuit, equations, omega, find, given, err) from None
     holes = [p for p in solution.system.parts.values() if isinstance(p.component, Hole)]
     open_holes = [p for p in holes if {p.model.variables["E"], p.model.variables["Z"]} & set(solution.missing)]
     if open_holes:
@@ -437,7 +485,8 @@ def _report(solution: Solution) -> Solution:
     return solution
 
 
-def _solve(circuit: Circuit, equations, omega, find, given, assumed) -> Solution:
+def _solve(circuit: Circuit, equations, omega, find, given, assumed, drop: frozenset = frozenset()) -> Solution:
+    """``drop``: data to leave out — ("given", index) or ("param", name), see _data_items."""
     ctx = Context(None if omega is None else parse(omega))
     system = compile_circuit(circuit, ctx=ctx)
     if isinstance(find, (str, sp.Symbol)):
@@ -445,10 +494,17 @@ def _solve(circuit: Circuit, equations, omega, find, given, assumed) -> Solution
     targets = [_target(system, name) for name in find or ()]
     known = dict(system.known) | assumed
     unknown = set(system.unknowns) - set(assumed)
+    for kind, name in drop:
+        if kind == "param":  # a component value treated as unknown
+            sym = system.symbol(name)
+            known.pop(sym, None)
+            unknown.add(sym)
     given_values: dict[sp.Symbol, sp.Expr] = {}
     pending: list[Law] = []
 
-    for law in _given_laws(equations, given, system):
+    for i, law in enumerate(_given_laws(equations, given, system)):
+        if ("given", i) in drop:
+            continue
         free = law.expr.free_symbols & unknown
         sym = next(iter(free)) if len(free) == 1 else None
         if sym is not None and sp.diff(law.expr, sym) == 1 and not (law.expr - sym).free_symbols & unknown:

@@ -42,7 +42,7 @@ STYLE = """
 .w{stroke:currentColor;stroke-width:1.6;fill:none;stroke-linecap:round;stroke-linejoin:round}
 .w .thick{stroke-width:3}.w .fill{fill:currentColor;stroke:none}.w .dashed{stroke-dasharray:4 3}
 .w .open{fill:none}.dot{fill:currentColor}
-text{font:13px ui-sans-serif,system-ui,sans-serif;fill:currentColor}
+text{font:13px ui-sans-serif,system-ui,sans-serif;fill:currentColor}.halo{fill:var(--paper,#fff)}
 text .sub{font-size:10px}.solved{fill:#2563eb;font-weight:600}.result{fill:#059669}
 .node{font-style:italic}.letter{font-weight:600;text-anchor:middle;dominant-baseline:central}
 """

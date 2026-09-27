@@ -176,6 +176,24 @@ export function isConnectionPoint(sch: SchematicData, lib: SymbolLibrary, p: Poi
     || w.points.slice(1).some((q, i) => onSegment(p, w.points[i], q)));
 }
 
+/**
+ * Move segment ``index`` of a wire sideways by ``by`` grid units (perpendicular to it).
+ * Neighbouring segments stretch; the wire's ends stay where they are (a corner is added
+ * next to them if needed), so its connections never change.
+ */
+export function moveSegment(w: WireData, index: number, by: number): WireData {
+  const pts = w.points.map((p) => [...p] as Point);
+  const [a, b] = [pts[index], pts[index + 1]];
+  const shift = (p: Point): Point => (a[1] === b[1] ? [p[0], p[1] + by] : [p[0] + by, p[1]]);
+  const moved = pts.map((p, i) => (i === index || i === index + 1 ? shift(p) : p));
+  const path = [
+    ...(index === 0 ? [pts[0]] : []),
+    ...moved,
+    ...(index + 1 === pts.length - 1 ? [pts[pts.length - 1]] : []),
+  ];
+  return { points: simplify(path) };
+}
+
 /** Where to put an element so that it rotates about its middle instead of its first pin. */
 export function rotatedAbout(e: ElementData, lib: SymbolLibrary, rotation: number): Point {
   const middle = (el: ElementData) => {
