@@ -32,6 +32,13 @@ try {
   check("no error outputs", (await page.locator(".output-error").count()) === 0);
   await page.screenshot({ path: `${shots}/notebook.png`, fullPage: true });
 
+  // pick an element in the side panel, then close the panel (it would cover the left of the board)
+  const pick = async (scope, name) => {
+    await scope.getByRole("button", { name: "Elementy" }).click();
+    await scope.locator(`.library-item[title="${name}"]`).click();
+    await scope.getByRole("button", { name: "Elementy" }).click();
+  };
+
   // a schematic cell's code, through its Kod view (and back to the drawing)
   const codeOf = async (cellLocator) => {
     await cellLocator.getByRole("tab", { name: "Kod" }).click();
@@ -104,6 +111,8 @@ try {
   const printed = bridge.locator(".print-drawing svg");
   check("print shows the drawing, not the editor", await printed.isVisible() && !(await bridge.locator(".board").isVisible())
     && (await printed.locator(".selected").count()) === 0 && (await printed.boundingBox()).height < 500);
+  check("print leaves out the simulation", !(await bridge.locator(".sim-outputs").isVisible())
+    && (await printed.locator(".reading, .label.solved").count()) === 0);
   await page.emulateMedia({ media: "screen" });
 
   // editor: place a resistor on the bridge canvas
@@ -111,7 +120,7 @@ try {
   const before = await canvas.locator(".element").count();
   const box = await canvas.boundingBox();
   await page.mouse.click(box.x + box.width * 0.6, box.y + box.height * 0.85); // deselect: the inspector would cover the spot
-  await page.getByTitle("Rezystor").first().click();
+  await pick(bridge, "Rezystor");
   await page.mouse.click(box.x + box.width * 0.8, box.y + box.height * 0.5);
   check("element placed", (await canvas.locator(".element").count()) === before + 1);
   check("inspector shows the new label", (await page.locator(".inspector input").first().inputValue()) === "R_5");
@@ -129,28 +138,29 @@ try {
   }, [gx * 20, gy * 20]);
   const click = async (gx, gy) => { const [x, y] = await at(gx, gy); await page.mouse.click(x, y); };
   const code = () => codeOf(cell);
-  await cell.getByTitle("Źródło napięcia").click(); await click(4, 6);
-  await cell.getByTitle("Rezystor").click(); await click(12, 3);
+  await pick(cell, "Źródło napięcia"); await click(4, 6);
+  await pick(cell, "Rezystor"); await click(12, 3);
   check("new elements show open pins", (await grid.locator(".open-pin").count()) === 4);
 
-  // the element library: search, Enter, place — and it joins the recent elements on the toolbar
+  // the element panel: search, Enter, place; the panel stays open (like Excalidraw's)
   await cell.getByRole("button", { name: "Elementy" }).click();
   await page.keyboard.type("kond");
   await page.keyboard.press("Enter");
   await click(24, 3);
   check("library search places an element", (await grid.locator(".element").count()) === 3
-    && (await cell.locator(".island.tools").getByTitle("Kondensator").count()) === 1);
+    && await cell.locator(".island.library").isVisible());
   await page.keyboard.press("Delete");  // keep the circuit a simple loop for what follows
+  await cell.getByRole("button", { name: "Elementy" }).click();  // close the panel
   const [x1, y1] = await at(8, 6); const [x2, y2] = await at(12, 3);
   await page.mouse.move(x1, y1); await page.mouse.down(); await page.mouse.move(x2, y2, { steps: 8 }); await page.mouse.up();
   await cell.getByRole("button", { name: "Przewód" }).click();
   for (const p of [[16, 3], [20, 3], [20, 10], [4, 10], [4, 6]]) await click(...p);  // ends on a pin by itself
   await page.keyboard.press("Escape");
-  check("wired into a loop", (await code()) === "uklad = loop(VoltageSource(), Resistor())");
+  check("wired into a loop", (await code()) === "układ1 = loop(VoltageSource(), Resistor())");
   await click(14, 3); await page.keyboard.press("r");
   check("rotating 90° disconnects", (await grid.locator(".open-pin").count()) === 2);
   await click(14, 3); await page.keyboard.press("r");
-  check("rotating 180° reverses in place", (await code()) === "uklad = loop(VoltageSource(), Resistor())");
+  check("rotating 180° reverses in place", (await code()) === "układ1 = loop(VoltageSource(), Resistor())");
   // drag the bottom segment of the loop's return wire two squares down: still the same circuit
   const [sx, sy] = await at(12, 10); const [tx, ty] = await at(12, 12);
   await page.mouse.move(sx, sy); await page.mouse.down(); await page.mouse.move(tx, ty, { steps: 6 }); await page.mouse.up();
@@ -160,7 +170,7 @@ try {
   await page.mouse.move(ex, ey); await page.mouse.down(); await page.mouse.move(ex - 120, ey - 60, { steps: 6 }); await page.mouse.up();
   const pinAfter = await at(4, 6);
   check("dragging empty space pans the view", Math.round(pinBefore[0] - pinAfter[0]) === 120 && Math.round(pinBefore[1] - pinAfter[1]) === 60
-    && (await code()) === "uklad = loop(VoltageSource(), Resistor())");
+    && (await code()) === "układ1 = loop(VoltageSource(), Resistor())");
   await cell.getByRole("button", { name: "Dopasuj widok" }).click();
   check("fit shows the whole drawing", (await grid.locator(".element").count()) === 2);
 
@@ -173,11 +183,24 @@ try {
   const [gx, gy] = await at(14, 3); const [hx, hy] = await at(16, 5);
   await page.mouse.move(gx, gy); await page.mouse.down(); await page.mouse.move(hx, hy, { steps: 6 }); await page.mouse.up();
   check("shift + drag selects many and moves them together", selected === 2
-    && (await code()) === "uklad = loop(VoltageSource(), Resistor())" && (await grid.locator(".open-pin").count()) === 0);
+    && (await code()) === "układ1 = loop(VoltageSource(), Resistor())" && (await grid.locator(".open-pin").count()) === 0);
   await page.keyboard.press("Meta+z");  // back where it was, for the segment check below
 
-  check("moving a wire segment keeps connections", (await code()) === "uklad = loop(VoltageSource(), Resistor())"
+  check("moving a wire segment keeps connections", (await code()) === "układ1 = loop(VoltageSource(), Resistor())"
     && (await grid.locator(".open-pin").count()) === 0);
+
+  // the name in the corner is a variable in code: "Układ 1" → układ1; renaming renames it
+  await cell.locator(".name-box").click();
+  await cell.locator(".name-edit input").fill("Mój obwód");
+  const hint = await cell.locator(".name-edit code").textContent();
+  await page.keyboard.press("Enter");
+  await page.locator(".cellbar").getByRole("button", { name: "+ Kod" }).click();
+  const user = page.locator(".cell-code").last();
+  await user.locator(".cm-content").click();
+  await page.keyboard.insertText("mójobwód.solve(I_R_1=1)\ndisplay(schematic(mójobwód))");
+  await user.getByRole("button", { name: /Uruchom/ }).click();
+  await user.locator(".output-svg svg").waitFor({ timeout: 30_000 });
+  check("schematic name is a variable in code", hint === "mójobwód" && (await user.locator(".output-error").count()) === 0);
 
   // the examples notebook from the menu runs without a single error
   page.once("dialog", (d) => d.accept());

@@ -60,6 +60,7 @@ export function App() {
     setCells((cells) => cells.map((c) => (c.id === id ? ({ ...c, ...patch } as Cell) : c)));
   const insert = (index: number, type: CellType) => {
     const cell = newCell(type);
+    if (cell.type === "schematic") cell.name = freeName(latest.current.cells);
     setCells((cells) => [...cells.slice(0, index), cell, ...cells.slice(index)]);
     setFocused(cell.id);
   };
@@ -230,6 +231,14 @@ export function App() {
       </main>
     </div>
   );
+}
+
+/** "Układ 1", "Układ 2", …: the first name no schematic has yet. */
+function freeName(cells: Cell[]): string {
+  const taken = new Set(cells.flatMap((c) => (c.type === "schematic" ? [c.name] : [])));
+  let n = 1;
+  while (taken.has(`Układ ${n}`)) n++;
+  return `Układ ${n}`;
 }
 
 function Menu({ label, children }: { label: string; children: ReactNode }) {

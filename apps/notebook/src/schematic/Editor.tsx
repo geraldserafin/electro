@@ -36,20 +36,8 @@ interface Props {
 
 const clampZoom = (z: number) => Math.min(3, Math.max(0.25, z));
 
-const RECENT_KEY = "electro-recent-elements";
-const DEFAULT_RECENT = ["resistor", "voltage_source", "ground"];
-
-function loadRecent(): string[] {
-  try {
-    const saved = JSON.parse(localStorage.getItem(RECENT_KEY) ?? "null");
-    if (Array.isArray(saved) && saved.every((k) => typeof k === "string")) return saved.slice(0, 3);
-  } catch {
-    // private mode or broken value
-  }
-  return DEFAULT_RECENT;
-}
-
 const HISTORY = 100;
+const PANEL = 260; // screen px the element panel takes on the left (with its margin)
 
 /** Start with the drawing near the top-left, below the toolbar. */
 function startCamera(sch: SchematicData, lib: SymbolLibrary): Camera {
@@ -72,7 +60,6 @@ export function SchematicEditor({ value, onChange, library, results, topLeft, to
   const [help, setHelp] = useState(false);
   const [libraryOpen, setLibraryOpen] = useState(false);
   const [query, setQuery] = useState("");
-  const [recent, setRecent] = useState<string[]>(loadRecent);
   const [full, setFull] = useState(false);
   const [spaceHeld, setSpaceHeld] = useState(false);
   const [cam, setCam] = useState<Camera>(() => startCamera(value, library));
@@ -90,7 +77,7 @@ export function SchematicEditor({ value, onChange, library, results, topLeft, to
   // in the notebook the board is as tall as the drawing needs (fixed after opening, so it never jumps)
   const [boardHeight] = useState(() => {
     const [, y0, , y1] = bounds(value, library);
-    return Math.min(640, Math.max(380, (y1 - y0) * G + 240));
+    return Math.min(640, Math.max(440, (y1 - y0) * G + 240)); // ≥ 440: room for the element panel
   });
 
   /** A camera that shows the whole drawing. */
@@ -317,13 +304,13 @@ export function SchematicEditor({ value, onChange, library, results, topLeft, to
     if (mod && event.key.toLowerCase() === "z") (event.shiftKey ? redo : undo)();
     else if (mod && event.key.toLowerCase() === "y") redo();
     else if (event.key === "Escape") {
+      // one step back at a time: the wire being drawn, the tool / selection, the panel, full screen
       if (draft) setDraft(null);
-      else if (libraryOpen) setLibraryOpen(false);
-      else if (full && tool.type === "select" && !selection) setFull(false);
-      else {
+      else if (tool.type !== "select" || selection) {
         setTool({ type: "select" });
         setSelection(null);
-      }
+      } else if (libraryOpen) setLibraryOpen(false);
+      else if (full) setFull(false);
     } else if (event.key === "Enter" && draft) {
       addWire(draft);
       setDraft(null);
@@ -335,7 +322,8 @@ export function SchematicEditor({ value, onChange, library, results, topLeft, to
       const k = KINDS[(Number(event.key) + 9) % 10];
       if (k) choose(k.kind);
     }
-    else if ((event.key === "k" || event.key === "K" || event.key === "/") && !mod) openLibrary();
+    else if ((event.key === "k" || event.key === "K") && !mod) (libraryOpen ? setLibraryOpen(false) : openLibrary());
+    else if (event.key === "/" && !mod) openLibrary();
     else if ((event.key === "f" || event.key === "F") && !mod) setFull((f) => !f);
     else if (event.key === "Delete" || event.key === "Backspace") removeSelected();
     else return;
@@ -358,24 +346,20 @@ export function SchematicEditor({ value, onChange, library, results, topLeft, to
     : tool.type === "hand" ? "Przeciągnij, żeby przesunąć widok · ⌘/Ctrl + kółko albo szczypanie powiększa"
     : "Przeciągnij element, żeby go przesunąć · od końcówki — przewód · puste miejsce — przesuwa widok · Shift + przeciągnij — zaznacz wiele";
 
-  /** Pick an element to place; it becomes one of the (three) recent ones on the toolbar. */
+  /** Pick an element to place (the side panel stays open, like Excalidraw's). */
   function choose(kind: string) {
     setTool({ type: "place", kind });
     setDraft(null);
-    setLibraryOpen(false);
-    const next = [kind, ...recent.filter((k) => k !== kind)].slice(0, 3);
-    setRecent(next);
-    try {
-      localStorage.setItem(RECENT_KEY, JSON.stringify(next));
-    } catch {
-      // not remembered across visits — fine
-    }
     svgRef.current?.focus({ preventScroll: true });
   }
 
   function openLibrary() {
     setQuery("");
     setLibraryOpen(true);
+    // the panel covers the left of the board: move the drawing out from under it
+    if (!value.elements.length && !value.wires.length) return;
+    const left = (bounds(value, library)[0] * G - 60 - cam.x) * cam.zoom; // - room for labels
+    if (left < PANEL) setCam((c) => ({ ...c, x: c.x - (PANEL - left) / c.zoom }));
   }
 
   const symbolIcon = (kind: string) =>
@@ -395,12 +379,6 @@ export function SchematicEditor({ value, onChange, library, results, topLeft, to
     { tool: { type: "select" }, label: "Zaznacz", key: "V", icon: <Pointer /> },
     { tool: { type: "hand" }, label: "Rączka — przesuwanie widoku", key: "H", icon: <Hand /> },
     { tool: { type: "wire" }, label: "Przewód", key: "W", icon: <WireIcon /> },
-    ...recent.filter((kind) => kindInfo(kind)).map((kind) => ({
-      tool: { type: "place", kind } as Tool,
-      label: kindInfo(kind)!.name,
-      key: shortcut(kind),
-      icon: symbolIcon(kind),
-    })),
   ];
   const found = searchKinds(query);
   const groups = [...new Set(found.map((k) => k.group))];
@@ -519,10 +497,10 @@ export function SchematicEditor({ value, onChange, library, results, topLeft, to
 
       <div className="island top-left no-print">{topLeft}</div>
       <div className="island tools no-print" role="toolbar">
-        {tools.map(({ tool: t, label, key, icon }, i) => (
+        {tools.map(({ tool: t, label, key, icon }) => (
           <button
             key={label}
-            className={`tool ${isActive(t) ? "active" : ""} ${i === 2 ? "sep-after" : ""}`}
+            className={`tool ${isActive(t) ? "active" : ""}`}
             title={`${label}${key ? ` (${key})` : ""}`}
             aria-label={label}
             onClick={() => (t.type === "place" ? choose(t.kind) : (setTool(t), setDraft(null), svgRef.current?.focus({ preventScroll: true })))}
@@ -534,7 +512,7 @@ export function SchematicEditor({ value, onChange, library, results, topLeft, to
         <span className="sep" />
         <button
           className={`tool library-button ${libraryOpen ? "active" : ""}`}
-          title="Wszystkie elementy (K)"
+          title="Panel elementów (K)"
           aria-label="Elementy"
           onClick={() => (libraryOpen ? setLibraryOpen(false) : openLibrary())}
         >
@@ -543,7 +521,11 @@ export function SchematicEditor({ value, onChange, library, results, topLeft, to
         </button>
       </div>
       {libraryOpen && (
-        <div className="island library no-print" role="dialog" aria-label="Biblioteka elementów">
+        <div className="island library no-print" role="complementary" aria-label="Biblioteka elementów">
+          <div className="library-head">
+            <h4>Elementy</h4>
+            <button className="icon" onClick={() => setLibraryOpen(false)} title="Zamknij panel (K)" aria-label="Zamknij panel">×</button>
+          </div>
           <label className="library-search">
             <Search />
             <input
@@ -562,7 +544,8 @@ export function SchematicEditor({ value, onChange, library, results, topLeft, to
               <h5>{group}</h5>
               <div className="library-grid">
                 {found.filter((k) => k.group === group).map((k) => (
-                  <button key={k.kind} className="library-item" title={k.name} onClick={() => choose(k.kind)}>
+                  <button key={k.kind} className={`library-item ${tool.type === "place" && tool.kind === k.kind ? "active" : ""}`}
+                          title={k.name} onClick={() => choose(k.kind)}>
                     {symbolIcon(k.kind)}
                     <span>{k.name}</span>
                     {shortcut(k.kind) && <kbd>{shortcut(k.kind)}</kbd>}
@@ -574,7 +557,7 @@ export function SchematicEditor({ value, onChange, library, results, topLeft, to
           {!found.length && <p className="muted">Nic nie pasuje do „{query}”.</p>}
         </div>
       )}
-      <div className="board-hint no-print">{hint}</div>
+      {!libraryOpen && <div className="board-hint no-print">{hint}</div>}
       <div className="island top-right no-print">{topRight}</div>
       {(selectedElement || selection?.type === "wire" || selection?.type === "group") && (
         <Inspector

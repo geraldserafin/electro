@@ -460,6 +460,8 @@ def solve(circuit: Circuit, *equations, omega=None, find=None, **given) -> Solut
     A ``Hole`` the data does not pin down is filled with the simplest element that fits:
     a resistor (E = 0), else a source (Z = 0).
     """
+    if not isinstance(circuit, Circuit) and hasattr(circuit, "to_circuit"):
+        circuit = circuit.to_circuit()  # a drawing (electro_schematic.Schematic)
     try:
         solution = _solve(circuit, equations, omega, find, given, {})
     except Contradiction as err:

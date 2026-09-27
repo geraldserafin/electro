@@ -120,6 +120,12 @@ class Schematic:
     elements: list[Element] = field(default_factory=list)
     wires: list[Wire] = field(default_factory=list)
 
+    def __getattr__(self, name: str):
+        """Anything else is the circuit's: ``drawing.solve(...)``, ``drawing.transpose()``, …"""
+        if name.startswith("_"):
+            raise AttributeError(name)
+        return getattr(self.to_circuit(), name)
+
     # ------------------------------------------------------------------ access
 
     def element(self, id: str) -> Element:

@@ -11,6 +11,7 @@ import ast
 import contextlib
 import io
 import json
+import re
 import traceback
 import warnings
 
@@ -39,10 +40,17 @@ def symbols() -> str:
     return json.dumps(symbol_library(), ensure_ascii=False)
 
 
+def variable(name: str) -> str:
+    """A schematic's name as the Python variable cells see it: ``"Układ 1"`` → ``układ1``."""
+    v = re.sub(r"\W", "", name.lower())
+    if not v:
+        return "uklad"
+    return f"_{v}" if v[0].isdigit() else v
+
+
 def code(schematic_json: str, name: str) -> str:
-    """A drawing as plain electro code, for the "show code" button."""
-    variable = name if name.isidentifier() else "uklad"
-    return Schematic.from_json(schematic_json).to_code(variable)
+    """A drawing as plain electro code, for the code view."""
+    return Schematic.from_json(schematic_json).to_code(variable(name))
 
 
 def from_code(source: str, name: str, old_json: str = "") -> str:
@@ -57,19 +65,19 @@ def from_code(source: str, name: str, old_json: str = "") -> str:
     from electro_schematic import layout
     from electro_schematic.layout import Unsupported
 
-    variable = name if name.isidentifier() else "uklad"
+    var = variable(name)
     scope: dict = {}
     exec(PRELUDE, scope)
     prelude = set(scope)
     try:
         exec(compile(source, CELL, "exec"), scope)
-        found = scope.get(variable)
+        found = scope.get(var)
         if not isinstance(found, Circuit):
             defined = [v for k, v in scope.items() if k not in prelude and isinstance(v, Circuit)]
             if not defined:
-                raise ValueError(f"W kodzie nie ma układu — przypisz go do zmiennej, np. {variable} = loop(...)")
+                raise ValueError(f"W kodzie nie ma układu — przypisz go do zmiennej, np. {var} = loop(...)")
             found = defined[-1]
-        kept = _same_but_values(Schematic.from_json(old_json), found, variable) if old_json else None
+        kept = _same_but_values(Schematic.from_json(old_json), found, var) if old_json else None
         if kept is not None:
             return json.dumps({"schematic": json.loads(kept.to_json())}, ensure_ascii=False)
         try:
@@ -163,6 +171,10 @@ def simulate(schematic_json: str, data: str = "") -> str:
 
 
 def to_output(obj) -> dict:
+    if isinstance(obj, Schematic):  # a schematic cell's variable on its own: show the drawing
+        from electro_render import schematic
+
+        obj = schematic(obj)
     for method, kind in (("_repr_svg_", "svg"), ("_repr_markdown_", "markdown"), ("_repr_latex_", "markdown")):
         data = getattr(obj, method, lambda: None)()  # sympy defines some of these and returns None
         if data is not None:
@@ -190,6 +202,8 @@ def run(code: str, schematics_json: str = "{}") -> str:
         return drawings[name]
 
     namespace["schemat"] = schemat
+    for name, drawing in drawings.items():  # "Układ 1" is układ1 in code
+        namespace[variable(name)] = drawing
     namespace["display"] = lambda *objects: outputs.extend(to_output(o) for o in objects)
     stdout = io.StringIO()
     with contextlib.redirect_stdout(stdout), warnings.catch_warnings(record=True) as caught:

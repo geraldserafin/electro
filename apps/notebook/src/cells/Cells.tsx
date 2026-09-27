@@ -170,25 +170,13 @@ export function SchematicCell({ cell, update, library, toCell, simulate, running
     }
   };
 
-  const name = (
-    <label className="schematic-name" title="Pod tą nazwą kod widzi schemat: schemat(&quot;…&quot;)">
-      <code>schemat("</code>
-      <input value={cell.name} onChange={(e) => update({ name: e.target.value })} spellCheck={false} />
-      <code>")</code>
-    </label>
-  );
-  const actions = (
-    <>
-      <ViewSwitch view={view} onSwitch={switchTo} busy={busy} />
-      <button className="primary" onClick={run} disabled={(empty && view === "schematic") || running || busy}
-              title="Policz prądy i napięcia">
-        <Play /> {running ? "Liczę…" : "Symuluj"}
-      </button>
-    </>
-  );
+  const name = <NameBox name={cell.name} onRename={(n) => update({ name: n })} />;
+  const actions = <ViewSwitch view={view} onSwitch={switchTo} busy={busy} />;
 
   return (
     <div className="schematic-cell">
+      <RunButton run={run} running={running || busy} label="Symuluj — policz prądy i napięcia (Shift+Enter w kodzie)" />
+      <div className="cell-body">
       {view === "schematic" ? (
         <SchematicEditor
           value={cell.schematic}
@@ -201,7 +189,7 @@ export function SchematicCell({ cell, update, library, toCell, simulate, running
       ) : (
         <div className="board code-view">
           <div className="code-view-bar">
-            <div className="island static">{name}</div>
+            <div className="island static name-island">{name}</div>
             <span className="spacer" />
             <button className="ghost" onClick={() => source && toCell(source)} disabled={!source}
                     title="Wstaw ten kod pod spodem jako zwykłą komórkę z kodem">
@@ -224,12 +212,12 @@ export function SchematicCell({ cell, update, library, toCell, simulate, running
           {error
             ? <pre className="output-error code-view-note">{error}</pre>
             : <p className="code-view-note">
-                Zmiany w kodzie wracają na schemat po przełączeniu na „Schemat” (albo Symuluj / Shift+Enter) —
-                wtedy schemat układa się na nowo.
+                Zmiany w kodzie wracają na schemat po przełączeniu na „Schemat” albo po uruchomieniu.
               </p>}
         </div>
       )}
-      <PrintDrawing value={cell.schematic} library={library} results={cell.stale ? undefined : cell.results} />
+      {/* the PDF shows the circuit as drawn; results belong to code cells: schematic(układ1, sol) */}
+      <PrintDrawing value={cell.schematic} library={library} />
       <div className="sim-bar no-print">
         <label>
           Dane pomiarowe
@@ -243,11 +231,48 @@ export function SchematicCell({ cell, update, library, toCell, simulate, running
         </label>
       </div>
       {cell.outputs && cell.outputs.length > 0 && (
-        <div className={cell.stale ? "stale" : ""}>
-          {cell.stale && <p className="stale-note">Schemat albo dane się zmieniły — kliknij „Symuluj”, żeby przeliczyć.</p>}
+        <div className={`sim-outputs no-print ${cell.stale ? "stale" : ""}`}>
+          {cell.stale && <p className="stale-note">Schemat albo dane się zmieniły — uruchom, żeby przeliczyć.</p>}
           <Outputs outputs={cell.outputs} />
         </div>
       )}
+      </div>
     </div>
   );
+}
+
+/** "Układ 1" in the corner; a click edits it. In code the schematic is the variable układ1. */
+function NameBox({ name, onRename }: { name: string; onRename: (name: string) => void }) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(name);
+  const commit = () => {
+    setEditing(false);
+    if (draft.trim()) onRename(draft.trim());
+    else setDraft(name);
+  };
+  if (!editing)
+    return (
+      <button className="name-box" onClick={() => { setDraft(name); setEditing(true); }}
+              title={`W kodzie: ${variableName(name)} — kliknij, żeby zmienić nazwę`}>
+        {name}
+      </button>
+    );
+  return (
+    <span className="name-edit">
+      <input autoFocus value={draft} spellCheck={false} aria-label="Nazwa schematu"
+             onChange={(e) => setDraft(e.target.value)} onBlur={commit}
+             onKeyDown={(e) => {
+               if (e.key === "Enter") commit();
+               if (e.key === "Escape") { setDraft(name); setEditing(false); }
+             }} />
+      <small>w kodzie: <code>{variableName(draft)}</code></small>
+    </span>
+  );
+}
+
+/** Mirrors kernel.variable(): "Układ 1" → układ1. */
+export function variableName(name: string): string {
+  const v = name.toLowerCase().replace(/[^\p{L}\p{N}_]/gu, "");
+  if (!v) return "uklad";
+  return /^\p{N}/u.test(v) ? `_${v}` : v;
 }

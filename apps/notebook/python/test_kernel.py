@@ -51,7 +51,7 @@ def test_code_of_a_drawing():
 
     drawing = layout(loop(VoltageSource(12), Resistor(4))).to_json()
     assert kernel.code(drawing, "petla") == "petla = loop(VoltageSource(12), Resistor(4))"
-    assert kernel.code(drawing, "nie nazwa") .startswith("uklad = ")
+    assert kernel.code(drawing, "nie nazwa").startswith("nienazwa = ")
 
 
 def test_the_editors_symbol_file_is_up_to_date():
@@ -125,3 +125,17 @@ def test_code_view_keeps_the_drawing_when_only_values_change():
     # a new element in a net(...) (no automatic layout for it): says to add elements on the drawing
     grown = source.replace("Resistor(100)", "Resistor(100) + Resistor(1)", 1)
     assert "elementy dodawaj na schemacie" in json.loads(kernel.from_code(grown, "mostek", old.to_json()))["error"]
+
+
+def test_a_schematic_is_a_variable_named_after_it():
+    from electro import Resistor, VoltageSource, loop
+    from electro_schematic import layout
+
+    assert kernel.variable("Układ 1") == "układ1" and kernel.variable("1 test") == "_1test" and kernel.variable("") == "uklad"
+    drawing = layout(loop(VoltageSource(12), Resistor())).to_json()
+    kernel.reset()
+    out = json.loads(kernel.run("sol = układ1.solve(I_R_1=2)\ndisplay(schematic(układ1, sol))\nsol['R_1'].value",
+                                json.dumps({"Układ 1": drawing})))
+    assert out[0]["type"] == "svg" and "6" in out[1]["data"]
+    assert json.loads(kernel.run("układ1", json.dumps({"Układ 1": drawing})))[0]["type"] == "svg"
+    assert kernel.code(drawing, "Układ 1").startswith("układ1 = ")

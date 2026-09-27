@@ -306,7 +306,7 @@ main > .add-row { justify-content: center; }
 .code-view-note { margin: 0; font-size: 14px; color: var(--muted); }
 pre.code-view-note { color: var(--danger); }
 
-.schematic-cell { padding-left: 48px; }
+.schematic-cell { display: flex; gap: 8px; align-items: flex-start; }
 .board {
   position: relative;
   height: 480px; /* overridden by the editor to fit the drawing */
@@ -370,14 +370,13 @@ pre.code-view-note { color: var(--danger); }
 .island.tools .tool-text { font: italic 600 14px ui-sans-serif, system-ui; }
 .island.tools .library-button { width: auto; padding: 0 12px 0 10px; gap: 6px; }
 
-/* element library: a panel under the toolbar, with search and sections */
+/* element library: a side panel on the left (like Excalidraw's), open while "Elementy" is on */
 .island.library {
   top: 60px;
-  left: 50%;
-  transform: translateX(-50%);
+  left: 12px;
+  bottom: 64px;
   z-index: 6;
-  width: min(420px, calc(100% - 24px));
-  max-height: calc(100% - 80px);
+  width: 236px;
   overflow-y: auto;
   flex-direction: column;
   align-items: stretch;
@@ -388,14 +387,18 @@ pre.code-view-note { color: var(--danger); }
 .library-search input { flex: 1; border: none; outline: none; background: transparent; padding: 7px 0; }
 .library-search:focus-within { border-color: var(--primary); }
 .island.library h5 { margin: 8px 4px 2px; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); }
-.library-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 2px; }
+.library-head { display: flex; align-items: center; justify-content: space-between; padding: 0 2px 4px 4px; }
+.library-head h4 { margin: 0; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); }
+.library-head .icon { font-size: 18px; line-height: 1; padding: 2px 8px; color: var(--muted); }
+.library-grid { display: grid; grid-template-columns: 1fr; gap: 1px; }
+.island .library-item.active { background: var(--tool-active); color: var(--tool-active-text); }
 .island .library-item { justify-content: flex-start; gap: 10px; padding: 6px 8px; text-align: left; }
 .library-item span { flex: 1; }
 .library-item kbd { color: var(--faint); }
 .library-item .tool-symbol { color: var(--text); flex: none; }
 
 .board.fullscreen { position: fixed; inset: 12px; z-index: 100; height: auto; box-shadow: 0 10px 40px rgba(0, 0, 0, 0.25); }
-.island.top-left { top: 12px; left: 12px; padding: 4px 8px; }
+.island.top-left { top: 12px; left: 12px; padding: 4px; }
 .island.top-right { top: 12px; right: 12px; }
 .island.bottom-left { bottom: 12px; left: 12px; }
 .island.bottom-right { bottom: 12px; right: 12px; }
@@ -411,9 +414,12 @@ pre.code-view-note { color: var(--danger); }
   white-space: nowrap;
   pointer-events: none;
 }
-.schematic-name { display: flex; align-items: center; gap: 1px; font-size: 13px; color: var(--muted); }
-.schematic-name input { width: 96px; padding: 2px 6px; font-size: 14px; border-color: transparent; background: transparent; }
-.schematic-name input:hover { border-color: var(--line); }
+/* the schematic's name: a plain box in the corner, a click edits it */
+.island .name-box { font-size: 15px; font-weight: 500; padding: 4px 10px; }
+.name-edit { display: flex; flex-direction: column; gap: 2px; padding: 2px; }
+.name-edit input { width: 180px; font-size: 15px; padding: 4px 8px; }
+.name-edit small { font-size: 12px; color: var(--muted); padding: 0 4px 2px; }
+.name-edit code { font-family: var(--mono); color: var(--text); }
 
 .island.inspector {  /* on the right: drawings start top-left, so this side is usually free */
   top: 64px;
@@ -473,4 +479,5 @@ kbd { font: 11px ui-monospace, monospace; border: 1px solid var(--line); border-
   .stale { display: none; } /* results of an older drawing */
   .hide-code-in-print .code-editor { display: none; }
   .code-editor .cm-gutters { display: none; }
+  .cm-line { white-space: pre-wrap; word-break: break-word; } /* long lines wrap instead of being cut off */
 }
