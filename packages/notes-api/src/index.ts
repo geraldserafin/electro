@@ -2,3 +2,5 @@
 export * from "./Api.js"
 export * from "./Errors.js"
 export * from "./Notebook.js"
+export * from "./preview.js"
+export * from "./slug.js"

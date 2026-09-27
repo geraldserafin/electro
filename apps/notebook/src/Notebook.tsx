@@ -1,80 +1,44 @@
+// One note, edited: its cells, running them, and saving it to the notes server as it changes.
+// The page (routes/NotePage.tsx) reads the note by its address and hands it over.
 import { useEffect, useRef, useState, type ReactNode } from "react";
+import { Link } from "react-router";
 import { CodeCell, MarkdownCell, SchematicCell } from "./cells/Cells";
 import { Bolt, Down, Export, More, Notes, Plus, RunAll, Trash, Up } from "./icons";
-import { useAtom } from "@effect-atom/atom-react";
-import { copyOf } from "./format";
-import { viewAtom } from "./notes/atoms";
-import { Gallery } from "./notes/Gallery";
 import { SyncStatus } from "./notes/SyncStatus";
+import { useNoteSync } from "./notes/sync";
 import { Outline } from "./Outline";
-import { useNotesSync } from "./notes/sync";
 import { kernel } from "./python/kernel";
-import { download, load, newCell, save, upload } from "./storage";
+import { usePython } from "./python/usePython";
 import symbols from "./schematic/symbols.json";
-import type { Cell, CellType, Notebook, SchematicData, SymbolLibrary } from "./types";
+import { download, newCell } from "./storage";
+import type { Cell, CellType, Notebook as NotebookData, SchematicData, SymbolLibrary } from "./types";
 
 // generated from electro_render.symbol_library() (scripts/make_symbols.py), so drawings
 // show before Python has loaded
-const library = symbols as unknown as SymbolLibrary;
+export const library = symbols as unknown as SymbolLibrary;
 
-type Status = "loading" | "ready" | "error";
-
-/** Every notebook in examples/ shows up in the ⋯ menu (and opens with ?przyklad=<name>). */
-const EXAMPLE_FILES = import.meta.glob<Notebook>("../examples/*.electro.json", { eager: true, import: "default" });
-const EXAMPLES = Object.values(EXAMPLE_FILES);
-
-/** ?przyklad=nieznane-i-dziury replaces the current notebook with that example. */
-function fromAddress(): Notebook | null {
-  const params = new URLSearchParams(location.search);
-  const name = params.get("przyklad");
-  if (!name) return null;
-  params.delete("przyklad");
-  history.replaceState(null, "", location.pathname + (params.size ? `?${params}` : ""));
-  const found = Object.entries(EXAMPLE_FILES).find(([path]) => path.endsWith(`/${name}.electro.json`));
-  return found ? copyOf(found[1]) : null;
-}
-
-export function App() {
-  const [notebook, setNotebook] = useState<Notebook>(() => fromAddress() ?? load());
-  const [status, setStatus] = useState<Status>("loading");
-  const [statusText, setStatusText] = useState("Uruchamiam Pythona…");
+/**
+ * ``initial``/``revision``: the note as read from the server; ``reload``: read it again (after a
+ * conflict, to take the server's version); ``onDelete``: remove it.
+ */
+export function Notebook({ initial, revision, reload, onDelete, onSaved }: {
+  initial: NotebookData; revision: number | null; reload: () => void; onDelete: () => void;
+  onSaved?: (slug: string) => void; // after each save: the note's address (a new title may change it)
+}) {
+  const [notebook, setNotebook] = useState<NotebookData>(initial);
+  const python = usePython();
   const [running, setRunning] = useState<Set<string>>(new Set());
   const [focused, setFocused] = useState<string | null>(null);
   const executions = useRef(0);
-  // the notebook on the notes server: saved as it changes; other notes opened from the panel
-  const sync = useNotesSync(notebook, (next) => {
-    executions.current = 0;
-    setNotebook(next);
-  });
-  const [view, setView] = useAtom(viewAtom);
-  const gallery = view === "notes";
-  const fileInput = useRef<HTMLInputElement>(null);
+  const sync = useNoteSync(notebook, revision, reload, onSaved);
   const latest = useRef(notebook);
   latest.current = notebook;
+  const ready = python.kind === "ready";
 
+  // each note starts with a clean Python: variables of another note do not leak into this one
   useEffect(() => {
-    kernel.ready
-      .then(() => {
-        setStatus("ready");
-        setStatusText("Python gotowy");
-      })
-      .catch((error: Error) => {
-        setStatus("error");
-        setStatusText(`Python się nie uruchomił: ${error.message}`);
-      });
+    void kernel.ready.then(() => kernel.reset());
   }, []);
-
-  // save at most 400 ms after a change — not 400 ms after the last one, which never comes while
-  // "run all" keeps adding outputs
-  const saving = useRef<number | null>(null);
-  useEffect(() => {
-    if (saving.current === null)
-      saving.current = window.setTimeout(() => {
-        saving.current = null;
-        save(latest.current);
-      }, 400);
-  }, [notebook]);
-  useEffect(() => () => { if (saving.current !== null) save(latest.current); }, []);
 
   const setCells = (fn: (cells: Cell[]) => Cell[]) => setNotebook((nb) => ({ ...nb, cells: fn(nb.cells) }));
   const update = (id: string, patch: Partial<Cell>) =>
@@ -154,74 +118,38 @@ export function App() {
     setCells((cells) => cells.map((c) => (c.type === "code" ? { ...c, outputs: [], execution: undefined } : c)));
   };
 
-  const open = async (file: File | undefined) => {
-    if (!file) return;
-    try {
-      setNotebook(await upload(file));
-    } catch (error) {
-      alert(String(error));
-    }
-  };
-
-  const openExample = (example: Notebook) => {
-    if (confirm("Otworzyć przykład? Bieżący notatnik zostanie zastąpiony (zapisz go wcześniej: ⋯ → Zapisz plik)."))
-      setNotebook(copyOf(example));
-  };
-
   return (
     <div className={`notebook ${notebook.settings.codeInPdf ? "" : "hide-code-in-print"}`}>
-      {/* one line: logo, title — Python's state, run all, PDF, and the rest under "⋯" */}
+      {/* one line: all notes, title — saved?, Python, run all, PDF, and the rest under "⋯" */}
       <header className="appbar no-print">
-        <button className={`icon-button ${gallery ? "open" : ""}`} onClick={() => setView(gallery ? "notebook" : "notes")}
-                title={gallery ? "Wróć do notatki" : "Wszystkie notatki"} aria-label="Notatki" aria-pressed={gallery}>
-          <Notes />
-        </button>
+        <Link className="icon-button" to="/" title="Wszystkie notatki" aria-label="Notatki"><Notes /></Link>
         <div className="brand" title="electro — notatnik elektroniki"><Bolt /></div>
-        {gallery
-          ? <span className="title spacer-title" />
-          : <input className="title" value={notebook.title} placeholder="Bez tytułu" aria-label="Tytuł notatnika"
-                   onChange={(e) => setNotebook({ ...notebook, title: e.target.value })} />}
+        <input className="title" value={notebook.title} placeholder="Bez tytułu" aria-label="Tytuł notatnika"
+               onChange={(e) => setNotebook({ ...notebook, title: e.target.value })} />
         <SyncStatus state={sync.state} onKeepMine={sync.keepMine} onTakeTheirs={sync.takeTheirs} />
-        <div className={`status ${status}`} title={statusText} role="status" aria-label={statusText}>
+        <div className={`status ${python.kind}`} title={python.text} role="status" aria-label={python.text}>
           <span className="dot" /> Python
         </div>
-        {/* the notebook's own actions: not in the gallery */}
-        {!gallery && (
-          <>
-            <button className="icon-button" onClick={runAll} disabled={status !== "ready"}
-                    title="Uruchom wszystko" aria-label="Uruchom wszystko"><RunAll /></button>
-            <button className="icon-button" onClick={() => window.print()} title="Eksport do PDF" aria-label="Eksport PDF">
-              <Export />
-            </button>
-            <Menu label={<More />} title="Więcej" right>
-              <button onClick={() => fileInput.current?.click()}>Otwórz plik…</button>
-              <button onClick={() => download(notebook)}>Zapisz plik</button>
-              <hr />
-              {EXAMPLES.map((example, i) => (
-                <button key={i} onClick={() => openExample(example)}>Przykład: {example.title}</button>
-              ))}
-              <hr />
-              <label className="check">
-                <input type="checkbox" checked={notebook.settings.codeInPdf}
-                       onChange={(e) => setNotebook({ ...notebook, settings: { ...notebook.settings, codeInPdf: e.target.checked } })} />
-                pokazuj kod w PDF
-              </label>
-              <button onClick={resetKernel} disabled={status !== "ready"}>Wyczyść pamięć Pythona</button>
-            </Menu>
-          </>
-        )}
-        <input ref={fileInput} type="file" accept=".json" hidden onChange={(e) => open(e.target.files?.[0])} />
+        <button className="icon-button" onClick={runAll} disabled={!ready}
+                title="Uruchom wszystko" aria-label="Uruchom wszystko"><RunAll /></button>
+        <button className="icon-button" onClick={() => window.print()} title="Eksport do PDF" aria-label="Eksport PDF">
+          <Export />
+        </button>
+        <Menu label={<More />} title="Więcej" right>
+          <button onClick={() => download(notebook)}>Zapisz plik</button>
+          <label className="check">
+            <input type="checkbox" checked={notebook.settings.codeInPdf}
+                   onChange={(e) => setNotebook({ ...notebook, settings: { ...notebook.settings, codeInPdf: e.target.checked } })} />
+            pokazuj kod w PDF
+          </label>
+          <button onClick={resetKernel} disabled={!ready}>Wyczyść pamięć Pythona</button>
+          <hr />
+          <button className="danger" onClick={onDelete}>Usuń notatkę</button>
+        </Menu>
       </header>
 
-      {gallery && (
-        <Gallery currentId={notebook.id} library={library}
-                 onOpen={(id) => { setView("notebook"); if (id !== notebook.id) void sync.open(id); }}
-                 onCreate={() => { setView("notebook"); void sync.create(); }}
-                 onDelete={(note) => confirm(`Usunąć notatkę „${note.title || "Bez tytułu"}”? Tego nie da się cofnąć.`)
-                   && sync.destroy(note.id)} />
-      )}
-      {!gallery && <Outline cells={notebook.cells} />}
-      <main hidden={gallery}>
+      <Outline cells={notebook.cells} />
+      <main>
         <AddRow onAdd={(type) => insert(0, type)} />
         {notebook.cells.map((cell, index) => (
           <section

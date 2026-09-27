@@ -18,7 +18,8 @@ class Kernel {
       if (reply.ok) call.resolve(reply.result);
       else call.reject(new Error(reply.error));
     };
-    const bundleUrl = new URL("py/bundle.json", document.baseURI).href;
+    // from the app's root, not the page's address (/notes/:id would put it under /notes/)
+    const bundleUrl = new URL(`${import.meta.env.BASE_URL}py/bundle.json`, location.origin).href;
     this.ready = this.call("init", { bundleUrl }).then(() => undefined);
   }
 

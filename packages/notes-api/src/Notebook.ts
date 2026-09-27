@@ -16,6 +16,9 @@ export const NoteId = Schema.String.pipe(
 )
 export type NoteId = typeof NoteId.Type
 
+/** A note's address: its slug (from the title; also an older one) or its id. */
+export const NoteRef = NoteId.annotations({ identifier: "NoteRef", description: "Slug albo identyfikator notatki" })
+
 export const MarkdownCell = Schema.Struct(
   { id: Schema.NonEmptyString, type: Schema.Literal("markdown"), source: Schema.String },
   Rest,
@@ -78,6 +81,7 @@ export type NotePreview = typeof NotePreview.Type
 /** What a list of notes shows, without the documents themselves. */
 export const NoteSummary = Schema.Struct({
   id: NoteId,
+  slug: Schema.String, // its address: /notes/<slug>
   title: Schema.String,
   modified: Schema.String, // as the notebook says (when it was last edited)
   savedAt: Schema.String, // when the server stored this revision
@@ -91,6 +95,7 @@ export type NoteSummary = typeof NoteSummary.Type
 /** A stored note: the document and its revision (for saving without overwriting newer work). */
 export const Note = Schema.Struct({
   document: NotebookDocument,
+  slug: Schema.String,
   revision: Schema.Int,
   savedAt: Schema.String,
 }).annotations({ identifier: "Note" })
@@ -106,5 +111,6 @@ export const SaveNote = Schema.Struct({
 }).annotations({ identifier: "SaveNote" })
 export type SaveNote = typeof SaveNote.Type
 
-export const Saved = Schema.Struct({ revision: Schema.Int, savedAt: Schema.String })
+/** A save went through: the new revision, and the address (a new title may have changed it). */
+export const Saved = Schema.Struct({ revision: Schema.Int, savedAt: Schema.String, slug: Schema.String })
 export type Saved = typeof Saved.Type

@@ -1,7 +1,7 @@
 // The notes server, as atoms: a typed client made from the contract (@electro/notes-api), the
 // list of notes as a query, and saving / opening / deleting as mutations. Saving and deleting
 // refresh the list through the "notes" reactivity key.
-import { Atom, AtomHttpApi } from "@effect-atom/atom-react";
+import { AtomHttpApi } from "@effect-atom/atom-react";
 import { FetchHttpClient } from "@effect/platform";
 import { NotesApi, type NotebookDocument } from "@electro/notes-api";
 import type { Notebook } from "../types";
@@ -27,6 +27,3 @@ export const removeNote = NotesClient.mutation("notes", "remove");
  */
 export const toDocument = (notebook: Notebook) => notebook as unknown as NotebookDocument;
 export const fromDocument = (document: NotebookDocument) => document as unknown as Notebook;
-
-/** What the page shows: the open notebook, or all notes (the gallery). */
-export const viewAtom = Atom.make<"notebook" | "notes">("notebook").pipe(Atom.keepAlive);

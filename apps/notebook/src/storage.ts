@@ -1,34 +1,12 @@
 import { blank, deserialize, serialize } from "./format";
 import type { Cell, CellType, Notebook } from "./types";
 
-const KEY = "electro-notebook";
-
 export const newId = () => Math.random().toString(36).slice(2, 10);
 
 export function newCell(type: CellType): Cell {
   if (type === "markdown") return { id: newId(), type, source: "" };
   if (type === "code") return { id: newId(), type, source: "", outputs: [] };
   return { id: newId(), type, name: "uklad", schematic: { elements: [], wires: [] } };
-}
-
-/** The notebook of the last visit (in this browser), or the first example. */
-export function load(): Notebook {
-  try {
-    const saved = localStorage.getItem(KEY);
-    if (saved) return deserialize(saved); // older versions are migrated
-  } catch (error) {
-    console.warn("Zapisany notatnik nie dał się odczytać:", error);
-  }
-  return example();
-}
-
-export function save(notebook: Notebook) {
-  try {
-    localStorage.setItem(KEY, serialize(notebook, { stamp: false }));
-  } catch (error) {
-    // storage full or blocked: the file export still works
-    console.warn("Nie udało się zapisać notatnika w przeglądarce:", error);
-  }
 }
 
 export function download(notebook: Notebook) {

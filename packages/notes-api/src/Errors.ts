@@ -5,7 +5,7 @@ import { NoteId } from "./Notebook.js"
 
 export class NoteNotFound extends Schema.TaggedError<NoteNotFound>()(
   "NoteNotFound",
-  { id: NoteId },
+  { id: Schema.String }, // the id or slug asked for
   HttpApiSchema.annotations({ status: 404 }),
 ) {
   get message() {

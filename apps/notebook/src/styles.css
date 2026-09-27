@@ -192,6 +192,13 @@ input:focus, textarea:focus { outline: 2px solid var(--accent-soft); border-colo
 /* all notes: a gallery of first pages (like Figma's files) */
 .gallery { max-width: 1240px; margin: 0 auto; padding: 28px 32px 96px; }
 .gallery h1 { margin: 0 0 20px; font-size: 22px; font-weight: 500; }
+.gallery h2 { margin: 48px 0 16px; font-size: 16px; font-weight: 500; color: var(--muted); }
+.gallery-note.error { color: var(--danger); }
+.app-name { font-size: 17px; font-weight: 500; }
+.card-open:link, .card-open:visited { color: inherit; }
+/* a note that could not be shown: loading, missing, server down */
+.page-message { max-width: 560px; margin: 96px auto; padding: 0 24px; text-align: center; }
+.page-message h1 { font-size: 22px; font-weight: 500; margin: 0 0 8px; }
 .gallery-grid { display: grid; grid-template-columns: repeat(auto-fill, 212px); gap: 28px 24px; }
 .gallery-note { margin-top: 24px; color: var(--muted); font-size: 14px; }
 .card { position: relative; display: grid; }
@@ -203,7 +210,6 @@ input:focus, textarea:focus { outline: 2px solid var(--accent-soft); border-colo
   transition: box-shadow 0.12s, transform 0.12s;
 }
 .card:hover .thumb { box-shadow: 0 0 0 1px var(--faint), 0 6px 18px rgba(0, 0, 0, 0.12); }
-.card.current .thumb { box-shadow: 0 0 0 2px var(--accent); }
 .card.new .thumb { background: transparent; box-shadow: none; border: 1.5px dashed var(--faint); color: var(--muted); }
 .card.new .thumb svg { width: 28px; height: 28px; }
 .card.new:hover .thumb { border-color: var(--text); color: var(--text); }

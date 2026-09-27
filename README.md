@@ -39,14 +39,18 @@ apps/notebook ──HttpApiClient──▶ /api ──▶ apps/server ──SqlC
       └──────────────── packages/notes-api ──────────┘  jeden kontrakt: ścieżki, schematy, błędy
 ```
 
-- **Kontrakt jest jeden.** `packages/notes-api` opisuje endpointy (`GET/PUT/DELETE /api/notes/:id`,
+- **Każda notatka ma swój adres.** `/` to wszystkie notatki (galeria pierwszych stron) i przykłady,
+  `/notes/:ref` to notatka pobrana z serwera, a `/examples/:name` tworzy nową notatkę z przykładu.
+  `ref` to slug z tytułu (`/notes/zadanie-4-mostek`) albo `id`. Po zmianie tytułu adres się zmienia,
+  a stare slugi dalej prowadzą do tej samej notatki.
+- **Kontrakt jest jeden.** `packages/notes-api` opisuje endpointy (`GET /api/notes/:ref`, `PUT/DELETE /api/notes/:id`,
   `GET /api/notes`), dokument (format pliku v2) i błędy (`NoteNotFound` 404, `RevisionConflict` 409,
   `NoteIdMismatch` 400). Serwer go implementuje (`HttpApiBuilder`), a notatnik woła przez klienta wygenerowanego
   z tego samego opisu (`AtomHttpApi`), więc typy i błędy zgadzają się z obu stron bez ręcznego kodu.
 - **Zapis jest optymistyczny.** Klient wysyła rewizję, od której zaczął. Jeśli ktoś zapisał w międzyczasie
   (druga karta, drugi komputer), serwer zwraca konflikt, a notatnik pyta, którą wersję zostawić.
-- **Offline działa dalej.** Gdy serwer jest niedostępny, notatnik zapisuje się w przeglądarce
-  i ponawia wysyłkę.
+- **Serwer jest źródłem prawdy.** Strona notatki pobiera ją z serwera, a gdy serwer znika w trakcie edycji,
+  zapis jest ponawiany, a przeglądarka ostrzega przed zamknięciem karty z niezapisanymi zmianami.
 - **Jeden użytkownik (na razie).** Tabela `notes` nie ma jeszcze `user_id`. Użytkownicy dojdą jako middleware
   uwierzytelniania na grupie `notes` i kolumna w kluczu. Adresy API się nie zmienią.
 - **Baza jest za `SqlClient`.** Przejście z SQLite na Postgresa to wymiana warstwy w `apps/server/src/Database.ts`.

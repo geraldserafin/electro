@@ -9,8 +9,10 @@ import { mkdirSync } from "node:fs"
 import { dirname } from "node:path"
 import notes from "./migrations/0001_notes.js"
 import preview from "./migrations/0002_preview.js"
+import slugs from "./migrations/0003_slugs.js"
+import missingSlugs from "./migrations/0004_missing_slugs.js"
 
-const migrations = SqliteMigrator.fromRecord({ "0001_notes": notes, "0002_preview": preview })
+const migrations = SqliteMigrator.fromRecord({ "0001_notes": notes, "0002_preview": preview, "0003_slugs": slugs, "0004_missing_slugs": missingSlugs })
 
 /** SQLite at `filename`, migrated to the current schema. */
 export const layer = (filename: string) => {

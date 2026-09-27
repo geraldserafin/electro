@@ -42,7 +42,7 @@ describe("notes API", () => {
         { type: "schematic", name: "Układ 1", schematic: { elements: [], wires: [] } },
         { type: "code", source: "układ1.solve()" },
       ] })
-      const note = yield* api.notes.get({ path: { id: "n1" } })
+      const note = yield* api.notes.get({ path: { ref: "n1" } })
       expect(note.revision).toBe(1)
       expect(note.document).toEqual(doc("n1")) // outputs, results and all: stored as sent
     }).pipe(Effect.provide(TestServer)))
@@ -58,12 +58,37 @@ describe("notes API", () => {
       expect((summary!.preview.cells[0] as { source: string }).source.length).toBe(1600)
     }).pipe(Effect.provide(TestServer)))
 
+  it.effect("addresses: a slug from the title, unique; old slugs and the id keep working", () =>
+    Effect.gen(function* () {
+      const api = yield* client
+      const a = yield* api.notes.save({ path: { id: "a" }, payload: { document: doc("a", "Zadanie 4 — mostek Wheatstone'a"), baseRevision: null } })
+      expect(a.slug).toBe("zadanie-4-mostek-wheatstonea")
+      const b = yield* api.notes.save({ path: { id: "b" }, payload: { document: doc("b", "Zadanie 4: mostek Wheatstone’a!"), baseRevision: null } })
+      expect(b.slug).toBe("zadanie-4-mostek-wheatstonea-2") // the same title: a suffix
+      expect((yield* api.notes.save({ path: { id: "b" }, payload: { document: doc("b", "Zadanie 4 – mostek Wheatstone'a"), baseRevision: 1 } })).slug)
+        .toBe("zadanie-4-mostek-wheatstonea-2") // a title that still makes it: the address stays
+      const renamed = yield* api.notes.save({ path: { id: "a" }, payload: { document: doc("a", "Łączenie źródeł"), baseRevision: 1 } })
+      expect(renamed.slug).toBe("laczenie-zrodel")
+      for (const ref of ["laczenie-zrodel", "zadanie-4-mostek-wheatstonea", "a"]) // new, old, id
+        expect((yield* api.notes.get({ path: { ref } })).document.id).toBe("a")
+      // an old slug is not handed to another note
+      const c = yield* api.notes.save({ path: { id: "c" }, payload: { document: doc("c", "Zadanie 4 — mostek Wheatstone'a"), baseRevision: null } })
+      expect(c.slug).toBe("zadanie-4-mostek-wheatstonea-3")
+      expect((yield* api.notes.list()).map((n) => n.slug).sort()).toEqual(
+        ["laczenie-zrodel", "zadanie-4-mostek-wheatstonea-2", "zadanie-4-mostek-wheatstonea-3"])
+      // deleted: its addresses are free again
+      yield* api.notes.remove({ path: { id: "a" } })
+      expect(yield* api.notes.get({ path: { ref: "laczenie-zrodel" } }).pipe(Effect.flip)).toMatchObject({ _tag: "NoteNotFound" })
+      const d = yield* api.notes.save({ path: { id: "d" }, payload: { document: doc("d", "Łączenie źródeł"), baseRevision: null } })
+      expect(d.slug).toBe("laczenie-zrodel")
+    }).pipe(Effect.provide(TestServer)))
+
   it.effect("keys the contract does not name pass through", () =>
     Effect.gen(function* () {
       const api = yield* client
       const document = doc("n2", "X", { tags: ["lab"], settings: { codeInPdf: false, theme: "dark" } })
       yield* api.notes.save({ path: { id: "n2" }, payload: { document, baseRevision: null } })
-      const back = (yield* api.notes.get({ path: { id: "n2" } })).document
+      const back = (yield* api.notes.get({ path: { ref: "n2" } })).document
       expect(back).toMatchObject({ tags: ["lab"], settings: { codeInPdf: false, theme: "dark" } })
     }).pipe(Effect.provide(TestServer)))
 
@@ -82,13 +107,13 @@ describe("notes API", () => {
       // updating what does not exist
       const ghost = yield* api.notes.save({ path: { id: "n9" }, payload: { document: doc("n9"), baseRevision: 3 } }).pipe(Effect.flip)
       expect(ghost).toMatchObject({ _tag: "RevisionConflict", current: 0, base: 3 })
-      expect((yield* api.notes.get({ path: { id: "n1" } })).document.title).toBe("Nowy tytuł")
+      expect((yield* api.notes.get({ path: { ref: "n1" } })).document.title).toBe("Nowy tytuł")
     }).pipe(Effect.provide(TestServer)))
 
   it.effect("missing notes, mismatched ids, delete", () =>
     Effect.gen(function* () {
       const api = yield* client
-      expect(yield* api.notes.get({ path: { id: "nope" } }).pipe(Effect.flip)).toMatchObject({ _tag: "NoteNotFound", id: "nope" })
+      expect(yield* api.notes.get({ path: { ref: "nope" } }).pipe(Effect.flip)).toMatchObject({ _tag: "NoteNotFound", id: "nope" })
       const mismatch = yield* api.notes.save({ path: { id: "a1" }, payload: { document: doc("b2"), baseRevision: null } }).pipe(Effect.flip)
       expect(mismatch).toMatchObject({ _tag: "NoteIdMismatch", path: "a1", document: "b2" })
       yield* api.notes.save({ path: { id: "n1" }, payload: { document: doc("n1"), baseRevision: null } })

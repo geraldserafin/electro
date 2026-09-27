@@ -34,7 +34,22 @@ try {
   const page = await browser.newPage({ viewport: { width: 1100, height: 900 } });
   const errors = [];
   page.on("pageerror", (e) => errors.push(String(e)));
-  await page.goto(`http://localhost:${port}/`);
+  // / : all notes (none yet) and the examples; an example becomes a note at /notes/:id
+  const app = `http://localhost:${port}`;
+  // the note on screen: its address (a slug) and, from the server, its id
+  const noteRef = () => new URL(page.url()).pathname.match(/^\/notes\/([\w-]+)$/)?.[1];
+  const noteOnServer = async (ref = noteRef()) => (await fetch(`${notesUrl}/api/notes/${ref}`)).json();
+  const home = async () => {
+    await page.getByRole("link", { name: "Notatki" }).click();
+    await page.locator(".gallery").waitFor();
+  };
+  await page.goto(`${app}/`);
+  await page.locator(".gallery h2", { hasText: "Przykłady" }).waitFor();
+  check("home: no notes yet, the examples", (await page.locator(".gallery .card:not(.new)").count()) === (await page.locator(".gallery h2 ~ .gallery-grid .card").count()));
+  await page.locator(".card", { hasText: "Sprawozdanie: mostek Wheatstone'a" }).locator(".card-open").click();
+  await page.waitForURL(/\/notes\/[\w-]+$/);
+  check("an example becomes a note at an address from its title", noteRef() === "sprawozdanie-mostek-wheatstonea"
+    && (await noteOnServer()).document.title === "Sprawozdanie: mostek Wheatstone'a");
   await page.locator(".appbar .status.ready").waitFor({ timeout: 120_000 });
   check("pyodide starts in the worker", true);
 
@@ -274,9 +289,10 @@ try {
   check("schematic name is a variable in code", hint === "mójobwód" && (await user.locator(".output-error").count()) === 0);
 
   // the examples notebook from the menu runs without a single error
-  page.once("dialog", (d) => d.accept());
-  await page.getByRole("button", { name: "Więcej" }).click();
-  await page.getByRole("button", { name: "Przykład: Przykłady: niewiadome i dziury" }).click();
+  await home();
+  await page.locator(".card", { hasText: "Przykłady: niewiadome i dziury" }).locator(".card-open").click();
+  await page.waitForURL(/\/notes\/przyklady-niewiadome-i-dziury$/);
+  await page.locator(".appbar .status.ready").waitFor({ timeout: 60_000 });
   await page.getByRole("button", { name: "Uruchom wszystko" }).click();
   await page.locator(".cell-code").last().locator(".outputs").waitFor({ timeout: 60_000 });
   check("examples run without errors", (await page.locator(".output-error").count()) === 0
@@ -351,46 +367,52 @@ try {
       { id: "a", type: "markdown", source: "Tekst z **wersji 1**" },
       { id: "b", type: "schematic", name: "mostek", schematic: { elements: [], wires: [] }, data: "I_A_1 = 0", outputs: [] },
     ] }));
+    await home();
     await page.locator('.appbar input[type="file"]').setInputFiles(old);
-    await page.locator(".appbar .title").and(page.locator('[value="Stary notatnik"]')).waitFor({ timeout: 5_000 });
-    await page.waitForTimeout(600);
-    const saved = await page.evaluate(() => JSON.parse(localStorage.getItem("electro-notebook")));
-    check("an old (v1) file opens, migrated to the current format", saved.version === 2 && saved.format === "electro-notebook"
-      && saved.title === "Stary notatnik" && !("data" in saved.cells[1]) && typeof saved.id === "string");
+    await page.locator(".appbar .title").and(page.locator('[value="Stary notatnik"]')).waitFor({ timeout: 10_000 });
+    const saved = (await noteOnServer()).document;
+    check("an old (v1) file becomes a note, migrated to the current format", saved.version === 2
+      && saved.format === "electro-notebook" && saved.title === "Stary notatnik" && !("data" in saved.cells[1]));
   }
 
-  // notes on the server: the open notebook saves itself; the gallery; a second note; a conflict
+  // notes at their addresses: the list with thumbnails; a new note; back and forth; a conflict
   {
     const title = page.locator(".appbar .title");
-    const savedSign = page.locator(".sync.saved");
     const gallery = page.locator(".gallery");
-    const cards = gallery.locator(".card:not(.new)");
-    const toGallery = async () => {
-      await page.getByRole("button", { name: "Notatki" }).click();
-      await gallery.waitFor();
-    };
-    await savedSign.waitFor({ timeout: 10_000 });
+    const notes = gallery.locator(".gallery-grid").first().locator(".card:not(.new)");
+    const { document: { id }, slug } = await noteOnServer();
     const firstTitle = await title.inputValue();
-    await toGallery();
-    await gallery.locator(".card.current").waitFor({ timeout: 10_000 });
-    check("the gallery: the open note, with its first page as a thumbnail",
-      (await gallery.locator(".card.current .card-title").innerText()) === firstTitle
-      && (await gallery.locator(".card.current .page").innerText()).includes("wersji 1") && !(await page.locator("main").isVisible()));
-    const id = await gallery.locator(".card.current").getAttribute("data-id");
+    await home();
+    const card = gallery.locator(`.card[data-id="${id}"]`);
+    await card.waitFor({ timeout: 10_000 });
+    check("home: the notes with their first pages as thumbnails",
+      (await card.locator(".card-title").innerText()) === firstTitle && (await card.locator(".page").innerText()).includes("wersji 1"));
 
-    const before = await cards.count();
-    await gallery.getByRole("button", { name: "Nowa notatka" }).click();
+    const before = await notes.count();
+    await gallery.getByRole("button", { name: "Nowa notatka", exact: true }).click();
+    await page.waitForURL(/\/notes\/notatka(-\d+)?$/); // no title yet
     await title.fill("Druga notatka");
-    await page.locator(".sync.saved").waitFor({ timeout: 10_000 });
-    await page.waitForTimeout(1200); // the next save, with the title
-    await toGallery();
-    await page.waitForFunction((n) => document.querySelectorAll(".gallery .card:not(.new)").length === n, before + 1, { timeout: 10_000 });
-    await gallery.locator(`.card[data-id="${id}"] .card-open`).click();
+    await page.waitForURL(/\/notes\/druga-notatka$/, { timeout: 10_000 }); // the title makes the address
+    const second = (await noteOnServer()).document.id;
+    check("renaming a note changes its address", (await page.locator(".sync.saved").count()) === 1);
+    await page.goBack(); // the browser's back: the list again
+    await page.waitForFunction((n) => document.querySelectorAll(".gallery .gallery-grid:first-of-type .card:not(.new)").length === n, before + 1, { timeout: 10_000 });
+    await card.locator(".card-open").click();
     await page.waitForFunction((t) => document.querySelector(".appbar .title")?.value === t, firstTitle, { timeout: 10_000 });
-    check("a second note; opening the first from the gallery", (await page.locator(".cell").count()) > 1);
+    check("a new note; back to the list; the first note opens from its card", noteRef() === slug);
 
-    // someone saves the same note elsewhere (a direct call, as another tab would)
-    await savedSign.waitFor();
+    await page.goto(`${app}/notes/${second}`); // by id: the note, and the address becomes its slug
+    await page.waitForFunction(() => document.querySelector(".appbar .title")?.value === "Druga notatka", null, { timeout: 60_000 });
+    await page.waitForURL(/\/notes\/druga-notatka$/);
+    await page.goto(`${app}/notes/notatka`); // the slug it had before its title
+    await page.waitForURL(/\/notes\/druga-notatka$/, { timeout: 60_000 });
+    await page.goto(`${app}/notes/nie-ma-takiej`);
+    await page.getByRole("heading", { name: "Nie ma takiej notatki" }).waitFor();
+    check("addresses: by slug, by id, by an older slug; an unknown one says so", true);
+
+    // someone saves the note elsewhere (a direct call, as another tab would), then it is edited here
+    await page.goto(`${app}/notes/${slug}`);
+    await page.waitForFunction((t) => document.querySelector(".appbar .title")?.value === t, firstTitle, { timeout: 60_000 });
     const note = await (await fetch(`${notesUrl}/api/notes/${id}`)).json();
     await fetch(`${notesUrl}/api/notes/${id}`, { method: "PUT", headers: { "content-type": "application/json" },
       body: JSON.stringify({ document: { ...note.document, title: "Zmienione gdzie indziej" }, baseRevision: note.revision }) });
@@ -398,17 +420,17 @@ try {
     await page.locator(".sync.conflict").waitFor({ timeout: 10_000 });
     await page.locator(".sync.conflict .icon-button").click();
     await page.getByRole("button", { name: /Z serwera/ }).click();
-    await page.waitForFunction(() => document.querySelector(".appbar .title").value === "Zmienione gdzie indziej", null, { timeout: 10_000 });
-    check("a conflict is shown and resolved by taking the server's version", await savedSign.isVisible());
+    await page.waitForFunction(() => document.querySelector(".appbar .title")?.value === "Zmienione gdzie indziej", null, { timeout: 10_000 });
+    check("a conflict is shown and resolved by taking the server's version", (await page.locator(".sync.conflict").count()) === 0);
 
-    await toGallery();
-    const second = gallery.locator(".card", { hasText: "Druga notatka" });
-    await second.hover();
-    await second.getByRole("button", { name: "Więcej" }).click();
+    await home();
+    const drugi = gallery.locator(`.card[data-id="${second}"]`);
+    await drugi.hover();
+    await drugi.getByRole("button", { name: "Więcej" }).click();
     page.once("dialog", (d) => d.accept());
-    await second.getByRole("menuitem", { name: "Usuń notatkę" }).click();
-    await page.waitForFunction((n) => document.querySelectorAll(".gallery .card:not(.new)").length === n, before, { timeout: 10_000 });
-    check("a note is deleted", (await (await fetch(`${notesUrl}/api/notes`)).json()).length === before);
+    await drugi.getByRole("menuitem", { name: "Usuń notatkę" }).click();
+    await drugi.waitFor({ state: "detached", timeout: 10_000 });
+    check("a note is deleted", (await fetch(`${notesUrl}/api/notes/${second}`)).status === 404);
   }
 
   check("no page errors", errors.length === 0);

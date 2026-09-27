@@ -1,12 +1,15 @@
-/** The start of a note for its thumbnail: what fits on (about) the first page, cut short. */
-import type { NotebookDocument, NotePreview, PreviewCell } from "@electro/notes-api"
+/**
+ * The start of a note for its thumbnail: what fits on (about) the first page, cut short. The
+ * server stores it with each note; the notebook makes the same for examples it has locally.
+ */
+import type { NotebookDocument, NotePreview, PreviewCell } from "./Notebook.js"
 
 const CELLS = 8 // at most this many cells
 const TEXT = 1600 // characters of text in all
 const CODE_LINES = 12
 const SCHEMATICS = 2
 
-export const preview = (document: NotebookDocument): NotePreview => {
+export const previewOf = (document: NotebookDocument): NotePreview => {
   const codeInPdf = document.settings.codeInPdf
   const cells: PreviewCell[] = []
   let text = 0

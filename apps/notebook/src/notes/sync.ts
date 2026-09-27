@@ -1,79 +1,53 @@
-// Keeping the open notebook on the notes server.
+// Saving the note on /notes/:id to the notes server as it is edited.
 //
-// Every change is sent at most a second after it happens, with the revision it was based on;
-// one save is in flight at a time (a second one waits), so revisions never cross. A conflict —
-// the note changed elsewhere — stops saving until the user picks a version. When the server is
-// unreachable the notebook still lives in this browser (storage.ts) and saving is retried.
-import { Atom, useAtomSet, useAtomValue } from "@effect-atom/atom-react";
+// Every change is sent at most a second after it happens, with the revision the note was read
+// at; one save is in flight at a time (a second one waits), so revisions never cross. A conflict
+// — the note changed elsewhere — stops saving until the user picks a version. When the server
+// cannot be reached, saving is retried; what is pending is sent when the page is left.
+import { useAtomSet } from "@effect-atom/atom-react";
 import { Cause, Exit, Option } from "effect";
-import { useCallback, useEffect, useRef } from "react";
-import { blank } from "../format";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { Notebook } from "../types";
-import { fromDocument, getNote, NOTES, removeNote, saveNote, toDocument } from "./atoms";
+import { NOTES, saveNote, toDocument } from "./atoms";
 
 export type SyncState =
-  | { kind: "idle" } // nothing sent yet
+  | { kind: "idle" } // nothing to send
   | { kind: "saving" }
   | { kind: "saved"; at: string }
-  | { kind: "offline" } // the server is unreachable: kept in this browser, retried
+  | { kind: "offline" } // the server is unreachable: retried
   | { kind: "conflict"; current: number } // changed elsewhere since it was read
   | { kind: "error"; message: string };
-
-export const syncStateAtom = Atom.make<SyncState>({ kind: "idle" }).pipe(Atom.keepAlive);
 
 const DELAY = 1000;
 const RETRY = 10_000;
 
-// ------------------------------------------------------------------ revisions this browser knows
-
-const REVISIONS_KEY = "electro-notes-revisions";
-
-const revisions = {
-  read(): Record<string, number> {
-    try {
-      return JSON.parse(localStorage.getItem(REVISIONS_KEY) ?? "{}");
-    } catch {
-      return {};
-    }
-  },
-  get(id: string): number | null {
-    return this.read()[id] ?? null;
-  },
-  set(id: string, revision: number | null) {
-    const all = this.read();
-    if (revision === null) delete all[id];
-    else all[id] = revision;
-    try {
-      localStorage.setItem(REVISIONS_KEY, JSON.stringify(all));
-    } catch {
-      // not remembered: the next save from here asks as if new, and gets a conflict to resolve
-    }
-  },
-};
-
-/** The error a failed call ended with, if it is one of ours (tagged), else the defect/transport. */
-function failure(cause: Cause.Cause<unknown>): { _tag?: string; current?: number; message?: string } | null {
-  const error = Option.getOrNull(Cause.failureOption(cause));
-  return (error as { _tag?: string } | null) ?? null;
+/** The error a failed call ended with, if it is one of ours (tagged); null for transport and defects. */
+export function failure(cause: Cause.Cause<unknown>): { _tag?: string; current?: number; message?: string } | null {
+  return (Option.getOrNull(Cause.failureOption(cause)) as { _tag?: string } | null) ?? null;
 }
 
-// ------------------------------------------------------------------ the hook
+const unreachable = (error: { _tag?: string } | null) =>
+  error === null || error._tag === "RequestError" || error._tag === "ResponseError";
 
-export function useNotesSync(notebook: Notebook, replace: (notebook: Notebook) => void) {
-  const state = useAtomValue(syncStateAtom);
-  const setState = useAtomSet(syncStateAtom);
+/**
+ * ``revision``: what the note was read at (null: not on the server yet); ``reload``: read the
+ * note again (to take the server's version after a conflict).
+ */
+export function useNoteSync(notebook: Notebook, revision: number | null, reload: () => void,
+                            onSaved: (slug: string) => void = () => {}) {
+  const [state, setState] = useState<SyncState>({ kind: "idle" });
   const save = useAtomSet(saveNote, { mode: "promiseExit" });
-  const get = useAtomSet(getNote, { mode: "promiseExit" });
-  const remove = useAtomSet(removeNote, { mode: "promiseExit" });
 
   const latest = useRef(notebook);
   latest.current = notebook;
-  const current = useRef(state);
-  current.current = state;
-  const saved = useRef<Notebook | null>(null); // the notebook object last stored (or read) on the server
+  const base = useRef(revision);
+  const conflict = useRef(false);
+  const sent = useRef<Notebook>(notebook); // the version the server has (as loaded, at first)
   const inflight = useRef<Promise<void> | null>(null);
   const again = useRef(false);
   const timer = useRef<number | null>(null);
+  const saved = useRef(onSaved);
+  saved.current = onSaved;
 
   const push = useCallback(async (): Promise<void> => {
     if (inflight.current) {
@@ -81,26 +55,29 @@ export function useNotesSync(notebook: Notebook, replace: (notebook: Notebook) =
       return inflight.current;
     }
     const nb = latest.current;
-    if (nb === saved.current || current.current.kind === "conflict") return;
+    if ((nb === sent.current && base.current !== null) || conflict.current) return;
     const run = (async () => {
       setState({ kind: "saving" });
       const exit = await save({
         path: { id: nb.id },
-        payload: { document: toDocument(nb), baseRevision: revisions.get(nb.id) },
+        payload: { document: toDocument(nb), baseRevision: base.current },
         reactivityKeys: NOTES,
       });
       if (Exit.isSuccess(exit)) {
-        revisions.set(nb.id, exit.value.revision);
-        saved.current = nb;
+        base.current = exit.value.revision;
+        sent.current = nb;
         setState({ kind: "saved", at: exit.value.savedAt });
+        saved.current(exit.value.slug);
         return;
       }
       const error = failure(exit.cause);
-      if (error?._tag === "RevisionConflict") setState({ kind: "conflict", current: error.current ?? 0 });
-      else if (error?._tag === "RequestError" || error?._tag === "ResponseError" || error === null) {
+      if (error?._tag === "RevisionConflict") {
+        conflict.current = true;
+        setState({ kind: "conflict", current: error.current ?? 0 });
+      } else if (unreachable(error)) {
         setState({ kind: "offline" });
         schedule(RETRY);
-      } else setState({ kind: "error", message: error.message ?? String(error._tag) });
+      } else setState({ kind: "error", message: error?.message ?? String(error?._tag) });
     })();
     inflight.current = run;
     try {
@@ -112,7 +89,7 @@ export function useNotesSync(notebook: Notebook, replace: (notebook: Notebook) =
       again.current = false;
       await push();
     }
-  }, [save, setState]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [save]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const schedule = (delay = DELAY) => {
     if (timer.current !== null) return;
@@ -122,75 +99,46 @@ export function useNotesSync(notebook: Notebook, replace: (notebook: Notebook) =
     }, delay);
   };
 
-  // a change: send it soon. At the start, only a notebook the server has never seen is sent
-  // (one it knows is sent on its first change — opening a page is not an edit)
+  // a change: sent a moment later (opening a note is not a change)
   const first = useRef(true);
   useEffect(() => {
     if (first.current) {
       first.current = false;
-      if (revisions.get(notebook.id) !== null) return;
+      if (base.current !== null) return;
     }
     schedule();
   }, [notebook]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  /** Wait until what is on screen is on the server (before switching notes). */
-  const flush = async () => {
+  // leaving the page (another note, the list): send what is pending
+  useEffect(() => () => {
     if (timer.current !== null) {
       clearTimeout(timer.current);
       timer.current = null;
+      void push();
     }
-    await push();
-  };
+  }, [push]);
 
-  const open = async (id: string) => {
-    await flush();
-    const exit = await get({ path: { id } });
-    if (Exit.isFailure(exit)) {
-      const error = failure(exit.cause);
-      setState(error?._tag === "NoteNotFound" ? { kind: "error", message: `Nie ma już notatki ${id}.` } : { kind: "offline" });
-      return;
-    }
-    const nb = fromDocument(exit.value.document);
-    revisions.set(id, exit.value.revision);
-    saved.current = nb;
-    setState({ kind: "saved", at: exit.value.savedAt });
-    replace(nb);
-  };
-
-  const create = async () => {
-    await flush();
-    setState({ kind: "idle" });
-    replace(blank());
-  };
-
-  const destroy = async (id: string) => {
-    const exit = await remove({ path: { id }, reactivityKeys: NOTES });
-    if (Exit.isFailure(exit) && failure(exit.cause)?._tag !== "NoteNotFound") {
-      setState({ kind: "offline" });
-      return false;
-    }
-    revisions.set(id, null);
-    if (latest.current.id === id) {
-      setState({ kind: "idle" });
-      replace(blank());
-    }
-    return true;
-  };
+  // closing the tab with changes not on the server yet: the browser asks first
+  useEffect(() => {
+    const warn = (event: BeforeUnloadEvent) => {
+      if (timer.current !== null || inflight.current || state.kind === "offline" || state.kind === "conflict")
+        event.preventDefault();
+    };
+    window.addEventListener("beforeunload", warn);
+    return () => window.removeEventListener("beforeunload", warn);
+  }, [state]);
 
   /** Conflict: keep what is on screen (it becomes the newest revision)… */
   const keepMine = async () => {
     if (state.kind !== "conflict") return;
-    revisions.set(latest.current.id, state.current || null);
-    saved.current = null;
+    base.current = state.current || null;
+    conflict.current = false;
+    sent.current = null as unknown as Notebook; // whatever is on screen is new to the server
     setState({ kind: "idle" });
     await push();
   };
   /** …or take what the server has. */
-  const takeTheirs = async () => {
-    setState({ kind: "idle" });
-    saved.current = latest.current; // nothing to send before reading
-    await open(latest.current.id);
-  };
+  const takeTheirs = reload;
 
-  return { state, open, create, destroy, keepMine, takeTheirs, flush };
+  return { state, keepMine, takeTheirs };
 }

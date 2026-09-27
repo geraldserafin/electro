@@ -1,7 +1,6 @@
 import { SqlClient } from "@effect/sql"
-import { NotebookDocument } from "@electro/notes-api"
+import { NotebookDocument, previewOf } from "@electro/notes-api"
 import { Effect, Schema } from "effect"
-import { preview } from "../preview.js"
 
 /** A thumbnail of each note's first page, kept next to it; made for the notes saved before. */
 export default Effect.gen(function* () {
@@ -10,6 +9,6 @@ export default Effect.gen(function* () {
   const rows = yield* sql<{ id: string; document: string }>`SELECT id, document FROM notes`
   for (const row of rows) {
     const document = yield* Schema.decode(Schema.parseJson(NotebookDocument))(row.document)
-    yield* sql`UPDATE notes SET preview = ${JSON.stringify(preview(document))} WHERE id = ${row.id}`
+    yield* sql`UPDATE notes SET preview = ${JSON.stringify(previewOf(document))} WHERE id = ${row.id}`
   }
 })

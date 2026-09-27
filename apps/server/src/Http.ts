@@ -9,7 +9,7 @@ export const NotesLive = HttpApiBuilder.group(NotesApi, "notes", (handlers) =>
     const repo = yield* NotesRepo
     return handlers
       .handle("list", () => repo.list)
-      .handle("get", ({ path }) => repo.get(path.id))
+      .handle("get", ({ path }) => repo.get(path.ref))
       .handle("save", ({ path, payload }) =>
         payload.document.id !== path.id
           ? Effect.fail(new NoteIdMismatch({ path: path.id, document: payload.document.id }))

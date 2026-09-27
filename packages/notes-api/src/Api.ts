@@ -6,7 +6,7 @@
 import { HttpApi, HttpApiEndpoint, HttpApiGroup } from "@effect/platform"
 import { Schema } from "effect"
 import { NoteIdMismatch, NoteNotFound, RevisionConflict } from "./Errors.js"
-import { Note, NoteId, NoteSummary, Saved, SaveNote } from "./Notebook.js"
+import { Note, NoteId, NoteRef, NoteSummary, Saved, SaveNote } from "./Notebook.js"
 
 const ById = Schema.Struct({ id: NoteId })
 
@@ -16,8 +16,9 @@ export class NotesGroup extends HttpApiGroup.make("notes")
       .addSuccess(Schema.Array(NoteSummary)),
   )
   .add(
-    HttpApiEndpoint.get("get", "/notes/:id")
-      .setPath(ById)
+    // by address: the slug (a current or an older one) or the id
+    HttpApiEndpoint.get("get", "/notes/:ref")
+      .setPath(Schema.Struct({ ref: NoteRef }))
       .addSuccess(Note)
       .addError(NoteNotFound),
   )
