@@ -282,6 +282,17 @@ try {
       && await cell.locator(".markdown-view").first().isVisible());
   }
 
+  // "+ Kod / + Tekst / + Schemat" only on the edge between cells
+  {
+    const first = page.locator(".cell").first();
+    const pill = first.locator(":scope > .add-row button").first();
+    await first.hover({ position: { x: 300, y: 20 } });
+    const hiddenInside = !(await pill.isVisible());
+    const box = await first.boundingBox();
+    await page.mouse.move(box.x + 300, box.y + box.height + 4); // just below the cell's edge
+    check("add buttons show on the edge only", hiddenInside && await pill.isVisible());
+  }
+
   check("no page errors", errors.length === 0);
   if (errors.length) console.log(errors);
   await browser.close();

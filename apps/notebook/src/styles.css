@@ -230,17 +230,17 @@ main {
 .cell:hover .cell-tools, .cell.focused .cell-tools { opacity: 1; pointer-events: auto; }
 .cell-tools button { padding: 4px; color: var(--muted); }
 
-/* "+ Kod  + Tekst  + Schemat", as in Colab: pills on the edge between cells, shown on hover */
+/* "+ Kod  + Tekst  + Schemat", as in Colab: pills on the edge between cells. The row is a thin
+   strip along the whole edge; the pills show only while the pointer is in it. */
 .add-row {
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 8px;
-  height: 36px;
-  opacity: 0;
-  transition: opacity 0.12s;
+  height: 28px;
 }
-.add-row:hover, .cell:hover > .add-row, .cell.focused > .add-row { opacity: 1; }
+.add-row button { visibility: hidden; opacity: 0; transition: opacity 0.12s; }
+.add-row:hover button, .add-row:focus-within button { visibility: visible; opacity: 1; }
 .add-row button {
   gap: 4px;
   padding: 4px 14px 4px 10px;
@@ -253,7 +253,8 @@ main {
 }
 .add-row button:hover { background: var(--hover); border-color: var(--muted); }
 /* only in the middle, so it never covers the next cell's tools on the right */
-.cell > .add-row { position: absolute; left: 50%; transform: translateX(-50%); bottom: -24px; z-index: 4; }
+/* from the bottom padding of this cell, over the gap, to the top padding of the next one */
+.cell > .add-row { position: absolute; left: 0; right: 0; bottom: -20px; z-index: 4; }
 main > .add-row { justify-content: center; }
 
 /* text */
