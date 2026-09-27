@@ -1,11 +1,12 @@
 // End-to-end check in a real browser engine: Pyodide starts in the worker, the example
 // notebook runs, outputs appear, and a schematic element can be placed and dragged.
 import { spawn } from "node:child_process";
+import { tmpdir } from "node:os";
 import { webkit } from "playwright";
 
 const port = 4174;
 const server = spawn("pnpm", ["exec", "vite", "preview", "--port", String(port), "--strictPort"], { stdio: "ignore" });
-const shots = process.env.SHOTS ?? ".";
+const shots = process.env.SHOTS ?? tmpdir();  // screenshots, for looking at by hand
 let failed = false;
 const check = (name, ok) => {
   console.log(`${ok ? "ok  " : "FAIL"} ${name}`);
