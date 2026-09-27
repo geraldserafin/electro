@@ -258,6 +258,30 @@ try {
     check("text cells: edited in place, stored as Markdown", stored.endsWith("Nowe zdanie z **pogrubieniem** i wzorem $U = R I$")
       && (await text.locator("strong").last().innerText()) === "pogrubieniem");
   }
+  // the block handle (inside the cell): move a paragraph up — moved, not copied — then delete it
+  {
+    const cell = page.locator(".markdown-cell").first();
+    const blocks = cell.locator(".ProseMirror > p");
+    const before = await blocks.count();
+    const stored = () => page.evaluate(() => JSON.parse(localStorage.getItem("electro-notebook")).cells[0].source);
+    await blocks.nth(1).hover();
+    await cell.locator(".block-handle .grip").click();
+    await cell.getByRole("menuitem", { name: /W górę/ }).click();
+    await page.waitForTimeout(1000);
+    const moved = await stored();
+    check("block handle: moved up, not copied", (await blocks.count()) === before
+      && (await blocks.first().innerText()).startsWith("Nowe zdanie") && moved.startsWith("Nowe zdanie")
+      && moved.split("Nowe zdanie").length === 2);
+    await blocks.first().hover();
+    const box = await cell.locator(".block-handle").boundingBox();
+    const cellBox = await page.locator(".cell-markdown").first().boundingBox();
+    await cell.locator(".block-handle .grip").click();
+    await cell.getByRole("menuitem", { name: /Usuń/ }).click();
+    await page.waitForTimeout(1000);
+    check("block handle: inside the cell, deletes a block", box.x > cellBox.x && (await blocks.count()) === before - 1
+      && !(await stored()).includes("Nowe zdanie"));
+  }
+
   check("no page errors", errors.length === 0);
   if (errors.length) console.log(errors);
   await browser.close();

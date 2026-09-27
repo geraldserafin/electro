@@ -278,6 +278,20 @@ main > .add-row { justify-content: center; }
   background: transparent;
 }
 .rich-text .milkdown .ProseMirror { padding: 4px 8px; line-height: 1.6; }
+/* Crepe's own "+" and drag handle: replaced by ours (inside the cell, with a menu) */
+.rich-text .milkdown .milkdown-block-handle { display: none !important; }
+.rich-text { position: relative; }
+.block-handle { position: absolute; left: -40px; z-index: 5; padding-top: 5px; }
+.block-handle .grip { width: 26px; height: 26px; padding: 0; justify-content: center; color: var(--faint); border-radius: 6px; }
+.block-handle .grip:hover, .block-handle .grip[aria-expanded="true"] { color: var(--text); background: var(--hover); }
+.block-menu {
+  position: absolute; top: 30px; left: 0; z-index: 9; min-width: 200px;
+  display: grid; padding: 4px; border-radius: 10px; background: var(--island); box-shadow: var(--island-shadow);
+}
+.block-menu button { justify-content: flex-start; gap: 10px; padding: 6px 10px; font-size: 14px; border-radius: 6px; }
+.block-menu button kbd { margin-left: auto; color: var(--faint); }
+.block-menu button.danger:hover { background: var(--err-bg); }
+.block-menu hr { width: 100%; border: none; border-top: 1px solid var(--line); margin: 4px 0; }
 .rich-text .milkdown .ProseMirror > :first-child { margin-top: 0; }
 .rich-text .milkdown .ProseMirror h1 { font-size: 2em; font-weight: 500; margin-top: 16px; line-height: 1.25; }
 .rich-text .milkdown .ProseMirror h2 { font-size: 1.5em; font-weight: 500; margin-top: 14px; line-height: 1.3; }
