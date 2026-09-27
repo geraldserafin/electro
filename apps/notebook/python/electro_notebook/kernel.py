@@ -15,6 +15,7 @@ import traceback
 import warnings
 
 from electro import CircuitError
+from sympy import I as sp_I
 from electro_render import symbol_library
 from electro_schematic import Schematic
 
@@ -42,6 +43,67 @@ def code(schematic_json: str, name: str) -> str:
     """A drawing as plain electro code, for the "show code" button."""
     variable = name if name.isidentifier() else "uklad"
     return Schematic.from_json(schematic_json).to_code(variable)
+
+
+def _parse_data(text: str) -> dict[str, str]:
+    """``"I_R_1 = 0,5; U_R_2 = 4"`` (``;`` or new lines between entries) → keyword arguments for solve()."""
+    given = {}
+    for entry in text.replace("\n", ";").split(";"):
+        if not entry.strip():
+            continue
+        name, sep, value = entry.partition("=")
+        if not sep or not name.strip() or not value.strip():
+            raise ValueError(f"Nie rozumiem „{entry.strip()}” — wpisz np. I_R_1 = 0,5")
+        given[name.strip()] = value.strip()
+    return given
+
+
+def simulate(schematic_json: str, data: str = "") -> str:
+    """The "Symuluj" button: solve a drawing and report every element's values.
+
+    Returns JSON ``{"results": {id: {...}}, "outputs": [...]}``; ``results`` go next to the
+    elements on the canvas, ``outputs`` (a table, warnings, errors) under the drawing.
+    """
+    from electro.values import UNKNOWN, fmt
+    from electro_render.schematic import _short
+    from electro_render.trace import name as latex_name
+
+    sch = Schematic.from_json(schematic_json)
+    outputs: list[dict] = []
+    results: dict[str, dict] = {}
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always")
+        try:
+            solution = sch.to_circuit().solve(**_parse_data(data))
+        except (CircuitError, ValueError, KeyError) as err:
+            message = err.args[0] if isinstance(err, KeyError) and err.args else err
+            return json.dumps({"results": {}, "outputs": [{"type": "error", "data": str(message)}]}, ensure_ascii=False)
+    rows = ["| element | wartość | U | I | P |", "|---|---|---|---|---|"]
+    for label in solution.system.parts:
+        r = solution[label]
+        comp = r.component
+        current = r.I if r.I is not None and r.I.is_real and r.I.is_number else None
+        sign = -1 if current is not None and current < 0 else 1
+        if r.realized is not None:
+            value = _short(r.realized)
+        elif comp.has_value:
+            value = fmt(r.value, comp.unit) if r.value is not None else "?"
+        else:
+            value = ""
+        entry = {
+            "value": value,
+            "solved": (comp.has_value and comp.value is UNKNOWN and r.value is not None) or r.realized is not None,
+            "U": fmt(sign * r.U, "V") if r.U is not None else None,
+            "I": fmt(sign * r.I, "A") if r.I is not None else None,
+            "P": fmt(r.P, "W") if r.P is not None and not r.P.has(sp_I) else None,
+            "reversed": sign < 0,  # the current really flows from the second pin to the first
+        }
+        results[label] = entry
+        rows.append(f"| ${latex_name(label)}$ | {value or '—'} | "
+                    f"{entry['U'] or '—'} | {entry['I'] or '—'} | {entry['P'] or '—'} |")
+    outputs.append({"type": "markdown", "data": "\n".join(rows)})
+    outputs += [{"type": "warning", "data": str(w.message)} for w in caught]
+    return json.dumps({"results": results, "outputs": outputs}, ensure_ascii=False)
 
 
 def to_output(obj) -> dict:

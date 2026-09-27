@@ -6,7 +6,10 @@ Notatnik w przeglądarce, trochę jak Colab, ale pod elektronikę. Python dział
 - **Tekst:** Markdown ze wzorami `$...$`. Dwuklik włącza edycję.
 - **Kod:** Python z gotowym `electro`. Wszystkie komórki mają wspólną pamięć. Wynik ostatniego wyrażenia
   (schemat, `steps(sol)`, wzór) wyświetla się pod komórką. `Shift+Enter` uruchamia komórkę.
-- **Schemat:** edytor na siatce. Kod sięga do niego przez `schemat("nazwa")`.
+- **Schemat:** edytor na siatce w stylu Excalidraw. Na górze pasek narzędzi ze skrótami (V, W, 1–0), po prawej
+  „Kod” i „Symuluj”, na dole powiększenie, cofanie i pomoc. **Symuluj** liczy prądy i napięcia i pokazuje je przy
+  elementach oraz w tabeli. Wartości niewiadome wypełnia z pola „Dane pomiarowe” (np. `I_A_1 = 0; U_R_2 = 4`).
+  Kod sięga do schematu przez `schemat("nazwa")`.
 - **Eksport PDF:** czysty wydruk bez przycisków i siatki. Kod można ukryć przełącznikiem „kod w PDF”.
 
 Notatnik zapisuje się automatycznie w przeglądarce. „Zapisz plik” i „Otwórz…” obsługują pliki `.electro.json`.
@@ -52,7 +55,7 @@ Testy kernela w zwykłym Pythonie (`python/test_kernel.py`) chodzą razem z resz
 | `python/electro_notebook/kernel.py` | wykonuje komórki, zamienia wyniki na wyjścia (`_repr_svg_`, `_repr_markdown_`, `_repr_latex_`) |
 | `src/python/worker.ts` | ładuje Pyodide + sympy + nasze paczki (z `bundle.json`) |
 | `src/python/kernel.ts` | wywołania workera jako obietnice |
-| `src/schematic/` | edytor siatki; symbole bierze z `electro_render.symbol_library()`, więc wygląda jak raport |
+| `src/schematic/` | edytor siatki; `symbols.json` to wygląd elementów wygenerowany z `electro_render.symbol_library()` (`scripts/make_symbols.py`, test pilnuje zgodności), więc schemat wygląda jak raport i widać go, zanim Python się załaduje |
 | `src/cells/` | komórki i wyjścia |
 
 Przy `devenv up` zmiany w `packages/` wystarczy odświeżyć w przeglądarce. Przy samym `pnpm dev` `bundle.json` powstaje tylko przy starcie (albo użyj `pnpm python --watch`).

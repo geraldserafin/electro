@@ -206,7 +206,7 @@ export function rotatedAbout(e: ElementData, lib: SymbolLibrary, rotation: numbe
 }
 
 /** The same drawing moved so that nothing sits left of / above ``margin`` (the canvas starts at 0, 0). */
-export const MARGIN = 2;
+export const MARGIN = 3;
 
 export function normalized(sch: SchematicData, lib: SymbolLibrary, margin = MARGIN): SchematicData {
   if (!sch.elements.length && !sch.wires.length) return sch;

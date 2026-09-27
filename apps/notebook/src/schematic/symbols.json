@@ -1,0 +1,178 @@
+{
+ "grid": 20,
+ "style": "\n.w{stroke:currentColor;stroke-width:1.6;fill:none;stroke-linecap:round;stroke-linejoin:round}\n.w .thick{stroke-width:3}.w .fill{fill:currentColor;stroke:none}.w .dashed{stroke-dasharray:4 3}\n.w .open{fill:none}.dot{fill:currentColor}\ntext{font:13px ui-sans-serif,system-ui,sans-serif;fill:currentColor}.halo{fill:var(--paper,#fff)}\ntext .sub{font-size:10px}.solved{fill:#2563eb;font-weight:600}.result{fill:#059669}\n.node{font-style:italic}.letter{font-weight:600;text-anchor:middle;dominant-baseline:central}\n",
+ "kinds": {
+  "resistor": {
+   "pins": [
+    [
+     0,
+     0
+    ],
+    [
+     80,
+     0
+    ]
+   ],
+   "svg": "<path d=\"M0 0H22M58 0H80\"/><g transform=\"translate(40 0)\"><rect x=\"-18\" y=\"-7\" width=\"36\" height=\"14\"/></g>",
+   "letter": null,
+   "upright": false
+  },
+  "capacitor": {
+   "pins": [
+    [
+     0,
+     0
+    ],
+    [
+     80,
+     0
+    ]
+   ],
+   "svg": "<path d=\"M0 0H20M60 0H80\"/><g transform=\"translate(40 0)\"><path d=\"M-20 0H-4M4 0H20\"/><path class=\"thick\" d=\"M-4 -12V12M4 -12V12\"/></g>",
+   "letter": null,
+   "upright": false
+  },
+  "inductor": {
+   "pins": [
+    [
+     0,
+     0
+    ],
+    [
+     80,
+     0
+    ]
+   ],
+   "svg": "<path d=\"M0 0H20M60 0H80\"/><g transform=\"translate(40 0)\"><path d=\"M-20 0a5 5 0 0 1 10 0a5 5 0 0 1 10 0a5 5 0 0 1 10 0a5 5 0 0 1 10 0\"/></g>",
+   "letter": null,
+   "upright": false
+  },
+  "voltage_source": {
+   "pins": [
+    [
+     0,
+     0
+    ],
+    [
+     80,
+     0
+    ]
+   ],
+   "svg": "<path d=\"M0 0H27M53 0H80\"/><g transform=\"translate(40 0)\"><circle r=\"13\"/><path d=\"M-13 0H13\"/><path class=\"fill\" d=\"M13 0l-7 -4v8z\"/></g>",
+   "letter": null,
+   "upright": false
+  },
+  "current_source": {
+   "pins": [
+    [
+     0,
+     0
+    ],
+    [
+     80,
+     0
+    ]
+   ],
+   "svg": "<path d=\"M0 0H27M53 0H80\"/><g transform=\"translate(40 0)\"><circle r=\"13\"/><path d=\"M0 -13V13\"/><path class=\"fill\" d=\"M24 0l-8 -4.5v9z\"/></g>",
+   "letter": null,
+   "upright": false
+  },
+  "ammeter": {
+   "pins": [
+    [
+     0,
+     0
+    ],
+    [
+     80,
+     0
+    ]
+   ],
+   "svg": "<path d=\"M0 0H27M53 0H80\"/><g transform=\"translate(40 0)\"><circle r=\"13\"/></g>",
+   "letter": "A",
+   "upright": false
+  },
+  "voltmeter": {
+   "pins": [
+    [
+     0,
+     0
+    ],
+    [
+     80,
+     0
+    ]
+   ],
+   "svg": "<path d=\"M0 0H27M53 0H80\"/><g transform=\"translate(40 0)\"><circle r=\"13\"/></g>",
+   "letter": "V",
+   "upright": false
+  },
+  "hole": {
+   "pins": [
+    [
+     0,
+     0
+    ],
+    [
+     80,
+     0
+    ]
+   ],
+   "svg": "<path d=\"M0 0H22M58 0H80\"/><g transform=\"translate(40 0)\"><rect class=\"dashed\" x=\"-18\" y=\"-10\" width=\"36\" height=\"20\"/></g>",
+   "letter": "?",
+   "upright": false
+  },
+  "opamp": {
+   "pins": [
+    [
+     0,
+     40
+    ],
+    [
+     0,
+     0
+    ],
+    [
+     80,
+     20
+    ]
+   ],
+   "svg": "<path d=\"M0 0H20M0 40H20M60 20H80\"/><path d=\"M20 -10L20 50L62 20Z\"/><path d=\"M24 0h7M24 40h7M27.5 36.5v7\"/>",
+   "letter": null,
+   "upright": false
+  },
+  "ground": {
+   "pins": [
+    [
+     0,
+     0
+    ]
+   ],
+   "svg": "<path d=\"M0 0v10M-11 10h22M-7 14h14M-3 18h6\"/>",
+   "letter": null,
+   "upright": true
+  },
+  "label": {
+   "pins": [
+    [
+     0,
+     0
+    ]
+   ],
+   "svg": "",
+   "letter": null,
+   "upright": true
+  },
+  "terminal": {
+   "pins": [
+    [
+     0,
+     0
+    ]
+   ],
+   "svg": "<circle class=\"open\" r=\"3.5\"/>",
+   "letter": null,
+   "upright": true
+  }
+ }
+}

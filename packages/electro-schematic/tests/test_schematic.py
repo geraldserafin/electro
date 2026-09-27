@@ -33,6 +33,7 @@ def test_layout_is_on_the_grid_and_keeps_labels():
     sch = layout(supply(12) + Resistor(10) + shunt(Resistor()) + ground)
     assert [e.id for e in sch.components()] == ["E_1", "R_1", "R_2"]
     assert all(isinstance(c, int) for e in sch.elements for c in e.at)
+    assert min(p[0] for e in sch.elements for p in e.pins()) == 3 == min(p[1] for w in sch.wires for p in w.points)
     assert sch.element("R_2").value is None and sch.element("R_1").value == "10"
 
 

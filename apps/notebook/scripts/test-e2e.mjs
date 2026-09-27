@@ -22,7 +22,7 @@ try {
   await page.getByText("Python gotowy").waitFor({ timeout: 120_000 });
   check("pyodide starts in the worker", true);
 
-  await page.getByRole("button", { name: "▶ Uruchom wszystko" }).click();
+  await page.getByRole("button", { name: "Uruchom wszystko" }).click();
   await page.locator(".output-svg svg").nth(1).waitFor({ timeout: 60_000 });
   const text = await page.locator(".outputs").allInnerTexts();
   check("steps() rendered with KaTeX", (await page.locator(".outputs .katex").count()) > 0);
@@ -31,8 +31,17 @@ try {
   check("no error outputs", (await page.locator(".output-error").count()) === 0);
   await page.screenshot({ path: `${shots}/notebook.png`, fullPage: true });
 
+  // "Symuluj" on the drawing, with a measurement for the unknown
+  const bridge = page.locator(".cell-schematic").first();
+  await bridge.locator(".sim-bar input").fill("I_A_1 = 0");
+  await bridge.getByRole("button", { name: "Symuluj" }).click();
+  await bridge.locator(".outputs table").waitFor({ timeout: 30_000 });
+  check("simulation: table and values on the drawing",
+    (await bridge.locator(".outputs table").innerText()).includes("200 Ω")
+    && (await bridge.locator(".canvas .label.solved").textContent()).includes("200"));
+
   // "show code" turns the drawing into plain electro code in a new cell
-  await page.getByRole("button", { name: "Pokaż kod" }).first().click();
+  await page.getByRole("button", { name: "Kod", exact: true }).first().click();
   await page.getByText("mostek = net(").waitFor({ timeout: 30_000 });
   check("schematic → code cell", true);
 
@@ -47,16 +56,19 @@ try {
   await canvas.screenshot({ path: `${shots}/editor.png` });
 
   // wiring by hand in a fresh schematic: drag from a pin, then the wire tool; rotation
-  await page.locator("main > .add-row").getByRole("button", { name: "+ Schemat" }).click();
-  const cell = page.locator(".cell-schematic").first();
+  await page.locator(".cellbar").getByRole("button", { name: "+ Schemat" }).click();
+  const cell = page.locator(".cell-schematic").last();  // added at the end of the notebook
+  await cell.scrollIntoViewIfNeeded();
   const grid = cell.locator(".canvas");
   const at = async (gx, gy) => { const b = await grid.boundingBox(); return [b.x + gx * 20, b.y + gy * 20]; };
   const click = async (gx, gy) => { const [x, y] = await at(gx, gy); await page.mouse.click(x, y); };
   const code = async () => {
-    await cell.getByRole("button", { name: "Pokaż kod" }).click();
-    await page.waitForTimeout(800);
-    const text = await page.locator(".cell-code .cm-content").first().innerText();
-    await page.locator(".cell-code").first().getByTitle("Usuń komórkę").click();
+    await cell.getByRole("button", { name: "Kod", exact: true }).click();
+    const inserted = cell.locator("xpath=following-sibling::section[1]");  // the new cell right below
+    await inserted.locator(".cm-content").waitFor();
+    const text = await inserted.locator(".cm-content").innerText();
+    await inserted.hover();
+    await inserted.getByTitle("Usuń komórkę").click();
     return text;
   };
   await cell.getByTitle("Źródło napięcia").click(); await click(4, 6);
@@ -80,8 +92,9 @@ try {
 
   // the examples notebook from the menu runs without a single error
   page.once("dialog", (d) => d.accept());
-  await page.locator("select.examples").selectOption({ label: "Przykłady: niewiadome i dziury" });
-  await page.getByRole("button", { name: "▶ Uruchom wszystko" }).click();
+  await page.getByRole("button", { name: "Plik" }).click();
+  await page.getByRole("button", { name: "Przykład: Przykłady: niewiadome i dziury" }).click();
+  await page.getByRole("button", { name: "Uruchom wszystko" }).click();
   await page.locator(".cell-code").last().locator(".outputs").waitFor({ timeout: 60_000 });
   check("examples run without errors", (await page.locator(".output-error").count()) === 0
     && (await page.locator(".cell-code .outputs").count()) === (await page.locator(".cell-code").count()));

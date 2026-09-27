@@ -54,5 +54,39 @@ def test_code_of_a_drawing():
     assert kernel.code(drawing, "nie nazwa") .startswith("uklad = ")
 
 
+def test_the_editors_symbol_file_is_up_to_date():
+    from pathlib import Path
+
+    from electro_render import symbol_library
+
+    path = Path(__file__).parent.parent / "src/schematic/symbols.json"
+    assert json.loads(path.read_text(encoding="utf-8")) == symbol_library(), "run scripts/make_symbols.py"
+
+
 def test_symbols_for_the_editor():
     assert "resistor" in json.loads(kernel.symbols())["kinds"]
+
+
+def test_simulate_a_drawing_with_measurements():
+    import sys
+    from pathlib import Path
+
+    sys.path.insert(0, str(Path(__file__).parents[3] / "packages/electro-schematic/tests"))
+    from test_schematic import bridge
+
+    out = json.loads(kernel.simulate(bridge().to_json(), "I_A_1 = 0"))
+    r2 = out["results"]["R_2"]
+    assert r2["value"] == "200 Ω" and r2["solved"] and r2["I"] == "33.33 mA"
+    assert out["outputs"][0]["type"] == "markdown" and "| $R_{2}$ | 200 Ω |" in out["outputs"][0]["data"]
+
+
+def test_simulate_reports_problems():
+    from electro import Resistor, VoltageSource, loop
+    from electro_schematic import layout
+
+    drawing = layout(loop(VoltageSource(12), Resistor())).to_json()
+    out = json.loads(kernel.simulate(drawing, ""))
+    assert out["outputs"][-1]["type"] == "warning"  # R_1 unknown and no data
+    assert json.loads(kernel.simulate(drawing, "I_R_1 = 0,5"))["results"]["R_1"]["value"] == "24 Ω"
+    assert "Nie rozumiem" in json.loads(kernel.simulate(drawing, "I_R_1 0,5"))["outputs"][0]["data"]
+    assert json.loads(kernel.simulate(drawing, "I_R_9 = 1"))["outputs"][0]["type"] == "error"

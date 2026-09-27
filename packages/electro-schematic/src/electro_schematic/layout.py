@@ -320,4 +320,19 @@ def _to_schematic(block: Block, frame: Frame) -> Schematic:
             sch.elements.append(Element(auto_id("lbl"), "label", _grid(frame, item.points[0]), text=item.data["text"]))
         elif item.kind == "terminal":
             sch.elements.append(Element(auto_id("t"), "terminal", _grid(frame, item.points[0])))
+    return _from_margin(sch)
+
+
+MARGIN = 3  # grid units between the drawing and the top-left corner (the editor keeps the same)
+
+
+def _from_margin(sch: Schematic) -> Schematic:
+    """Shift the drawing so it starts MARGIN units from (0, 0), like the editor expects."""
+    points = [p for e in sch.elements for p in e.pins()] + [p for w in sch.wires for p in w.points]
+    dx = MARGIN - min(p[0] for p in points)
+    dy = MARGIN - min(p[1] for p in points)
+    for e in sch.elements:
+        e.at = (e.at[0] + dx, e.at[1] + dy)
+    for w in sch.wires:
+        w.points = [(x + dx, y + dy) for x, y in w.points]
     return sch

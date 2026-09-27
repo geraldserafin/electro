@@ -31,10 +31,29 @@ export type Output = {
   data: string;
 };
 
+/** What "Symuluj" found for one element (already formatted, e.g. "33.33 mA"). */
+export interface ElementResult {
+  value: string;
+  solved: boolean; // the value was unknown (or a hole) and the solver found it
+  U: string | null;
+  I: string | null;
+  P: string | null;
+  reversed: boolean; // the current really flows from the second pin to the first
+}
+
 export type Cell =
   | { id: string; type: "markdown"; source: string }
-  | { id: string; type: "code"; source: string; outputs: Output[] }
-  | { id: string; type: "schematic"; name: string; schematic: SchematicData };
+  | { id: string; type: "code"; source: string; outputs: Output[]; execution?: number }
+  | {
+      id: string;
+      type: "schematic";
+      name: string;
+      schematic: SchematicData;
+      data?: string; // measurements for the simulation, e.g. "I_A_1 = 0; U_R_2 = 4"
+      results?: Record<string, ElementResult>;
+      outputs?: Output[];
+      stale?: boolean; // the drawing changed since the last simulation
+    };
 
 export type CellType = Cell["type"];
 

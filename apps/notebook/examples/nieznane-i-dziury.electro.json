@@ -4,17 +4,17 @@
   "codeInPdf": true,
   "cells": [
     {
-      "id": "41f82ee2",
+      "id": "358b20c8",
       "type": "markdown",
       "source": "Każdy przykład to osobna komórka — uruchom wszystko przyciskiem **▶ Uruchom wszystko** albo pojedynczo (`Shift+Enter`).\nWartość elementu, której nie znasz, zostawiasz pustą: `Resistor()`. Solver szuka jej z dodatkowych danych\n(`I_R_1=…`, `U_R_2=…`, `P_R_1=…`). Każda niewiadoma potrzebuje jednej **niezależnej** danej."
     },
     {
-      "id": "4fd5da8f",
+      "id": "8a635b45",
       "type": "markdown",
       "source": "## 1. Nieznany opór z pomiaru napięcia"
     },
     {
-      "id": "20ef03da",
+      "id": "fb86f94c",
       "type": "code",
       "source": "dzielnik = supply(12) + Resistor(100) + Resistor() + ground\nsol = dzielnik.solve(U_R_2=4, find=\"R_2\")\nsteps(sol)",
       "outputs": [
@@ -25,12 +25,12 @@
       ]
     },
     {
-      "id": "6e911d73",
+      "id": "69b0de29",
       "type": "markdown",
       "source": "## 2. Nieznane źródło\nNapięcie źródła też może być niewiadomą. Tu wychodzi dodatnie — źródło jest skierowane tak, jak je narysowaliśmy."
     },
     {
-      "id": "9dd77428",
+      "id": "3985b9df",
       "type": "code",
       "source": "petla = loop(VoltageSource(), Resistor(10), Resistor(20))\npetla.solve(I_R_1=\"0,5\", find=\"E_1\")",
       "outputs": [
@@ -41,12 +41,12 @@
       ]
     },
     {
-      "id": "22cc393a",
+      "id": "7c3e9f9c",
       "type": "markdown",
       "source": "## 3. Minus w wyniku = odwrotna polaryzacja\nDwa źródła w jednej pętli. Prąd 2 A przez 4 Ω daje 8 V, a pierwsze źródło ma 12 V — więc drugie musi\n*odbierać* 4 V. Ujemny wynik znaczy: to źródło jest w rzeczywistości skierowane odwrotnie niż w zapisie."
     },
     {
-      "id": "e7daf57a",
+      "id": "bd8d731b",
       "type": "code",
       "source": "dwa_zrodla = loop(VoltageSource(12), Resistor(4), VoltageSource())\ndwa_zrodla.solve(I_R_1=2, find=\"E_2\")",
       "outputs": [
@@ -57,18 +57,18 @@
       ]
     },
     {
-      "id": "20b2a2bf",
+      "id": "7af699f4",
       "type": "markdown",
       "source": "## 4. Kilka niewiadomych naraz\nTrzy niewiadome (R₁, R₃, E₂) i trzy pomiary. Gałęzie są czytane od masy w górę, a `.transpose()` przy R₂ i R₃\nsprawia, że ich napięcie i prąd liczymy „w dół” — tak, jak mierzyliśmy."
     },
     {
-      "id": "15dea7b8",
+      "id": "60ae1ded",
       "type": "code",
       "source": "uklad = (\n    (VoltageSource(12) + Resistor())\n    | Resistor(4).transpose()\n    | ((Resistor().transpose() | CurrentSource(1)) + VoltageSource().transpose())\n)\nsol = uklad.solve(I_R_1=2, U_R_2=8, U_R_3=5, find=[\"R_1\", \"R_3\", \"E_2\"])\ndisplay(schematic(uklad, sol))\nsol",
       "outputs": [
         {
           "type": "svg",
-          "data": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"-103.6 -244 927.2 258\" width=\"927.2\" height=\"258\"><style>\n.w{stroke:currentColor;stroke-width:1.6;fill:none;stroke-linecap:round;stroke-linejoin:round}\n.w .thick{stroke-width:3}.w .fill{fill:currentColor;stroke:none}.w .dashed{stroke-dasharray:4 3}\n.w .open{fill:none}.dot{fill:currentColor}\ntext{font:13px ui-sans-serif,system-ui,sans-serif;fill:currentColor}.halo{fill:var(--paper,#fff)}\ntext .sub{font-size:10px}.solved{fill:#2563eb;font-weight:600}.result{fill:#059669}\n.node{font-style:italic}.letter{font-weight:600;text-anchor:middle;dominant-baseline:central}\n</style><path class=\"w\" d=\"M0 -180L0 -220M240 -100L240 -220M480 -20L480 -40M480 -120L480 -140M480 -40L720 -40M480 -120L720 -120M0 -20L240 -20M0 -220L240 -220M240 -20L480 -20M240 -220L480 -220\"/><circle class=\"dot\" cx=\"240\" cy=\"-20\" r=\"3\"/><circle class=\"dot\" cx=\"480\" cy=\"-120\" r=\"3\"/><circle class=\"dot\" cx=\"480\" cy=\"-40\" r=\"3\"/><circle class=\"dot\" cx=\"240\" cy=\"-220\" r=\"3\"/><g class=\"w\" transform=\"translate(0 -20) rotate(270)\"><path d=\"M0 0H27M53 0H80\"/><g transform=\"translate(40 0)\"><circle r=\"13\"/><path d=\"M-13 0H13\"/><path class=\"fill\" d=\"M13 0l-7 -4v8z\"/></g></g><g class=\"w\" transform=\"translate(0 -100) rotate(270)\"><path d=\"M0 0H22M58 0H80\"/><g transform=\"translate(40 0)\"><rect x=\"-18\" y=\"-7\" width=\"36\" height=\"14\"/></g></g><g class=\"w\" transform=\"translate(240 -100) rotate(90)\"><path d=\"M0 0H22M58 0H80\"/><g transform=\"translate(40 0)\"><rect x=\"-18\" y=\"-7\" width=\"36\" height=\"14\"/></g></g><g class=\"w\" transform=\"translate(480 -120) rotate(90)\"><path d=\"M0 0H22M58 0H80\"/><g transform=\"translate(40 0)\"><rect x=\"-18\" y=\"-7\" width=\"36\" height=\"14\"/></g></g><g class=\"w\" transform=\"translate(720 -40) rotate(270)\"><path d=\"M0 0H27M53 0H80\"/><g transform=\"translate(40 0)\"><circle r=\"13\"/><path d=\"M0 -13V13\"/><path class=\"fill\" d=\"M24 0l-8 -4.5v9z\"/></g></g><g class=\"w\" transform=\"translate(480 -220) rotate(90)\"><path d=\"M0 0H27M53 0H80\"/><g transform=\"translate(40 0)\"><circle r=\"13\"/><path d=\"M-13 0H13\"/><path class=\"fill\" d=\"M13 0l-7 -4v8z\"/></g></g><rect class=\"halo\" x=\"-91.6\" y=\"-67\" width=\"70.6\" height=\"15\" rx=\"2\"/><rect class=\"halo\" x=\"21\" y=\"-75\" width=\"70.6\" height=\"31\" rx=\"2\"/><rect class=\"halo\" x=\"-84.2\" y=\"-147\" width=\"63.2\" height=\"15\" rx=\"2\"/><rect class=\"halo\" x=\"21\" y=\"-155\" width=\"70.6\" height=\"31\" rx=\"2\"/><rect class=\"halo\" x=\"155.8\" y=\"-67\" width=\"63.2\" height=\"15\" rx=\"2\"/><rect class=\"halo\" x=\"261\" y=\"-75\" width=\"70.6\" height=\"31\" rx=\"2\"/><rect class=\"halo\" x=\"395.8\" y=\"-87\" width=\"63.2\" height=\"15\" rx=\"2\"/><rect class=\"halo\" x=\"501\" y=\"-95\" width=\"70.6\" height=\"31\" rx=\"2\"/><rect class=\"halo\" x=\"635.8\" y=\"-87\" width=\"63.2\" height=\"15\" rx=\"2\"/><rect class=\"halo\" x=\"741\" y=\"-95\" width=\"70.6\" height=\"31\" rx=\"2\"/><rect class=\"halo\" x=\"388.4\" y=\"-187\" width=\"70.6\" height=\"15\" rx=\"2\"/><rect class=\"halo\" x=\"501\" y=\"-195\" width=\"70.6\" height=\"31\" rx=\"2\"/><text class=\"label\" x=\"-21\" y=\"-56\" text-anchor=\"end\" xml:space=\"preserve\">E<tspan class=\"sub\" dy=\"4\">1</tspan><tspan dy=\"-4\"> = 12 V</tspan></text><text class=\"result\" x=\"21\" y=\"-64\" text-anchor=\"start\" xml:space=\"preserve\">I = 2 A ↑</text><text class=\"result\" x=\"21\" y=\"-48\" text-anchor=\"start\" xml:space=\"preserve\">U = 12 V</text><text class=\"solved\" x=\"-21\" y=\"-136\" text-anchor=\"end\" xml:space=\"preserve\">R<tspan class=\"sub\" dy=\"4\">1</tspan><tspan dy=\"-4\"> = 2 Ω</tspan></text><text class=\"result\" x=\"21\" y=\"-144\" text-anchor=\"start\" xml:space=\"preserve\">I = 2 A ↑</text><text class=\"result\" x=\"21\" y=\"-128\" text-anchor=\"start\" xml:space=\"preserve\">U = 4 V</text><text class=\"label\" x=\"219\" y=\"-56\" text-anchor=\"end\" xml:space=\"preserve\">R<tspan class=\"sub\" dy=\"4\">2</tspan><tspan dy=\"-4\"> = 4 Ω</tspan></text><text class=\"result\" x=\"261\" y=\"-64\" text-anchor=\"start\" xml:space=\"preserve\">I = 2 A ↓</text><text class=\"result\" x=\"261\" y=\"-48\" text-anchor=\"start\" xml:space=\"preserve\">U = 8 V</text><text class=\"solved\" x=\"459\" y=\"-76\" text-anchor=\"end\" xml:space=\"preserve\">R<tspan class=\"sub\" dy=\"4\">3</tspan><tspan dy=\"-4\"> = 5 Ω</tspan></text><text class=\"result\" x=\"501\" y=\"-84\" text-anchor=\"start\" xml:space=\"preserve\">I = 1 A ↓</text><text class=\"result\" x=\"501\" y=\"-68\" text-anchor=\"start\" xml:space=\"preserve\">U = 5 V</text><text class=\"label\" x=\"699\" y=\"-76\" text-anchor=\"end\" xml:space=\"preserve\">J<tspan class=\"sub\" dy=\"4\">1</tspan><tspan dy=\"-4\"> = 1 A</tspan></text><text class=\"result\" x=\"741\" y=\"-84\" text-anchor=\"start\" xml:space=\"preserve\">I = 1 A ↑</text><text class=\"result\" x=\"741\" y=\"-68\" text-anchor=\"start\" xml:space=\"preserve\">U = 5 V</text><text class=\"solved\" x=\"459\" y=\"-176\" text-anchor=\"end\" xml:space=\"preserve\">E<tspan class=\"sub\" dy=\"4\">2</tspan><tspan dy=\"-4\"> = -3 V</tspan></text><text class=\"result\" x=\"501\" y=\"-184\" text-anchor=\"start\" xml:space=\"preserve\">I = 0 A ↓</text><text class=\"result\" x=\"501\" y=\"-168\" text-anchor=\"start\" xml:space=\"preserve\">U = -3 V</text></svg>"
+          "data": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"-43.6 36 927.2 258\" width=\"927.2\" height=\"258\"><style>\n.w{stroke:currentColor;stroke-width:1.6;fill:none;stroke-linecap:round;stroke-linejoin:round}\n.w .thick{stroke-width:3}.w .fill{fill:currentColor;stroke:none}.w .dashed{stroke-dasharray:4 3}\n.w .open{fill:none}.dot{fill:currentColor}\ntext{font:13px ui-sans-serif,system-ui,sans-serif;fill:currentColor}.halo{fill:var(--paper,#fff)}\ntext .sub{font-size:10px}.solved{fill:#2563eb;font-weight:600}.result{fill:#059669}\n.node{font-style:italic}.letter{font-weight:600;text-anchor:middle;dominant-baseline:central}\n</style><path class=\"w\" d=\"M60 100L60 60M300 180L300 60M540 260L540 240M540 160L540 140M540 240L780 240M540 160L780 160M60 260L300 260M60 60L300 60M300 260L540 260M300 60L540 60\"/><circle class=\"dot\" cx=\"300\" cy=\"260\" r=\"3\"/><circle class=\"dot\" cx=\"540\" cy=\"160\" r=\"3\"/><circle class=\"dot\" cx=\"540\" cy=\"240\" r=\"3\"/><circle class=\"dot\" cx=\"300\" cy=\"60\" r=\"3\"/><g class=\"w\" transform=\"translate(60 260) rotate(270)\"><path d=\"M0 0H27M53 0H80\"/><g transform=\"translate(40 0)\"><circle r=\"13\"/><path d=\"M-13 0H13\"/><path class=\"fill\" d=\"M13 0l-7 -4v8z\"/></g></g><g class=\"w\" transform=\"translate(60 180) rotate(270)\"><path d=\"M0 0H22M58 0H80\"/><g transform=\"translate(40 0)\"><rect x=\"-18\" y=\"-7\" width=\"36\" height=\"14\"/></g></g><g class=\"w\" transform=\"translate(300 180) rotate(90)\"><path d=\"M0 0H22M58 0H80\"/><g transform=\"translate(40 0)\"><rect x=\"-18\" y=\"-7\" width=\"36\" height=\"14\"/></g></g><g class=\"w\" transform=\"translate(540 160) rotate(90)\"><path d=\"M0 0H22M58 0H80\"/><g transform=\"translate(40 0)\"><rect x=\"-18\" y=\"-7\" width=\"36\" height=\"14\"/></g></g><g class=\"w\" transform=\"translate(780 240) rotate(270)\"><path d=\"M0 0H27M53 0H80\"/><g transform=\"translate(40 0)\"><circle r=\"13\"/><path d=\"M0 -13V13\"/><path class=\"fill\" d=\"M24 0l-8 -4.5v9z\"/></g></g><g class=\"w\" transform=\"translate(540 60) rotate(90)\"><path d=\"M0 0H27M53 0H80\"/><g transform=\"translate(40 0)\"><circle r=\"13\"/><path d=\"M-13 0H13\"/><path class=\"fill\" d=\"M13 0l-7 -4v8z\"/></g></g><rect class=\"halo\" x=\"-31.6\" y=\"213\" width=\"70.6\" height=\"15\" rx=\"2\"/><rect class=\"halo\" x=\"81\" y=\"205\" width=\"70.6\" height=\"31\" rx=\"2\"/><rect class=\"halo\" x=\"-24.2\" y=\"133\" width=\"63.2\" height=\"15\" rx=\"2\"/><rect class=\"halo\" x=\"81\" y=\"125\" width=\"70.6\" height=\"31\" rx=\"2\"/><rect class=\"halo\" x=\"215.8\" y=\"213\" width=\"63.2\" height=\"15\" rx=\"2\"/><rect class=\"halo\" x=\"321\" y=\"205\" width=\"70.6\" height=\"31\" rx=\"2\"/><rect class=\"halo\" x=\"455.8\" y=\"193\" width=\"63.2\" height=\"15\" rx=\"2\"/><rect class=\"halo\" x=\"561\" y=\"185\" width=\"70.6\" height=\"31\" rx=\"2\"/><rect class=\"halo\" x=\"695.8\" y=\"193\" width=\"63.2\" height=\"15\" rx=\"2\"/><rect class=\"halo\" x=\"801\" y=\"185\" width=\"70.6\" height=\"31\" rx=\"2\"/><rect class=\"halo\" x=\"448.4\" y=\"93\" width=\"70.6\" height=\"15\" rx=\"2\"/><rect class=\"halo\" x=\"561\" y=\"85\" width=\"70.6\" height=\"31\" rx=\"2\"/><text class=\"label\" x=\"39\" y=\"224\" text-anchor=\"end\" xml:space=\"preserve\">E<tspan class=\"sub\" dy=\"4\">1</tspan><tspan dy=\"-4\"> = 12 V</tspan></text><text class=\"result\" x=\"81\" y=\"216\" text-anchor=\"start\" xml:space=\"preserve\">I = 2 A ↑</text><text class=\"result\" x=\"81\" y=\"232\" text-anchor=\"start\" xml:space=\"preserve\">U = 12 V</text><text class=\"solved\" x=\"39\" y=\"144\" text-anchor=\"end\" xml:space=\"preserve\">R<tspan class=\"sub\" dy=\"4\">1</tspan><tspan dy=\"-4\"> = 2 Ω</tspan></text><text class=\"result\" x=\"81\" y=\"136\" text-anchor=\"start\" xml:space=\"preserve\">I = 2 A ↑</text><text class=\"result\" x=\"81\" y=\"152\" text-anchor=\"start\" xml:space=\"preserve\">U = 4 V</text><text class=\"label\" x=\"279\" y=\"224\" text-anchor=\"end\" xml:space=\"preserve\">R<tspan class=\"sub\" dy=\"4\">2</tspan><tspan dy=\"-4\"> = 4 Ω</tspan></text><text class=\"result\" x=\"321\" y=\"216\" text-anchor=\"start\" xml:space=\"preserve\">I = 2 A ↓</text><text class=\"result\" x=\"321\" y=\"232\" text-anchor=\"start\" xml:space=\"preserve\">U = 8 V</text><text class=\"solved\" x=\"519\" y=\"204\" text-anchor=\"end\" xml:space=\"preserve\">R<tspan class=\"sub\" dy=\"4\">3</tspan><tspan dy=\"-4\"> = 5 Ω</tspan></text><text class=\"result\" x=\"561\" y=\"196\" text-anchor=\"start\" xml:space=\"preserve\">I = 1 A ↓</text><text class=\"result\" x=\"561\" y=\"212\" text-anchor=\"start\" xml:space=\"preserve\">U = 5 V</text><text class=\"label\" x=\"759\" y=\"204\" text-anchor=\"end\" xml:space=\"preserve\">J<tspan class=\"sub\" dy=\"4\">1</tspan><tspan dy=\"-4\"> = 1 A</tspan></text><text class=\"result\" x=\"801\" y=\"196\" text-anchor=\"start\" xml:space=\"preserve\">I = 1 A ↑</text><text class=\"result\" x=\"801\" y=\"212\" text-anchor=\"start\" xml:space=\"preserve\">U = 5 V</text><text class=\"solved\" x=\"519\" y=\"104\" text-anchor=\"end\" xml:space=\"preserve\">E<tspan class=\"sub\" dy=\"4\">2</tspan><tspan dy=\"-4\"> = -3 V</tspan></text><text class=\"result\" x=\"561\" y=\"96\" text-anchor=\"start\" xml:space=\"preserve\">I = 0 A ↓</text><text class=\"result\" x=\"561\" y=\"112\" text-anchor=\"start\" xml:space=\"preserve\">U = -3 V</text></svg>"
         },
         {
           "type": "text",
@@ -77,12 +77,12 @@
       ]
     },
     {
-      "id": "c02c3bfb",
+      "id": "6629456d",
       "type": "markdown",
       "source": "### 4a. Uwaga na zwrot pomiaru\nTen sam układ **bez** `.transpose()` przy R₂ i R₃ liczy ich napięcia w górę. Te same liczby oznaczają wtedy\nco innego — i przestają do siebie pasować. Znak danej zależy od kierunku elementu."
     },
     {
-      "id": "81b9214b",
+      "id": "3a1f5d91",
       "type": "code",
       "source": "bez_transpose = (\n    (VoltageSource(12) + Resistor())\n    | Resistor(4)\n    | ((Resistor() | CurrentSource(1)) + VoltageSource().transpose())\n)\ntry:\n    bez_transpose.solve(I_R_1=2, U_R_2=8, U_R_3=5)\nexcept CircuitError as e:\n    print(e)\n\nbez_transpose.solve(I_R_1=2, U_R_2=-8, U_R_3=-5, find=[\"R_1\", \"R_3\", \"E_2\"])  # te same pomiary „w górę”",
       "outputs": [
@@ -97,12 +97,12 @@
       ]
     },
     {
-      "id": "4fe1391e",
+      "id": "365d7a64",
       "type": "markdown",
       "source": "## 5. Za mało danych\nBez pomiaru na R₃ solver nie zgaduje — mówi, ilu danych brakuje i które wystarczą."
     },
     {
-      "id": "ec887683",
+      "id": "6825942a",
       "type": "code",
       "source": "try:\n    uklad.solve(I_R_1=2, U_R_2=8, find=[\"R_1\", \"R_3\", \"E_2\"])\nexcept MissingData as e:\n    print(e)\n    print(\"Udało się wyznaczyć:\", e.solution.answers[\"R_1\"], \"Ω\")",
       "outputs": [
@@ -113,12 +113,12 @@
       ]
     },
     {
-      "id": "c0943fb3",
+      "id": "50467440",
       "type": "markdown",
       "source": "## 6. Dane, które niczego nie wnoszą\nPrzy znanym R₂ = 4 Ω napięcie 4 V i prąd 1 A na R₂ to **ta sama** informacja. Dwie dane, ale jedna wiedza —\nwięc przy dwóch niewiadomych dalej czegoś brakuje."
     },
     {
-      "id": "8329415e",
+      "id": "e26c93a5",
       "type": "code",
       "source": "try:\n    (supply() + Resistor() + Resistor(4) + ground).solve(U_R_2=4, I_R_2=1, find=[\"E_1\", \"R_1\"])\nexcept MissingData as e:\n    print(e)",
       "outputs": [
@@ -129,12 +129,12 @@
       ]
     },
     {
-      "id": "2220ae8f",
+      "id": "08e9d226",
       "type": "markdown",
       "source": "## 7. Sprzeczne dane\nSolver wskazuje, które dane się wykluczają."
     },
     {
-      "id": "8416f672",
+      "id": "c516f8be",
       "type": "code",
       "source": "try:\n    (supply(12) + Resistor(10) + Resistor(20) + ground).solve(I_R_1=1)\nexcept Contradiction as e:\n    print(e)",
       "outputs": [
@@ -145,12 +145,12 @@
       ]
     },
     {
-      "id": "31d56cd5",
+      "id": "882280ab",
       "type": "markdown",
       "source": "## 8. Dwa rozwiązania\nMoc to $P = U \\cdot I$ — równanie kwadratowe. Opornik 2 Ω i 8 Ω dają w tej pętli tę samą moc 8 W.\nJedna dodatkowa równość rozstrzyga."
     },
     {
-      "id": "5a50cb54",
+      "id": "f05ad692",
       "type": "code",
       "source": "dwa = loop(VoltageSource(12), Resistor(), Resistor(4))\ntry:\n    dwa.solve(P_R_1=8, find=\"R_1\")\nexcept Ambiguous as e:\n    print(e)\n\ndwa.solve(Eq(P(\"R_1\"), 8), Eq(U(\"R_1\"), 2 * U(\"R_2\")), find=\"R_1\")  # R₁ ma dwa razy więcej napięcia niż R₂",
       "outputs": [
@@ -165,12 +165,12 @@
       ]
     },
     {
-      "id": "cc90d226",
+      "id": "394b71b2",
       "type": "markdown",
       "source": "## 9. Wynik literowy\nZamiast liczby — litera. Wynik wychodzi jako wzór."
     },
     {
-      "id": "3b8d671b",
+      "id": "6d4dec40",
       "type": "code",
       "source": "(supply(\"E\") + Resistor(\"R_a\") + Resistor(\"R_b\") + ground).solve(find=\"U_R_2\")",
       "outputs": [
@@ -181,12 +181,12 @@
       ]
     },
     {
-      "id": "3c2277dd",
+      "id": "4dfb292c",
       "type": "markdown",
       "source": "## 10. Mostek z niewiadomą (nie da się zapisać przez `+` i `|`)"
     },
     {
-      "id": "3768191f",
+      "id": "d7918587",
       "type": "code",
       "source": "mostek = net(\n    (VoltageSource(10), \"0\", \"A\"),\n    (Resistor(100), \"A\", \"B\"), (Resistor(), \"B\", \"0\"),\n    (Resistor(50), \"A\", \"C\"), (Resistor(100), \"C\", \"0\"),\n    (Ammeter(), \"B\", \"C\"),\n)\nmostek.solve(I_A_1=0, find=\"R_2\")",
       "outputs": [
@@ -197,12 +197,12 @@
       ]
     },
     {
-      "id": "934e8207",
+      "id": "2b67a667",
       "type": "markdown",
       "source": "## 11. Nieznane źródło prądu"
     },
     {
-      "id": "41349841",
+      "id": "fcc7c3f1",
       "type": "code",
       "source": "rownolegle = net((CurrentSource(), \"0\", \"A\"), (Resistor(10), \"A\", \"0\"), (Resistor(40), \"A\", \"0\"))\nrownolegle.solve(U_R_1=8, find=\"J_1\")",
       "outputs": [
@@ -213,17 +213,17 @@
       ]
     },
     {
-      "id": "db82913a",
+      "id": "5b9953db",
       "type": "markdown",
       "source": "# Dziury: `Hole()`\nDziura to element, o którym nie wiemy nawet, **czym** jest. Każdy liniowy dwójnik to źródło $E$ szeregowo\nz oporem $Z$, ale z jednego pomiaru nie da się ich rozdzielić — więc solver bierze **najprostszy** pasujący\nelement: rezystor, potem przerwę, potem źródło. Przyjęte założenie widać w rozwiązaniu."
     },
     {
-      "id": "6833d731",
+      "id": "fad64f96",
       "type": "markdown",
-      "source": "## 12. Dziura → rezystor\nŻarówka 12 Ω ma dostać 0,5 A z akumulatora 12 V. Co wstawić?"
+      "source": "## 12. Dziura → rezystor\nŻarówka 12 Ω ma dostać 0,5 A z akumulatora 12 V. Co wstawić? Na schemacie wpisz pomiar w **Dane pomiarowe**\ni kliknij **Symuluj** — albo policz to kodem, jak niżej."
     },
     {
-      "id": "12a0f5df",
+      "id": "be2ea162",
       "type": "schematic",
       "name": "zarowka",
       "schematic": {
@@ -233,8 +233,8 @@
             "id": "E_1",
             "kind": "voltage_source",
             "at": [
-              1,
-              0
+              4,
+              3
             ],
             "rotation": 0,
             "value": "12",
@@ -244,8 +244,8 @@
             "id": "R_1",
             "kind": "resistor",
             "at": [
-              7,
-              0
+              10,
+              3
             ],
             "rotation": 0,
             "value": "12",
@@ -255,8 +255,8 @@
             "id": "X_1",
             "kind": "hole",
             "at": [
-              13,
-              0
+              16,
+              3
             ],
             "rotation": 0,
             "value": null,
@@ -267,83 +267,11 @@
           {
             "points": [
               [
-                0,
-                0
+                3,
+                3
               ],
               [
-                1,
-                0
-              ]
-            ]
-          },
-          {
-            "points": [
-              [
-                5,
-                0
-              ],
-              [
-                6,
-                0
-              ]
-            ]
-          },
-          {
-            "points": [
-              [
-                6,
-                0
-              ],
-              [
-                7,
-                0
-              ]
-            ]
-          },
-          {
-            "points": [
-              [
-                11,
-                0
-              ],
-              [
-                12,
-                0
-              ]
-            ]
-          },
-          {
-            "points": [
-              [
-                12,
-                0
-              ],
-              [
-                13,
-                0
-              ]
-            ]
-          },
-          {
-            "points": [
-              [
-                17,
-                0
-              ],
-              [
-                18,
-                0
-              ]
-            ]
-          },
-          {
-            "points": [
-              [
-                18,
-                0
-              ],
-              [
-                18,
+                4,
                 3
               ]
             ]
@@ -351,11 +279,11 @@
           {
             "points": [
               [
-                18,
+                8,
                 3
               ],
               [
-                0,
+                9,
                 3
               ]
             ]
@@ -363,26 +291,132 @@
           {
             "points": [
               [
-                0,
+                9,
                 3
               ],
               [
-                0,
-                0
+                10,
+                3
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                14,
+                3
+              ],
+              [
+                15,
+                3
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                15,
+                3
+              ],
+              [
+                16,
+                3
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                20,
+                3
+              ],
+              [
+                21,
+                3
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                21,
+                3
+              ],
+              [
+                21,
+                6
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                21,
+                6
+              ],
+              [
+                3,
+                6
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                3,
+                6
+              ],
+              [
+                3,
+                3
               ]
             ]
           }
         ]
-      }
+      },
+      "data": "I_R_1 = 0,5",
+      "results": {
+        "E_1": {
+          "value": "12 V",
+          "solved": false,
+          "U": "12 V",
+          "I": "500 mA",
+          "P": "6 W",
+          "reversed": false
+        },
+        "R_1": {
+          "value": "12 Ω",
+          "solved": false,
+          "U": "6 V",
+          "I": "500 mA",
+          "P": "3 W",
+          "reversed": false
+        },
+        "X_1": {
+          "value": "R = 12 Ω",
+          "solved": true,
+          "U": "6 V",
+          "I": "500 mA",
+          "P": "3 W",
+          "reversed": false
+        }
+      },
+      "outputs": [
+        {
+          "type": "markdown",
+          "data": "| element | wartość | U | I | P |\n|---|---|---|---|---|\n| $E_{1}$ | 12 V | 12 V | 500 mA | 6 W |\n| $R_{1}$ | 12 Ω | 6 V | 500 mA | 3 W |\n| $X_{1}$ | R = 12 Ω | 6 V | 500 mA | 3 W |"
+        }
+      ],
+      "stale": false
     },
     {
-      "id": "ef6d0022",
+      "id": "ef5d9de3",
       "type": "code",
       "source": "zarowka = schemat(\"zarowka\").to_circuit()\nsol = zarowka.solve(I_R_1=\"0,5\")\ndisplay(schematic(schemat(\"zarowka\"), sol))\nsteps(sol)",
       "outputs": [
         {
           "type": "svg",
-          "data": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"-12 -47 384 119\" width=\"384\" height=\"119\"><style>\n.w{stroke:currentColor;stroke-width:1.6;fill:none;stroke-linecap:round;stroke-linejoin:round}\n.w .thick{stroke-width:3}.w .fill{fill:currentColor;stroke:none}.w .dashed{stroke-dasharray:4 3}\n.w .open{fill:none}.dot{fill:currentColor}\ntext{font:13px ui-sans-serif,system-ui,sans-serif;fill:currentColor}.halo{fill:var(--paper,#fff)}\ntext .sub{font-size:10px}.solved{fill:#2563eb;font-weight:600}.result{fill:#059669}\n.node{font-style:italic}.letter{font-weight:600;text-anchor:middle;dominant-baseline:central}\n</style><path class=\"w\" d=\"M0 0L20 0M100 0L120 0M120 0L140 0M220 0L240 0M240 0L260 0M340 0L360 0M360 0L360 60M360 60L0 60M0 60L0 0\"/><g class=\"w\" transform=\"translate(20 0) rotate(0)\"><path d=\"M0 0H27M53 0H80\"/><g transform=\"translate(40 0)\"><circle r=\"13\"/><path d=\"M-13 0H13\"/><path class=\"fill\" d=\"M13 0l-7 -4v8z\"/></g></g><g class=\"w\" transform=\"translate(140 0) rotate(0)\"><path d=\"M0 0H22M58 0H80\"/><g transform=\"translate(40 0)\"><rect x=\"-18\" y=\"-7\" width=\"36\" height=\"14\"/></g></g><g class=\"w\" transform=\"translate(260 0) rotate(0)\"><path d=\"M0 0H22M58 0H80\"/><g transform=\"translate(40 0)\"><rect class=\"dashed\" x=\"-18\" y=\"-10\" width=\"36\" height=\"20\"/></g></g><text class=\"letter\" x=\"300\" y=\"0\">?</text><rect class=\"halo\" x=\"24.7\" y=\"-34\" width=\"70.6\" height=\"15\" rx=\"2\"/><rect class=\"halo\" x=\"13.6\" y=\"20\" width=\"92.8\" height=\"31\" rx=\"2\"/><rect class=\"halo\" x=\"144.7\" y=\"-34\" width=\"70.6\" height=\"15\" rx=\"2\"/><rect class=\"halo\" x=\"133.6\" y=\"20\" width=\"92.8\" height=\"31\" rx=\"2\"/><rect class=\"halo\" x=\"253.6\" y=\"-34\" width=\"92.8\" height=\"15\" rx=\"2\"/><rect class=\"halo\" x=\"253.6\" y=\"20\" width=\"92.8\" height=\"31\" rx=\"2\"/><text class=\"label\" x=\"60\" y=\"-23\" text-anchor=\"middle\" xml:space=\"preserve\">E<tspan class=\"sub\" dy=\"4\">1</tspan><tspan dy=\"-4\"> = 12 V</tspan></text><text class=\"result\" x=\"60\" y=\"31\" text-anchor=\"middle\" xml:space=\"preserve\">I = 500 mA →</text><text class=\"result\" x=\"60\" y=\"47\" text-anchor=\"middle\" xml:space=\"preserve\">U = 12 V</text><text class=\"label\" x=\"180\" y=\"-23\" text-anchor=\"middle\" xml:space=\"preserve\">R<tspan class=\"sub\" dy=\"4\">1</tspan><tspan dy=\"-4\"> = 12 Ω</tspan></text><text class=\"result\" x=\"180\" y=\"31\" text-anchor=\"middle\" xml:space=\"preserve\">I = 500 mA →</text><text class=\"result\" x=\"180\" y=\"47\" text-anchor=\"middle\" xml:space=\"preserve\">U = 6 V</text><text class=\"solved\" x=\"300\" y=\"-23\" text-anchor=\"middle\" xml:space=\"preserve\">X<tspan class=\"sub\" dy=\"4\">1</tspan><tspan dy=\"-4\">: R = 12 Ω</tspan></text><text class=\"result\" x=\"300\" y=\"31\" text-anchor=\"middle\" xml:space=\"preserve\">I = 500 mA →</text><text class=\"result\" x=\"300\" y=\"47\" text-anchor=\"middle\" xml:space=\"preserve\">U = 6 V</text></svg>"
+          "data": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"48 13 384 119\" width=\"384\" height=\"119\"><style>\n.w{stroke:currentColor;stroke-width:1.6;fill:none;stroke-linecap:round;stroke-linejoin:round}\n.w .thick{stroke-width:3}.w .fill{fill:currentColor;stroke:none}.w .dashed{stroke-dasharray:4 3}\n.w .open{fill:none}.dot{fill:currentColor}\ntext{font:13px ui-sans-serif,system-ui,sans-serif;fill:currentColor}.halo{fill:var(--paper,#fff)}\ntext .sub{font-size:10px}.solved{fill:#2563eb;font-weight:600}.result{fill:#059669}\n.node{font-style:italic}.letter{font-weight:600;text-anchor:middle;dominant-baseline:central}\n</style><path class=\"w\" d=\"M60 60L80 60M160 60L180 60M180 60L200 60M280 60L300 60M300 60L320 60M400 60L420 60M420 60L420 120M420 120L60 120M60 120L60 60\"/><g class=\"w\" transform=\"translate(80 60) rotate(0)\"><path d=\"M0 0H27M53 0H80\"/><g transform=\"translate(40 0)\"><circle r=\"13\"/><path d=\"M-13 0H13\"/><path class=\"fill\" d=\"M13 0l-7 -4v8z\"/></g></g><g class=\"w\" transform=\"translate(200 60) rotate(0)\"><path d=\"M0 0H22M58 0H80\"/><g transform=\"translate(40 0)\"><rect x=\"-18\" y=\"-7\" width=\"36\" height=\"14\"/></g></g><g class=\"w\" transform=\"translate(320 60) rotate(0)\"><path d=\"M0 0H22M58 0H80\"/><g transform=\"translate(40 0)\"><rect class=\"dashed\" x=\"-18\" y=\"-10\" width=\"36\" height=\"20\"/></g></g><text class=\"letter\" x=\"360\" y=\"60\">?</text><rect class=\"halo\" x=\"84.7\" y=\"26\" width=\"70.6\" height=\"15\" rx=\"2\"/><rect class=\"halo\" x=\"73.6\" y=\"80\" width=\"92.8\" height=\"31\" rx=\"2\"/><rect class=\"halo\" x=\"204.7\" y=\"26\" width=\"70.6\" height=\"15\" rx=\"2\"/><rect class=\"halo\" x=\"193.6\" y=\"80\" width=\"92.8\" height=\"31\" rx=\"2\"/><rect class=\"halo\" x=\"313.6\" y=\"26\" width=\"92.8\" height=\"15\" rx=\"2\"/><rect class=\"halo\" x=\"313.6\" y=\"80\" width=\"92.8\" height=\"31\" rx=\"2\"/><text class=\"label\" x=\"120\" y=\"37\" text-anchor=\"middle\" xml:space=\"preserve\">E<tspan class=\"sub\" dy=\"4\">1</tspan><tspan dy=\"-4\"> = 12 V</tspan></text><text class=\"result\" x=\"120\" y=\"91\" text-anchor=\"middle\" xml:space=\"preserve\">I = 500 mA →</text><text class=\"result\" x=\"120\" y=\"107\" text-anchor=\"middle\" xml:space=\"preserve\">U = 12 V</text><text class=\"label\" x=\"240\" y=\"37\" text-anchor=\"middle\" xml:space=\"preserve\">R<tspan class=\"sub\" dy=\"4\">1</tspan><tspan dy=\"-4\"> = 12 Ω</tspan></text><text class=\"result\" x=\"240\" y=\"91\" text-anchor=\"middle\" xml:space=\"preserve\">I = 500 mA →</text><text class=\"result\" x=\"240\" y=\"107\" text-anchor=\"middle\" xml:space=\"preserve\">U = 6 V</text><text class=\"solved\" x=\"360\" y=\"37\" text-anchor=\"middle\" xml:space=\"preserve\">X<tspan class=\"sub\" dy=\"4\">1</tspan><tspan dy=\"-4\">: R = 12 Ω</tspan></text><text class=\"result\" x=\"360\" y=\"91\" text-anchor=\"middle\" xml:space=\"preserve\">I = 500 mA →</text><text class=\"result\" x=\"360\" y=\"107\" text-anchor=\"middle\" xml:space=\"preserve\">U = 6 V</text></svg>"
         },
         {
           "type": "markdown",
@@ -391,12 +425,12 @@
       ]
     },
     {
-      "id": "ca262028",
+      "id": "f101e9a4",
       "type": "markdown",
       "source": "## 13. Dziura → źródło\nPrąd płynie „pod prąd” akumulatora (−1 A) — żaden opornik tego nie zrobi, to musi być ładowarka."
     },
     {
-      "id": "50050b66",
+      "id": "ed9b27f8",
       "type": "code",
       "source": "ladowanie = loop(VoltageSource(12), Resistor(2), Hole())\nsol = ladowanie.solve(I_R_1=-1)\nsol[\"X_1\"]",
       "outputs": [
@@ -407,12 +441,12 @@
       ]
     },
     {
-      "id": "82805249",
+      "id": "08b5718a",
       "type": "markdown",
       "source": "## 14. Dziura → przewód\nCałe 12 V odkłada się na 10 Ω (1,2 A) — w dziurze nie ma żadnego spadku napięcia."
     },
     {
-      "id": "9ca69470",
+      "id": "5b2990ac",
       "type": "code",
       "source": "loop(VoltageSource(12), Resistor(10), Hole()).solve(I_R_1=\"1,2\")[\"X_1\"]",
       "outputs": [
@@ -423,12 +457,12 @@
       ]
     },
     {
-      "id": "b098ff5e",
+      "id": "dcbf26e3",
       "type": "markdown",
       "source": "## 15. Dziura → przerwa\nPrąd nie płynie wcale, a całe napięcie jest na dziurze."
     },
     {
-      "id": "8d43c940",
+      "id": "88093fa1",
       "type": "code",
       "source": "przerwa = loop(VoltageSource(12), Resistor(10), Hole())\nsol = przerwa.solve(I_R_1=0)\nprint(sol[\"X_1\"])\nprint(code(przerwa.fill(sol)))  # po wstawieniu przerwy pętla przestaje być pętlą",
       "outputs": [
@@ -439,12 +473,12 @@
       ]
     },
     {
-      "id": "557982c2",
+      "id": "d0edc56e",
       "type": "markdown",
       "source": "## 16. Dwie dziury w szeregu\nZnając tylko prąd, nie da się rozdzielić, ile napięcia przypada na którą dziurę. Jedno napięcie więcej — i już."
     },
     {
-      "id": "40eba9a0",
+      "id": "6f1185d3",
       "type": "code",
       "source": "dwie = loop(VoltageSource(12), Hole(), Hole())\ntry:\n    dwie.solve(I_E_1=1, find=\"U_X_1\")\nexcept MissingData as e:\n    print(e)\n\nsol = dwie.solve(I_E_1=1, U_X_1=5)\nsol[\"X_1\"], sol[\"X_2\"]",
       "outputs": [
@@ -459,12 +493,12 @@
       ]
     },
     {
-      "id": "7e52c5aa",
+      "id": "ae1d4864",
       "type": "markdown",
       "source": "## 17. Dziura i zwykła niewiadoma naraz"
     },
     {
-      "id": "d13bc569",
+      "id": "1bc2a66b",
       "type": "code",
       "source": "sol = loop(VoltageSource(12), Resistor(), Hole()).solve(I_E_1=1, U_R_1=4)\nsol",
       "outputs": [

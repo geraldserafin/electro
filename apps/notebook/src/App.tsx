@@ -1,12 +1,18 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { CodeCell, MarkdownCell, SchematicCell } from "./cells/Cells";
+import { Bolt, Chevron, Down, Play, Trash, Up } from "./icons";
 import { kernel } from "./python/kernel";
 import { download, load, newCell, save, upload } from "./storage";
+import symbols from "./schematic/symbols.json";
 import type { Cell, CellType, Notebook, SchematicData, SymbolLibrary } from "./types";
+
+// generated from electro_render.symbol_library() (scripts/make_symbols.py), so drawings
+// show before Python has loaded
+const library = symbols as unknown as SymbolLibrary;
 
 type Status = "loading" | "ready" | "error";
 
-/** Every notebook in examples/ shows up in the "Przykłady" menu (and opens with ?przyklad=<name>). */
+/** Every notebook in examples/ shows up in the Plik menu (and opens with ?przyklad=<name>). */
 const EXAMPLE_FILES = import.meta.glob<Notebook>("../examples/*.electro.json", { eager: true, import: "default" });
 const EXAMPLES = Object.values(EXAMPLE_FILES);
 
@@ -23,25 +29,24 @@ function fromAddress(): Notebook | null {
 
 export function App() {
   const [notebook, setNotebook] = useState<Notebook>(() => fromAddress() ?? load());
-  const [library, setLibrary] = useState<SymbolLibrary | null>(null);
   const [status, setStatus] = useState<Status>("loading");
-  const [statusText, setStatusText] = useState("Ładowanie Pythona (Pyodide)…");
+  const [statusText, setStatusText] = useState("Uruchamiam Pythona…");
   const [running, setRunning] = useState<Set<string>>(new Set());
+  const [focused, setFocused] = useState<string | null>(null);
+  const executions = useRef(0);
   const fileInput = useRef<HTMLInputElement>(null);
   const latest = useRef(notebook);
   latest.current = notebook;
 
   useEffect(() => {
     kernel.ready
-      .then(() => kernel.symbols())
-      .then((lib) => {
-        setLibrary(lib);
+      .then(() => {
         setStatus("ready");
         setStatusText("Python gotowy");
       })
       .catch((error: Error) => {
         setStatus("error");
-        setStatusText(`Nie udało się uruchomić Pythona: ${error.message}`);
+        setStatusText(`Python się nie uruchomił: ${error.message}`);
       });
   }, []);
 
@@ -53,8 +58,11 @@ export function App() {
   const setCells = (fn: (cells: Cell[]) => Cell[]) => setNotebook((nb) => ({ ...nb, cells: fn(nb.cells) }));
   const update = (id: string, patch: Partial<Cell>) =>
     setCells((cells) => cells.map((c) => (c.id === id ? ({ ...c, ...patch } as Cell) : c)));
-  const insert = (index: number, type: CellType) =>
-    setCells((cells) => [...cells.slice(0, index), newCell(type), ...cells.slice(index)]);
+  const insert = (index: number, type: CellType) => {
+    const cell = newCell(type);
+    setCells((cells) => [...cells.slice(0, index), cell, ...cells.slice(index)]);
+    setFocused(cell.id);
+  };
   const remove = (id: string) => setCells((cells) => cells.filter((c) => c.id !== id));
   const move = (index: number, by: number) =>
     setCells((cells) => {
@@ -70,15 +78,11 @@ export function App() {
       latest.current.cells.flatMap((c) => (c.type === "schematic" ? [[c.name, c.schematic] as const] : [])),
     );
 
-  const run = async (id: string) => {
-    const cell = latest.current.cells.find((c) => c.id === id);
-    if (!cell || cell.type !== "code") return;
+  const busy = async (id: string, work: () => Promise<void>) => {
     setRunning((r) => new Set(r).add(id));
     try {
       await kernel.ready;
-      update(id, { outputs: await kernel.run(cell.source, schematics()) });
-    } catch (error) {
-      update(id, { outputs: [{ type: "error", data: String(error) }] });
+      await work();
     } finally {
       setRunning((r) => {
         const next = new Set(r);
@@ -88,22 +92,54 @@ export function App() {
     }
   };
 
-  const runAll = async () => {
-    for (const cell of latest.current.cells) if (cell.type === "code") await run(cell.id);
+  const run = (id: string) => {
+    const cell = latest.current.cells.find((c) => c.id === id);
+    if (!cell || cell.type !== "code") return Promise.resolve();
+    return busy(id, async () => {
+      try {
+        const outputs = await kernel.run(cell.source, schematics());
+        update(id, { outputs, execution: ++executions.current });
+      } catch (error) {
+        update(id, { outputs: [{ type: "error", data: String(error) }] });
+      }
+    });
   };
 
-  const showCode = async (index: number, cell: Extract<Cell, { type: "schematic" }>) => {
-    try {
-      const source = await kernel.code(cell.schematic, cell.name);
-      setCells((cells) => [...cells.slice(0, index + 1), { ...newCell("code"), source } as Cell, ...cells.slice(index + 1)]);
-    } catch (error) {
-      alert(`Nie udało się zamienić schematu na kod: ${error}`);
+  const simulate = (id: string) => {
+    const cell = latest.current.cells.find((c) => c.id === id);
+    if (!cell || cell.type !== "schematic") return Promise.resolve();
+    return busy(id, async () => {
+      try {
+        const { results, outputs } = await kernel.simulate(cell.schematic, cell.data ?? "");
+        update(id, { results, outputs, stale: false });
+      } catch (error) {
+        update(id, { results: {}, outputs: [{ type: "error", data: String(error) }], stale: false });
+      }
+    });
+  };
+
+  const runAll = async () => {
+    for (const cell of latest.current.cells) {
+      if (cell.type === "code") await run(cell.id);
+      if (cell.type === "schematic" && cell.results) await simulate(cell.id);
     }
   };
 
   const resetKernel = async () => {
     await kernel.reset();
-    setCells((cells) => cells.map((c) => (c.type === "code" ? { ...c, outputs: [] } : c)));
+    executions.current = 0;
+    setCells((cells) => cells.map((c) => (c.type === "code" ? { ...c, outputs: [], execution: undefined } : c)));
+  };
+
+  const showCode = async (index: number, cell: Extract<Cell, { type: "schematic" }>) => {
+    try {
+      const source = await kernel.code(cell.schematic, cell.name);
+      const code = { ...newCell("code"), source } as Cell;
+      setCells((cells) => [...cells.slice(0, index + 1), code, ...cells.slice(index + 1)]);
+      setFocused(code.id);
+    } catch (error) {
+      alert(`Nie udało się zamienić schematu na kod: ${error}`);
+    }
   };
 
   const open = async (file: File | undefined) => {
@@ -115,46 +151,70 @@ export function App() {
     }
   };
 
+  const openExample = (example: Notebook) => {
+    if (confirm("Otworzyć przykład? Bieżący notatnik zostanie zastąpiony (zapisz go wcześniej przez Plik → Zapisz)."))
+      setNotebook(structuredClone(example));
+  };
+
   return (
     <div className={`notebook ${notebook.codeInPdf ? "" : "hide-code-in-print"}`}>
-      <header className="toolbar no-print">
-        <span className={`status ${status}`} title={statusText}>● {statusText}</span>
-        <span className="spacer" />
-        <button onClick={runAll} disabled={status !== "ready"}>▶ Uruchom wszystko</button>
-        <button onClick={resetKernel} disabled={status !== "ready"}>Wyczyść pamięć</button>
-        <select
-          className="examples"
-          value=""
-          onChange={(e) => {
-            const example = EXAMPLES[Number(e.target.value)];
-            if (example && confirm("Otworzyć przykład? Bieżący notatnik zostanie zastąpiony (zapisz go wcześniej przez „Zapisz plik”)."))
-              setNotebook(structuredClone(example));
-          }}
-        >
-          <option value="" disabled>Przykłady…</option>
-          {EXAMPLES.map((example, i) => <option key={i} value={i}>{example.title}</option>)}
-        </select>
-        <button onClick={() => fileInput.current?.click()}>Otwórz…</button>
-        <button onClick={() => download(notebook)}>Zapisz plik</button>
-        <label className="check">
-          <input type="checkbox" checked={notebook.codeInPdf}
-                 onChange={(e) => setNotebook({ ...notebook, codeInPdf: e.target.checked })} />
-          kod w PDF
-        </label>
-        <button className="primary" onClick={() => window.print()}>Eksport PDF</button>
+      <header className="appbar no-print">
+        <div className="brand" title="electro — notatnik elektroniki"><Bolt /></div>
+        <div className="titleblock">
+          <input className="title" value={notebook.title} placeholder="Bez tytułu" aria-label="Tytuł notatnika"
+                 onChange={(e) => setNotebook({ ...notebook, title: e.target.value })} />
+          <nav className="menubar">
+            <Menu label="Plik">
+              <button onClick={() => fileInput.current?.click()}>Otwórz plik…</button>
+              <button onClick={() => download(notebook)}>Zapisz plik</button>
+              <hr />
+              {EXAMPLES.map((example, i) => (
+                <button key={i} onClick={() => openExample(example)}>Przykład: {example.title}</button>
+              ))}
+              <hr />
+              <button onClick={() => window.print()}>Eksport do PDF…</button>
+              <label className="check">
+                <input type="checkbox" checked={notebook.codeInPdf}
+                       onChange={(e) => setNotebook({ ...notebook, codeInPdf: e.target.checked })} />
+                pokazuj kod w PDF
+              </label>
+            </Menu>
+            <Menu label="Środowisko">
+              <button onClick={runAll} disabled={status !== "ready"}>Uruchom wszystko</button>
+              <button onClick={resetKernel} disabled={status !== "ready"}>Wyczyść pamięć Pythona</button>
+            </Menu>
+          </nav>
+        </div>
+        <div className={`status ${status}`} title={statusText}>
+          <span className="dot" /> {statusText}
+        </div>
         <input ref={fileInput} type="file" accept=".json" hidden onChange={(e) => open(e.target.files?.[0])} />
       </header>
 
+      <div className="cellbar no-print">
+        <button onClick={() => insert(notebook.cells.length, "code")}>+ Kod</button>
+        <button onClick={() => insert(notebook.cells.length, "markdown")}>+ Tekst</button>
+        <button onClick={() => insert(notebook.cells.length, "schematic")}>+ Schemat</button>
+        <span className="spacer" />
+        <button onClick={runAll} disabled={status !== "ready"} aria-label="Uruchom wszystko">
+          <Play /> Uruchom wszystko
+        </button>
+        <button className="primary" onClick={() => window.print()}>Eksport PDF</button>
+      </div>
+
       <main>
-        <input className="title" value={notebook.title} placeholder="Tytuł"
-               onChange={(e) => setNotebook({ ...notebook, title: e.target.value })} />
         <AddRow onAdd={(type) => insert(0, type)} />
         {notebook.cells.map((cell, index) => (
-          <section key={cell.id} className={`cell cell-${cell.type}`}>
+          <section
+            key={cell.id}
+            className={`cell cell-${cell.type} ${focused === cell.id ? "focused" : ""}`}
+            onFocusCapture={() => setFocused(cell.id)}
+            onPointerDownCapture={() => setFocused(cell.id)}
+          >
             <div className="cell-tools no-print">
-              <button onClick={() => move(index, -1)} title="W górę">↑</button>
-              <button onClick={() => move(index, 1)} title="W dół">↓</button>
-              <button onClick={() => remove(cell.id)} title="Usuń komórkę">✕</button>
+              <button onClick={() => move(index, -1)} title="W górę" aria-label="W górę"><Up /></button>
+              <button onClick={() => move(index, 1)} title="W dół" aria-label="W dół"><Down /></button>
+              <button onClick={() => remove(cell.id)} title="Usuń komórkę" aria-label="Usuń komórkę"><Trash /></button>
             </div>
             {cell.type === "markdown" && <MarkdownCell cell={cell} update={(p) => update(cell.id, p)} />}
             {cell.type === "code" && (
@@ -163,12 +223,39 @@ export function App() {
             )}
             {cell.type === "schematic" && (
               <SchematicCell cell={cell} update={(p) => update(cell.id, p)} library={library}
-                             showCode={() => showCode(index, cell)} />
+                             showCode={() => showCode(index, cell)} simulate={() => simulate(cell.id)}
+                             running={running.has(cell.id)} />
             )}
             <AddRow onAdd={(type) => insert(index + 1, type)} />
           </section>
         ))}
+        {!notebook.cells.length && <p className="empty">Pusty notatnik — dodaj komórkę przyciskami powyżej.</p>}
       </main>
+    </div>
+  );
+}
+
+function Menu({ label, children }: { label: string; children: ReactNode }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!open) return;
+    const close = (event: PointerEvent) => {
+      if (!ref.current?.contains(event.target as Node)) setOpen(false);
+    };
+    document.addEventListener("pointerdown", close);
+    return () => document.removeEventListener("pointerdown", close);
+  }, [open]);
+  return (
+    <div className="menu" ref={ref}>
+      <button className={open ? "open" : ""} onClick={() => setOpen(!open)} aria-haspopup="menu" aria-expanded={open}>
+        {label} <Chevron />
+      </button>
+      {open && (
+        <div className="menu-items" role="menu" onClick={(e) => (e.target as HTMLElement).tagName === "BUTTON" && setOpen(false)}>
+          {children}
+        </div>
+      )}
     </div>
   );
 }
@@ -176,9 +263,11 @@ export function App() {
 function AddRow({ onAdd }: { onAdd: (type: CellType) => void }) {
   return (
     <div className="add-row no-print">
-      <button onClick={() => onAdd("markdown")}>+ Tekst</button>
+      <span className="line" />
       <button onClick={() => onAdd("code")}>+ Kod</button>
+      <button onClick={() => onAdd("markdown")}>+ Tekst</button>
       <button onClick={() => onAdd("schematic")}>+ Schemat</button>
+      <span className="line" />
     </div>
   );
 }

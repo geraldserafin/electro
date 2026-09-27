@@ -6,15 +6,15 @@ const PYODIDE = "https://cdn.jsdelivr.net/pyodide/v314.0.7/full/";
 
 type Request =
   | { id: number; type: "init"; bundleUrl: string }
-  | { id: number; type: "symbols" }
   | { id: number; type: "run"; code: string; schematics: string }
   | { id: number; type: "code"; schematic: string; name: string }
+  | { id: number; type: "simulate"; schematic: string; data: string }
   | { id: number; type: "reset" };
 
 interface Kernel {
   run(code: string, schematics: string): string;
   code(schematic: string, name: string): string;
-  symbols(): string;
+  simulate(schematic: string, data: string): string;
   reset(): void;
 }
 
@@ -48,7 +48,7 @@ self.onmessage = async (event: MessageEvent<Request>) => {
     const result =
       request.type === "run" ? k.run(request.code, request.schematics)
       : request.type === "code" ? k.code(request.schematic, request.name)
-      : request.type === "symbols" ? k.symbols()
+      : request.type === "simulate" ? k.simulate(request.schematic, request.data)
       : (k.reset(), null);
     self.postMessage({ id: request.id, ok: true, result });
   } catch (error) {
