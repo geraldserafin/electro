@@ -203,6 +203,28 @@ try {
     check("scrolled away: a button brings the drawing back", shownAtFirst === 0 && inView && (await back.count()) === 0);
   }
 
+  // export: a dialog with the pages and what goes in; the choices are the note's
+  {
+    await page.getByRole("button", { name: "Eksport PDF" }).click();
+    const dialog = page.getByRole("dialog", { name: "Eksport do PDF" });
+    await dialog.locator(".export-pages").waitFor({ timeout: 10_000 });
+    const frame = dialog.locator("iframe");
+    const codeShown = () => frame.evaluate((f) => [...f.contentDocument.querySelectorAll(".sheet .code-editor")]
+      .some((el) => getComputedStyle(el).display !== "none"));
+    const before = await codeShown();
+    await dialog.getByRole("switch", { name: "Kod komórek" }).uncheck();
+    await page.waitForTimeout(800);
+    const after = await codeShown();
+    await page.keyboard.press("Escape");
+    await page.waitForTimeout(1500); // saved with the note
+    const settings = (await noteOnServer()).document.settings;
+    check("export: pages in a preview; code off leaves it out, and the note keeps it",
+      before && !after && settings.codeInPdf === false && !(await dialog.isVisible()));
+    await page.getByRole("button", { name: "Eksport PDF" }).click();
+    await dialog.getByRole("switch", { name: "Kod komórek" }).check();
+    await page.keyboard.press("Escape");
+  }
+
   // the PDF: the drawing cropped to what is drawn, without the editor (and its selection)
   await bridge.locator('.board .element[data-id="R_1"]').click();
   await page.emulateMedia({ media: "print" });
@@ -216,9 +238,10 @@ try {
   // editor: place a resistor on the bridge canvas
   const canvas = page.locator(".board .canvas").first();
   const before = await canvas.locator(".element").count();
-  const box = await canvas.boundingBox();
+  let box = await canvas.boundingBox();
   await page.mouse.click(box.x + box.width * 0.6, box.y + box.height * 0.85); // deselect: the inspector would cover the spot
   await pick(bridge, "Rezystor");
+  box = await canvas.boundingBox(); // where it is now
   await page.mouse.click(box.x + box.width * 0.8, box.y + box.height * 0.5);
   check("element placed", (await canvas.locator(".element").count()) === before + 1);
   check("inspector shows the new label", (await page.locator(".inspector input").first().inputValue()) === "R_5");

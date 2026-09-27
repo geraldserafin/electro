@@ -8,6 +8,8 @@ import { SyncNotice } from "./notes/SyncNotice";
 import { useNoteSync } from "./notes/sync";
 import { Outline } from "./Outline";
 import { TitleBox } from "./TitleBox";
+import { ExportDialog } from "./pdf/ExportDialog";
+import { PdfContext, pageCss, pdfOf, printClasses, type PdfSettings } from "./pdf/settings";
 import { kernel } from "./python/kernel";
 import { usePython } from "./python/usePython";
 import symbols from "./schematic/symbols.json";
@@ -36,6 +38,10 @@ export function Notebook({ initial, revision, reload, onSaved }: {
   latest.current = notebook;
   const ready = python.kind === "ready";
   const [outline, setOutline] = useOutlineOpen();
+  const [exporting, setExporting] = useState(false);
+  const pdf = pdfOf(notebook.settings);
+  const setPdf = (patch: Partial<PdfSettings>) =>
+    setNotebook((nb) => ({ ...nb, settings: { ...nb.settings, pdf: { ...pdfOf(nb.settings), ...patch } } }));
   const setTitle = (title: string) => setNotebook({ ...latest.current, title });
 
   // each note starts with a clean Python: variables of another note do not leak into this one
@@ -118,10 +124,11 @@ export function Notebook({ initial, revision, reload, onSaved }: {
 
 
   return (
-    <div className={`notebook ${notebook.settings.codeInPdf ? "" : "hide-code-in-print"}`}
+    <div className={`notebook ${printClasses(pdf, notebook.settings.codeInPdf)}`}
          // a click outside every cell (and the app's islands) leaves the cell being worked on
          onPointerDownCapture={(e) => {
-           if (!(e.target as Element).closest(".cell, .float, .float-group, .note-nav, .notice, .menu-items")) setFocused(null);
+           // (the export dialog is a portal: its clicks bubble here too, and are not outside)
+           if (!(e.target as Element).closest(".cell, .float, .float-group, .note-nav, .notice, .menu-items, .export-backdrop")) setFocused(null);
          }}>
       {/* left: the way back and the app (as on the home screen), under it a sidebar — the note's
           title and its sections; right: run, PDF */}
@@ -145,17 +152,25 @@ export function Notebook({ initial, revision, reload, onSaved }: {
       <div className="float-group top-right no-print">
         <button className={`float icon-button ${ready ? "" : "waiting"}`} onClick={runAll} disabled={!ready}
                 title={ready ? "Uruchom wszystko" : python.text} aria-label="Uruchom wszystko"><RunAll /></button>
-        <button className="float icon-button" onClick={() => window.print()} title="Eksport do PDF" aria-label="Eksport PDF">
+        <button className="float icon-button" onClick={() => setExporting(true)} title="Eksport do PDF" aria-label="Eksport PDF">
           <Export />
         </button>
       </div>
       <SyncNotice state={sync.state} onKeepMine={sync.keepMine} onTakeTheirs={sync.takeTheirs} />
+      <style>{pageCss(pdf)}</style>
+      {exporting && (
+        <ExportDialog pdf={pdf} codeInPdf={notebook.settings.codeInPdf} title={notebook.title} onChange={setPdf}
+                      onCode={(codeInPdf) => setNotebook((nb) => ({ ...nb, settings: { ...nb.settings, codeInPdf } }))}
+                      onClose={() => setExporting(false)} />
+      )}
 
+      <PdfContext.Provider value={pdf}>
       <main className={`appear ${outline ? "with-nav" : ""}`}>
         {/* the title is the note's first heading too (and the PDF's) */}
         <input className="doc-title no-print" value={notebook.title} placeholder="Bez tytułu" aria-label="Tytuł"
                spellCheck={false} onChange={(e) => setTitle(e.target.value)} />
         {notebook.title && <h1 className="doc-title print-only">{notebook.title}</h1>}
+        {pdf.date && <p className="doc-date print-only">{new Date().toLocaleDateString("pl-PL", { day: "numeric", month: "long", year: "numeric" })}</p>}
         <AddRow onAdd={(type) => insert(0, type)} />
         {notebook.cells.map((cell, index) => (
           <section
@@ -185,6 +200,7 @@ export function Notebook({ initial, revision, reload, onSaved }: {
         ))}
         {!notebook.cells.length && <p className="empty">Pusty notatnik — dodaj pierwszą komórkę przyciskami powyżej.</p>}
       </main>
+      </PdfContext.Provider>
     </div>
   );
 }

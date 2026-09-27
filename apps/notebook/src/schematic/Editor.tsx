@@ -63,6 +63,9 @@ export function SchematicEditor({ value, onChange, library, results, topLeft, to
   const [help, setHelp] = useState(false);
   const [libraryOpen, setLibraryOpen] = useState(false);
   const [query, setQuery] = useState("");
+  // the panel's search takes the keyboard when it opens — without scrolling the page to it
+  const search = useRef<HTMLInputElement>(null);
+  useEffect(() => { if (libraryOpen) search.current?.focus({ preventScroll: true }); }, [libraryOpen]);
   const [full, setFull] = useState(false);
   const [spaceHeld, setSpaceHeld] = useState(false);
   const [cam, setCam] = useState<Camera>(() => camera?.current ?? startCamera(value, library));
@@ -553,7 +556,7 @@ export function SchematicEditor({ value, onChange, library, results, topLeft, to
           <label className="library-search">
             <Search />
             <input
-              autoFocus
+              ref={search}
               value={query}
               placeholder="Szukaj…"
               onChange={(e) => setQuery(e.target.value)}

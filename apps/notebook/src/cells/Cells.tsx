@@ -4,6 +4,7 @@ import { kernel } from "../python/kernel";
 import { PrintDrawing, SchematicEditor, type Camera } from "../schematic/Editor";
 import type { Cell, ElementResult, Problem, SchematicData, SchematicView, SymbolLibrary } from "../types";
 import { CodeEditor } from "./CodeEditor";
+import { usePdf } from "../pdf/settings";
 import { Markdown } from "./Markdown";
 import { Outputs } from "./Outputs";
 
@@ -135,6 +136,8 @@ export function SchematicCell({ cell, update, library, simulate, running, focuse
   focused: boolean;
 }) {
   const empty = !cell.schematic.elements.length;
+  const pdf = usePdf();
+  const printed = pdf.results && !cell.stale ? cell.results : undefined; // values on the drawing, if the PDF has them
   const view: SchematicView = cell.view === "code" ? "code" : "schematic";
   // just clicked into: the board takes the keyboard at once (its shortcuts work without another click)
   const wasFocused = useRef(focused);
@@ -235,7 +238,7 @@ export function SchematicCell({ cell, update, library, simulate, running, focuse
         <div className="schematic-doc no-print" title="Kliknij, żeby edytować">
           {empty
             ? <p className="schematic-doc-empty">Pusty schemat — kliknij, żeby rysować.</p>
-            : <PrintDrawing value={cell.schematic} library={library} onScreen />}
+            : <PrintDrawing value={cell.schematic} library={library} results={printed} onScreen />}
         </div>
       ) : view === "schematic" ? (
         <SchematicEditor
@@ -273,7 +276,7 @@ export function SchematicCell({ cell, update, library, simulate, running, focuse
         </div>
       )}
       {/* the PDF shows the circuit as drawn; results belong to code cells: schematic(układ1, sol) */}
-      <PrintDrawing value={cell.schematic} library={library} />
+      <PrintDrawing value={cell.schematic} library={library} results={printed} />
       {focused && cell.results && Object.keys(cell.results).length > 0 && (
         <ResultsTable results={cell.results} stale={!!cell.stale} />
       )}
