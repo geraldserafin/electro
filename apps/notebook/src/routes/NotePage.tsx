@@ -4,7 +4,7 @@ import { useAtomSet } from "@effect-atom/atom-react";
 import { Exit } from "effect";
 import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router";
-import { Back, Bolt } from "../icons";
+import { Back } from "../icons";
 import { fromDocument, getNote, NOTES, removeNote } from "../notes/atoms";
 import { failure } from "../notes/sync";
 import { Notebook } from "../Notebook";
@@ -74,7 +74,6 @@ export function NotePage() {
     <div className="notebook">
       <header className="appbar no-print">
         <Link className="icon-button" to="/" title="Wszystkie notatki" aria-label="Wszystkie notatki"><Back /></Link>
-        <div className="brand"><Bolt /></div>
         <span className="spacer-title" />
       </header>
       <div className="page-message">

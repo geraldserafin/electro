@@ -151,7 +151,10 @@ input:focus, textarea:focus { outline: 2px solid var(--accent-soft); border-colo
   padding: 4px 8px;
 }
 .title:hover { border-color: var(--line); }
-.icon-button { width: 36px; height: 36px; padding: 0; justify-content: center; border-radius: 50%; color: var(--muted); }
+.icon-button {
+  display: inline-flex; align-items: center; justify-content: center; flex: none; /* also on links */
+  width: 36px; height: 36px; padding: 0; border-radius: 50%; color: var(--muted);
+}
 .icon-button:hover:not(:disabled), .icon-button.open { color: var(--text); background: var(--hover); }
 .menu { position: relative; }
 .menu-items {
@@ -255,6 +258,14 @@ input:focus, textarea:focus { outline: 2px solid var(--accent-soft); border-colo
 .outline a:hover { background: var(--hover); color: var(--text); }
 .outline a.active { background: var(--tool-active); color: var(--tool-active-text); }
 .outline a svg { flex: none; width: 15px; height: 15px; }
+/* its switch: floating under the bar — at the right edge, or at the open panel's top-left corner */
+.outline-toggle {
+  position: fixed; top: 64px; right: 16px; z-index: 13; width: 36px; height: 36px; padding: 0;
+  justify-content: center; border-radius: 10px; color: var(--muted);
+  background: var(--island); box-shadow: var(--island-shadow); transition: right 0.15s, color 0.1s;
+}
+.outline-toggle:hover { color: var(--text); background: var(--island); }
+.outline-toggle.open { right: calc(280px + 12px); color: var(--tool-active-text); }
 /* the notebook stays centred in what is left beside the panel */
 main.beside-outline { max-width: calc(1120px + 280px); padding-right: calc(24px + 280px); }
 @media (max-width: 900px) { main.beside-outline { max-width: none; padding-right: 24px; } } /* narrow: the panel covers */
