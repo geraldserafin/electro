@@ -7,17 +7,23 @@ import { useEffect, useId, useRef, useState, type PointerEvent as ReactPointerEv
 import { Expand, Grid, Hand, Help, Minus, Plus, Pointer, Redo, Search, Shrink, Undo, WireIcon } from "../icons";
 import type { ElementData, ElementResult, Point, SchematicData, SymbolLibrary, WireData } from "../types";
 import {
-  KINDS, attach, bounds, elbow, searchKinds, hasValue, isComponent, isConnectionPoint, junctions, kindInfo, nextId,
+  KINDS, attach, bounds, elbow, inBox, moveGroup, searchKinds, hasValue, isComponent, isConnectionPoint, junctions, kindInfo, nextId,
   moveSegment, openPins, pins, rotatedAbout, same, simplify, updateElement,
 } from "./model";
 
 type Tool = { type: "select" } | { type: "hand" } | { type: "wire" } | { type: "place"; kind: string };
 type Camera = { x: number; y: number; zoom: number }; // top-left corner of the view, in drawing px
-type Selection = { type: "element"; id: string } | { type: "wire"; index: number } | null;
+type Selection =
+  | { type: "element"; id: string }
+  | { type: "wire"; index: number }
+  | { type: "group"; ids: string[]; wires: number[] } // from shift + drag
+  | null;
 type Gesture =
   | { type: "move"; id: string; start: Point; origin: Point; snapshot: SchematicData; moved: boolean }
   | { type: "wire"; from: Point }
-  | { type: "segment"; wire: number; index: number; start: Point; snapshot: SchematicData; moved: boolean };
+  | { type: "segment"; wire: number; index: number; start: Point; snapshot: SchematicData; moved: boolean }
+  | { type: "group"; ids: string[]; wires: number[]; start: Point; snapshot: SchematicData; moved: boolean }
+  | { type: "box"; from: Point; to: Point }; // shift + drag on empty space, in drawing units (not rounded)
 
 interface Props {
   value: SchematicData;
@@ -171,6 +177,11 @@ export function SchematicEditor({ value, onChange, library, results, topLeft, to
     if (selection?.type === "element")
       commit({ ...value, elements: value.elements.filter((e) => e.id !== selection.id) });
     if (selection?.type === "wire") commit({ ...value, wires: value.wires.filter((_, i) => i !== selection.index) });
+    if (selection?.type === "group") {
+      const ids = new Set(selection.ids);
+      const wires = new Set(selection.wires);
+      commit({ elements: value.elements.filter((e) => !ids.has(e.id)), wires: value.wires.filter((_, i) => !wires.has(i)) });
+    }
     setSelection(null);
   };
 
@@ -230,8 +241,24 @@ export function SchematicEditor({ value, onChange, library, results, topLeft, to
     if (tool.type !== "select") return;
     event.stopPropagation();
     svgRef.current?.focus({ preventScroll: true });
-    setSelection({ type: "element", id: e.id });
-    setGesture({ type: "move", id: e.id, start: toGrid(event), origin: e.at, snapshot: value, moved: false });
+    if (selection?.type === "group" && selection.ids.includes(e.id))
+      setGesture({ type: "group", ids: selection.ids, wires: selection.wires, start: toGrid(event), snapshot: value, moved: false });
+    else {
+      setSelection({ type: "element", id: e.id });
+      setGesture({ type: "move", id: e.id, start: toGrid(event), origin: e.at, snapshot: value, moved: false });
+    }
+    svgRef.current?.setPointerCapture(event.pointerId);
+  };
+
+  const toDrawing = (event: { clientX: number; clientY: number }): Point => {
+    const point = new DOMPoint(event.clientX, event.clientY).matrixTransform(svgRef.current!.getScreenCTM()!.inverse());
+    return [point.x / G, point.y / G];
+  };
+
+  const startBox = (event: ReactPointerEvent) => {
+    svgRef.current?.focus({ preventScroll: true });
+    const p = toDrawing(event);
+    setGesture({ type: "box", from: p, to: p });
     svgRef.current?.setPointerCapture(event.pointerId);
   };
 
@@ -253,6 +280,12 @@ export function SchematicEditor({ value, onChange, library, results, topLeft, to
         onChange(updateElement(gesture.snapshot, library, gesture.id, { at }));
         if (!gesture.moved) setGesture({ ...gesture, moved: true });
       }
+    }
+    if (gesture?.type === "box") setGesture({ ...gesture, to: toDrawing(event) });
+    if (gesture?.type === "group") {
+      const d: Point = [p[0] - gesture.start[0], p[1] - gesture.start[1]];
+      onChange(moveGroup(gesture.snapshot, library, gesture.ids, gesture.wires, d));
+      if ((d[0] || d[1]) && !gesture.moved) setGesture({ ...gesture, moved: true });
     }
     if (gesture?.type === "segment") {
       const w = gesture.snapshot.wires[gesture.wire];
@@ -276,6 +309,13 @@ export function SchematicEditor({ value, onChange, library, results, topLeft, to
   const onUp = () => {
     if (gesture?.type === "move" && gesture.moved) commit(attach(value, library, gesture.id), gesture.snapshot);
     if (gesture?.type === "segment" && gesture.moved) commit(value, gesture.snapshot);
+    if (gesture?.type === "group" && gesture.moved) commit(value, gesture.snapshot);
+    if (gesture?.type === "box") {
+      const { ids, wires } = inBox(value, library, gesture.from, gesture.to);
+      setSelection(ids.length + wires.length === 0 ? null
+        : ids.length === 1 && !wires.length ? { type: "element", id: ids[0] }
+        : { type: "group", ids, wires });
+    }
     if (gesture?.type === "wire" && cursor && !same(cursor, gesture.from)) addWire(elbow(gesture.from, cursor));
     setGesture(null);
   };
@@ -324,7 +364,7 @@ export function SchematicEditor({ value, onChange, library, results, topLeft, to
     tool.type === "place" ? `Kliknij na siatce, żeby postawić: ${kindInfo(tool.kind)?.name ?? tool.kind}. Esc — anuluj.`
     : tool.type === "wire" ? "Klikaj kolejne punkty; przewód kończy się sam na pinie albo innym przewodzie. Esc — przerwij."
     : tool.type === "hand" ? "Przeciągnij, żeby przesunąć widok · ⌘/Ctrl + kółko albo szczypanie powiększa"
-    : "Przeciągnij element, żeby go przesunąć · od końcówki — przewód · puste miejsce — przesuwa widok · R obraca";
+    : "Przeciągnij element, żeby go przesunąć · od końcówki — przewód · puste miejsce — przesuwa widok · Shift + przeciągnij — zaznacz wiele";
 
   /** Pick an element to place; it becomes one of the (three) recent ones on the toolbar. */
   function choose(kind: string) {
@@ -391,6 +431,7 @@ export function SchematicEditor({ value, onChange, library, results, topLeft, to
           tabIndex={0}
           onPointerDown={(event) => {
             if (spaceHeld || tool.type === "hand" || event.button === 1) startPan(event, false);
+            else if (tool.type === "select" && event.shiftKey) startBox(event); // shift + drag: select many
             else if (tool.type === "select") startPan(event, true); // empty space: drag pans, click deselects
             else onCanvasDown(event);
           }}
@@ -433,7 +474,8 @@ export function SchematicEditor({ value, onChange, library, results, topLeft, to
 
           {value.wires.map((w, i) => (
             <g key={i}>
-              <polyline className={`w wire ${selection?.type === "wire" && selection.index === i ? "selected" : ""}`}
+              <polyline className={`w wire ${(selection?.type === "wire" && selection.index === i)
+                || (selection?.type === "group" && selection.wires.includes(i)) ? "selected" : ""}`}
                         points={pointsOf(w.points)} />
               {w.points.slice(1).map((q, j) => (
                 <polyline
@@ -452,7 +494,8 @@ export function SchematicEditor({ value, onChange, library, results, topLeft, to
           ))}
           {value.elements.map((e) => (
             <ElementView key={e.id} element={e} library={library} wires={value.wires} result={results?.[e.id]}
-                         selected={selection?.type === "element" && selection.id === e.id}
+                         selected={(selection?.type === "element" && selection.id === e.id)
+                           || (selection?.type === "group" && selection.ids.includes(e.id))}
                          onPointerDown={(event) => onElementDown(event, e)} />
           ))}
           {openPins(value, library).map(([x, y]) => (
@@ -469,6 +512,11 @@ export function SchematicEditor({ value, onChange, library, results, topLeft, to
             )),
           )}
           {preview && <polyline className="w draft" points={pointsOf(preview)} />}
+          {gesture?.type === "box" && (
+            <rect className="rubber-band"
+                  x={Math.min(gesture.from[0], gesture.to[0]) * G} y={Math.min(gesture.from[1], gesture.to[1]) * G}
+                  width={Math.abs(gesture.to[0] - gesture.from[0]) * G} height={Math.abs(gesture.to[1] - gesture.from[1]) * G} />
+          )}
           {snap && <circle className="snap" cx={snap[0] * G} cy={snap[1] * G} r="7" />}
           {tool.type === "place" && cursor && (
             <g className="w ghost" transform={`translate(${cursor[0] * G} ${cursor[1] * G})`}
@@ -536,7 +584,7 @@ export function SchematicEditor({ value, onChange, library, results, topLeft, to
       )}
       <div className="board-hint no-print">{hint}</div>
       <div className="island top-right no-print">{topRight}</div>
-      {(selectedElement || selection?.type === "wire") && (
+      {(selectedElement || selection?.type === "wire" || selection?.type === "group") && (
         <Inspector
           key={selectedElement?.id ?? selection?.type ?? "none"}
           selection={selection}
@@ -577,6 +625,7 @@ export function SchematicEditor({ value, onChange, library, results, topLeft, to
             <dt>1–0</dt><dd>elementy w kolejności z biblioteki</dd>
             <dt>F</dt><dd>pełny ekran</dd>
             <dt>R</dt><dd>obróć o 90° (dwa razy = odwróć)</dd>
+            <dt>Shift + przeciągnij</dt><dd>zaznacz wiele (potem przeciągnij razem, Del usuwa)</dd>
             <dt>Del</dt><dd>usuń zaznaczone</dd>
             <dt>Esc</dt><dd>przerwij / odznacz</dd>
             <dt>⌘/Ctrl Z</dt><dd>cofnij (⇧ — ponów)</dd>
@@ -688,6 +737,14 @@ function Inspector({ selection, element, taken, onChange, onRename, onRotate, on
   onRemove: () => void;
 }) {
   const [id, setId] = useState(element?.id ?? "");
+  if (selection?.type === "group")
+    return (
+      <div className="island inspector no-print">
+        <h4>Zaznaczone</h4>
+        <p className="muted">{selection.ids.length} el., {selection.wires.length} przew. — przeciągnij, żeby przesunąć razem</p>
+        <button className="danger" onClick={onRemove}>Usuń (Del)</button>
+      </div>
+    );
   if (selection?.type === "wire")
     return (
       <div className="island inspector no-print">

@@ -110,6 +110,54 @@ function drag(wires: WireData[], moved: Map<string, Point>): WireData[] {
   });
 }
 
+/**
+ * Move a group by ``d``: its elements and the wires wholly inside it shift together;
+ * other wires attached to the group's pins follow like when one element moves.
+ */
+export function moveGroup(
+  sch: SchematicData, lib: SymbolLibrary, ids: string[], wireIndexes: number[], d: Point,
+): SchematicData {
+  const inGroup = new Set(ids);
+  const shift = ([x, y]: Point): Point => [x + d[0], y + d[1]];
+  const moved = new Map<string, Point>();
+  const elements = sch.elements.map((e) => {
+    if (!inGroup.has(e.id)) return e;
+    pins(e, lib).forEach((p) => moved.set(key(p), shift(p)));
+    return { ...e, at: shift(e.at) };
+  });
+  const own = new Set(wireIndexes);
+  // wires hanging on the group's own wires follow them too, not only those on its pins
+  sch.wires.forEach((w, i) => { if (own.has(i)) w.points.forEach((p) => moved.set(key(p), shift(p))); });
+  // …including ends that sit in the middle of one of them (T-junctions)
+  const groupWires = sch.wires.filter((_, i) => own.has(i));
+  for (const w of sch.wires.filter((_, i) => !own.has(i)))
+    for (const end of [w.points[0], w.points[w.points.length - 1]])
+      if (groupWires.some((g) => g.points.slice(1).some((q, j) => onSegment(end, g.points[j], q))))
+        moved.set(key(end), shift(end));
+  const others = drag(sch.wires.filter((_, i) => !own.has(i)), moved);
+  let next = 0;
+  const wires = sch.wires.map((w, i) => (own.has(i) ? { points: w.points.map(shift) } : others[next++]));
+  return { elements, wires };
+}
+
+/**
+ * What a rubber band from a to b (drawing units) covers: elements and wires wholly inside.
+ * A wire attached to an element left outside stays out of the group (it stretches instead),
+ * so moving the group never tears it off that element.
+ */
+export function inBox(sch: SchematicData, lib: SymbolLibrary, a: Point, b: Point): { ids: string[]; wires: number[] } {
+  const [x0, x1, y0, y1] = [Math.min(a[0], b[0]), Math.max(a[0], b[0]), Math.min(a[1], b[1]), Math.max(a[1], b[1])];
+  const inside = ([x, y]: Point) => x >= x0 && x <= x1 && y >= y0 && y <= y1;
+  const ids = sch.elements.filter((e) => pins(e, lib).every(inside)).map((e) => e.id);
+  const chosen = new Set(ids);
+  const outsidePins = new Set(sch.elements.filter((e) => !chosen.has(e.id)).flatMap((e) => pins(e, lib)).map(key));
+  const wires = sch.wires.flatMap((w, i) => {
+    const ends = [w.points[0], w.points[w.points.length - 1]];
+    return w.points.every(inside) && !ends.some((p) => outsidePins.has(key(p))) ? [i] : [];
+  });
+  return { ids, wires };
+}
+
 export function updateElement(
   sch: SchematicData, lib: SymbolLibrary, id: string, change: Partial<ElementData>,
 ): SchematicData {

@@ -296,6 +296,7 @@ main > .add-row { justify-content: center; }
 .canvas:not(.tool-select) .pin-handle { pointer-events: none; }
 .canvas .snap { fill: none; stroke: #2f9e44; stroke-width: 2; pointer-events: none; }
 .canvas .ghost { opacity: 0.4; pointer-events: none; }
+.canvas .rubber-band { fill: var(--tool-active); fill-opacity: 0.35; stroke: var(--primary); stroke-width: 1; stroke-dasharray: 4 3; pointer-events: none; }
 .canvas.tool-wire, .canvas.tool-place { cursor: crosshair; }
 .canvas text { paint-order: stroke; stroke: var(--board); stroke-width: 4px; stroke-linejoin: round; }
 .canvas .label { font-size: 13px; }

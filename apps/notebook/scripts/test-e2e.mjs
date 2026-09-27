@@ -41,6 +41,33 @@ try {
     (await bridge.locator(".outputs table").innerText()).includes("200 Ω")
     && (await bridge.locator(".canvas .label.solved").textContent()).includes("200"));
 
+  // moving part of the bridge as a group keeps every connection (edge wires stretch or follow)
+  {
+    const grid = bridge.locator(".canvas");
+    const at = (gx, gy) => grid.evaluate((svg, [x, y]) => {
+      const p = new DOMPoint(x, y).matrixTransform(svg.getScreenCTM());
+      return [p.x, p.y];
+    }, [gx * 20, gy * 20]);
+    const bridgeCode = async () => {
+      await bridge.getByRole("button", { name: "Kod", exact: true }).click();
+      const inserted = bridge.locator("xpath=following-sibling::section[1]");
+      await inserted.locator(".cm-content").waitFor();
+      const text = await inserted.locator(".cm-content").innerText();
+      await inserted.hover();
+      await inserted.getByTitle("Usuń komórkę").click();
+      return text;
+    };
+    const before = await bridgeCode();
+    const [x0, y0] = await at(12, -1); const [x1, y1] = await at(21, 15);
+    await page.keyboard.down("Shift");
+    await page.mouse.move(x0, y0); await page.mouse.down(); await page.mouse.move(x1, y1, { steps: 5 }); await page.mouse.up();
+    await page.keyboard.up("Shift");
+    const [gx, gy] = await at(18, 2); const [hx, hy] = await at(22, 2);
+    await page.mouse.move(gx, gy); await page.mouse.down(); await page.mouse.move(hx, hy, { steps: 5 }); await page.mouse.up();
+    check("moving a group keeps the bridge connected", (await bridgeCode()) === before
+      && (await grid.locator(".open-pin").count()) === 0);
+  }
+
   // "show code" turns the drawing into plain electro code in a new cell
   await page.getByRole("button", { name: "Kod", exact: true }).first().click();
   await page.getByText("mostek = net(").waitFor({ timeout: 30_000 });
@@ -110,6 +137,18 @@ try {
     && (await code()) === "uklad = loop(VoltageSource(), Resistor())");
   await cell.getByRole("button", { name: "Dopasuj widok" }).click();
   check("fit shows the whole drawing", (await grid.locator(".element").count()) === 2);
+
+  // shift + drag selects many; the group moves together and keeps its connections
+  const [bx0, by0] = await at(1, 0); const [bx1, by1] = await at(23, 14);
+  await page.keyboard.down("Shift");
+  await page.mouse.move(bx0, by0); await page.mouse.down(); await page.mouse.move(bx1, by1, { steps: 6 }); await page.mouse.up();
+  await page.keyboard.up("Shift");
+  const selected = await grid.locator(".element.selected").count();
+  const [gx, gy] = await at(14, 3); const [hx, hy] = await at(16, 5);
+  await page.mouse.move(gx, gy); await page.mouse.down(); await page.mouse.move(hx, hy, { steps: 6 }); await page.mouse.up();
+  check("shift + drag selects many and moves them together", selected === 2
+    && (await code()) === "uklad = loop(VoltageSource(), Resistor())" && (await grid.locator(".open-pin").count()) === 0);
+  await page.keyboard.press("Meta+z");  // back where it was, for the segment check below
 
   check("moving a wire segment keeps connections", (await code()) === "uklad = loop(VoltageSource(), Resistor())"
     && (await grid.locator(".open-pin").count()) === 0);
