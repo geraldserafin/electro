@@ -273,6 +273,12 @@ main > .add-row { justify-content: center; }
 }
 .cell:hover .gutter .run, .cell.focused .gutter .run { color: var(--bg); background: var(--text); border-color: var(--text); }
 .gutter .run.running { animation: pulse 0.8s ease-in-out infinite alternate; }
+/* a schematic's run button says whether there is anything to run: filled when there is, */
+.schematic-cell .gutter .run:not(.done):not(:disabled) { color: #fff; background: var(--primary); border-color: var(--primary); }
+/* …faint when the results are up to date */
+.gutter .run.done, .cell:hover .gutter .run.done, .cell.focused .gutter .run.done {
+  color: var(--faint); background: transparent; border-color: var(--line); opacity: 0.6;
+}
 .gutter .execution { font: 13px var(--mono); color: var(--faint); }
 .cell-body { flex: 1; min-width: 0; }
 .code-editor .cm-editor { font-size: 16px; }
@@ -403,17 +409,6 @@ pre.code-view-note { color: var(--danger); }
 .island.bottom-left { bottom: 12px; left: 12px; }
 .island.bottom-right { bottom: 12px; right: 12px; }
 .island .zoom { min-width: 52px; justify-content: center; font-variant-numeric: tabular-nums; }
-.board-hint {
-  position: absolute;
-  z-index: 2;
-  top: 60px;
-  left: 50%;
-  transform: translateX(-50%);
-  font-size: 12px;
-  color: var(--faint);
-  white-space: nowrap;
-  pointer-events: none;
-}
 /* the schematic's name: a plain box in the corner, a click edits it */
 .island .name-box { font-size: 15px; font-weight: 500; padding: 4px 10px; }
 .name-edit { display: flex; flex-direction: column; gap: 2px; padding: 2px; }
@@ -444,11 +439,6 @@ pre.code-view-note { color: var(--danger); }
 .island.help-panel dd { margin: 0; color: var(--muted); }
 .island.help-panel p { margin: 8px 0 0; color: var(--muted); font-size: 12px; }
 
-.sim-bar { display: flex; margin-top: 8px; }
-.sim-bar label { flex: 1; display: flex; align-items: center; gap: 10px; font-size: 15px; color: var(--muted); }
-.sim-bar input { flex: 1; font-family: var(--mono); font-size: 15px; }
-.stale > .outputs { opacity: 0.5; }
-.stale-note { margin: 8px 0 0; font-size: 15px; color: var(--warn); }
 
 kbd { font: 11px ui-monospace, monospace; border: 1px solid var(--line); border-radius: 4px; padding: 0 4px; }
 .muted { color: var(--muted); }
@@ -457,7 +447,6 @@ kbd { font: 11px ui-monospace, monospace; border: 1px solid var(--line); border-
   .markdown-edit { grid-template-columns: 1fr; }
   .schematic-cell, .markdown-view, .markdown-edit { padding-left: 0; }
   .gutter { width: 32px; }
-  .board-hint { display: none; }
 }
 
 /* ---- PDF export: the browser's "print to PDF" of a clean report ---- */
@@ -465,7 +454,7 @@ kbd { font: 11px ui-monospace, monospace; border: 1px solid var(--line); border-
   @page { margin: 18mm 16mm; }
   :root { --bg: #fff; --paper: #fff; --board: #fff; --text: #000; --line: #fff; --code-bg: #f5f5f5; color-scheme: light; }
   body { font-size: 11pt; }
-  .no-print, .cell-tools, .add-row, .island, .board-hint { display: none !important; }
+  .no-print, .cell-tools, .add-row, .island { display: none !important; }
   main { max-width: none; padding: 0; }
   .cell { border: none !important; box-shadow: none !important; padding: 0; margin-bottom: 10pt; break-inside: avoid; }
   .markdown-view, .schematic-cell { padding-left: 0; }
@@ -476,8 +465,66 @@ kbd { font: 11px ui-monospace, monospace; border: 1px solid var(--line); border-
   .print-drawing svg, .output-svg svg { display: block; margin-left: auto; margin-right: auto; max-width: 100%; height: auto; }
   .output-svg { overflow: visible; }
   .canvas .label.solved { fill: #000; }
-  .stale { display: none; } /* results of an older drawing */
   .hide-code-in-print .code-editor { display: none; }
   .code-editor .cm-gutters { display: none; }
   .cm-line { white-space: pre-wrap; word-break: break-word; } /* long lines wrap instead of being cut off */
 }
+
+/* ---------------------------------------------------------------- results of a run */
+
+.results {
+  margin-top: 12px;
+  border-collapse: separate;
+  border-spacing: 0;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  overflow: hidden;
+  font-size: 16px;
+  font-variant-numeric: tabular-nums;
+  transition: opacity 0.15s;
+}
+.results th {
+  padding: 8px 16px;
+  background: var(--hover);
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 500;
+  text-align: right;
+  white-space: nowrap;
+}
+.results td { padding: 7px 16px; border-top: 1px solid var(--line); text-align: right; white-space: nowrap; }
+.results th:first-child, .results td.name { text-align: left; }
+.results td.name { font-weight: 500; }
+.results td.name sub { font-size: 0.72em; }
+.results td.solved { color: var(--primary); font-weight: 600; }
+.results tbody tr:hover td { background: var(--hover); }
+.results.stale { opacity: 0.45; } /* from an older drawing: the run button is on again */
+
+/* warnings / errors: a sign on the board, next to the full screen button; a click unfolds them */
+.island.status { bottom: 12px; right: 104px; padding: 4px; }
+.island.static.status { position: relative; }
+.problems { position: relative; }
+.problems-sign { padding: 6px; }
+.problems.warning .problems-sign { color: var(--warn); background: var(--warn-bg); }
+.problems.error .problems-sign { color: var(--danger); background: var(--err-bg); }
+.problems-panel {
+  position: absolute;
+  bottom: calc(100% + 12px);
+  right: -4px;
+  z-index: 8;
+  width: min(420px, 80vw);
+  max-height: 320px;
+  overflow-y: auto;
+  padding: 12px 14px;
+  border-radius: 10px;
+  background: var(--island);
+  box-shadow: var(--island-shadow);
+  font-size: 15px;
+  white-space: normal; /* the island around it keeps its buttons on one line; text wraps */
+}
+.code-view .problems-panel { bottom: auto; top: calc(100% + 12px); }
+.problems-panel h4 { margin: 0 0 6px; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; }
+.problems.warning .problems-panel h4 { color: var(--warn); }
+.problems.error .problems-panel h4 { color: var(--danger); }
+.problems-panel .markdown p { margin: 4px 0; }
+.problems-panel .katex { white-space: nowrap; } /* break between names, never inside one */

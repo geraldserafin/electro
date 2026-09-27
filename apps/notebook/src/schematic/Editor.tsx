@@ -32,6 +32,7 @@ interface Props {
   results?: Record<string, ElementResult>; // from "Symuluj", drawn next to the elements
   topLeft?: ReactNode;
   topRight?: ReactNode;
+  status?: ReactNode; // its own island, next to the full screen button (e.g. warnings)
 }
 
 const clampZoom = (z: number) => Math.min(3, Math.max(0.25, z));
@@ -46,7 +47,7 @@ function startCamera(sch: SchematicData, lib: SymbolLibrary): Camera {
   return { x: x0 * lib.grid - 80, y: y0 * lib.grid - 110, zoom: 1 };
 }
 
-export function SchematicEditor({ value, onChange, library, results, topLeft, topRight }: Props) {
+export function SchematicEditor({ value, onChange, library, results, topLeft, topRight, status }: Props) {
   const G = library.grid;
   const gridId = useId();
   const svgRef = useRef<SVGSVGElement>(null);
@@ -340,12 +341,6 @@ export function SchematicEditor({ value, onChange, library, results, topLeft, to
   const snap = wiring && cursor && isConnectionPoint(value, library, cursor) ? cursor : null;
   const pointsOf = (ps: Point[]) => ps.map(([x, y]) => `${x * G},${y * G}`).join(" ");
 
-  const hint =
-    tool.type === "place" ? `Kliknij na siatce, żeby postawić: ${kindInfo(tool.kind)?.name ?? tool.kind}. Esc — anuluj.`
-    : tool.type === "wire" ? "Klikaj kolejne punkty; przewód kończy się sam na pinie albo innym przewodzie. Esc — przerwij."
-    : tool.type === "hand" ? "Przeciągnij, żeby przesunąć widok · ⌘/Ctrl + kółko albo szczypanie powiększa"
-    : "Przeciągnij element, żeby go przesunąć · od końcówki — przewód · puste miejsce — przesuwa widok · Shift + przeciągnij — zaznacz wiele";
-
   /** Pick an element to place (the side panel stays open, like Excalidraw's). */
   function choose(kind: string) {
     setTool({ type: "place", kind });
@@ -557,7 +552,6 @@ export function SchematicEditor({ value, onChange, library, results, topLeft, to
           {!found.length && <p className="muted">Nic nie pasuje do „{query}”.</p>}
         </div>
       )}
-      {!libraryOpen && <div className="board-hint no-print">{hint}</div>}
       <div className="island top-right no-print">{topRight}</div>
       {(selectedElement || selection?.type === "wire" || selection?.type === "group") && (
         <Inspector
@@ -585,6 +579,7 @@ export function SchematicEditor({ value, onChange, library, results, topLeft, to
         <button className="icon" title="Cofnij (Ctrl/Cmd+Z)" aria-label="Cofnij" onClick={undo}><Undo /></button>
         <button className="icon" title="Ponów (Ctrl/Cmd+Shift+Z)" aria-label="Ponów" onClick={redo}><Redo /></button>
       </div>
+      {status && <div className="island status no-print">{status}</div>}
       <div className="island bottom-right no-print">
         <button className="icon" title={full ? "Zamknij pełny ekran (F)" : "Pełny ekran (F)"} aria-label="Pełny ekran"
                 onClick={() => setFull((f) => !f)}>{full ? <Shrink /> : <Expand />}</button>

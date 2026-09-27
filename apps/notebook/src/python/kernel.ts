@@ -1,5 +1,5 @@
 // The page's handle on the Python worker: every call is a message and a promise.
-import type { ElementResult, Output, SchematicData } from "../types";
+import type { ElementResult, Output, Problem, SchematicData } from "../types";
 
 type Reply = { id: number; ok: true; result: unknown } | { id: number; ok: false; error: string };
 
@@ -48,10 +48,9 @@ class Kernel {
     return JSON.parse((await this.call("fromCode", { source, name, old: JSON.stringify(old) })) as string);
   }
 
-  /** The "Symuluj" button: every element's values, plus a table / warnings for under the drawing. */
-  async simulate(schematic: SchematicData, data: string):
-    Promise<{ results: Record<string, ElementResult>; outputs: Output[] }> {
-    return JSON.parse((await this.call("simulate", { schematic: JSON.stringify(schematic), data })) as string);
+  /** A schematic cell's run button: every element's values, and what went wrong. */
+  async simulate(schematic: SchematicData): Promise<{ results: Record<string, ElementResult>; problems: Problem[] }> {
+    return JSON.parse((await this.call("simulate", { schematic: JSON.stringify(schematic) })) as string);
   }
 
   async reset(): Promise<void> {

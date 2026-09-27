@@ -123,17 +123,17 @@ def _parse_data(text: str) -> dict[str, str]:
 
 
 def simulate(schematic_json: str, data: str = "") -> str:
-    """The "Symuluj" button: solve a drawing and report every element's values.
+    """The run button of a schematic cell: solve the drawing and report every element's values.
 
-    Returns JSON ``{"results": {id: {...}}, "outputs": [...]}``; ``results`` go next to the
-    elements on the canvas, ``outputs`` (a table, warnings, errors) under the drawing.
+    Returns JSON ``{"results": {id: {...}}, "problems": [{"kind": "warning" | "error", "text": ...}]}``:
+    ``results`` go on the drawing and in the table under it; ``problems`` (Markdown, names in
+    LaTeX) behind the warning button on the board.
     """
     from electro.values import UNKNOWN, fmt
     from electro_render.schematic import _short
-    from electro_render.trace import name as latex_name
 
     sch = Schematic.from_json(schematic_json)
-    outputs: list[dict] = []
+    labels = [e.id for e in sch.components()]
     results: dict[str, dict] = {}
     with warnings.catch_warnings(record=True) as caught:
         warnings.simplefilter("always")
@@ -141,8 +141,8 @@ def simulate(schematic_json: str, data: str = "") -> str:
             solution = sch.to_circuit().solve(**_parse_data(data))
         except (CircuitError, ValueError, KeyError) as err:
             message = err.args[0] if isinstance(err, KeyError) and err.args else err
-            return json.dumps({"results": {}, "outputs": [{"type": "error", "data": str(message)}]}, ensure_ascii=False)
-    rows = ["| element | wartość | U | I | P |", "|---|---|---|---|---|"]
+            return json.dumps({"results": {}, "problems": [{"kind": "error", "text": _math(str(message), labels)}]},
+                              ensure_ascii=False)
     for label in solution.system.parts:
         r = solution[label]
         comp = r.component
@@ -154,7 +154,7 @@ def simulate(schematic_json: str, data: str = "") -> str:
             value = fmt(r.value, comp.unit) if r.value is not None else "?"
         else:
             value = ""
-        entry = {
+        results[label] = {
             "value": value,
             "solved": (comp.has_value and comp.value is UNKNOWN and r.value is not None) or r.realized is not None,
             "U": fmt(sign * r.U, "V") if r.U is not None else None,
@@ -162,12 +162,30 @@ def simulate(schematic_json: str, data: str = "") -> str:
             "P": fmt(r.P, "W") if r.P is not None and not r.P.has(sp_I) else None,
             "reversed": sign < 0,  # the current really flows from the second pin to the first
         }
-        results[label] = entry
-        rows.append(f"| ${latex_name(label)}$ | {value or '—'} | "
-                    f"{entry['U'] or '—'} | {entry['I'] or '—'} | {entry['P'] or '—'} |")
-    outputs.append({"type": "markdown", "data": "\n".join(rows)})
-    outputs += [{"type": "warning", "data": str(w.message)} for w in caught]
-    return json.dumps({"results": results, "outputs": outputs}, ensure_ascii=False)
+    problems = [{"kind": "warning", "text": _math(str(w.message), labels)} for w in caught]
+    return json.dumps({"results": results, "problems": problems}, ensure_ascii=False)
+
+
+# a quantity's name, maybe with its value: "U_R_1", "E_1 = 12 V", "I_A_1 = -666.7 mA"
+_NAME = re.compile(r"\b([A-Za-z]+(?:_[A-Za-z0-9]+)+)\b(?: = (-?[0-9][0-9.,/]*) ?([a-zA-ZΩµ°]*))?")
+
+
+def _math(message: str, labels=()) -> str:
+    """A solver message as Markdown, quantities in LaTeX: ``E_1 = 12 V`` → ``$E_{1} = 12\\,\\mathrm{V}$``.
+
+    ``labels``: element names, so that one without an index (``E``) is set in LaTeX too.
+    """
+    from electro_render.trace import _unit, name
+
+    plain = [re.escape(label) for label in labels if "_" not in label]
+    pattern = _NAME if not plain else re.compile(
+        _NAME.pattern.replace(r"\b([A-Za-z]+(?:_[A-Za-z0-9]+)+)\b", rf"\b((?:{'|'.join(plain)})|[A-Za-z]+(?:_[A-Za-z0-9]+)+)\b"))
+
+    def tex(m: re.Match) -> str:
+        quantity, number, unit = m.groups()
+        return f"${name(quantity)}" + (f" = {number}{_unit(unit)}" if number else "") + "$"
+
+    return pattern.sub(tex, message)
 
 
 def to_output(obj) -> dict:

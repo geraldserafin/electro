@@ -49,25 +49,32 @@ try {
     return text;
   };
 
-  // "Symuluj" on the drawing, with a measurement for the unknown
+  // the run button of a schematic: values on the drawing and a table; the ammeter's reading (0) is the datum
   const bridge = page.locator(".cell-schematic").first();
-  await bridge.locator(".sim-bar input").fill("I_A_1 = 0");
-  await bridge.getByRole("button", { name: "Symuluj" }).click();
-  await bridge.locator(".outputs table").waitFor({ timeout: 30_000 });
-  check("simulation: table and values on the drawing",
-    (await bridge.locator(".outputs table").innerText()).includes("200 Ω")
-    && (await bridge.locator(".board .canvas .label.solved").allTextContents()).join(" ").includes("200"));
+  const runBridge = bridge.locator(".gutter .run");
+  const reading = async (value) => {
+    await bridge.locator('.board .canvas .element[data-id="A_1"]').click();
+    await bridge.locator(".inspector input").nth(1).fill(value);
+  };
+  await runBridge.click();
+  await bridge.locator("table.results:not(.stale)").waitFor({ timeout: 30_000 });
+  check("run: table and values on the drawing, then the button rests",
+    (await bridge.locator("table.results").innerText()).includes("200 Ω")
+    && (await bridge.locator(".board .canvas .label.solved").allTextContents()).join(" ").includes("200")
+    && await runBridge.isDisabled());
 
-  // the same measurement typed as the ammeter's reading instead of in "Dane pomiarowe"
-  await bridge.locator('.board .canvas .element[data-id="A_1"]').click();
-  await bridge.locator(".inspector input").nth(1).fill("0");
-  await bridge.locator(".sim-bar input").fill("");
-  await bridge.getByRole("button", { name: "Symuluj" }).click();
-  await bridge.locator(".stale").waitFor({ state: "detached", timeout: 30_000 });
-  await page.waitForTimeout(300);
-  check("ammeter reading is a measurement",
-    (await bridge.locator(".board .canvas .label.solved").allTextContents()).join(" ").includes("200")
-    && (await bridge.locator(".board .canvas").textContent()).includes("A1 = 0 A"));
+  // no reading: not enough data — a warning sign on the board, unfolding into LaTeX
+  await reading("");
+  check("a change turns the run button back on", !(await runBridge.isDisabled())
+    && (await bridge.locator("table.results.stale").count()) === 1);
+  await runBridge.click();
+  await bridge.locator(".problems.warning .problems-sign").click();
+  check("missing data: a warning sign, names in LaTeX",
+    (await bridge.locator(".problems-panel .katex").count()) > 0
+    && (await bridge.locator(".problems-panel").innerText()).includes("brakuje"));
+  await reading("0");
+  await runBridge.click();
+  await bridge.locator(".problems").waitFor({ state: "detached", timeout: 30_000 });
 
   // moving part of the bridge as a group keeps every connection (edge wires stretch or follow)
   {
@@ -111,7 +118,7 @@ try {
   const printed = bridge.locator(".print-drawing svg");
   check("print shows the drawing, not the editor", await printed.isVisible() && !(await bridge.locator(".board").isVisible())
     && (await printed.locator(".selected").count()) === 0 && (await printed.boundingBox()).height < 500);
-  check("print leaves out the simulation", !(await bridge.locator(".sim-outputs").isVisible())
+  check("print leaves out the simulation", !(await bridge.locator("table.results").isVisible())
     && (await printed.locator(".reading, .label.solved").count()) === 0);
   await page.emulateMedia({ media: "screen" });
 

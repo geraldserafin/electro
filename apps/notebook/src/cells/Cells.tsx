@@ -1,8 +1,8 @@
-import { useEffect, useState } from "react";
-import { CodeIcon, Play, SchematicIcon } from "../icons";
+import { useEffect, useRef, useState } from "react";
+import { CodeIcon, Play, SchematicIcon, WarningIcon } from "../icons";
 import { kernel } from "../python/kernel";
 import { PrintDrawing, SchematicEditor } from "../schematic/Editor";
-import type { Cell, SchematicData, SymbolLibrary } from "../types";
+import type { Cell, ElementResult, Problem, SchematicData, SymbolLibrary } from "../types";
 import { CodeEditor } from "./CodeEditor";
 import { Markdown } from "./Markdown";
 import { Outputs } from "./Outputs";
@@ -40,12 +40,14 @@ export function MarkdownCell({ cell, update }: { cell: Extract<Cell, { type: "ma
 }
 
 /** Colab-style gutter: a round run button that shows [n] when the cell has run. */
-function RunButton({ run, running, label, execution }: {
+function RunButton({ run, running, label, execution, done }: {
   run: () => void; running: boolean; label: string; execution?: number;
+  done?: boolean; // nothing changed since the last run: nothing to run
 }) {
   return (
     <div className="gutter no-print">
-      <button className={`run ${running ? "running" : ""}`} onClick={run} disabled={running} title={label} aria-label={label}>
+      <button className={`run ${running ? "running" : ""} ${done ? "done" : ""}`} onClick={run} disabled={running || done}
+              title={done ? "Wyniki są aktualne — zmień coś na schemacie, żeby przeliczyć" : label} aria-label={label}>
         <Play />
       </button>
       {execution !== undefined && !running && <span className="execution">[{execution}]</span>}
@@ -173,9 +175,14 @@ export function SchematicCell({ cell, update, library, toCell, simulate, running
   const name = <NameBox name={cell.name} onRename={(n) => update({ name: n })} />;
   const actions = <ViewSwitch view={view} onSwitch={switchTo} busy={busy} />;
 
+  // the results are up to date: the run button rests until something changes
+  const done = cell.results !== undefined && !cell.stale && !(view === "code" && source !== generated);
+  const problems = !cell.stale && cell.problems?.length ? <Problems problems={cell.problems} /> : null;
+
   return (
     <div className="schematic-cell">
-      <RunButton run={run} running={running || busy} label="Symuluj — policz prądy i napięcia (Shift+Enter w kodzie)" />
+      <RunButton run={run} running={running || busy} done={done || empty}
+                 label="Policz prądy i napięcia (Shift+Enter w kodzie)" />
       <div className="cell-body">
       {view === "schematic" ? (
         <SchematicEditor
@@ -185,12 +192,14 @@ export function SchematicCell({ cell, update, library, toCell, simulate, running
           results={cell.stale ? undefined : cell.results}
           topLeft={name}
           topRight={actions}
+          status={problems}
         />
       ) : (
         <div className="board code-view">
           <div className="code-view-bar">
             <div className="island static name-island">{name}</div>
             <span className="spacer" />
+            {problems && <div className="island static status">{problems}</div>}
             <button className="ghost" onClick={() => source && toCell(source)} disabled={!source}
                     title="Wstaw ten kod pod spodem jako zwykłą komórkę z kodem">
               Kopiuj do komórki
@@ -209,35 +218,72 @@ export function SchematicCell({ cell, update, library, toCell, simulate, running
               ? <p className="code-view-wait">Zamieniam schemat na kod…</p>
               : <CodeEditor value={source} onChange={setSource} />}
           </div>
-          {error
-            ? <pre className="output-error code-view-note">{error}</pre>
-            : <p className="code-view-note">
-                Zmiany w kodzie wracają na schemat po przełączeniu na „Schemat” albo po uruchomieniu.
-              </p>}
+          {error && <pre className="output-error code-view-note">{error}</pre>}
         </div>
       )}
       {/* the PDF shows the circuit as drawn; results belong to code cells: schematic(układ1, sol) */}
       <PrintDrawing value={cell.schematic} library={library} />
-      <div className="sim-bar no-print">
-        <label>
-          Dane pomiarowe
-          <input
-            value={cell.data ?? ""}
-            placeholder="dla niewiadomych, np. I_A_1 = 0; U_R_2 = 4"
-            spellCheck={false}
-            onChange={(e) => update({ data: e.target.value, ...(cell.results ? { stale: true } : {}) })}
-            onKeyDown={(e) => e.key === "Enter" && run()}
-          />
-        </label>
-      </div>
-      {cell.outputs && cell.outputs.length > 0 && (
-        <div className={`sim-outputs no-print ${cell.stale ? "stale" : ""}`}>
-          {cell.stale && <p className="stale-note">Schemat albo dane się zmieniły — uruchom, żeby przeliczyć.</p>}
-          <Outputs outputs={cell.outputs} />
-        </div>
+      {cell.results && Object.keys(cell.results).length > 0 && (
+        <ResultsTable results={cell.results} stale={!!cell.stale} />
       )}
       </div>
     </div>
+  );
+}
+
+/** A warning / error sign on the board; a click unfolds what is wrong (with the names in LaTeX). */
+function Problems({ problems }: { problems: Problem[] }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => { // a click anywhere else folds it again
+    if (!open) return;
+    const close = (event: PointerEvent) => { if (!ref.current?.contains(event.target as Node)) setOpen(false); };
+    document.addEventListener("pointerdown", close);
+    return () => document.removeEventListener("pointerdown", close);
+  }, [open]);
+  const error = problems.some((p) => p.kind === "error");
+  const title = error ? "Błąd — nie da się policzyć" : "Nie wszystko da się wyznaczyć";
+  return (
+    <div className={`problems ${error ? "error" : "warning"}`} ref={ref}>
+      <button className="icon problems-sign" onClick={() => setOpen((o) => !o)} title={title} aria-label={title}
+              aria-expanded={open}>
+        <WarningIcon />
+      </button>
+      {open && (
+        <div className="problems-panel" role="dialog" aria-label={title}>
+          <h4>{title}</h4>
+          {problems.map((p, i) => <Markdown key={i} source={p.text} />)}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/** "R_1" → R with a subscript 1. */
+function Name({ id }: { id: string }) {
+  const [base, ...sub] = id.split("_");
+  return <>{base}{sub.length > 0 && <sub>{sub.join(",")}</sub>}</>;
+}
+
+/** What the run found, element by element. */
+function ResultsTable({ results, stale }: { results: Record<string, ElementResult>; stale: boolean }) {
+  return (
+    <table className={`results no-print ${stale ? "stale" : ""}`}>
+      <thead>
+        <tr><th>Element</th><th>Wartość</th><th>Napięcie U</th><th>Prąd I</th><th>Moc P</th></tr>
+      </thead>
+      <tbody>
+        {Object.entries(results).map(([id, r]) => (
+          <tr key={id}>
+            <td className="name"><Name id={id} /></td>
+            <td className={r.solved ? "solved" : ""}>{r.value || "—"}</td>
+            <td>{r.U ?? "—"}</td>
+            <td>{r.I ?? "—"}</td>
+            <td>{r.P ?? "—"}</td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
   );
 }
 

@@ -41,6 +41,12 @@ export interface ElementResult {
   reversed: boolean; // the current really flows from the second pin to the first
 }
 
+/** A warning (not everything could be found) or an error, as Markdown with LaTeX. */
+export interface Problem {
+  kind: "warning" | "error";
+  text: string;
+}
+
 export type Cell =
   | { id: string; type: "markdown"; source: string }
   | { id: string; type: "code"; source: string; outputs: Output[]; execution?: number }
@@ -49,10 +55,9 @@ export type Cell =
       type: "schematic";
       name: string;
       schematic: SchematicData;
-      data?: string; // measurements for the simulation, e.g. "I_A_1 = 0; U_R_2 = 4"
-      results?: Record<string, ElementResult>;
-      outputs?: Output[];
-      stale?: boolean; // the drawing changed since the last simulation
+      results?: Record<string, ElementResult>; // from the last run
+      problems?: Problem[]; // why the last run could not find everything
+      stale?: boolean; // the drawing changed since the last run
       view?: "schematic" | "code"; // which side of the cell is shown
     };
 

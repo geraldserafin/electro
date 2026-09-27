@@ -112,10 +112,10 @@ export function App() {
     if (!cell || cell.type !== "schematic") return Promise.resolve();
     return busy(id, async () => {
       try {
-        const { results, outputs } = await kernel.simulate(schematic ?? cell.schematic, cell.data ?? "");
-        update(id, { results, outputs, stale: false });
+        const { results, problems } = await kernel.simulate(schematic ?? cell.schematic);
+        update(id, { results, problems, stale: false });
       } catch (error) {
-        update(id, { results: {}, outputs: [{ type: "error", data: String(error) }], stale: false });
+        update(id, { results: {}, problems: [{ kind: "error", text: String(error) }], stale: false });
       }
     });
   };

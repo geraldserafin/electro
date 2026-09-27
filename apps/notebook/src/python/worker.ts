@@ -9,14 +9,14 @@ type Request =
   | { id: number; type: "run"; code: string; schematics: string }
   | { id: number; type: "code"; schematic: string; name: string }
   | { id: number; type: "fromCode"; source: string; name: string; old: string }
-  | { id: number; type: "simulate"; schematic: string; data: string }
+  | { id: number; type: "simulate"; schematic: string }
   | { id: number; type: "reset" };
 
 interface Kernel {
   run(code: string, schematics: string): string;
   code(schematic: string, name: string): string;
   from_code(source: string, name: string, old: string): string;
-  simulate(schematic: string, data: string): string;
+  simulate(schematic: string): string;
   reset(): void;
 }
 
@@ -52,7 +52,7 @@ self.onmessage = async (event: MessageEvent<Request>) => {
       request.type === "run" ? k.run(request.code, request.schematics)
       : request.type === "code" ? k.code(request.schematic, request.name)
       : request.type === "fromCode" ? k.from_code(request.source, request.name, request.old)
-      : request.type === "simulate" ? k.simulate(request.schematic, request.data)
+      : request.type === "simulate" ? k.simulate(request.schematic)
       : (k.reset(), null);
     self.postMessage({ id: request.id, ok: true, result });
   } catch (error) {

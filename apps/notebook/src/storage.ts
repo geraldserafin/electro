@@ -63,7 +63,7 @@ export function example(): Notebook {
             { id: "R_2", kind: "resistor", at: [8, 6], rotation: 90, value: null, text: null },
             { id: "R_3", kind: "resistor", at: [18, 0], rotation: 90, value: "50", text: null },
             { id: "R_4", kind: "resistor", at: [18, 6], rotation: 90, value: "100", text: null },
-            { id: "A_1", kind: "ammeter", at: [11, 5], rotation: 0, value: null, text: null },
+            { id: "A_1", kind: "ammeter", at: [11, 5], rotation: 0, value: "0", text: null }, // reading: 0 A
             { id: "gnd1", kind: "ground", at: [0, 14], rotation: 0, value: null, text: null },
           ],
           wires: [
@@ -75,7 +75,7 @@ export function example(): Notebook {
       },
       {
         id: newId(), type: "code", outputs: [],
-        source: 'mostek = schemat("mostek").to_circuit()\nsol = mostek.solve(I_A_1=0, find="R_2")\nsteps(sol)',
+        source: 'sol = mostek.solve(find="R_2")  # mostek: the schematic above\nsteps(sol)',
       },
       {
         id: newId(), type: "markdown",
@@ -83,7 +83,7 @@ export function example(): Notebook {
       },
       {
         id: newId(), type: "code", outputs: [],
-        source: 'schematic(schemat("mostek"), mostek.solve(I_A_1=0))',
+        source: 'schematic(mostek, sol)',
       },
       {
         id: newId(), type: "markdown",

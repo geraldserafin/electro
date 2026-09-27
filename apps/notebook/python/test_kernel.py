@@ -74,22 +74,23 @@ def test_simulate_a_drawing_with_measurements():
     sys.path.insert(0, str(Path(__file__).parents[3] / "packages/electro-schematic/tests"))
     from test_schematic import bridge
 
-    out = json.loads(kernel.simulate(bridge().to_json(), "I_A_1 = 0"))
+    drawing = bridge()
+    drawing.element("A_1").value = "0"  # the ammeter's reading
+    out = json.loads(kernel.simulate(drawing.to_json()))
     r2 = out["results"]["R_2"]
-    assert r2["value"] == "200 Ω" and r2["solved"] and r2["I"] == "33.33 mA"
-    assert out["outputs"][0]["type"] == "markdown" and "| $R_{2}$ | 200 Ω |" in out["outputs"][0]["data"]
+    assert r2["value"] == "200 Ω" and r2["solved"] and r2["I"] == "33.33 mA" and out["problems"] == []
 
 
 def test_simulate_reports_problems():
-    from electro import Resistor, VoltageSource, loop
+    from electro import Ammeter, Resistor, VoltageSource, loop
     from electro_schematic import layout
 
     drawing = layout(loop(VoltageSource(12), Resistor())).to_json()
-    out = json.loads(kernel.simulate(drawing, ""))
-    assert out["outputs"][-1]["type"] == "warning"  # R_1 unknown and no data
-    assert json.loads(kernel.simulate(drawing, "I_R_1 = 0,5"))["results"]["R_1"]["value"] == "24 Ω"
-    assert "Nie rozumiem" in json.loads(kernel.simulate(drawing, "I_R_1 0,5"))["outputs"][0]["data"]
-    assert json.loads(kernel.simulate(drawing, "I_R_9 = 1"))["outputs"][0]["type"] == "error"
+    [problem] = json.loads(kernel.simulate(drawing))["problems"]  # R_1 unknown and no data
+    assert problem["kind"] == "warning" and "$R_{1}$" in problem["text"]  # names in LaTeX
+    contradiction = layout(loop(VoltageSource(12), Resistor(4), Ammeter(2))).to_json()
+    [problem] = json.loads(kernel.simulate(contradiction))["problems"]
+    assert problem["kind"] == "error" and r"$E_{1} = 12\,\mathrm{V}$" in problem["text"]
 
 
 def test_code_view_round_trip():

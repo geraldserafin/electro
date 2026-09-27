@@ -6,9 +6,9 @@ from electro_schematic import layout
 cells = []
 md = lambda text: cells.append({"id": secrets.token_hex(4), "type": "markdown", "source": text.strip()})
 code = lambda text: cells.append({"id": secrets.token_hex(4), "type": "code", "source": text.strip(), "outputs": []})
-drawing = lambda name, circuit, data="", simulate=False: cells.append({
+drawing = lambda name, circuit, simulate=False: cells.append({
     "id": secrets.token_hex(4), "type": "schematic", "name": name,
-    "schematic": json.loads(layout(circuit).to_json()), "data": data, "simulate": simulate})
+    "schematic": json.loads(layout(circuit).to_json()), "simulate": simulate})
 
 md("""
 Każdy przykład to osobna komórka — uruchom wszystko przyciskiem **▶ Uruchom wszystko** albo pojedynczo (`Shift+Enter`).
@@ -155,14 +155,13 @@ element: rezystor, potem przerwę, potem źródło. Przyjęte założenie widać
 
 md("""
 ## 12. Dziura → rezystor
-Żarówka 12 Ω ma dostać 0,5 A z akumulatora 12 V. Co wstawić? Na schemacie wpisz pomiar w **Dane pomiarowe**
-i kliknij **Symuluj** — albo policz to kodem, jak niżej.
+Żarówka 12 Ω ma dostać 0,5 A z akumulatora 12 V (tyle pokazuje amperomierz). Co wstawić? Uruchom schemat
+przyciskiem ▶ — albo policz to kodem, jak niżej: schemat to zmienna `zarowka`.
 """)
-drawing("zarowka", loop(VoltageSource(12), Resistor(12), Hole()), "I_R_1 = 0,5")
+drawing("zarowka", loop(VoltageSource(12), Resistor(12), Ammeter("0,5"), Hole()), simulate=True)
 code("""
-zarowka = schemat("zarowka").to_circuit()
-sol = zarowka.solve(I_R_1="0,5")
-display(schematic(schemat("zarowka"), sol))
+sol = zarowka.solve()
+display(schematic(zarowka, sol))
 steps(sol)
 """)
 
@@ -231,8 +230,8 @@ schematics = {c["name"]: json.dumps(c["schematic"]) for c in cells if c["type"] 
 for cell in cells:
     if cell["type"] == "code":
         cell["outputs"] = json.loads(kernel.run(cell["source"], json.dumps(schematics)))
-    if cell["type"] == "schematic" and (cell.pop("simulate") or cell["data"]):  # as if "Symuluj" was clicked
-        cell.update(json.loads(kernel.simulate(json.dumps(cell["schematic"]), cell["data"])), stale=False)
+    if cell["type"] == "schematic" and cell.pop("simulate"):  # as if its run button was clicked
+        cell.update(json.loads(kernel.simulate(json.dumps(cell["schematic"]))), stale=False)
 
 notebook = {"version": 1, "title": "Przykłady: niewiadome i dziury", "codeInPdf": True, "cells": cells}
 path = "apps/notebook/examples/nieznane-i-dziury.electro.json"
