@@ -12,7 +12,7 @@ from collections import Counter
 from xml.sax.saxutils import escape
 
 from electro import circuit as ct
-from electro.components import Ammeter, Hole
+from electro.components import OPEN, Ammeter, Hole
 from electro.values import UNKNOWN, fmt
 from electro_schematic import GRID, KINDS, Schematic, layout
 from electro_schematic.layout import label_sides
@@ -52,7 +52,9 @@ def _neg(v: Vec) -> Vec:
 
 
 def _short(c: ct.Circuit) -> str:
-    """Compact description of a filled hole: ``R = 2 Ω``, ``E = 17 V (odwr.)``."""
+    """Compact description of a filled hole: ``R = 2 Ω``, ``E = 17 V (odwr.)``, ``przerwa``."""
+    if c is OPEN:
+        return "przerwa"
     if isinstance(c, ct.Transpose):
         return f"{_short(c.part)} (odwr.)"
     if isinstance(c, ct.Seq):

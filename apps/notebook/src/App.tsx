@@ -6,6 +6,11 @@ import type { Cell, CellType, Notebook, SchematicData, SymbolLibrary } from "./t
 
 type Status = "loading" | "ready" | "error";
 
+/** Every notebook in examples/ shows up in the "Przykłady" menu. */
+const EXAMPLES = Object.values(
+  import.meta.glob<Notebook>("../examples/*.electro.json", { eager: true, import: "default" }),
+);
+
 export function App() {
   const [notebook, setNotebook] = useState<Notebook>(load);
   const [library, setLibrary] = useState<SymbolLibrary | null>(null);
@@ -107,6 +112,18 @@ export function App() {
         <span className="spacer" />
         <button onClick={runAll} disabled={status !== "ready"}>▶ Uruchom wszystko</button>
         <button onClick={resetKernel} disabled={status !== "ready"}>Wyczyść pamięć</button>
+        <select
+          className="examples"
+          value=""
+          onChange={(e) => {
+            const example = EXAMPLES[Number(e.target.value)];
+            if (example && confirm("Otworzyć przykład? Bieżący notatnik zostanie zastąpiony (zapisz go wcześniej przez „Zapisz plik”)."))
+              setNotebook(structuredClone(example));
+          }}
+        >
+          <option value="" disabled>Przykłady…</option>
+          {EXAMPLES.map((example, i) => <option key={i} value={i}>{example.title}</option>)}
+        </select>
         <button onClick={() => fileInput.current?.click()}>Otwórz…</button>
         <button onClick={() => download(notebook)}>Zapisz plik</button>
         <label className="check">

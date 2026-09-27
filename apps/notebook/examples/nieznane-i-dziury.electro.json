@@ -1,0 +1,368 @@
+{
+  "version": 1,
+  "title": "Przykłady: niewiadome i dziury",
+  "codeInPdf": true,
+  "cells": [
+    {
+      "id": "af294463",
+      "type": "markdown",
+      "source": "Każdy przykład to osobna komórka — uruchom wszystko przyciskiem **▶ Uruchom wszystko** albo pojedynczo (`Shift+Enter`).\nWartość elementu, której nie znasz, zostawiasz pustą: `Resistor()`. Solver szuka jej z dodatkowych danych\n(`I_R_1=…`, `U_R_2=…`, `P_R_1=…`). Każda niewiadoma potrzebuje jednej **niezależnej** danej."
+    },
+    {
+      "id": "1c3bd89b",
+      "type": "markdown",
+      "source": "## 1. Nieznany opór z pomiaru napięcia"
+    },
+    {
+      "id": "7b0de0d2",
+      "type": "code",
+      "source": "dzielnik = supply(12) + Resistor(100) + Resistor() + ground\nsol = dzielnik.solve(U_R_2=4, find=\"R_2\")\nsteps(sol)",
+      "outputs": []
+    },
+    {
+      "id": "47cd449b",
+      "type": "markdown",
+      "source": "## 2. Nieznane źródło\nNapięcie źródła też może być niewiadomą. Tu wychodzi dodatnie — źródło jest skierowane tak, jak je narysowaliśmy."
+    },
+    {
+      "id": "3704e090",
+      "type": "code",
+      "source": "petla = loop(VoltageSource(), Resistor(10), Resistor(20))\npetla.solve(I_R_1=\"0,5\", find=\"E_1\")",
+      "outputs": []
+    },
+    {
+      "id": "15b10e67",
+      "type": "markdown",
+      "source": "## 3. Minus w wyniku = odwrotna polaryzacja\nDwa źródła w jednej pętli. Prąd 2 A przez 4 Ω daje 8 V, a pierwsze źródło ma 12 V — więc drugie musi\n*odbierać* 4 V. Ujemny wynik znaczy: to źródło jest w rzeczywistości skierowane odwrotnie niż w zapisie."
+    },
+    {
+      "id": "cfefc70b",
+      "type": "code",
+      "source": "dwa_zrodla = loop(VoltageSource(12), Resistor(4), VoltageSource())\ndwa_zrodla.solve(I_R_1=2, find=\"E_2\")",
+      "outputs": []
+    },
+    {
+      "id": "33c754fa",
+      "type": "markdown",
+      "source": "## 4. Kilka niewiadomych naraz\nTrzy niewiadome (R₁, R₃, E₂) i trzy pomiary. Gałęzie są czytane od masy w górę, a `.transpose()` przy R₂ i R₃\nsprawia, że ich napięcie i prąd liczymy „w dół” — tak, jak mierzyliśmy."
+    },
+    {
+      "id": "ebd67147",
+      "type": "code",
+      "source": "uklad = (\n    (VoltageSource(12) + Resistor())\n    | Resistor(4).transpose()\n    | ((Resistor().transpose() | CurrentSource(1)) + VoltageSource().transpose())\n)\nsol = uklad.solve(I_R_1=2, U_R_2=8, U_R_3=5, find=[\"R_1\", \"R_3\", \"E_2\"])\ndisplay(schematic(uklad, sol))\nsol",
+      "outputs": []
+    },
+    {
+      "id": "4d95d4dd",
+      "type": "markdown",
+      "source": "### 4a. Uwaga na zwrot pomiaru\nTen sam układ **bez** `.transpose()` przy R₂ i R₃ liczy ich napięcia w górę. Te same liczby oznaczają wtedy\nco innego — i przestają do siebie pasować. Znak danej zależy od kierunku elementu."
+    },
+    {
+      "id": "6a26183c",
+      "type": "code",
+      "source": "bez_transpose = (\n    (VoltageSource(12) + Resistor())\n    | Resistor(4)\n    | ((Resistor() | CurrentSource(1)) + VoltageSource().transpose())\n)\ntry:\n    bez_transpose.solve(I_R_1=2, U_R_2=8, U_R_3=5)\nexcept CircuitError as e:\n    print(e)\n\nbez_transpose.solve(I_R_1=2, U_R_2=-8, U_R_3=-5, find=[\"R_1\", \"R_3\", \"E_2\"])  # te same pomiary „w górę”",
+      "outputs": []
+    },
+    {
+      "id": "47a5c7bb",
+      "type": "markdown",
+      "source": "## 5. Za mało danych\nBez pomiaru na R₃ solver nie zgaduje — mówi, ilu danych brakuje i które wystarczą."
+    },
+    {
+      "id": "f61690f8",
+      "type": "code",
+      "source": "try:\n    uklad.solve(I_R_1=2, U_R_2=8, find=[\"R_1\", \"R_3\", \"E_2\"])\nexcept MissingData as e:\n    print(e)\n    print(\"Udało się wyznaczyć:\", e.solution.answers[\"R_1\"], \"Ω\")",
+      "outputs": []
+    },
+    {
+      "id": "ec4bb938",
+      "type": "markdown",
+      "source": "## 6. Dane, które niczego nie wnoszą\nPrzy znanym R₂ = 4 Ω napięcie 4 V i prąd 1 A na R₂ to **ta sama** informacja. Dwie dane, ale jedna wiedza —\nwięc przy dwóch niewiadomych dalej czegoś brakuje."
+    },
+    {
+      "id": "e8ae6b6b",
+      "type": "code",
+      "source": "try:\n    (supply() + Resistor() + Resistor(4) + ground).solve(U_R_2=4, I_R_2=1, find=[\"E_1\", \"R_1\"])\nexcept MissingData as e:\n    print(e)",
+      "outputs": []
+    },
+    {
+      "id": "d97fbdd7",
+      "type": "markdown",
+      "source": "## 7. Sprzeczne dane\nSolver wskazuje, które dane się wykluczają."
+    },
+    {
+      "id": "b1c5831c",
+      "type": "code",
+      "source": "try:\n    (supply(12) + Resistor(10) + Resistor(20) + ground).solve(I_R_1=1)\nexcept Contradiction as e:\n    print(e)",
+      "outputs": []
+    },
+    {
+      "id": "09f5b13b",
+      "type": "markdown",
+      "source": "## 8. Dwa rozwiązania\nMoc to $P = U \\cdot I$ — równanie kwadratowe. Opornik 2 Ω i 8 Ω dają w tej pętli tę samą moc 8 W.\nJedna dodatkowa równość rozstrzyga."
+    },
+    {
+      "id": "d4ec0057",
+      "type": "code",
+      "source": "dwa = loop(VoltageSource(12), Resistor(), Resistor(4))\ntry:\n    dwa.solve(P_R_1=8, find=\"R_1\")\nexcept Ambiguous as e:\n    print(e)\n\ndwa.solve(Eq(P(\"R_1\"), 8), Eq(U(\"R_1\"), 2 * U(\"R_2\")), find=\"R_1\")  # R₁ ma dwa razy więcej napięcia niż R₂",
+      "outputs": []
+    },
+    {
+      "id": "29e9d2df",
+      "type": "markdown",
+      "source": "## 9. Wynik literowy\nZamiast liczby — litera. Wynik wychodzi jako wzór."
+    },
+    {
+      "id": "957fa920",
+      "type": "code",
+      "source": "(supply(\"E\") + Resistor(\"R_a\") + Resistor(\"R_b\") + ground).solve(find=\"U_R_2\")",
+      "outputs": []
+    },
+    {
+      "id": "cf7668be",
+      "type": "markdown",
+      "source": "## 10. Mostek z niewiadomą (nie da się zapisać przez `+` i `|`)"
+    },
+    {
+      "id": "f6792df9",
+      "type": "code",
+      "source": "mostek = net(\n    (VoltageSource(10), \"0\", \"A\"),\n    (Resistor(100), \"A\", \"B\"), (Resistor(), \"B\", \"0\"),\n    (Resistor(50), \"A\", \"C\"), (Resistor(100), \"C\", \"0\"),\n    (Ammeter(), \"B\", \"C\"),\n)\nmostek.solve(I_A_1=0, find=\"R_2\")",
+      "outputs": []
+    },
+    {
+      "id": "f44087ad",
+      "type": "markdown",
+      "source": "## 11. Nieznane źródło prądu"
+    },
+    {
+      "id": "21d3dd65",
+      "type": "code",
+      "source": "rownolegle = net((CurrentSource(), \"0\", \"A\"), (Resistor(10), \"A\", \"0\"), (Resistor(40), \"A\", \"0\"))\nrownolegle.solve(U_R_1=8, find=\"J_1\")",
+      "outputs": []
+    },
+    {
+      "id": "1c3ede01",
+      "type": "markdown",
+      "source": "# Dziury: `Hole()`\nDziura to element, o którym nie wiemy nawet, **czym** jest. Każdy liniowy dwójnik to źródło $E$ szeregowo\nz oporem $Z$, ale z jednego pomiaru nie da się ich rozdzielić — więc solver bierze **najprostszy** pasujący\nelement: rezystor, potem przerwę, potem źródło. Przyjęte założenie widać w rozwiązaniu."
+    },
+    {
+      "id": "797f2134",
+      "type": "markdown",
+      "source": "## 12. Dziura → rezystor\nŻarówka 12 Ω ma dostać 0,5 A z akumulatora 12 V. Co wstawić?"
+    },
+    {
+      "id": "33de9a96",
+      "type": "schematic",
+      "name": "zarowka",
+      "schematic": {
+        "version": 1,
+        "elements": [
+          {
+            "id": "E_1",
+            "kind": "voltage_source",
+            "at": [
+              1,
+              0
+            ],
+            "rotation": 0,
+            "value": "12",
+            "text": null
+          },
+          {
+            "id": "R_1",
+            "kind": "resistor",
+            "at": [
+              7,
+              0
+            ],
+            "rotation": 0,
+            "value": "12",
+            "text": null
+          },
+          {
+            "id": "X_1",
+            "kind": "hole",
+            "at": [
+              13,
+              0
+            ],
+            "rotation": 0,
+            "value": null,
+            "text": null
+          }
+        ],
+        "wires": [
+          {
+            "points": [
+              [
+                0,
+                0
+              ],
+              [
+                1,
+                0
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                5,
+                0
+              ],
+              [
+                6,
+                0
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                6,
+                0
+              ],
+              [
+                7,
+                0
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                11,
+                0
+              ],
+              [
+                12,
+                0
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                12,
+                0
+              ],
+              [
+                13,
+                0
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                17,
+                0
+              ],
+              [
+                18,
+                0
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                18,
+                0
+              ],
+              [
+                18,
+                3
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                18,
+                3
+              ],
+              [
+                0,
+                3
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                0,
+                3
+              ],
+              [
+                0,
+                0
+              ]
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "924c0dff",
+      "type": "code",
+      "source": "zarowka = schemat(\"zarowka\").to_circuit()\nsol = zarowka.solve(I_R_1=\"0,5\")\ndisplay(schematic(schemat(\"zarowka\"), sol))\nsteps(sol)",
+      "outputs": []
+    },
+    {
+      "id": "483a683a",
+      "type": "markdown",
+      "source": "## 13. Dziura → źródło\nPrąd płynie „pod prąd” akumulatora (−1 A) — żaden opornik tego nie zrobi, to musi być ładowarka."
+    },
+    {
+      "id": "20d8db76",
+      "type": "code",
+      "source": "ladowanie = loop(VoltageSource(12), Resistor(2), Hole())\nsol = ladowanie.solve(I_R_1=-1)\nsol[\"X_1\"]",
+      "outputs": []
+    },
+    {
+      "id": "c369a018",
+      "type": "markdown",
+      "source": "## 14. Dziura → przewód\nCałe 12 V odkłada się na 10 Ω (1,2 A) — w dziurze nie ma żadnego spadku napięcia."
+    },
+    {
+      "id": "c569c606",
+      "type": "code",
+      "source": "loop(VoltageSource(12), Resistor(10), Hole()).solve(I_R_1=\"1,2\")[\"X_1\"]",
+      "outputs": []
+    },
+    {
+      "id": "17da32f5",
+      "type": "markdown",
+      "source": "## 15. Dziura → przerwa\nPrąd nie płynie wcale, a całe napięcie jest na dziurze."
+    },
+    {
+      "id": "d8690cc3",
+      "type": "code",
+      "source": "przerwa = loop(VoltageSource(12), Resistor(10), Hole())\nsol = przerwa.solve(I_R_1=0)\nprint(sol[\"X_1\"])\nprint(code(przerwa.fill(sol)))  # po wstawieniu przerwy pętla przestaje być pętlą",
+      "outputs": []
+    },
+    {
+      "id": "08395b63",
+      "type": "markdown",
+      "source": "## 16. Dwie dziury w szeregu\nZnając tylko prąd, nie da się rozdzielić, ile napięcia przypada na którą dziurę. Jedno napięcie więcej — i już."
+    },
+    {
+      "id": "fe34f7b9",
+      "type": "code",
+      "source": "dwie = loop(VoltageSource(12), Hole(), Hole())\ntry:\n    dwie.solve(I_E_1=1, find=\"U_X_1\")\nexcept MissingData as e:\n    print(e)\n\nsol = dwie.solve(I_E_1=1, U_X_1=5)\nsol[\"X_1\"], sol[\"X_2\"]",
+      "outputs": []
+    },
+    {
+      "id": "6c34bbee",
+      "type": "markdown",
+      "source": "## 17. Dziura i zwykła niewiadoma naraz"
+    },
+    {
+      "id": "dc43246c",
+      "type": "code",
+      "source": "sol = loop(VoltageSource(12), Resistor(), Hole()).solve(I_E_1=1, U_R_1=4)\nsol",
+      "outputs": []
+    }
+  ]
+}

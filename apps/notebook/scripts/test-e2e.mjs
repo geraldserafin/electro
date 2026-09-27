@@ -78,6 +78,14 @@ try {
   check("moving a wire segment keeps connections", (await code()) === "uklad = loop(VoltageSource(), Resistor())"
     && (await grid.locator(".open-pin").count()) === 0);
 
+  // the examples notebook from the menu runs without a single error
+  page.once("dialog", (d) => d.accept());
+  await page.locator("select.examples").selectOption({ label: "Przykłady: niewiadome i dziury" });
+  await page.getByRole("button", { name: "▶ Uruchom wszystko" }).click();
+  await page.locator(".cell-code").last().locator(".outputs").waitFor({ timeout: 60_000 });
+  check("examples run without errors", (await page.locator(".output-error").count()) === 0
+    && (await page.locator(".cell-code .outputs").count()) === (await page.locator(".cell-code").count()));
+
   check("no page errors", errors.length === 0);
   if (errors.length) console.log(errors);
   await browser.close();

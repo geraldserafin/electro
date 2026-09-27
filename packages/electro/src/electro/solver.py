@@ -12,8 +12,8 @@ from dataclasses import dataclass
 import sympy as sp
 from sympy.printing.str import StrPrinter
 
-from .circuit import Circuit
-from .components import Component, Context, Hole, Law
+from .circuit import Circuit, wire
+from .components import OPEN, Component, Context, Hole, Law
 from .semantics import KIND_ORDER, Placed, System, compile_circuit
 from .values import fmt, parse
 
@@ -173,7 +173,9 @@ class PartResult:
 
     def __repr__(self):
         if isinstance(self.component, Hole):
-            head = f"{self.label} → {self.realized!r}" if self.realized is not None else f"{self.label} → ?"
+            shown = ("przerwa" if self.realized is OPEN else "przewód" if self.realized is wire
+                     else "?" if self.realized is None else repr(self.realized))
+            head = f"{self.label} → {shown}"
             return f"{head}   U = {fmt(self.U, 'V')}   I = {fmt(self.I, 'A')}"
         head = f"{self.label} = {fmt(self.value, self.component.unit)}" if self.component.has_value else self.label
         fields = [f"U = {fmt(self.U, 'V')}", f"I = {fmt(self.I, 'A')}"]
@@ -231,7 +233,9 @@ class Solution:
         p = self._placed(label)
         if not isinstance(p.component, Hole):
             return None
-        E, Z = (self._value(p.model.variables[k]) for k in ("E", "Z"))
+        E, Z, I = (self._value(p.model.variables[k]) for k in ("E", "Z", "I"))
+        if p.model.variables["Z"] not in self.values and I == 0:
+            return OPEN  # no current through it and nothing else to say: a break
         return None if E is None or Z is None else Hole.realize(E, Z)
 
     def realize_component(self, component: Component) -> Circuit:
@@ -463,13 +467,18 @@ def solve(circuit: Circuit, *equations, omega=None, find=None, **given) -> Solut
     holes = [p for p in solution.system.parts.values() if isinstance(p.component, Hole)]
     open_holes = [p for p in holes if {p.model.variables["E"], p.model.variables["Z"]} & set(solution.missing)]
     if open_holes:
-        for choice in itertools.product(("E", "Z"), repeat=len(open_holes)):
+        # simplest first: a resistor (E = 0), a break (I = 0), a source (Z = 0)
+        for choice in itertools.product(("E", "I", "Z"), repeat=len(open_holes)):
             assumed = {p.model.variables[k]: sp.Integer(0) for p, k in zip(open_holes, choice)}
             try:
                 attempt = _solve(circuit, equations, omega, find, given, assumed)
             except CircuitError:
                 continue
-            if not {v for p in open_holes for v in (p.model.variables["E"], p.model.variables["Z"])} & set(attempt.missing):
+            # a break only pins down E (= −U); its Z does not matter
+            needed = {p.model.variables[v] for p, k in zip(open_holes, choice) for v in (("E",) if k == "I" else ("E", "Z"))}
+            if not needed & set(attempt.missing):
+                ignored = {p.model.variables["Z"] for p, k in zip(open_holes, choice) if k == "I"}
+                attempt.missing = [s for s in attempt.missing if s not in ignored]
                 solution = attempt
                 break
     return _report(solution)
@@ -556,8 +565,13 @@ def _solve(circuit: Circuit, equations, omega, find, given, assumed, drop: froze
             raise Contradiction("Sprzeczne dane: układ równań nie ma rozwiązania.\n" + "\n".join(
                 f"  {_str(law.expr)} = 0   — {law.reason}" for law in pending))
         if len(solutions) > 1:
-            raise Ambiguous("Więcej niż jedno rozwiązanie:\n" + "\n".join(
-                "  " + ", ".join(f"{k} = {v}" for k, v in s.items()) for s in solutions))
+            params = {p.model.param for p in system.parts.values()} & unknown
+            shown = targets or sorted(params, key=lambda s: s.name) or variables[:3]
+            options = " albo ".join(
+                ", ".join(f"{s.name} = {fmt(sol[s], _unit(system, s))}" for s in shown if s in sol) for sol in solutions
+            )
+            count = f"Są {len(solutions)} rozwiązania" if len(solutions) < 5 else f"Jest {len(solutions)} rozwiązań"
+            raise Ambiguous(f"{count}: {options}. Dodaj jeszcze jedną daną, która wskaże właściwe.")
         general = {k: sp.simplify(v) for k, v in solutions[0].items()}
         solved = {k: v for k, v in general.items() if k in unknown and not v.free_symbols & unknown}
         free = sorted(unknown - set(general), key=lambda s: s.name)

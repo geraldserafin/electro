@@ -80,6 +80,7 @@ input, textarea {
   border-bottom: 1px solid var(--line);
 }
 .toolbar .spacer { flex: 1; }
+.toolbar select { font: inherit; font-size: 13px; color: var(--text); background: var(--paper); border: 1px solid var(--line); border-radius: 6px; padding: 4px 6px; }
 .toolbar .check { font-size: 13px; display: flex; gap: 4px; align-items: center; color: var(--muted); }
 .status { font-size: 13px; color: var(--muted); }
 .status.ready { color: #059669; }

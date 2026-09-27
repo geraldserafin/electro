@@ -12,7 +12,9 @@ from dataclasses import dataclass, field
 
 import sympy as sp
 
-from .circuit import GROUND, Circuit, Netlist, ground, wire
+from .circuit import GROUND, Circuit, Netlist, ground, open_end, wire
+
+OPEN = open_end + open_end.transpose()  # 1 → 1 with nothing between: a break in the circuit
 from .values import UNKNOWN, fmt, parse
 
 
@@ -201,7 +203,9 @@ class Hole(NoValue, TwoTerminal):
     """An unknown two-terminal element: the solver decides what it is.
 
     Any linear two-terminal element is ``VoltageSource(E) + Resistor(Z)`` (Thévenin), so a hole
-    is the relation ``V_a − V_b = Z·I − E`` with unknown ``E`` and ``Z ≥ 0``.
+    is the relation ``V_a − V_b = Z·I − E`` with unknown ``E`` and ``Z ≥ 0``. When the data
+    leave that open, the simplest fitting element is taken: a resistor (E = 0), else a break
+    (I = 0, ``OPEN``), else a source (Z = 0).
     """
 
     prefix = "X"

@@ -3,6 +3,8 @@
 import pytest
 import sympy as sp
 
+import electro
+
 from electro import *
 
 
@@ -217,3 +219,17 @@ def test_contradiction_names_the_clashing_data():
     message = str(err.value)
     assert message.startswith("Sprzeczne dane:") and "E_1 = 12 V" in message and "I_R_1 = 5 A" in message
     assert "\n" not in message  # one line, not a dump of the equations
+
+
+def test_hole_with_no_current_is_a_break():
+    c = loop(VoltageSource(12), Resistor(10), Hole())
+    sol = c.solve(I_R_1=0)
+    assert sol.realize("X_1") is electro.components.OPEN
+    assert sol["X_1"].U == 12  # all of the voltage sits across the break
+
+
+def test_two_solutions_are_named():
+    with pytest.raises(Ambiguous, match=r"R_1 = 8 Ω albo R_1 = 2 Ω"):
+        loop(VoltageSource(12), Resistor(), Resistor(4)).solve(P_R_1=8)
+    sol = loop(VoltageSource(12), Resistor(), Resistor(4)).solve(Eq(P("R_1"), 8), Eq(U("R_1"), 2 * U("R_2")))
+    assert sol["R_1"].value == 8  # one more condition picks one
