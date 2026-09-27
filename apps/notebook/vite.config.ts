@@ -5,4 +5,5 @@ export default defineConfig({
   plugins: [react()],
   worker: { format: "es" },
   base: "./",
+  server: { port: 5190, strictPort: true },
 });

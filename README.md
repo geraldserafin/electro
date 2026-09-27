@@ -36,9 +36,9 @@ print(steps(sol))                           # Markdown z $...$
 ## Praca w repo
 
 ```sh
-devenv shell                       # python + sympy + pytest, node + pnpm
+devenv up                          # notatnik na http://localhost:5190 (+ przebudowa Pythona przy zmianach)
+devenv shell                       # python + sympy + pytest, node + pnpm (pnpm install robi się sam)
 pytest                             # testy paczek Pythona i kernela notatnika
-cd apps/notebook && pnpm dev       # notatnik na http://localhost:5173
 ```
 
 To jest workspace `uv` (`[tool.uv.workspace]` w `pyproject.toml`), więc działa też `uv sync && uv run pytest`.

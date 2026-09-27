@@ -13,9 +13,17 @@ Notatnik zapisuje się automatycznie w przeglądarce. „Zapisz plik” i „Otw
 
 ## Uruchomienie
 
+Najprościej z katalogu głównego repo:
+
+```sh
+devenv up           # notatnik na http://localhost:5190, bundle Pythona przebudowuje się przy każdej zmianie
+```
+
+Albo ręcznie w `apps/notebook`:
+
 ```sh
 pnpm install
-pnpm dev            # pakuje paczki Pythona do public/py/bundle.json i startuje Vite
+pnpm dev            # pakuje paczki Pythona do public/py/bundle.json i startuje Vite (port 5190)
 pnpm build          # produkcyjny build do dist/ (statyczny, można wrzucić na dowolny hosting)
 ```
 
@@ -38,4 +46,4 @@ Testy kernela w zwykłym Pythonie (`python/test_kernel.py`) chodzą razem z resz
 | `src/schematic/` | edytor siatki; symbole bierze z `electro_render.symbol_library()`, więc wygląda jak raport |
 | `src/cells/` | komórki i wyjścia |
 
-Po zmianie kodu w `packages/` trzeba przeładować `pnpm dev`, bo `bundle.json` powstaje przy starcie.
+Przy `devenv up` zmiany w `packages/` wystarczy odświeżyć w przeglądarce. Przy samym `pnpm dev` `bundle.json` powstaje tylko przy starcie (albo użyj `pnpm python --watch`).
