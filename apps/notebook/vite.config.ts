@@ -18,9 +18,13 @@ function reloadOnPython(): Plugin {
   };
 }
 
+const notesServer = process.env.NOTES_SERVER ?? "http://localhost:5191";
+
 export default defineConfig({
   plugins: [react(), reloadOnPython()],
   worker: { format: "es" },
   base: "./",
-  server: { port: 5190, strictPort: true },
+  // the notes server (apps/server) behind /api, in development and in the preview build
+  server: { port: 5190, strictPort: true, proxy: { "/api": notesServer } },
+  preview: { proxy: { "/api": notesServer } },
 });

@@ -1,0 +1,11 @@
+# TypeScript side of the monorepo (the Python packages under packages/ have no package.json)
+packages:
+  - apps/*
+  - packages/*
+
+# install scripts allowed to run: the SQLite driver (native binary) and esbuild (tsx)
+allowBuilds:
+  better-sqlite3: true
+  esbuild: true
+  "@parcel/watcher": false
+  msgpackr-extract: false

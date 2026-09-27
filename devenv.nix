@@ -15,7 +15,7 @@ in
   # apps/notebook (React + Vite); `pnpm install` runs when entering the shell
   languages.javascript = {
     enable = true;
-    directory = "apps/notebook";
+    directory = "."; # the pnpm workspace: apps/* and the TypeScript packages
     pnpm = {
       enable = true;
       install.enable = true;
@@ -31,5 +31,7 @@ in
   processes = {
     python-bundle.exec = "node ${notebook}/scripts/bundle-python.mjs --watch";
     notebook.exec = "cd ${notebook} && pnpm exec vite --port 5190 --strictPort";
+    # the notes server (Effect) on :5191, behind the notebook's /api; notes in .data/notes.sqlite
+    notes-server.exec = "cd ${root}/apps/server && PORT=5191 DATABASE_PATH=${root}/.data/notes.sqlite pnpm dev";
   };
 }

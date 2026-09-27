@@ -189,6 +189,45 @@ input:focus, textarea:focus { outline: 2px solid var(--accent-soft); border-colo
 .status.error .dot { background: var(--danger); }
 @keyframes pulse { to { opacity: 0.3; } }
 
+/* notes on the server: the side panel, and the save sign in the bar */
+.library-panel {
+  position: fixed;
+  top: 52px;
+  left: 0;
+  bottom: 0;
+  z-index: 15;
+  width: 280px;
+  display: flex;
+  flex-direction: column;
+  border-right: 1px solid var(--line);
+  background: var(--bg);
+}
+.library-panel header { display: flex; align-items: center; justify-content: space-between; padding: 12px 12px 8px 16px; }
+.library-panel h2 { margin: 0; font-size: 13px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); }
+.library-panel .new-note { gap: 4px; padding: 4px 12px 4px 8px; font-size: 14px; border: 1px solid var(--line); border-radius: 999px; }
+.library-panel ul { list-style: none; margin: 0; padding: 0 8px 16px; overflow-y: auto; }
+.library-panel li { position: relative; display: flex; border-radius: 8px; }
+.library-panel li:hover, .library-panel li.current { background: var(--hover); }
+.library-panel li.current { box-shadow: inset 3px 0 0 var(--accent); }
+.library-panel .open { flex: 1; min-width: 0; display: grid; gap: 1px; justify-items: start; padding: 8px 36px 8px 12px; text-align: left; }
+.library-panel .open:hover { background: transparent; }
+.library-panel .note-title { max-width: 100%; font-size: 15px; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.library-panel .meta { font-size: 12px; color: var(--muted); }
+.library-panel .delete { position: absolute; right: 4px; top: 50%; transform: translateY(-50%); padding: 6px; color: var(--muted); opacity: 0; }
+.library-panel li:hover .delete { opacity: 1; }
+.library-panel .delete:hover { color: var(--danger); background: var(--err-bg); }
+.muted.pad { padding: 8px 16px; font-size: 14px; }
+main.beside-library { margin-left: 280px; }
+@media (max-width: 900px) { main.beside-library { margin-left: auto; } } /* narrow: the panel covers */
+
+.sync { position: relative; }
+.sync.saving .icon-button { animation: pulse 0.8s ease-in-out infinite alternate; }
+.sync.saved .icon-button { color: var(--ok); }
+.sync.offline .icon-button { color: var(--faint); }
+.sync.conflict .icon-button, .sync.error .icon-button { color: var(--warn); background: var(--warn-bg); }
+.menu-items.conflict { left: auto; right: 0; min-width: 320px; padding: 8px 0; }
+.menu-items.conflict p { margin: 4px 16px 8px; font-size: 14px; color: var(--muted); }
+
 /* an empty notebook: the add buttons are always there */
 main > .add-row:only-child button, main > .add-row:has(+ .empty) button { visibility: visible; opacity: 1; }
 

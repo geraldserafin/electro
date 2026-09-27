@@ -17,15 +17,20 @@
     "@codemirror/language": "6.12.4",
     "@codemirror/state": "6.7.6",
     "@codemirror/view": "6.43.13",
+    "@effect-atom/atom-react": "0.7.0",
+    "@effect/platform": "0.97.2",
+    "@electro/notes-api": "workspace:*",
     "@lezer/highlight": "1.2.4",
     "@uiw/react-codemirror": "^4.25.12",
+    "effect": "3.22.2",
     "katex": "^0.18.9",
     "react": "^19.3.0",
     "react-dom": "^19.3.0",
     "react-markdown": "^10.1.0",
     "rehype-katex": "^7.0.1",
     "remark-gfm": "^4.0.1",
-    "remark-math": "^6.0.0"
+    "remark-math": "^6.0.0",
+    "scheduler": "^0.28.0"
   },
   "devDependencies": {
     "@types/react": "^19.3.0",

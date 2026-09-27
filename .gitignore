@@ -9,3 +9,4 @@ uv.lock
 node_modules/
 dist/
 *.tsbuildinfo
+.data/

@@ -7,8 +7,18 @@ import { tmpdir } from "node:os";
 import { webkit } from "playwright";
 
 const port = 4174;
-const server = spawn("pnpm", ["exec", "vite", "preview", "--port", String(port), "--strictPort"], { stdio: "ignore", detached: true });  // own process group, see the end
 const shots = process.env.SHOTS ?? tmpdir();  // screenshots, for looking at by hand
+// the notes server with a database of its own, and the built notebook in front of it (/api proxied)
+const notesPort = 4175;
+const notesUrl = `http://localhost:${notesPort}`;
+const database = join(tmpdir(), `electro-e2e-${Date.now()}.sqlite`);
+const notes = spawn("pnpm", ["exec", "tsx", "src/main.ts"], {
+  cwd: new URL("../../server/", import.meta.url), stdio: "ignore", detached: true,
+  env: { ...process.env, PORT: String(notesPort), DATABASE_PATH: database },
+});
+const server = spawn("pnpm", ["exec", "vite", "preview", "--port", String(port), "--strictPort"], {
+  stdio: "ignore", detached: true, env: { ...process.env, NOTES_SERVER: notesUrl },
+});  // own process groups, see the end
 let failed = false;
 const check = (name, ok) => {
   console.log(`${ok ? "ok  " : "FAIL"} ${name}`);
@@ -16,7 +26,10 @@ const check = (name, ok) => {
 };
 
 try {
-  await new Promise((r) => setTimeout(r, 1500));
+  for (let i = 0; i < 60; i++) {  // the notes server is up (and migrated)
+    if (await fetch(`${notesUrl}/api/health`).then((r) => r.ok, () => false)) break;
+    await new Promise((r) => setTimeout(r, 250));
+  }
   const browser = await webkit.launch();
   const page = await browser.newPage({ viewport: { width: 1100, height: 900 } });
   const errors = [];
@@ -330,10 +343,51 @@ try {
       && saved.title === "Stary notatnik" && !("data" in saved.cells[1]) && typeof saved.id === "string");
   }
 
+  // notes on the server: the open notebook saves itself; a second note; switching; a conflict
+  {
+    const library = page.locator(".library-panel");
+    const title = page.locator(".appbar .title");
+    const savedSign = page.locator(".sync.saved");
+    await page.getByRole("button", { name: "Notatki" }).click();
+    await library.locator("li.current").waitFor({ timeout: 10_000 });
+    const firstTitle = await title.inputValue();
+    check("the open notebook is on the server", (await library.locator("li.current .note-title").innerText()) === firstTitle);
+
+    const count = () => library.locator("li").count();
+    const waitForCount = (n) => page.waitForFunction((n) => document.querySelectorAll(".library-panel li").length === n, n, { timeout: 10_000 });
+    const before = await count();
+    await library.getByRole("button", { name: /Nowa/ }).click();
+    await title.fill("Druga notatka");
+    await waitForCount(before + 1);
+    await library.locator("li", { hasText: firstTitle }).locator(".open").click();
+    await page.waitForFunction((t) => document.querySelector(".appbar .title").value === t, firstTitle, { timeout: 10_000 });
+    check("a second note; switching back opens the first", (await count()) === before + 1
+      && (await page.locator(".cell").count()) > 1);
+
+    // someone saves the same note elsewhere (a direct call, as another tab would)
+    const id = await library.locator("li.current").getAttribute("data-id");
+    await savedSign.waitFor();
+    const note = await (await fetch(`${notesUrl}/api/notes/${id}`)).json();
+    await fetch(`${notesUrl}/api/notes/${id}`, { method: "PUT", headers: { "content-type": "application/json" },
+      body: JSON.stringify({ document: { ...note.document, title: "Zmienione gdzie indziej" }, baseRevision: note.revision }) });
+    await title.fill(`${firstTitle} (tutaj)`);
+    await page.locator(".sync.conflict").waitFor({ timeout: 10_000 });
+    await page.locator(".sync.conflict .icon-button").click();
+    await page.getByRole("button", { name: /Z serwera/ }).click();
+    await page.waitForFunction(() => document.querySelector(".appbar .title").value === "Zmienione gdzie indziej", null, { timeout: 10_000 });
+    check("a conflict is shown and resolved by taking the server's version", await savedSign.isVisible());
+
+    page.once("dialog", (d) => d.accept());
+    await library.locator("li", { hasText: "Druga notatka" }).locator(".delete").click({ force: true });
+    await waitForCount(before);
+    check("a note is deleted", (await (await fetch(`${notesUrl}/api/notes`)).json()).length === before);
+  }
+
   check("no page errors", errors.length === 0);
   if (errors.length) console.log(errors);
   await browser.close();
 } finally {
   process.kill(-server.pid);  // pnpm and the vite it started
+  process.kill(-notes.pid);
 }
 process.exit(failed ? 1 : 0);

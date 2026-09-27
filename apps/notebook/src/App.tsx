@@ -1,7 +1,11 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { CodeCell, MarkdownCell, SchematicCell } from "./cells/Cells";
-import { Bolt, Down, Export, More, Plus, RunAll, Trash, Up } from "./icons";
+import { Bolt, Down, Export, More, Notes, Plus, RunAll, Trash, Up } from "./icons";
+import { useAtom } from "@effect-atom/atom-react";
 import { copyOf } from "./format";
+import { libraryOpenAtom } from "./notes/atoms";
+import { Library, SyncStatus } from "./notes/Library";
+import { useNotesSync } from "./notes/sync";
 import { kernel } from "./python/kernel";
 import { download, load, newCell, save, upload } from "./storage";
 import symbols from "./schematic/symbols.json";
@@ -35,6 +39,12 @@ export function App() {
   const [running, setRunning] = useState<Set<string>>(new Set());
   const [focused, setFocused] = useState<string | null>(null);
   const executions = useRef(0);
+  // the notebook on the notes server: saved as it changes; other notes opened from the panel
+  const sync = useNotesSync(notebook, (next) => {
+    executions.current = 0;
+    setNotebook(next);
+  });
+  const [libraryOpen, setLibraryOpen] = useAtom(libraryOpenAtom);
   const fileInput = useRef<HTMLInputElement>(null);
   const latest = useRef(notebook);
   latest.current = notebook;
@@ -159,9 +169,12 @@ export function App() {
     <div className={`notebook ${notebook.settings.codeInPdf ? "" : "hide-code-in-print"}`}>
       {/* one line: logo, title — Python's state, run all, PDF, and the rest under "⋯" */}
       <header className="appbar no-print">
+        <button className={`icon-button ${libraryOpen ? "open" : ""}`} onClick={() => setLibraryOpen(!libraryOpen)}
+                title="Notatki" aria-label="Notatki" aria-expanded={libraryOpen}><Notes /></button>
         <div className="brand" title="electro — notatnik elektroniki"><Bolt /></div>
         <input className="title" value={notebook.title} placeholder="Bez tytułu" aria-label="Tytuł notatnika"
                onChange={(e) => setNotebook({ ...notebook, title: e.target.value })} />
+        <SyncStatus state={sync.state} onKeepMine={sync.keepMine} onTakeTheirs={sync.takeTheirs} />
         <div className={`status ${status}`} title={statusText} role="status" aria-label={statusText}>
           <span className="dot" /> Python
         </div>
@@ -188,7 +201,12 @@ export function App() {
         <input ref={fileInput} type="file" accept=".json" hidden onChange={(e) => open(e.target.files?.[0])} />
       </header>
 
-      <main>
+      {libraryOpen && (
+        <Library currentId={notebook.id} onOpen={sync.open} onCreate={sync.create}
+                 onDelete={(note) => confirm(`Usunąć notatkę „${note.title || "Bez tytułu"}”? Tego nie da się cofnąć.`)
+                   && sync.destroy(note.id)} />
+      )}
+      <main className={libraryOpen ? "beside-library" : ""}>
         <AddRow onAdd={(type) => insert(0, type)} />
         {notebook.cells.map((cell, index) => (
           <section

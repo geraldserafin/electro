@@ -35,4 +35,7 @@ export const Target = () => <Icon><circle cx="12" cy="12" r="7" /><circle cx="12
 export const RunAll = () => <Icon><path d="M4 6v12l8-6zM12 6v12l8-6z" fill="currentColor" stroke="none" /></Icon>;
 export const Export = () => <Icon><path d="M12 4v11M7.5 10.5L12 15l4.5-4.5" /><path d="M5 17v3h14v-3" /></Icon>;
 export const More = () => <Icon>{[6, 12, 18].map((x) => <circle key={x} cx={x} cy="12" r="1.6" fill="currentColor" stroke="none" />)}</Icon>;
+export const Cloud = () => <Icon><path d="M7 18.5h10.5a4 4 0 00.6-7.95A6 6 0 006.4 9.2 4.7 4.7 0 007 18.5z" /></Icon>;
+export const CloudOff = () => <Icon><path d="M7 18.5h10.5a4 4 0 00.6-7.95A6 6 0 006.4 9.2 4.7 4.7 0 007 18.5z" /><path d="M4 4l16 16" /></Icon>;
+export const Notes = () => <Icon><rect x="4" y="4" width="16" height="16" rx="2.5" /><path d="M9.5 4v16" /></Icon>;
 export const Chevron = () => <Icon size={14}><path d="M6 9l6 6 6-6" /></Icon>;
