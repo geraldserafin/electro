@@ -5,7 +5,7 @@ import { Exit } from "effect";
 import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router";
 import { Back } from "../icons";
-import { fromDocument, getNote, NOTES, removeNote } from "../notes/atoms";
+import { fromDocument, getNote } from "../notes/atoms";
 import { failure } from "../notes/sync";
 import { Notebook } from "../Notebook";
 import type { Notebook as NotebookData } from "../types";
@@ -20,7 +20,6 @@ export function NotePage() {
   const { ref = "" } = useParams();
   const navigate = useNavigate();
   const get = useAtomSet(getNote, { mode: "promiseExit" });
-  const remove = useAtomSet(removeNote, { mode: "promiseExit" });
   const [loaded, setLoaded] = useState<Loaded>({ kind: "loading" });
   const [reads, setReads] = useState(0); // "read it again" (after a conflict, or a failed read)
   // the addresses of the note on screen (its id, its slugs): a move between them is not a new note
@@ -50,7 +49,6 @@ export function NotePage() {
   }, [ref, reads, get, navigate]);
 
   if (loaded.kind === "ready") {
-    const title = loaded.notebook.title || "Bez tytułu";
     return (
       <Notebook
         key={`${loaded.notebook.id}:${reads}`} // a note read again starts afresh
@@ -61,21 +59,14 @@ export function NotePage() {
           addresses.current.add(slug);
           if (slug !== ref) navigate(`/notes/${slug}`, { replace: true });
         }}
-        onDelete={async () => {
-          if (!confirm(`Usunąć notatkę „${title}”? Tego nie da się cofnąć.`)) return;
-          const exit = await remove({ path: { id: loaded.notebook.id }, reactivityKeys: NOTES });
-          if (Exit.isSuccess(exit) || failure(exit.cause)?._tag === "NoteNotFound") navigate("/");
-          else alert("Nie udało się usunąć notatki — serwer jest niedostępny.");
-        }}
       />
     );
   }
   return (
     <div className="notebook">
-      <header className="appbar no-print">
+      <div className="float top-left no-print">
         <Link className="icon-button" to="/" title="Wszystkie notatki" aria-label="Wszystkie notatki"><Back /></Link>
-        <span className="spacer-title" />
-      </header>
+      </div>
       <div className="page-message">
         {loaded.kind === "loading" && <p className="muted">Wczytuję notatkę…</p>}
         {loaded.kind === "missing" && (

@@ -32,15 +32,16 @@ export function Home() {
 
   return (
     <div className="notebook">
-      <header className="appbar no-print">
-        <div className="brand" title="electro — notatnik elektroniki"><Bolt /></div>
+      <div className="float top-left no-print">
+        <span className="brand" title="electro — notatnik elektroniki"><Bolt /></span>
         <span className="app-name">electro</span>
-        <span className="spacer-title" />
-        <button className="icon-button" onClick={() => fileInput.current?.click()}
+      </div>
+      <div className="float-group top-right no-print">
+        <button className="float icon-button" onClick={() => fileInput.current?.click()}
                 title="Otwórz plik .electro.json jako nową notatkę" aria-label="Otwórz plik"><Upload /></button>
         <input ref={fileInput} type="file" accept=".json" hidden
                onChange={(e) => { const file = e.target.files?.[0]; e.target.value = ""; if (file) void start(async () => copyOf(await upload(file))); }} />
-      </header>
+      </div>
 
       <div className="gallery">
         <h1>Notatki</h1>

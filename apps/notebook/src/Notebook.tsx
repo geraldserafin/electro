@@ -1,16 +1,17 @@
 // One note, edited: its cells, running them, and saving it to the notes server as it changes.
 // The page (routes/NotePage.tsx) reads the note by its address and hands it over.
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router";
 import { CodeCell, MarkdownCell, SchematicCell } from "./cells/Cells";
-import { Back, Down, Export, More, Plus, RunAll, Trash, Up } from "./icons";
-import { SyncStatus } from "./notes/SyncStatus";
+import { Back, Down, Export, OutlineIcon, Plus, RunAll, Trash, Up } from "./icons";
+import { SyncNotice } from "./notes/SyncNotice";
 import { useNoteSync } from "./notes/sync";
 import { Outline } from "./Outline";
+import { TitleBox } from "./TitleBox";
 import { kernel } from "./python/kernel";
 import { usePython } from "./python/usePython";
 import symbols from "./schematic/symbols.json";
-import { download, newCell } from "./storage";
+import { newCell } from "./storage";
 import type { Cell, CellType, Notebook as NotebookData, SchematicData, SymbolLibrary } from "./types";
 
 // generated from electro_render.symbol_library() (scripts/make_symbols.py), so drawings
@@ -19,10 +20,10 @@ export const library = symbols as unknown as SymbolLibrary;
 
 /**
  * ``initial``/``revision``: the note as read from the server; ``reload``: read it again (after a
- * conflict, to take the server's version); ``onDelete``: remove it.
+ * conflict, to take the server's version).
  */
-export function Notebook({ initial, revision, reload, onDelete, onSaved }: {
-  initial: NotebookData; revision: number | null; reload: () => void; onDelete: () => void;
+export function Notebook({ initial, revision, reload, onSaved }: {
+  initial: NotebookData; revision: number | null; reload: () => void;
   onSaved?: (slug: string) => void; // after each save: the note's address (a new title may change it)
 }) {
   const [notebook, setNotebook] = useState<NotebookData>(initial);
@@ -113,42 +114,33 @@ export function Notebook({ initial, revision, reload, onDelete, onSaved }: {
     }
   };
 
-  const resetKernel = async () => {
-    await kernel.reset();
-    executions.current = 0;
-    setCells((cells) => cells.map((c) => (c.type === "code" ? { ...c, outputs: [], execution: undefined } : c)));
-  };
+
 
   return (
     <div className={`notebook ${notebook.settings.codeInPdf ? "" : "hide-code-in-print"}`}>
-      {/* one line: all notes, title — saved?, Python, run all, PDF, and the rest under "⋯" */}
-      <header className="appbar no-print">
-        <Link className="icon-button" to="/" title="Wszystkie notatki" aria-label="Wszystkie notatki"><Back /></Link>
-        <input className="title" value={notebook.title} placeholder="Bez tytułu" aria-label="Tytuł notatnika"
-               onChange={(e) => setNotebook({ ...notebook, title: e.target.value })} />
-        <SyncStatus state={sync.state} onKeepMine={sync.keepMine} onTakeTheirs={sync.takeTheirs} />
-        <div className={`status ${python.kind}`} title={python.text} role="status" aria-label={python.text}>
-          <span className="dot" /> Python
+      {/* no bar: floating islands (like Excalidraw) — the way back and the title on the left, the
+          note's actions on the right; the table of contents opens under them */}
+      {/* left: the way back, the title, and the table of contents' switch; right: run, PDF */}
+      <div className="float-group top-left no-print">
+        <div className="float">
+          <Link className="icon-button" to="/" title="Wszystkie notatki" aria-label="Wszystkie notatki"><Back /></Link>
+          <TitleBox title={notebook.title} onChange={(title) => setNotebook({ ...latest.current, title })} />
         </div>
-        <button className="icon-button" onClick={runAll} disabled={!ready}
-                title="Uruchom wszystko" aria-label="Uruchom wszystko"><RunAll /></button>
-        <button className="icon-button" onClick={() => window.print()} title="Eksport do PDF" aria-label="Eksport PDF">
+        <button className={`float icon-button ${outline ? "open" : ""}`} onClick={() => setOutline(!outline)} aria-pressed={outline}
+                title={outline ? "Zwiń spis treści" : "Spis treści"} aria-label="Spis treści">
+          <OutlineIcon />
+        </button>
+      </div>
+      <div className="float-group top-right no-print">
+        <button className={`float icon-button ${ready ? "" : "waiting"}`} onClick={runAll} disabled={!ready}
+                title={ready ? "Uruchom wszystko" : python.text} aria-label="Uruchom wszystko"><RunAll /></button>
+        <button className="float icon-button" onClick={() => window.print()} title="Eksport do PDF" aria-label="Eksport PDF">
           <Export />
         </button>
-        <Menu label={<More />} title="Więcej" right>
-          <button onClick={() => download(notebook)}>Zapisz plik</button>
-          <label className="check">
-            <input type="checkbox" checked={notebook.settings.codeInPdf}
-                   onChange={(e) => setNotebook({ ...notebook, settings: { ...notebook.settings, codeInPdf: e.target.checked } })} />
-            pokazuj kod w PDF
-          </label>
-          <button onClick={resetKernel} disabled={!ready}>Wyczyść pamięć Pythona</button>
-          <hr />
-          <button className="danger" onClick={onDelete}>Usuń notatkę</button>
-        </Menu>
-      </header>
+      </div>
+      <SyncNotice state={sync.state} onKeepMine={sync.keepMine} onTakeTheirs={sync.takeTheirs} />
 
-      <Outline cells={notebook.cells} open={outline} onToggle={() => setOutline(!outline)} />
+      <Outline cells={notebook.cells} open={outline} />
       <main>
         <AddRow onAdd={(type) => insert(0, type)} />
         {notebook.cells.map((cell, index) => (
@@ -215,31 +207,6 @@ function freeName(cells: Cell[]): string {
   return `Układ ${n}`;
 }
 
-function Menu({ label, title, right, children }: { label: ReactNode; title?: string; right?: boolean; children: ReactNode }) {
-  const [open, setOpen] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    if (!open) return;
-    const close = (event: PointerEvent) => {
-      if (!ref.current?.contains(event.target as Node)) setOpen(false);
-    };
-    document.addEventListener("pointerdown", close);
-    return () => document.removeEventListener("pointerdown", close);
-  }, [open]);
-  return (
-    <div className={`menu ${right ? "right" : ""}`} ref={ref}>
-      <button className={`icon-button ${open ? "open" : ""}`} onClick={() => setOpen(!open)} aria-haspopup="menu"
-              aria-expanded={open} title={title} aria-label={title}>
-        {label}
-      </button>
-      {open && (
-        <div className="menu-items" role="menu" onClick={(e) => (e.target as HTMLElement).tagName === "BUTTON" && setOpen(false)}>
-          {children}
-        </div>
-      )}
-    </div>
-  );
-}
 
 function AddRow({ onAdd }: { onAdd: (type: CellType) => void }) {
   return (

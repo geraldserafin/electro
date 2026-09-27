@@ -1,9 +1,9 @@
 // The table of contents: a panel on the right with the headings of the text cells and the
 // schematics, in order — one tile each, indented by level. A click scrolls there; the section
-// being read is lit. It lies over the page (in the margin, where there is room) and slides in and
-// out; folded, only its switch is left.
+// being read is lit. A floating island on the left (its switch is next to the title), centred on
+// the page's height, over the page — in the margin where there is room.
 import { useEffect, useMemo, useState } from "react";
-import { OutlineIcon, SchematicIcon } from "./icons";
+import { SchematicIcon } from "./icons";
 import type { Cell } from "./types";
 
 type Entry = { key: string; cell: string; nth: number; level: number; text: string; schematic?: boolean };
@@ -32,7 +32,7 @@ function place(e: Entry): HTMLElement | null {
 
 const plain = (s: string) => s.replace(/[*_`$]/g, "").replace(/\[(.*?)\]\(.*?\)/g, "$1").replace(/\\,/g, " ");
 
-export function Outline({ cells, open, onToggle }: { cells: Cell[]; open: boolean; onToggle: () => void }) {
+export function Outline({ cells, open }: { cells: Cell[]; open: boolean }) {
   const entries = useMemo(() => cells.flatMap(headings), [cells]);
   const [active, setActive] = useState<string | null>(null);
 
@@ -52,17 +52,9 @@ export function Outline({ cells, open, onToggle }: { cells: Cell[]; open: boolea
   }, [entries]);
 
   const top = Math.min(...entries.map((e) => e.level));
-  const toggle = (
-    <button className={`icon-button outline-toggle no-print ${open ? "open" : ""}`} onClick={onToggle} aria-pressed={open}
-            title={open ? "Zwiń spis treści" : "Spis treści"} aria-label="Spis treści">
-      <OutlineIcon />
-    </button>
-  );
   return (
     <>
-    {toggle}
     <nav className={`outline no-print ${open ? "open" : ""}`} aria-label="Spis treści" aria-hidden={!open} inert={!open}>
-      <header><h2>Spis treści</h2></header>
       {entries.length === 0 && <p className="outline-empty">Nagłówki z tekstu (<code># Tytuł</code>) i schematy pojawią się tutaj.</p>}
       <ul>
         {entries.map((e) => (

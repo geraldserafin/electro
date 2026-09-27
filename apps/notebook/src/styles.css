@@ -23,6 +23,9 @@
   --tool-active-text: #4a47b1;
   --primary: #6965db;
   --primary-hover: #5753d0;
+  /* the notebook's floating islands: neutral, one step off the page */
+  --surface: #ffffff;
+  --selected: #eceef1;
   /* type and code, as in Colab (its colours are VS Code's "Light+" / "Dark+") */
   --sans: "Google Sans", Roboto, ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
   --mono: "Roboto Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
@@ -63,6 +66,8 @@
     --tool-active-text: #d6d4ff;
     --primary: #a8a5ff;
     --primary-hover: #bbb8ff;
+    --surface: #262626;
+    --selected: #34353a;
     --hl-keyword: #569cd6;
     --hl-control: #c586c0;
     --hl-string: #ce9178;
@@ -115,20 +120,32 @@ input, textarea {
 }
 input:focus, textarea:focus { outline: 2px solid var(--accent-soft); border-color: var(--accent); }
 
-/* ---------------------------------------------------------------- top bar */
+/* ---------------------------------------------------------------- floating islands (no bar, like Excalidraw) */
 
-.appbar {
-  position: sticky;
-  top: 0;
+.float {
+  position: fixed;
+  top: 12px;
   z-index: 20;
   display: flex;
   align-items: center;
-  gap: 6px;
-  height: 52px;
-  padding: 0 12px;
-  background: var(--bg);
-  border-bottom: 1px solid var(--line);
+  gap: 2px;
+  padding: 4px;
+  border-radius: 12px;
+  background: var(--surface);
+  border: 1px solid var(--line);
 }
+.float.top-left { left: 12px; max-width: calc(50vw - 24px); }
+.float .icon-button { border-radius: 8px; }
+/* separate buttons, each its own island, in a row */
+.float-group { position: fixed; top: 12px; z-index: 20; display: flex; gap: 8px; }
+.float-group.top-left { left: 12px; max-width: calc(100vw - 150px); }
+.float-group.top-right { right: 12px; }
+.float-group.top-left > .float:first-child { min-width: 0; }
+.float-group .float { position: static; }
+.float.icon-button { width: 46px; height: 46px; padding: 0; border-radius: 12px; color: var(--text); }
+.float.icon-button:hover:not(:disabled) { background: var(--selected); }
+.float.icon-button.open { background: var(--selected); }
+.float.icon-button.waiting { animation: pulse 0.9s ease-in-out infinite alternate; } /* Python is starting */
 .brand {
   width: 32px;
   height: 32px;
@@ -136,21 +153,16 @@ input:focus, textarea:focus { outline: 2px solid var(--accent-soft); border-colo
   display: grid;
   place-items: center;
   color: #f9ab00;
-  background: var(--hover);
   flex: none;
-  margin-right: 4px;
 }
-.title {
-  flex: 1;
-  min-width: 0;
-  max-width: 640px;
-  margin-right: auto;
-  font-size: 18px;
-  border: 1px solid transparent;
-  background: transparent;
-  padding: 4px 8px;
+.app-name { font-size: 16px; font-weight: 500; padding: 0 10px 0 2px; }
+/* the note's title: a plain box, a click edits it */
+.title-box {
+  min-width: 0; max-width: 420px; height: 36px; line-height: 24px; padding: 6px 10px; border-radius: 8px;
+  font-size: 16px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: block;
 }
-.title:hover { border-color: var(--line); }
+.title-box.untitled { color: var(--muted); font-weight: 400; }
+.title-edit { height: 36px; font-size: 16px; font-weight: 500; padding: 5px 9px; border-radius: 8px; max-width: 420px; }
 .icon-button {
   display: inline-flex; align-items: center; justify-content: center; flex: none; /* also on links */
   width: 36px; height: 36px; padding: 0; border-radius: 50%; color: var(--muted);
@@ -193,7 +205,7 @@ input:focus, textarea:focus { outline: 2px solid var(--accent-soft); border-colo
 @keyframes pulse { to { opacity: 0.3; } }
 
 /* all notes: a gallery of first pages (like Figma's files) */
-.gallery { max-width: 1240px; margin: 0 auto; padding: 28px 32px 96px; }
+.gallery { max-width: 1240px; margin: 0 auto; padding: 84px 32px 96px; }
 .gallery h1 { margin: 0 0 20px; font-size: 22px; font-weight: 500; }
 .gallery h2 { margin: 48px 0 16px; font-size: 16px; font-weight: 500; color: var(--muted); }
 .gallery-note.error { color: var(--danger); }
@@ -241,33 +253,25 @@ input:focus, textarea:focus { outline: 2px solid var(--accent-soft); border-colo
                        display: flex; justify-content: center; margin: 8px 0 12px; }
 .page .print-drawing svg { max-width: 100%; height: auto; }
 
-/* the table of contents: a panel on the right, over the page (in its margin where there is room),
-   sliding in and out; one tile per section, the current one lit */
+/* the table of contents: a flat island under the note's actions (its switch), over the page —
+   in the margin where there is room; one tile per section, the current one lit */
 .outline {
-  position: fixed; top: 52px; right: 0; bottom: 0; z-index: 12; width: 280px;
-  overflow-y: auto; padding: 16px 12px 24px; background: var(--bg); border-left: 1px solid var(--line);
-  font-size: 14px;
-  transform: translateX(100%); opacity: 0; visibility: hidden;
-  transition: transform 0.24s cubic-bezier(0.2, 0.8, 0.2, 1), opacity 0.18s ease, visibility 0s linear 0.24s;
+  position: fixed; top: 50%; left: 12px; z-index: 19; width: 280px; max-height: min(72vh, calc(100vh - 150px));
+  overflow-y: auto; padding: 12px 8px; border-radius: 12px;
+  background: var(--surface); border: 1px solid var(--line); font-size: 14px;
+  transform: translate(-8px, -50%); opacity: 0; visibility: hidden; /* on the left, centred on the page's height */
+  transition: transform 0.2s cubic-bezier(0.2, 0.8, 0.2, 1), opacity 0.16s ease, visibility 0s linear 0.2s;
 }
 .outline.open {
-  transform: none; opacity: 1; visibility: visible; box-shadow: -8px 0 24px rgba(0, 0, 0, 0.08);
-  transition: transform 0.24s cubic-bezier(0.2, 0.8, 0.2, 1), opacity 0.18s ease, visibility 0s;
+  transform: translate(0, -50%); opacity: 1; visibility: visible;
+  transition: transform 0.2s cubic-bezier(0.2, 0.8, 0.2, 1), opacity 0.16s ease, visibility 0s;
 }
-.outline.open li { animation: tile-in 0.28s ease both; }
+.outline.open li { animation: tile-in 0.26s ease both; }
 .outline.open li:nth-child(n + 2) { animation-delay: 0.03s; }
 .outline.open li:nth-child(n + 4) { animation-delay: 0.06s; }
 .outline.open li:nth-child(n + 8) { animation-delay: 0.09s; }
-@keyframes tile-in { from { opacity: 0; transform: translateX(10px); } }
-.outline header { display: flex; align-items: center; height: 36px; margin: -6px 0 8px 44px; } /* room for the switch */
-.outline h2 { margin: 0; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: var(--faint); }
-/* its switch: alone at the right edge when folded; at the panel's top-left corner when open */
-.outline-toggle {
-  position: fixed; top: 62px; right: 12px; z-index: 13; border-radius: 8px;
-  transition: right 0.24s cubic-bezier(0.2, 0.8, 0.2, 1), background 0.1s, color 0.1s;
-}
-.outline-toggle.open { right: calc(280px - 12px - 36px); }
-@media (prefers-reduced-motion: reduce) { .outline, .outline.open, .outline-toggle, .outline.open li { transition: none; animation: none; } }
+@keyframes tile-in { from { opacity: 0; transform: translateX(-6px); } }
+@media (prefers-reduced-motion: reduce) { .outline, .outline.open, .outline.open li { transition: none; animation: none; } }
 .outline-empty { margin: 0 12px; color: var(--muted); font-size: 13px; }
 .outline ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 1px; }
 .outline a {
@@ -275,19 +279,11 @@ input:focus, textarea:focus { outline: 2px solid var(--accent-soft); border-colo
   color: var(--muted); text-decoration: none; line-height: 1.35; transition: background 0.1s, color 0.1s;
 }
 .outline a.depth-0 { color: var(--text); font-weight: 500; }
-.outline a:hover { background: var(--hover); color: var(--text); }
-.outline a.active { background: var(--tool-active); color: var(--tool-active-text); }
+.outline a:hover { background: var(--selected); color: var(--text); }
+.outline a.active { background: var(--selected); color: var(--text); font-weight: 500; }
 .outline a svg { flex: none; width: 15px; height: 15px; }
-.cell, .cell .markdown-view :is(h1, h2, h3) { scroll-margin-top: 72px; } /* below the sticky bar */
-.spacer-title { flex: 1; }
+.cell, .cell .markdown-view :is(h1, h2, h3) { scroll-margin-top: 72px; } /* below the islands */
 
-.sync { position: relative; }
-.sync.saving .icon-button { animation: pulse 0.8s ease-in-out infinite alternate; }
-.sync.saved .icon-button { color: var(--ok); }
-.sync.offline .icon-button { color: var(--faint); }
-.sync.conflict .icon-button, .sync.error .icon-button { color: var(--warn); background: var(--warn-bg); }
-.menu-items.conflict { left: auto; right: 0; min-width: 320px; padding: 8px 0; }
-.menu-items.conflict p { margin: 4px 16px 8px; font-size: 14px; color: var(--muted); }
 
 /* an empty notebook: the add buttons are always there */
 main > .add-row:only-child button, main > .add-row:has(+ .empty) button { visibility: visible; opacity: 1; }
@@ -297,7 +293,7 @@ main > .add-row:only-child button, main > .add-row:has(+ .empty) button { visibi
 main {
   max-width: 1120px;
   margin: 0 auto;
-  padding: 16px 24px 120px;
+  padding: 72px 24px 120px; /* under the floating islands */
 }
 .empty { color: var(--muted); text-align: center; }
 
@@ -674,3 +670,16 @@ kbd { font: 11px ui-monospace, monospace; border: 1px solid var(--line); border-
 .problems.error .problems-panel h4 { color: var(--danger); }
 .problems-panel .markdown p { margin: 4px 0; }
 .problems-panel .katex { white-space: nowrap; } /* break between names, never inside one */
+
+/* saving could not happen: a small notice at the bottom (nothing is shown while all is well) */
+.notice {
+  position: fixed; bottom: 16px; left: 50%; transform: translateX(-50%); z-index: 25;
+  display: flex; align-items: center; gap: 10px; max-width: calc(100vw - 32px);
+  padding: 8px 8px 8px 14px; border-radius: 12px; font-size: 14px;
+  background: var(--surface); border: 1px solid var(--line); color: var(--text);
+  animation: notice-in 0.2s ease both;
+}
+.notice svg { flex: none; color: var(--warn); }
+.notice button { padding: 5px 12px; border-radius: 8px; border: 1px solid var(--line); font-size: 14px; }
+.notice button:hover { background: var(--selected); }
+@keyframes notice-in { from { opacity: 0; transform: translate(-50%, 8px); } }
