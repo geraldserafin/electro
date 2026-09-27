@@ -118,41 +118,46 @@ input:focus, textarea:focus { outline: 2px solid var(--accent-soft); border-colo
 /* ---------------------------------------------------------------- top bar */
 
 .appbar {
+  position: sticky;
+  top: 0;
+  z-index: 20;
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 8px 16px 2px;
+  gap: 6px;
+  height: 52px;
+  padding: 0 12px;
+  background: var(--bg);
+  border-bottom: 1px solid var(--line);
 }
 .brand {
-  width: 36px;
-  height: 36px;
+  width: 32px;
+  height: 32px;
   border-radius: 8px;
   display: grid;
   place-items: center;
   color: #f9ab00;
   background: var(--hover);
   flex: none;
+  margin-right: 4px;
 }
-.titleblock { flex: 1; min-width: 0; }
 .title {
-  display: block;
-  width: 100%;
+  flex: 1;
+  min-width: 0;
   max-width: 640px;
-  font-size: 20px;
+  margin-right: auto;
+  font-size: 18px;
   border: 1px solid transparent;
   background: transparent;
-  padding: 2px 6px;
-  margin-left: -6px;
+  padding: 4px 8px;
 }
 .title:hover { border-color: var(--line); }
-.menubar { display: flex; gap: 2px; margin-left: -8px; }
+.icon-button { width: 36px; height: 36px; padding: 0; justify-content: center; border-radius: 50%; color: var(--muted); }
+.icon-button:hover:not(:disabled), .icon-button.open { color: var(--text); background: var(--hover); }
 .menu { position: relative; }
-.menu > button { color: var(--muted); padding: 2px 8px; gap: 2px; }
-.menu > button.open { background: var(--hover); color: var(--text); }
 .menu-items {
   position: absolute;
   z-index: 30;
-  top: 100%;
+  top: calc(100% + 4px);
   left: 0;
   min-width: 280px;
   padding: 6px 0;
@@ -161,13 +166,15 @@ input:focus, textarea:focus { outline: 2px solid var(--accent-soft); border-colo
   box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15), 0 8px 24px rgba(0, 0, 0, 0.12);
   display: grid;
 }
-.menu-items > button { justify-content: flex-start; border-radius: 0; padding: 7px 16px; }
+.menu.right .menu-items { left: auto; right: 0; }
+.menu-items > button { justify-content: flex-start; text-align: left; white-space: nowrap; border-radius: 0; padding: 7px 16px; }
 .menu-items hr { border: none; border-top: 1px solid var(--line); margin: 6px 0; width: 100%; }
 .menu-items .check { display: flex; gap: 8px; align-items: center; padding: 6px 16px; font-size: 14px; color: var(--muted); }
 .status {
   display: flex;
   align-items: center;
   gap: 6px;
+  margin-right: 6px;
   font-size: 13px;
   color: var(--muted);
   border: 1px solid var(--line);
@@ -182,18 +189,8 @@ input:focus, textarea:focus { outline: 2px solid var(--accent-soft); border-colo
 .status.error .dot { background: var(--danger); }
 @keyframes pulse { to { opacity: 0.3; } }
 
-.cellbar {
-  position: sticky;
-  top: 0;
-  z-index: 20;
-  display: flex;
-  align-items: center;
-  gap: 2px;
-  padding: 6px 12px;
-  background: var(--bg);
-  border-bottom: 1px solid var(--line);
-}
-.cellbar .spacer { flex: 1; }
+/* an empty notebook: the add buttons are always there */
+main > .add-row:only-child button, main > .add-row:has(+ .empty) button { visibility: visible; opacity: 1; }
 
 /* ---------------------------------------------------------------- cells */
 

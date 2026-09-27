@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { CodeCell, MarkdownCell, SchematicCell } from "./cells/Cells";
-import { Bolt, Chevron, Down, Play, Plus, Trash, Up } from "./icons";
+import { Bolt, Down, Export, More, Plus, RunAll, Trash, Up } from "./icons";
 import { kernel } from "./python/kernel";
 import { download, load, newCell, save, upload } from "./storage";
 import symbols from "./schematic/symbols.json";
@@ -156,49 +156,36 @@ export function App() {
 
   return (
     <div className={`notebook ${notebook.codeInPdf ? "" : "hide-code-in-print"}`}>
+      {/* one line: logo, title — Python's state, run all, PDF, and the rest under "⋯" */}
       <header className="appbar no-print">
         <div className="brand" title="electro — notatnik elektroniki"><Bolt /></div>
-        <div className="titleblock">
-          <input className="title" value={notebook.title} placeholder="Bez tytułu" aria-label="Tytuł notatnika"
-                 onChange={(e) => setNotebook({ ...notebook, title: e.target.value })} />
-          <nav className="menubar">
-            <Menu label="Plik">
-              <button onClick={() => fileInput.current?.click()}>Otwórz plik…</button>
-              <button onClick={() => download(notebook)}>Zapisz plik</button>
-              <hr />
-              {EXAMPLES.map((example, i) => (
-                <button key={i} onClick={() => openExample(example)}>Przykład: {example.title}</button>
-              ))}
-              <hr />
-              <button onClick={() => window.print()}>Eksport do PDF…</button>
-              <label className="check">
-                <input type="checkbox" checked={notebook.codeInPdf}
-                       onChange={(e) => setNotebook({ ...notebook, codeInPdf: e.target.checked })} />
-                pokazuj kod w PDF
-              </label>
-            </Menu>
-            <Menu label="Środowisko">
-              <button onClick={runAll} disabled={status !== "ready"}>Uruchom wszystko</button>
-              <button onClick={resetKernel} disabled={status !== "ready"}>Wyczyść pamięć Pythona</button>
-            </Menu>
-          </nav>
+        <input className="title" value={notebook.title} placeholder="Bez tytułu" aria-label="Tytuł notatnika"
+               onChange={(e) => setNotebook({ ...notebook, title: e.target.value })} />
+        <div className={`status ${status}`} title={statusText} role="status" aria-label={statusText}>
+          <span className="dot" /> Python
         </div>
-        <div className={`status ${status}`} title={statusText}>
-          <span className="dot" /> {statusText}
-        </div>
+        <button className="icon-button" onClick={runAll} disabled={status !== "ready"}
+                title="Uruchom wszystko" aria-label="Uruchom wszystko"><RunAll /></button>
+        <button className="icon-button" onClick={() => window.print()} title="Eksport do PDF" aria-label="Eksport PDF">
+          <Export />
+        </button>
+        <Menu label={<More />} title="Więcej" right>
+          <button onClick={() => fileInput.current?.click()}>Otwórz plik…</button>
+          <button onClick={() => download(notebook)}>Zapisz plik</button>
+          <hr />
+          {EXAMPLES.map((example, i) => (
+            <button key={i} onClick={() => openExample(example)}>Przykład: {example.title}</button>
+          ))}
+          <hr />
+          <label className="check">
+            <input type="checkbox" checked={notebook.codeInPdf}
+                   onChange={(e) => setNotebook({ ...notebook, codeInPdf: e.target.checked })} />
+            pokazuj kod w PDF
+          </label>
+          <button onClick={resetKernel} disabled={status !== "ready"}>Wyczyść pamięć Pythona</button>
+        </Menu>
         <input ref={fileInput} type="file" accept=".json" hidden onChange={(e) => open(e.target.files?.[0])} />
       </header>
-
-      <div className="cellbar no-print">
-        <button onClick={() => insert(notebook.cells.length, "code")}>+ Kod</button>
-        <button onClick={() => insert(notebook.cells.length, "markdown")}>+ Tekst</button>
-        <button onClick={() => insert(notebook.cells.length, "schematic")}>+ Schemat</button>
-        <span className="spacer" />
-        <button onClick={runAll} disabled={status !== "ready"} aria-label="Uruchom wszystko">
-          <Play /> Uruchom wszystko
-        </button>
-        <button className="primary" onClick={() => window.print()}>Eksport PDF</button>
-      </div>
 
       <main>
         <AddRow onAdd={(type) => insert(0, type)} />
@@ -227,7 +214,7 @@ export function App() {
             <AddRow onAdd={(type) => insert(index + 1, type)} />
           </section>
         ))}
-        {!notebook.cells.length && <p className="empty">Pusty notatnik — dodaj komórkę przyciskami powyżej.</p>}
+        {!notebook.cells.length && <p className="empty">Pusty notatnik — dodaj pierwszą komórkę przyciskami powyżej.</p>}
       </main>
     </div>
   );
@@ -241,7 +228,7 @@ function freeName(cells: Cell[]): string {
   return `Układ ${n}`;
 }
 
-function Menu({ label, children }: { label: string; children: ReactNode }) {
+function Menu({ label, title, right, children }: { label: ReactNode; title?: string; right?: boolean; children: ReactNode }) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -253,9 +240,10 @@ function Menu({ label, children }: { label: string; children: ReactNode }) {
     return () => document.removeEventListener("pointerdown", close);
   }, [open]);
   return (
-    <div className="menu" ref={ref}>
-      <button className={open ? "open" : ""} onClick={() => setOpen(!open)} aria-haspopup="menu" aria-expanded={open}>
-        {label} <Chevron />
+    <div className={`menu ${right ? "right" : ""}`} ref={ref}>
+      <button className={`icon-button ${open ? "open" : ""}`} onClick={() => setOpen(!open)} aria-haspopup="menu"
+              aria-expanded={open} title={title} aria-label={title}>
+        {label}
       </button>
       {open && (
         <div className="menu-items" role="menu" onClick={(e) => (e.target as HTMLElement).tagName === "BUTTON" && setOpen(false)}>

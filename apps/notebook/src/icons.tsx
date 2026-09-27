@@ -32,4 +32,7 @@ export const WarningIcon = () => <Icon><path d="M12 4L2.5 20h19z" /><path d="M12
 export const Pencil = () => <Icon size={16}><path d="M4 20h4L19 9l-4-4L4 16z" /><path d="M13.5 6.5l4 4" /></Icon>;
 export const Eye = () => <Icon size={16}><path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12z" /><circle cx="12" cy="12" r="2.8" /></Icon>;
 export const Target = () => <Icon><circle cx="12" cy="12" r="7" /><circle cx="12" cy="12" r="2" fill="currentColor" /><path d="M12 2v3M12 19v3M2 12h3M19 12h3" /></Icon>;
+export const RunAll = () => <Icon><path d="M4 6v12l8-6zM12 6v12l8-6z" fill="currentColor" stroke="none" /></Icon>;
+export const Export = () => <Icon><path d="M12 4v11M7.5 10.5L12 15l4.5-4.5" /><path d="M5 17v3h14v-3" /></Icon>;
+export const More = () => <Icon>{[6, 12, 18].map((x) => <circle key={x} cx={x} cy="12" r="1.6" fill="currentColor" stroke="none" />)}</Icon>;
 export const Chevron = () => <Icon size={14}><path d="M6 9l6 6 6-6" /></Icon>;

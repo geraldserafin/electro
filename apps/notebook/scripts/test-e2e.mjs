@@ -20,7 +20,7 @@ try {
   const errors = [];
   page.on("pageerror", (e) => errors.push(String(e)));
   await page.goto(`http://localhost:${port}/`);
-  await page.getByText("Python gotowy").waitFor({ timeout: 120_000 });
+  await page.locator(".appbar .status.ready").waitFor({ timeout: 120_000 });
   check("pyodide starts in the worker", true);
 
   await page.getByRole("button", { name: "Uruchom wszystko" }).click();
@@ -37,6 +37,13 @@ try {
     await scope.getByRole("button", { name: "Elementy" }).click();
     await scope.locator(`.library-item[title="${name}"]`).click();
     await scope.getByRole("button", { name: "Elementy" }).click();
+  };
+
+  // a new cell at the end: the add buttons on the last cell's bottom edge
+  const addAtEnd = async (name) => {
+    const edge = page.locator(".cell").last().locator(":scope > .add-row");
+    await edge.hover();
+    await edge.getByRole("button", { name }).click();
   };
 
   // a schematic cell's code, through its Kod view (and back to the drawing)
@@ -176,7 +183,7 @@ try {
   await canvas.screenshot({ path: `${shots}/editor.png` });
 
   // wiring by hand in a fresh schematic: drag from a pin, then the wire tool; rotation
-  await page.locator(".cellbar").getByRole("button", { name: "+ Schemat" }).click();
+  await addAtEnd("Schemat");
   const cell = page.locator(".cell-schematic").last();  // added at the end of the notebook
   await cell.scrollIntoViewIfNeeded();
   const grid = cell.locator(".board .canvas");
@@ -243,7 +250,7 @@ try {
   await cell.locator(".name-edit input").fill("Mój obwód");
   const hint = await cell.locator(".name-edit code").textContent();
   await page.keyboard.press("Enter");
-  await page.locator(".cellbar").getByRole("button", { name: "+ Kod" }).click();
+  await addAtEnd("Kod");
   const user = page.locator(".cell-code").last();
   await user.locator(".cm-content").click();
   await page.keyboard.insertText("mójobwód.solve(I_R_1=1)\ndisplay(schematic(mójobwód))");
@@ -253,7 +260,7 @@ try {
 
   // the examples notebook from the menu runs without a single error
   page.once("dialog", (d) => d.accept());
-  await page.getByRole("button", { name: "Plik" }).click();
+  await page.getByRole("button", { name: "Więcej" }).click();
   await page.getByRole("button", { name: "Przykład: Przykłady: niewiadome i dziury" }).click();
   await page.getByRole("button", { name: "Uruchom wszystko" }).click();
   await page.locator(".cell-code").last().locator(".outputs").waitFor({ timeout: 60_000 });
