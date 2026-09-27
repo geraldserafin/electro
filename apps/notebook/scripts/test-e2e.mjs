@@ -31,7 +31,7 @@ try {
     await new Promise((r) => setTimeout(r, 250));
   }
   const browser = await webkit.launch();
-  const page = await browser.newPage({ viewport: { width: 1100, height: 900 } });
+  const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
   const errors = [];
   page.on("pageerror", (e) => errors.push(String(e)));
   // / : all notes (none yet) and the examples; an example becomes a note at /notes/:id
@@ -303,9 +303,7 @@ try {
   {
     await page.setViewportSize({ width: 1700, height: 900 });
     const outline = page.locator("nav.outline");
-    const toggle = page.getByRole("button", { name: "Spis treści" });
-    await toggle.click();
-    await outline.waitFor();
+    await outline.waitFor(); // always there, under the title
     const entries = await outline.locator("a").allInnerTexts();
     await outline.getByRole("link", { name: "5. Za mało danych" }).click();
     await page.waitForTimeout(800);
@@ -313,10 +311,7 @@ try {
     check("table of contents: headings, a click scrolls there, the section is marked",
       entries.includes("1. Nieznany opór z pomiaru napięcia") && top > 40 && top < 140
       && (await outline.locator("a.active").innerText()) === "5. Za mało danych");
-    await toggle.click();
-    await page.waitForTimeout(400); // it slides out
-    check("table of contents: the button hides it", !(await outline.isVisible()));
-    await page.setViewportSize({ width: 1100, height: 900 });
+    await page.setViewportSize({ width: 1440, height: 900 });
   }
 
 

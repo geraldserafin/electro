@@ -1,6 +1,6 @@
 // The table of contents: the headings of the text cells and the schematics, in order — one tile
-// each, indented by level, under the title in the sidebar the title's island unfolds into. A
-// click scrolls there; the section being read is lit.
+// each, indented by level, under the title in the note's sidebar. A click scrolls there; the
+// section being read is lit.
 import { useEffect, useMemo, useState } from "react";
 import { SchematicIcon } from "./icons";
 import type { Cell } from "./types";
@@ -31,7 +31,7 @@ function place(e: Entry): HTMLElement | null {
 
 const plain = (s: string) => s.replace(/[*_`$]/g, "").replace(/\[(.*?)\]\(.*?\)/g, "$1").replace(/\\,/g, " ");
 
-export function Outline({ cells, open }: { cells: Cell[]; open: boolean }) {
+export function Outline({ cells }: { cells: Cell[] }) {
   const entries = useMemo(() => cells.flatMap(headings), [cells]);
   const [active, setActive] = useState<string | null>(null);
 
@@ -53,7 +53,7 @@ export function Outline({ cells, open }: { cells: Cell[]; open: boolean }) {
   const top = Math.min(...entries.map((e) => e.level));
   return (
     <>
-    <nav className={`outline no-print ${open ? "open" : ""}`} aria-label="Spis treści" aria-hidden={!open} inert={!open}>
+    <nav className="outline no-print" aria-label="Spis treści">
       {entries.length === 0 && <p className="outline-empty">Nagłówki z tekstu (<code># Tytuł</code>) i schematy pojawią się tutaj.</p>}
       <ul>
         {entries.map((e) => (

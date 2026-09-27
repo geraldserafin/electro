@@ -84,6 +84,10 @@
 
 * { box-sizing: border-box; }
 
+/* the whole app a little smaller: 100% here is 80% of the sizes below (not in print: the PDF keeps them) */
+:root { zoom: 0.8; }
+@media print { :root { zoom: 1; } }
+
 body {
   margin: 0;
   background: var(--bg);
@@ -138,6 +142,7 @@ input:focus, textarea:focus { outline: 2px solid var(--accent-soft); border-colo
 .float .icon-button { border-radius: 8px; }
 /* separate buttons, each its own island, in a row */
 .float-group { position: fixed; top: 12px; z-index: 20; display: flex; gap: 8px; }
+.float-group.top-left { left: 12px; }
 .float-group.top-right { right: 12px; }
 .float-group .float { position: static; }
 .float.icon-button { width: 46px; height: 46px; padding: 0; border-radius: 12px; color: var(--text); }
@@ -251,32 +256,23 @@ input:focus, textarea:focus { outline: 2px solid var(--accent-soft); border-colo
                        display: flex; justify-content: center; margin: 8px 0 12px; }
 .page .print-drawing svg { max-width: 100%; height: auto; }
 
-/* a note's top-left island (back, title, the table of contents' switch) unfolds into a sidebar:
-   it grows down and to 300 px, the sections appear under the title, the note moves aside */
+/* a note's sidebar, under the app's island: the title, the sections under it; the note beside it */
 .note-nav {
-  position: fixed; top: 12px; left: 12px; z-index: 20;
-  display: flex; flex-direction: column;
-  min-width: 0; max-width: min(420px, calc(100vw - 150px)); height: 46px; padding: 4px;
+  position: fixed; top: 80px; left: 12px; bottom: 12px; z-index: 20; width: 300px; /* under the app's islands */
+  display: flex; flex-direction: column; padding: 4px;
   overflow: hidden; border-radius: 12px; background: var(--surface); border: 1px solid var(--line);
-  transition: height 0.3s cubic-bezier(0.2, 0.8, 0.2, 1), min-width 0.3s cubic-bezier(0.2, 0.8, 0.2, 1),
-              max-width 0.3s cubic-bezier(0.2, 0.8, 0.2, 1);
 }
-.note-nav.open { height: calc(100vh - 24px); min-width: 300px; max-width: 300px; }
 .note-nav-head { flex: none; display: flex; align-items: center; gap: 2px; height: 36px; min-width: 0; }
 .note-nav-head .title-box { flex: 1; }
 .note-nav-head .icon-button { border-radius: 8px; }
-.outline {
-  flex: 1; min-height: 0; overflow-y: auto; margin-top: 10px; padding: 0 0 8px; font-size: 14px;
-  opacity: 0; visibility: hidden; transition: opacity 0.15s ease, visibility 0s linear 0.15s;
-}
-.outline.open { opacity: 1; visibility: visible; transition: opacity 0.2s ease 0.1s, visibility 0s; }
-.outline.open li { animation: tile-in 0.26s ease both 0.08s; }
-.outline.open li:nth-child(n + 2) { animation-delay: 0.11s; }
-.outline.open li:nth-child(n + 4) { animation-delay: 0.14s; }
-.outline.open li:nth-child(n + 8) { animation-delay: 0.17s; }
-main { transition: padding-left 0.3s cubic-bezier(0.2, 0.8, 0.2, 1), max-width 0.3s cubic-bezier(0.2, 0.8, 0.2, 1); }
+.outline { flex: 1; min-height: 0; overflow-y: auto; margin-top: 10px; padding: 0 0 8px; font-size: 14px; }
 main.with-nav { max-width: calc(1120px + 312px); padding-left: calc(24px + 312px); }
-@media (max-width: 900px) { main.with-nav { padding-left: 24px; max-width: none; } } /* narrow: it covers */
+/* narrow: no room for both — the title alone */
+@media (max-width: 900px) {
+  .note-nav { bottom: auto; width: auto; max-width: calc(100vw - 24px); }
+  .note-nav .outline { display: none; }
+  main.with-nav { padding-left: 24px; max-width: none; }
+}
 /* the title, the note's first heading (in the PDF too) */
 input.doc-title {
   display: block; width: 100%; margin: 0 0 4px; padding: 4px 8px 4px 65px; border: none; border-radius: 8px; /* in line with the cells' text */
@@ -285,8 +281,6 @@ input.doc-title {
 input.doc-title::placeholder { color: var(--faint); }
 input.doc-title:focus { outline: none; background: var(--hover); }
 h1.doc-title { font-size: 26pt; font-weight: 600; margin: 0 0 12pt; }
-@media (prefers-reduced-motion: reduce) { .note-nav, main, .outline, .outline.open li { transition: none; animation: none; } }
-@keyframes tile-in { from { opacity: 0; transform: translateX(-6px); } }
 .outline-empty { margin: 0 12px; color: var(--muted); font-size: 13px; }
 .outline ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 1px; }
 .outline a {

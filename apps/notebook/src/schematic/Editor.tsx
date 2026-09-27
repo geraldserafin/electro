@@ -72,7 +72,12 @@ export function SchematicEditor({ value, onChange, library, results, topLeft, to
     svgRef.current?.focus({ preventScroll: true });
     setActive(true); // as if clicked: keys and the wheel go to the board
   }, []);
-  const pan = useRef<{ x: number; y: number; cam: Camera; moved: boolean; click: boolean } | null>(null);
+  const pan = useRef<{ x: number; y: number; cam: Camera; moved: boolean; click: boolean; k: number } | null>(null);
+  /** Screen px per CSS px of the board (not 1 when the page is scaled, e.g. CSS zoom). */
+  const screenScale = () => {
+    const el = viewRef.current;
+    return el && el.clientWidth ? el.getBoundingClientRect().width / el.clientWidth : 1;
+  };
 
   // the size of the board on screen: the camera shows view.w × view.h screen px
   const [view, setView] = useState({ w: 800, h: 480 });
@@ -126,7 +131,8 @@ export function SchematicEditor({ value, onChange, library, results, topLeft, to
       const rect = el.getBoundingClientRect();
       // a trackpad pinch sends small steps, a mouse wheel big ones: cap a step at ~28%
       const step = Math.max(-25, Math.min(25, event.deltaY));
-      if (zooming) zoomAround(Math.exp(-step * 0.01), event.clientX - rect.left, event.clientY - rect.top);
+      const k = screenScale(); // the cursor's place on the board, in board px
+      if (zooming) zoomAround(Math.exp(-step * 0.01), (event.clientX - rect.left) / k, (event.clientY - rect.top) / k);
       else setCam((c) => ({ ...c, x: c.x + event.deltaX / c.zoom, y: c.y + event.deltaY / c.zoom }));
     };
     el.addEventListener("wheel", onWheel, { passive: false });
@@ -229,7 +235,7 @@ export function SchematicEditor({ value, onChange, library, results, topLeft, to
   /** Drag the view. From empty space in select mode a click without dragging deselects. */
   const startPan = (event: ReactPointerEvent, click: boolean) => {
     svgRef.current?.focus({ preventScroll: true });
-    pan.current = { x: event.clientX, y: event.clientY, cam, moved: false, click };
+    pan.current = { x: event.clientX, y: event.clientY, cam, moved: false, click, k: screenScale() };
     svgRef.current?.setPointerCapture(event.pointerId);
   };
 
@@ -425,7 +431,8 @@ export function SchematicEditor({ value, onChange, library, results, topLeft, to
             if (p) {
               const [dx, dy] = [event.clientX - p.x, event.clientY - p.y];
               if (Math.abs(dx) + Math.abs(dy) > 3) p.moved = true;
-              if (p.moved) setCam({ ...p.cam, x: p.cam.x - dx / p.cam.zoom, y: p.cam.y - dy / p.cam.zoom });
+              // the drawing follows the pointer exactly (screen px → board px → drawing px)
+              if (p.moved) setCam({ ...p.cam, x: p.cam.x - dx / p.k / p.cam.zoom, y: p.cam.y - dy / p.k / p.cam.zoom });
               return;
             }
             onMove(event);
