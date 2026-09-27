@@ -36,6 +36,7 @@ export function Notebook({ initial, revision, reload, onSaved }: {
   latest.current = notebook;
   const ready = python.kind === "ready";
   const [outline, setOutline] = useOutlineOpen();
+  const setTitle = (title: string) => setNotebook({ ...latest.current, title });
 
   // each note starts with a clean Python: variables of another note do not leak into this one
   useEffect(() => {
@@ -118,19 +119,19 @@ export function Notebook({ initial, revision, reload, onSaved }: {
 
   return (
     <div className={`notebook ${notebook.settings.codeInPdf ? "" : "hide-code-in-print"}`}>
-      {/* no bar: floating islands (like Excalidraw) — the way back and the title on the left, the
-          note's actions on the right; the table of contents opens under them */}
-      {/* left: the way back, the title, and the table of contents' switch; right: run, PDF */}
-      <div className="float-group top-left no-print">
-        <div className="float">
+      {/* left: the way back, the title and the table of contents' switch — an island that unfolds
+          into a sidebar with the sections under the title; right: run, PDF */}
+      <aside className={`note-nav no-print ${outline ? "open" : ""}`}>
+        <div className="note-nav-head">
           <Link className="icon-button" to="/" title="Wszystkie notatki" aria-label="Wszystkie notatki"><Back /></Link>
-          <TitleBox title={notebook.title} onChange={(title) => setNotebook({ ...latest.current, title })} />
+          <TitleBox title={notebook.title} onChange={setTitle} />
+          <button className={`icon-button ${outline ? "open" : ""}`} onClick={() => setOutline(!outline)} aria-pressed={outline}
+                  title={outline ? "Zwiń spis treści" : "Spis treści"} aria-label="Spis treści">
+            <OutlineIcon />
+          </button>
         </div>
-        <button className={`float icon-button ${outline ? "open" : ""}`} onClick={() => setOutline(!outline)} aria-pressed={outline}
-                title={outline ? "Zwiń spis treści" : "Spis treści"} aria-label="Spis treści">
-          <OutlineIcon />
-        </button>
-      </div>
+        <Outline cells={notebook.cells} open={outline} />
+      </aside>
       <div className="float-group top-right no-print">
         <button className={`float icon-button ${ready ? "" : "waiting"}`} onClick={runAll} disabled={!ready}
                 title={ready ? "Uruchom wszystko" : python.text} aria-label="Uruchom wszystko"><RunAll /></button>
@@ -140,8 +141,11 @@ export function Notebook({ initial, revision, reload, onSaved }: {
       </div>
       <SyncNotice state={sync.state} onKeepMine={sync.keepMine} onTakeTheirs={sync.takeTheirs} />
 
-      <Outline cells={notebook.cells} open={outline} />
-      <main>
+      <main className={outline ? "with-nav" : ""}>
+        {/* the title is the note's first heading too (and the PDF's) */}
+        <input className="doc-title no-print" value={notebook.title} placeholder="Bez tytułu" aria-label="Tytuł"
+               spellCheck={false} onChange={(e) => setTitle(e.target.value)} />
+        {notebook.title && <h1 className="doc-title print-only">{notebook.title}</h1>}
         <AddRow onAdd={(type) => insert(0, type)} />
         {notebook.cells.map((cell, index) => (
           <section

@@ -1,7 +1,6 @@
-// The table of contents: a panel on the right with the headings of the text cells and the
-// schematics, in order — one tile each, indented by level. A click scrolls there; the section
-// being read is lit. A floating island on the left (its switch is next to the title), centred on
-// the page's height, over the page — in the margin where there is room.
+// The table of contents: the headings of the text cells and the schematics, in order — one tile
+// each, indented by level, under the title in the sidebar the title's island unfolds into. A
+// click scrolls there; the section being read is lit.
 import { useEffect, useMemo, useState } from "react";
 import { SchematicIcon } from "./icons";
 import type { Cell } from "./types";
