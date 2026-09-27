@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { CodeCell, MarkdownCell, SchematicCell } from "./cells/Cells";
 import { Bolt, Down, Export, More, Plus, RunAll, Trash, Up } from "./icons";
+import { copyOf } from "./format";
 import { kernel } from "./python/kernel";
 import { download, load, newCell, save, upload } from "./storage";
 import symbols from "./schematic/symbols.json";
@@ -12,7 +13,7 @@ const library = symbols as unknown as SymbolLibrary;
 
 type Status = "loading" | "ready" | "error";
 
-/** Every notebook in examples/ shows up in the Plik menu (and opens with ?przyklad=<name>). */
+/** Every notebook in examples/ shows up in the ⋯ menu (and opens with ?przyklad=<name>). */
 const EXAMPLE_FILES = import.meta.glob<Notebook>("../examples/*.electro.json", { eager: true, import: "default" });
 const EXAMPLES = Object.values(EXAMPLE_FILES);
 
@@ -24,7 +25,7 @@ function fromAddress(): Notebook | null {
   params.delete("przyklad");
   history.replaceState(null, "", location.pathname + (params.size ? `?${params}` : ""));
   const found = Object.entries(EXAMPLE_FILES).find(([path]) => path.endsWith(`/${name}.electro.json`));
-  return found ? structuredClone(found[1]) : null;
+  return found ? copyOf(found[1]) : null;
 }
 
 export function App() {
@@ -150,12 +151,12 @@ export function App() {
   };
 
   const openExample = (example: Notebook) => {
-    if (confirm("Otworzyć przykład? Bieżący notatnik zostanie zastąpiony (zapisz go wcześniej przez Plik → Zapisz)."))
-      setNotebook(structuredClone(example));
+    if (confirm("Otworzyć przykład? Bieżący notatnik zostanie zastąpiony (zapisz go wcześniej: ⋯ → Zapisz plik)."))
+      setNotebook(copyOf(example));
   };
 
   return (
-    <div className={`notebook ${notebook.codeInPdf ? "" : "hide-code-in-print"}`}>
+    <div className={`notebook ${notebook.settings.codeInPdf ? "" : "hide-code-in-print"}`}>
       {/* one line: logo, title — Python's state, run all, PDF, and the rest under "⋯" */}
       <header className="appbar no-print">
         <div className="brand" title="electro — notatnik elektroniki"><Bolt /></div>
@@ -178,8 +179,8 @@ export function App() {
           ))}
           <hr />
           <label className="check">
-            <input type="checkbox" checked={notebook.codeInPdf}
-                   onChange={(e) => setNotebook({ ...notebook, codeInPdf: e.target.checked })} />
+            <input type="checkbox" checked={notebook.settings.codeInPdf}
+                   onChange={(e) => setNotebook({ ...notebook, settings: { ...notebook.settings, codeInPdf: e.target.checked } })} />
             pokazuj kod w PDF
           </label>
           <button onClick={resetKernel} disabled={status !== "ready"}>Wyczyść pamięć Pythona</button>

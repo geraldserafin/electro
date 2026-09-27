@@ -1,6 +1,8 @@
 // End-to-end check in a real browser engine: Pyodide starts in the worker, the example
 // notebook runs, outputs appear, and a schematic element can be placed and dragged.
-import { spawn } from "node:child_process";
+import { execFileSync, spawn } from "node:child_process";
+import { writeFileSync } from "node:fs";
+import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { webkit } from "playwright";
 
@@ -298,6 +300,34 @@ try {
     const box = await first.boundingBox();
     await page.mouse.move(box.x + 300, box.y + box.height + 4); // just below the cell's edge
     check("add buttons show on the edge only", hiddenInside && await pill.isVisible());
+  }
+
+  // the file: saved here, read by Python (electro_notes) — and an old (v1) file opens, migrated
+  {
+    await page.getByRole("button", { name: "Więcej" }).click();
+    const [download] = await Promise.all([page.waitForEvent("download"), page.getByRole("button", { name: "Zapisz plik" }).click()]);
+    const file = join(shots, "zapisany.electro.json");
+    await download.saveAs(file);
+    let python = "";
+    try {
+      python = execFileSync("python", ["-m", "electro_notes", "check", file], { encoding: "utf8" });
+    } catch (error) {
+      python = String(error.stdout ?? error);
+    }
+    check("a saved notebook is read by Python", python.includes("Notebook('Przykłady: niewiadome i dziury'"));
+    if (!python.includes("Notebook(")) console.log(python);
+
+    const old = join(shots, "stary.electro.json");
+    writeFileSync(old, JSON.stringify({ version: 1, title: "Stary notatnik", codeInPdf: true, cells: [
+      { id: "a", type: "markdown", source: "Tekst z **wersji 1**" },
+      { id: "b", type: "schematic", name: "mostek", schematic: { elements: [], wires: [] }, data: "I_A_1 = 0", outputs: [] },
+    ] }));
+    await page.locator('.appbar input[type="file"]').setInputFiles(old);
+    await page.locator(".appbar .title").and(page.locator('[value="Stary notatnik"]')).waitFor({ timeout: 5_000 });
+    await page.waitForTimeout(600);
+    const saved = await page.evaluate(() => JSON.parse(localStorage.getItem("electro-notebook")));
+    check("an old (v1) file opens, migrated to the current format", saved.version === 2 && saved.format === "electro-notebook"
+      && saved.title === "Stary notatnik" && !("data" in saved.cells[1]) && typeof saved.id === "string");
   }
 
   check("no page errors", errors.length === 0);

@@ -1,20 +1,26 @@
 {
-  "version": 1,
+  "format": "electro-notebook",
+  "version": 2,
+  "id": "przyklad-nieznane-i-dziury",
   "title": "Przykłady: niewiadome i dziury",
-  "codeInPdf": true,
+  "created": "2026-09-27T00:00:00Z",
+  "modified": "2026-09-27T00:00:00Z",
+  "settings": {
+    "codeInPdf": true
+  },
   "cells": [
     {
-      "id": "32e7789c",
+      "id": "5162831f",
       "type": "markdown",
       "source": "Każdy przykład to osobna komórka — uruchom wszystko przyciskiem **▶ Uruchom wszystko** albo pojedynczo (`Shift+Enter`).\nWartość elementu, której nie znasz, zostawiasz pustą: `Resistor()`. Solver szuka jej z dodatkowych danych\n(`I_R_1=…`, `U_R_2=…`, `P_R_1=…`). Każda niewiadoma potrzebuje jednej **niezależnej** danej."
     },
     {
-      "id": "7093176a",
+      "id": "30863a8f",
       "type": "markdown",
       "source": "## 1. Nieznany opór z pomiaru napięcia"
     },
     {
-      "id": "71c52c77",
+      "id": "91ea7794",
       "type": "code",
       "source": "dzielnik = supply(12) + Resistor(100) + Resistor() + ground\nsol = dzielnik.solve(U_R_2=4, find=\"R_2\")\nsteps(sol)",
       "outputs": [
@@ -25,12 +31,12 @@
       ]
     },
     {
-      "id": "67d175cc",
+      "id": "b4eec264",
       "type": "markdown",
       "source": "## 2. Nieznane źródło\nNapięcie źródła też może być niewiadomą. Tu wychodzi dodatnie — źródło jest skierowane tak, jak je narysowaliśmy."
     },
     {
-      "id": "7aa78f0d",
+      "id": "35cfae7a",
       "type": "code",
       "source": "petla = loop(VoltageSource(), Resistor(10), Resistor(20))\npetla.solve(I_R_1=\"0,5\", find=\"E_1\")",
       "outputs": [
@@ -41,12 +47,12 @@
       ]
     },
     {
-      "id": "2af41c3b",
+      "id": "8bd1681b",
       "type": "markdown",
       "source": "## 3. Minus w wyniku = odwrotna polaryzacja\nDwa źródła w jednej pętli. Prąd 2 A przez 4 Ω daje 8 V, a pierwsze źródło ma 12 V — więc drugie musi\n*odbierać* 4 V. Ujemny wynik znaczy: to źródło jest w rzeczywistości skierowane odwrotnie niż w zapisie."
     },
     {
-      "id": "f998f615",
+      "id": "86878f12",
       "type": "code",
       "source": "dwa_zrodla = loop(VoltageSource(12), Resistor(4), VoltageSource())\ndwa_zrodla.solve(I_R_1=2, find=\"E_2\")",
       "outputs": [
@@ -57,12 +63,12 @@
       ]
     },
     {
-      "id": "826ccee4",
+      "id": "a8248c06",
       "type": "markdown",
       "source": "## 4. Kilka niewiadomych naraz\nTrzy niewiadome (R₁, R₃, E₂) i trzy pomiary. Gałęzie są czytane od masy w górę, a `.transpose()` przy R₂ i R₃\nsprawia, że ich napięcie i prąd liczymy „w dół” — tak, jak mierzyliśmy."
     },
     {
-      "id": "1eddbf8f",
+      "id": "c5b1c1fc",
       "type": "code",
       "source": "uklad = (\n    (VoltageSource(12) + Resistor())\n    | Resistor(4).transpose()\n    | ((Resistor().transpose() | CurrentSource(1)) + VoltageSource().transpose())\n)\nsol = uklad.solve(I_R_1=2, U_R_2=8, U_R_3=5, find=[\"R_1\", \"R_3\", \"E_2\"])\ndisplay(schematic(uklad, sol))\nsol",
       "outputs": [
@@ -77,12 +83,12 @@
       ]
     },
     {
-      "id": "7664ecc9",
+      "id": "26c90813",
       "type": "markdown",
       "source": "### 4a. Uwaga na zwrot pomiaru\nTen sam układ **bez** `.transpose()` przy R₂ i R₃ liczy ich napięcia w górę. Te same liczby oznaczają wtedy\nco innego — i przestają do siebie pasować. Znak danej zależy od kierunku elementu."
     },
     {
-      "id": "9dbfaa92",
+      "id": "430106d1",
       "type": "code",
       "source": "bez_transpose = (\n    (VoltageSource(12) + Resistor())\n    | Resistor(4)\n    | ((Resistor() | CurrentSource(1)) + VoltageSource().transpose())\n)\ntry:\n    bez_transpose.solve(I_R_1=2, U_R_2=8, U_R_3=5)\nexcept CircuitError as e:\n    print(e)\n\nbez_transpose.solve(I_R_1=2, U_R_2=-8, U_R_3=-5, find=[\"R_1\", \"R_3\", \"E_2\"])  # te same pomiary „w górę”",
       "outputs": [
@@ -97,12 +103,12 @@
       ]
     },
     {
-      "id": "1fd3cf79",
+      "id": "704ead0f",
       "type": "markdown",
       "source": "## 5. Za mało danych\nBez pomiaru na R₃ solver nie zgaduje — mówi, ilu danych brakuje i które wystarczą."
     },
     {
-      "id": "88889b14",
+      "id": "f4a318db",
       "type": "code",
       "source": "try:\n    uklad.solve(I_R_1=2, U_R_2=8, find=[\"R_1\", \"R_3\", \"E_2\"])\nexcept MissingData as e:\n    print(e)\n    print(\"Udało się wyznaczyć:\", e.solution.answers[\"R_1\"], \"Ω\")",
       "outputs": [
@@ -113,12 +119,12 @@
       ]
     },
     {
-      "id": "77591916",
+      "id": "797d7bbd",
       "type": "markdown",
       "source": "## 6. Dane, które niczego nie wnoszą\nPrzy znanym R₂ = 4 Ω napięcie 4 V i prąd 1 A na R₂ to **ta sama** informacja. Dwie dane, ale jedna wiedza —\nwięc przy dwóch niewiadomych dalej czegoś brakuje."
     },
     {
-      "id": "42bad1c9",
+      "id": "3efa5ba5",
       "type": "code",
       "source": "try:\n    (supply() + Resistor() + Resistor(4) + ground).solve(U_R_2=4, I_R_2=1, find=[\"E_1\", \"R_1\"])\nexcept MissingData as e:\n    print(e)",
       "outputs": [
@@ -129,12 +135,12 @@
       ]
     },
     {
-      "id": "0841fd4e",
+      "id": "915ab068",
       "type": "markdown",
       "source": "## 7. Sprzeczne dane\nSolver wskazuje, które dane się wykluczają."
     },
     {
-      "id": "26d09fa0",
+      "id": "0c3b24bf",
       "type": "code",
       "source": "try:\n    (supply(12) + Resistor(10) + Resistor(20) + ground).solve(I_R_1=1)\nexcept Contradiction as e:\n    print(e)",
       "outputs": [
@@ -145,12 +151,12 @@
       ]
     },
     {
-      "id": "0bbe4ee9",
+      "id": "a86cf3d7",
       "type": "markdown",
       "source": "## 8. Dwa rozwiązania\nMoc to $P = U \\cdot I$ — równanie kwadratowe. Opornik 2 Ω i 8 Ω dają w tej pętli tę samą moc 8 W.\nJedna dodatkowa równość rozstrzyga."
     },
     {
-      "id": "dfbe63be",
+      "id": "406677d3",
       "type": "code",
       "source": "dwa = loop(VoltageSource(12), Resistor(), Resistor(4))\ntry:\n    dwa.solve(P_R_1=8, find=\"R_1\")\nexcept Ambiguous as e:\n    print(e)\n\ndwa.solve(Eq(P(\"R_1\"), 8), Eq(U(\"R_1\"), 2 * U(\"R_2\")), find=\"R_1\")  # R₁ ma dwa razy więcej napięcia niż R₂",
       "outputs": [
@@ -165,12 +171,12 @@
       ]
     },
     {
-      "id": "d494bad3",
+      "id": "bc70fd5b",
       "type": "markdown",
       "source": "## 9. Wynik literowy\nZamiast liczby — litera. Wynik wychodzi jako wzór."
     },
     {
-      "id": "c0d76cfd",
+      "id": "53e50cd7",
       "type": "code",
       "source": "(supply(\"E\") + Resistor(\"R_a\") + Resistor(\"R_b\") + ground).solve(find=\"U_R_2\")",
       "outputs": [
@@ -181,12 +187,12 @@
       ]
     },
     {
-      "id": "5f50538a",
+      "id": "8076d514",
       "type": "markdown",
       "source": "## 10. Mostek z niewiadomą (nie da się zapisać przez `+` i `|`)"
     },
     {
-      "id": "611a0eb0",
+      "id": "99a9319e",
       "type": "code",
       "source": "mostek = net(\n    (VoltageSource(10), \"0\", \"A\"),\n    (Resistor(100), \"A\", \"B\"), (Resistor(), \"B\", \"0\"),\n    (Resistor(50), \"A\", \"C\"), (Resistor(100), \"C\", \"0\"),\n    (Ammeter(), \"B\", \"C\"),\n)\nmostek.solve(I_A_1=0, find=\"R_2\")",
       "outputs": [
@@ -197,12 +203,12 @@
       ]
     },
     {
-      "id": "5ff3f631",
+      "id": "09ed7416",
       "type": "markdown",
       "source": "## 11. Nieznane źródło prądu"
     },
     {
-      "id": "4204fa13",
+      "id": "6b89269d",
       "type": "code",
       "source": "rownolegle = net((CurrentSource(), \"0\", \"A\"), (Resistor(10), \"A\", \"0\"), (Resistor(40), \"A\", \"0\"))\nrownolegle.solve(U_R_1=8, find=\"J_1\")",
       "outputs": [
@@ -213,17 +219,17 @@
       ]
     },
     {
-      "id": "6d79dbdc",
+      "id": "168203de",
       "type": "markdown",
       "source": "# Dziury: `Hole()`\nDziura to element, o którym nie wiemy nawet, **czym** jest. Każdy liniowy dwójnik to źródło $E$ szeregowo\nz oporem $Z$, ale z jednego pomiaru nie da się ich rozdzielić — więc solver bierze **najprostszy** pasujący\nelement: rezystor, potem przerwę, potem źródło. Przyjęte założenie widać w rozwiązaniu."
     },
     {
-      "id": "dd4b0c4f",
+      "id": "5d3627dd",
       "type": "markdown",
       "source": "## 12. Dziura → rezystor\nŻarówka 12 Ω ma dostać 0,5 A z akumulatora 12 V (tyle pokazuje amperomierz). Co wstawić? Uruchom schemat\nprzyciskiem ▶ — albo policz to kodem, jak niżej: schemat to zmienna `zarowka`."
     },
     {
-      "id": "200773a0",
+      "id": "52e7bba3",
       "type": "schematic",
       "name": "zarowka",
       "schematic": {
@@ -409,6 +415,7 @@
           }
         ]
       },
+      "view": "schematic",
       "results": {
         "E_1": {
           "value": "12 V",
@@ -443,11 +450,10 @@
           "reversed": false
         }
       },
-      "problems": [],
-      "stale": false
+      "problems": []
     },
     {
-      "id": "73f9b5be",
+      "id": "dfff6c9c",
       "type": "code",
       "source": "sol = zarowka.solve()\ndisplay(schematic(zarowka, sol))\nsteps(sol)",
       "outputs": [
@@ -462,12 +468,12 @@
       ]
     },
     {
-      "id": "2f8f1186",
+      "id": "50d783d0",
       "type": "markdown",
       "source": "## 13. Dziura → źródło\nPrąd płynie „pod prąd” akumulatora (−1 A) — żaden opornik tego nie zrobi, to musi być ładowarka."
     },
     {
-      "id": "16159aa6",
+      "id": "bf33678b",
       "type": "code",
       "source": "ladowanie = loop(VoltageSource(12), Resistor(2), Hole())\nsol = ladowanie.solve(I_R_1=-1)\nsol[\"X_1\"]",
       "outputs": [
@@ -478,12 +484,12 @@
       ]
     },
     {
-      "id": "a5744207",
+      "id": "9b76b1e3",
       "type": "markdown",
       "source": "## 14. Dziura → przewód\nCałe 12 V odkłada się na 10 Ω (1,2 A) — w dziurze nie ma żadnego spadku napięcia."
     },
     {
-      "id": "3aee8098",
+      "id": "8321a900",
       "type": "code",
       "source": "loop(VoltageSource(12), Resistor(10), Hole()).solve(I_R_1=\"1,2\")[\"X_1\"]",
       "outputs": [
@@ -494,12 +500,12 @@
       ]
     },
     {
-      "id": "4f564859",
+      "id": "5fd16c46",
       "type": "markdown",
       "source": "## 15. Dziura → przerwa\nPrąd nie płynie wcale, a całe napięcie jest na dziurze."
     },
     {
-      "id": "902efd72",
+      "id": "04e34bfe",
       "type": "code",
       "source": "przerwa = loop(VoltageSource(12), Resistor(10), Hole())\nsol = przerwa.solve(I_R_1=0)\nprint(sol[\"X_1\"])\nprint(code(przerwa.fill(sol)))  # po wstawieniu przerwy pętla przestaje być pętlą",
       "outputs": [
@@ -510,12 +516,12 @@
       ]
     },
     {
-      "id": "8f7627ad",
+      "id": "2cef22b1",
       "type": "markdown",
       "source": "## 16. Dwie dziury w szeregu\nZnając tylko prąd, nie da się rozdzielić, ile napięcia przypada na którą dziurę. Jedno napięcie więcej — i już."
     },
     {
-      "id": "1ee650a0",
+      "id": "92f1d4e2",
       "type": "code",
       "source": "dwie = loop(VoltageSource(12), Hole(), Hole())\ntry:\n    dwie.solve(I_E_1=1, find=\"U_X_1\")\nexcept MissingData as e:\n    print(e)\n\nsol = dwie.solve(I_E_1=1, U_X_1=5)\nsol[\"X_1\"], sol[\"X_2\"]",
       "outputs": [
@@ -530,12 +536,12 @@
       ]
     },
     {
-      "id": "3a551ac5",
+      "id": "f3049fc2",
       "type": "markdown",
       "source": "## 17. Dziura i zwykła niewiadoma naraz"
     },
     {
-      "id": "54c2eef7",
+      "id": "979dbd7d",
       "type": "code",
       "source": "sol = loop(VoltageSource(12), Resistor(), Hole()).solve(I_E_1=1, U_R_1=4)\nsol",
       "outputs": [
@@ -546,12 +552,12 @@
       ]
     },
     {
-      "id": "48e670c4",
+      "id": "8da84e9c",
       "type": "markdown",
       "source": "## 18. Pomiar na schemacie: amperomierz z odczytem\nZadanie: $I_2 = 2\\,\\mathrm{A}$, $R_1 = 3\\,Ω$, $R_2 = 18\\,Ω$, $R_3 = 3\\,Ω$, $R_4 = 6\\,Ω$ — jakie jest napięcie\nzasilające i rezystancja zastępcza? Znany prąd to **amperomierz z odczytem** `Ammeter(2)`: dana pomiarowa, a nie źródło\nprądu (`CurrentSource(2)` wymusza prąd, ale jego napięcie byłoby kolejną niewiadomą). Amperomierz bez odczytu\n(`Ammeter()`) solver sam „odczyta”. W edytorze odczyt wpisujesz w polu **Odczyt** amperomierza."
     },
     {
-      "id": "391c3909",
+      "id": "5e8b8c6a",
       "type": "schematic",
       "name": "zadanie4",
       "schematic": {
@@ -855,6 +861,7 @@
           }
         ]
       },
+      "view": "schematic",
       "results": {
         "E": {
           "value": "54 V",
@@ -905,11 +912,10 @@
           "reversed": false
         }
       },
-      "problems": [],
-      "stale": false
+      "problems": []
     },
     {
-      "id": "ecd342e7",
+      "id": "69c40f0d",
       "type": "code",
       "source": "obciazenie = Resistor(3) + ((Resistor(18) + Ammeter(2)) | (Resistor(3) + Resistor(6)))\nzadanie = loop(VoltageSource(label=\"E\"), obciazenie)\nprint(\"Rz =\", resistance(obciazenie), \"Ω\")  # odczyt amperomierza nie zmienia rezystancji\nzadanie.solve(find=\"E\")",
       "outputs": [

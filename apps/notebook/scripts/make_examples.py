@@ -1,4 +1,4 @@
-"""Builds apps/notebook/examples/nieznane-i-dziury.electro.json (run from the repo root with PYTHONPATH set, e.g. in devenv shell)."""
+"""Builds apps/notebook/examples/nieznane-i-dziury.electro.json (format: electro_notes) (run from the repo root with PYTHONPATH set, e.g. in devenv shell)."""
 import json, secrets
 from electro import Ammeter, Hole, Resistor, VoltageSource, loop
 from electro_schematic import layout
@@ -233,8 +233,16 @@ for cell in cells:
     if cell["type"] == "schematic" and cell.pop("simulate"):  # as if its run button was clicked
         cell.update(json.loads(kernel.simulate(json.dumps(cell["schematic"]))), stale=False)
 
-notebook = {"version": 1, "title": "Przykłady: niewiadome i dziury", "codeInPdf": True, "cells": cells}
+# through electro_notes: the file is checked, and in the current format; a fixed id and dates,
+# so regenerating it changes the file only where the content changed
+from electro_notes import FORMAT, VERSION, from_dict
+
+notebook = from_dict({
+    "format": FORMAT, "version": VERSION, "id": "przyklad-nieznane-i-dziury", "title": "Przykłady: niewiadome i dziury",
+    "created": "2026-09-27T00:00:00Z", "modified": "2026-09-27T00:00:00Z", "settings": {"codeInPdf": True},
+    "cells": cells,
+})
 path = "apps/notebook/examples/nieznane-i-dziury.electro.json"
 with open(path, "w", encoding="utf-8") as f:
-    json.dump(notebook, f, ensure_ascii=False, indent=2)
-print(path, len(cells), "cells")
+    f.write(notebook.dumps() + "\n")
+print(path, notebook)

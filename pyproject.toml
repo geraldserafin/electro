@@ -3,7 +3,7 @@
 name = "electro-workspace"
 version = "0.0.0"
 requires-python = ">=3.10"
-dependencies = ["electro", "electro-schematic", "electro-render"]
+dependencies = ["electro", "electro-schematic", "electro-render", "electro-notes"]
 
 [tool.uv]
 package = false
@@ -15,11 +15,12 @@ members = ["packages/*"]
 electro = { workspace = true }
 electro-schematic = { workspace = true }
 electro-render = { workspace = true }
+electro-notes = { workspace = true }
 
 [dependency-groups]
 dev = ["pytest"]
 
 [tool.pytest.ini_options]
-testpaths = ["packages/electro/tests", "packages/electro-schematic/tests", "packages/electro-render/tests", "apps/notebook/python"]
-pythonpath = ["packages/electro/src", "packages/electro-schematic/src", "packages/electro-render/src", "apps/notebook/python"]
+testpaths = ["packages/electro/tests", "packages/electro-schematic/tests", "packages/electro-render/tests", "packages/electro-notes/tests", "apps/notebook/python"]
+pythonpath = ["packages/electro/src", "packages/electro-schematic/src", "packages/electro-render/src", "packages/electro-notes/src", "apps/notebook/python"]
 addopts = "--import-mode=importlib"

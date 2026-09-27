@@ -1,3 +1,4 @@
+import { blank, deserialize, serialize } from "./format";
 import type { Cell, CellType, Notebook } from "./types";
 
 const KEY = "electro-notebook";
@@ -10,19 +11,20 @@ export function newCell(type: CellType): Cell {
   return { id: newId(), type, name: "uklad", schematic: { elements: [], wires: [] } };
 }
 
+/** The notebook of the last visit (in this browser), or the first example. */
 export function load(): Notebook {
   try {
     const saved = localStorage.getItem(KEY);
-    if (saved) return JSON.parse(saved);
-  } catch {
-    // private mode or broken data: start fresh
+    if (saved) return deserialize(saved); // older versions are migrated
+  } catch (error) {
+    console.warn("Zapisany notatnik nie dał się odczytać:", error);
   }
   return example();
 }
 
 export function save(notebook: Notebook) {
   try {
-    localStorage.setItem(KEY, JSON.stringify(notebook));
+    localStorage.setItem(KEY, serialize(notebook, { stamp: false }));
   } catch (error) {
     // storage full or blocked: the file export still works
     console.warn("Nie udało się zapisać notatnika w przeglądarce:", error);
@@ -30,7 +32,7 @@ export function save(notebook: Notebook) {
 }
 
 export function download(notebook: Notebook) {
-  const blob = new Blob([JSON.stringify(notebook, null, 2)], { type: "application/json" });
+  const blob = new Blob([serialize(notebook)], { type: "application/json" });
   const a = document.createElement("a");
   a.href = URL.createObjectURL(blob);
   a.download = `${notebook.title || "notatnik"}.electro.json`;
@@ -39,17 +41,13 @@ export function download(notebook: Notebook) {
 }
 
 export async function upload(file: File): Promise<Notebook> {
-  const data = JSON.parse(await file.text());
-  if (data?.version !== 1 || !Array.isArray(data.cells)) throw new Error("To nie jest plik notatnika.");
-  return data;
+  return deserialize(await file.text());
 }
 
 /** A first notebook that shows every kind of cell. */
 export function example(): Notebook {
   return {
-    version: 1,
-    title: "Sprawozdanie: mostek Wheatstone'a",
-    codeInPdf: true,
+    ...blank("Sprawozdanie: mostek Wheatstone'a"),
     cells: [
       {
         id: newId(), type: "markdown",

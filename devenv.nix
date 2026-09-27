@@ -24,7 +24,7 @@ in
 
   # the workspace packages importable from any directory (devenv's python module owns PYTHONPATH, so append)
   enterShell = ''
-    export PYTHONPATH="${root}/packages/electro/src:${root}/packages/electro-schematic/src:${root}/packages/electro-render/src:${root}/apps/notebook/python''${PYTHONPATH:+:$PYTHONPATH}"
+    export PYTHONPATH="${root}/packages/electro/src:${root}/packages/electro-schematic/src:${root}/packages/electro-render/src:${root}/packages/electro-notes/src:${root}/apps/notebook/python''${PYTHONPATH:+:$PYTHONPATH}"
   '';
 
   # `devenv up`: the notebook on http://localhost:5190, rebuilt from packages/ on every save

@@ -63,9 +63,15 @@ export type Cell =
 
 export type CellType = Cell["type"];
 
+/** A notebook file (*.electro.json), version 2 — see format.ts / electro_notes. */
 export interface Notebook {
-  version: 1;
+  format: "electro-notebook";
+  version: 2;
+  id: string; // stable identity, kept across saves
   title: string;
-  codeInPdf: boolean;
+  created: string; // ISO 8601
+  modified: string;
+  settings: { codeInPdf: boolean; [key: string]: unknown };
   cells: Cell[];
+  [key: string]: unknown; // keys a newer version wrote: kept as they are
 }

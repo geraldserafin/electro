@@ -8,11 +8,13 @@ schematy, a docelowo notatnik webowy z eksportem sprawozdań do PDF.
 | [`packages/electro`](packages/electro) | rdzeń: obwody jako morfizmy kategorii, kombinatory `+`/`\|`, solver, `find`, `Hole` |
 | [`packages/electro-schematic`](packages/electro-schematic) | rysunek na siatce: model (JSON), rysunek → obwód, auto-layout kodu, edycja (`move`, `rotate`) |
 | [`packages/electro-render`](packages/electro-render) | wygląd: biblioteka symboli (też jako JSON dla edytora), schemat → SVG, ślad rozwiązania → Markdown + LaTeX |
+| [`packages/electro-notes`](packages/electro-notes) | plik notatnika `*.electro.json`: odczyt, zapis, migracja starszych wersji, walidacja, `python -m electro_notes check` |
 | [`apps/notebook`](apps/notebook) | notatnik w przeglądarce (React + Pyodide): Markdown, kod, edytor schematów na siatce, eksport PDF |
 
 ```
 electro  ◀──  electro-schematic  ◀──  electro-render  ◀──  apps/notebook (Pyodide + edytor w TS)
-solver        gdzie co leży            jak to wygląda
+solver        gdzie co leży     ▲      jak to wygląda              │ ten sam format pliku
+                                └──  electro-notes  ◀──────────────┘
 ```
 
 ```python
