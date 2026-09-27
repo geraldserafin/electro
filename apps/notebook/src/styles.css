@@ -461,6 +461,9 @@ pre.code-view-note { color: var(--danger); }
 .island.top-left { top: 12px; left: 12px; padding: 4px; }
 .island.top-right { top: 12px; right: 12px; }
 .island.bottom-left { bottom: 12px; left: 12px; }
+/* the drawing is out of view: a way back, bottom centre (like Excalidraw's "scroll back to content") */
+.island.back-to-drawing { bottom: 12px; left: 50%; transform: translateX(-50%); padding: 8px 14px; gap: 8px; font-size: 14px; font-weight: 500; color: var(--tool-active-text); }
+.island.back-to-drawing:hover { background: var(--tool-active); }
 .island.bottom-right { bottom: 12px; right: 12px; }
 .island .zoom { min-width: 52px; justify-content: center; font-variant-numeric: tabular-nums; }
 /* the schematic's name: a plain box in the corner, a click edits it */

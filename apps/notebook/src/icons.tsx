@@ -30,4 +30,5 @@ export const Search = () => <Icon size={16}><circle cx="11" cy="11" r="6" /><pat
 export const SchematicIcon = () => <Icon><path d="M3 12h4l1.5-3 3 6 3-6 1.5 3h5" /></Icon>;
 export const WarningIcon = () => <Icon><path d="M12 4L2.5 20h19z" /><path d="M12 10v4.5" /><circle cx="12" cy="17.3" r=".7" fill="currentColor" /></Icon>;
 export const Grip = () => <Icon size={16}>{[7, 12, 17].flatMap((y) => [9, 15].map((x) => <circle key={`${x}${y}`} cx={x} cy={y} r="1.3" fill="currentColor" stroke="none" />))}</Icon>;
+export const Target = () => <Icon><circle cx="12" cy="12" r="7" /><circle cx="12" cy="12" r="2" fill="currentColor" /><path d="M12 2v3M12 19v3M2 12h3M19 12h3" /></Icon>;
 export const Chevron = () => <Icon size={14}><path d="M6 9l6 6 6-6" /></Icon>;

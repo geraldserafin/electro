@@ -139,6 +139,21 @@ try {
     await bridge.locator(".board .canvas").waitFor();
   }
 
+  // scrolled away from the drawing: a button brings it back (and only then is it there)
+  {
+    const back = bridge.getByRole("button", { name: /Wróć do schematu/ });
+    const shownAtFirst = await back.count();
+    await bridge.locator(".board").hover();
+    for (let i = 0; i < 12; i++) await page.mouse.wheel(0, 400);
+    await back.waitFor({ timeout: 5_000 });
+    await back.click();
+    const inView = await bridge.locator('.board .element[data-id="R_1"]').evaluate((el) => {
+      const r = el.getBoundingClientRect(), b = el.closest(".board").getBoundingClientRect();
+      return r.top >= b.top && r.bottom <= b.bottom && r.left >= b.left && r.right <= b.right;
+    });
+    check("scrolled away: a button brings the drawing back", shownAtFirst === 0 && inView && (await back.count()) === 0);
+  }
+
   // the PDF: the drawing cropped to what is drawn, without the editor (and its selection)
   await bridge.locator('.board .element[data-id="R_1"]').click();
   await page.emulateMedia({ media: "print" });

@@ -4,7 +4,7 @@
 // The drawing lives on an endless plane; the board shows it through a camera (a viewBox
 // that pans and zooms), like Excalidraw. Nothing moves under the cursor unless you pan.
 import { useEffect, useId, useLayoutEffect, useRef, useState, type PointerEvent as ReactPointerEvent, type ReactNode } from "react";
-import { Expand, Grid, Hand, Help, Minus, Plus, Pointer, Redo, Rotate, Search, Shrink, Trash, Undo, WireIcon } from "../icons";
+import { Expand, Grid, Hand, Help, Minus, Plus, Pointer, Redo, Rotate, Search, Shrink, Target, Trash, Undo, WireIcon } from "../icons";
 import type { ElementData, ElementResult, Point, SchematicData, SymbolLibrary, WireData } from "../types";
 import {
   KINDS, attach, bounds, elbow, inBox, moveGroup, searchKinds, hasValue, isComponent, isConnectionPoint, junctions, kindInfo, nextId,
@@ -98,6 +98,14 @@ export function SchematicEditor({ value, onChange, library, results, topLeft, to
     const zoom = clampZoom(Math.min(1.5, view.w / w, (view.h - 120) / h));
     return { x: ((x0 + x1) / 2) * G - view.w / 2 / zoom, y: ((y0 + y1) / 2) * G - (view.h + 40) / 2 / zoom, zoom };
   };
+
+  // the drawing is somewhere, but not in view (panned or zoomed away): offer the way back
+  const lost = (() => {
+    if (!value.elements.length && !value.wires.length) return false;
+    const [x0, y0, x1, y1] = bounds(value, library);
+    const [vx, vy, vw, vh] = [cam.x, cam.y, view.w / cam.zoom, view.h / cam.zoom];
+    return x1 * G < vx || x0 * G > vx + vw || y1 * G < vy || y0 * G > vy + vh;
+  })();
 
   const zoomAround = (factor: number, px = view.w / 2, py = view.h / 2) =>
     setCam((c) => {
@@ -583,6 +591,11 @@ export function SchematicEditor({ value, onChange, library, results, topLeft, to
           onRemove={removeSelected}
           icon={selectedElement ? symbolIcon(selectedElement.kind) : null}
         />
+      )}
+      {lost && (
+        <button className="island back-to-drawing no-print" onClick={() => setCam(fitted())}>
+          <Target /> Wróć do schematu
+        </button>
       )}
       <div className="island bottom-left no-print">
         <button className="icon" title="Pomniejsz" aria-label="Pomniejsz" onClick={() => zoomAround(1 / 1.2)}><Minus /></button>
