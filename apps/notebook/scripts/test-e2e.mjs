@@ -313,6 +313,7 @@ try {
       entries.includes("1. Nieznany opór z pomiaru napięcia") && top > 40 && top < 140
       && (await outline.locator("a.active").innerText()) === "5. Za mało danych");
     await toggle.click();
+    await page.waitForTimeout(400); // it slides out
     check("table of contents: the button hides it", !(await outline.isVisible()));
     await page.setViewportSize({ width: 1100, height: 900 });
   }

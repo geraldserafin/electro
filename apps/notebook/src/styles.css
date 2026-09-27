@@ -241,13 +241,33 @@ input:focus, textarea:focus { outline: 2px solid var(--accent-soft); border-colo
                        display: flex; justify-content: center; margin: 8px 0 12px; }
 .page .print-drawing svg { max-width: 100%; height: auto; }
 
-/* the table of contents: a panel on the right, one tile per section, the current one lit */
+/* the table of contents: a panel on the right, over the page (in its margin where there is room),
+   sliding in and out; one tile per section, the current one lit */
 .outline {
   position: fixed; top: 52px; right: 0; bottom: 0; z-index: 12; width: 280px;
   overflow-y: auto; padding: 16px 12px 24px; background: var(--bg); border-left: 1px solid var(--line);
   font-size: 14px;
+  transform: translateX(100%); opacity: 0; visibility: hidden;
+  transition: transform 0.24s cubic-bezier(0.2, 0.8, 0.2, 1), opacity 0.18s ease, visibility 0s linear 0.24s;
 }
-.outline h2 { margin: 0 0 10px 12px; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: var(--faint); }
+.outline.open {
+  transform: none; opacity: 1; visibility: visible; box-shadow: -8px 0 24px rgba(0, 0, 0, 0.08);
+  transition: transform 0.24s cubic-bezier(0.2, 0.8, 0.2, 1), opacity 0.18s ease, visibility 0s;
+}
+.outline.open li { animation: tile-in 0.28s ease both; }
+.outline.open li:nth-child(n + 2) { animation-delay: 0.03s; }
+.outline.open li:nth-child(n + 4) { animation-delay: 0.06s; }
+.outline.open li:nth-child(n + 8) { animation-delay: 0.09s; }
+@keyframes tile-in { from { opacity: 0; transform: translateX(10px); } }
+.outline header { display: flex; align-items: center; height: 36px; margin: -6px 0 8px 44px; } /* room for the switch */
+.outline h2 { margin: 0; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: var(--faint); }
+/* its switch: alone at the right edge when folded; at the panel's top-left corner when open */
+.outline-toggle {
+  position: fixed; top: 62px; right: 12px; z-index: 13; border-radius: 8px;
+  transition: right 0.24s cubic-bezier(0.2, 0.8, 0.2, 1), background 0.1s, color 0.1s;
+}
+.outline-toggle.open { right: calc(280px - 12px - 36px); }
+@media (prefers-reduced-motion: reduce) { .outline, .outline.open, .outline-toggle, .outline.open li { transition: none; animation: none; } }
 .outline-empty { margin: 0 12px; color: var(--muted); font-size: 13px; }
 .outline ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 1px; }
 .outline a {
@@ -258,17 +278,6 @@ input:focus, textarea:focus { outline: 2px solid var(--accent-soft); border-colo
 .outline a:hover { background: var(--hover); color: var(--text); }
 .outline a.active { background: var(--tool-active); color: var(--tool-active-text); }
 .outline a svg { flex: none; width: 15px; height: 15px; }
-/* its switch: floating under the bar — at the right edge, or at the open panel's top-left corner */
-.outline-toggle {
-  position: fixed; top: 64px; right: 16px; z-index: 13; width: 36px; height: 36px; padding: 0;
-  justify-content: center; border-radius: 10px; color: var(--muted);
-  background: var(--island); box-shadow: var(--island-shadow); transition: right 0.15s, color 0.1s;
-}
-.outline-toggle:hover { color: var(--text); background: var(--island); }
-.outline-toggle.open { right: calc(280px + 12px); color: var(--tool-active-text); }
-/* the notebook stays centred in what is left beside the panel */
-main.beside-outline { max-width: calc(1120px + 280px); padding-right: calc(24px + 280px); }
-@media (max-width: 900px) { main.beside-outline { max-width: none; padding-right: 24px; } } /* narrow: the panel covers */
 .cell, .cell .markdown-view :is(h1, h2, h3) { scroll-margin-top: 72px; } /* below the sticky bar */
 .spacer-title { flex: 1; }
 

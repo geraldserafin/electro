@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Link } from "react-router";
 import { CodeCell, MarkdownCell, SchematicCell } from "./cells/Cells";
-import { Back, Down, Export, More, OutlineIcon, Plus, RunAll, Trash, Up } from "./icons";
+import { Back, Down, Export, More, Plus, RunAll, Trash, Up } from "./icons";
 import { SyncStatus } from "./notes/SyncStatus";
 import { useNoteSync } from "./notes/sync";
 import { Outline } from "./Outline";
@@ -148,13 +148,8 @@ export function Notebook({ initial, revision, reload, onDelete, onSaved }: {
         </Menu>
       </header>
 
-      {/* the table of contents' switch: under the bar, at the panel's top-left corner (outside it) */}
-      <button className={`outline-toggle no-print ${outline ? "open" : ""}`} onClick={() => setOutline(!outline)}
-              title={outline ? "Ukryj spis treści" : "Spis treści"} aria-label="Spis treści" aria-pressed={outline}>
-        <OutlineIcon />
-      </button>
-      {outline && <Outline cells={notebook.cells} />}
-      <main className={outline ? "beside-outline" : ""}>
+      <Outline cells={notebook.cells} open={outline} onToggle={() => setOutline(!outline)} />
+      <main>
         <AddRow onAdd={(type) => insert(0, type)} />
         {notebook.cells.map((cell, index) => (
           <section
