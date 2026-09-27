@@ -23,6 +23,19 @@
   --tool-active-text: #4a47b1;
   --primary: #6965db;
   --primary-hover: #5753d0;
+  /* type and code, as in Colab (its colours are VS Code's "Light+" / "Dark+") */
+  --sans: "Google Sans", Roboto, ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --mono: "Roboto Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+  --hl-keyword: #0000ff;
+  --hl-control: #af00db;
+  --hl-string: #a31515;
+  --hl-number: #098658;
+  --hl-comment: #008000;
+  --hl-function: #795e26;
+  --hl-class: #267f99;
+  --hl-property: #001080;
+  --selection: #add6ff;
+  --bracket: #d6e9ff;
   color-scheme: light;
 }
 
@@ -50,6 +63,16 @@
     --tool-active-text: #d6d4ff;
     --primary: #a8a5ff;
     --primary-hover: #bbb8ff;
+    --hl-keyword: #569cd6;
+    --hl-control: #c586c0;
+    --hl-string: #ce9178;
+    --hl-number: #b5cea8;
+    --hl-comment: #6a9955;
+    --hl-function: #dcdcaa;
+    --hl-class: #4ec9b0;
+    --hl-property: #9cdcfe;
+    --selection: #264f78;
+    --bracket: #3a3d41;
     color-scheme: dark;
   }
 }
@@ -60,12 +83,12 @@ body {
   margin: 0;
   background: var(--bg);
   color: var(--text);
-  font: 16px/1.6 "Google Sans", Roboto, ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  font: 18px/1.6 var(--sans);
 }
 
 button {
   font: inherit;
-  font-size: 14px;
+  font-size: 15px;
   color: var(--text);
   background: transparent;
   border: 1px solid transparent;
@@ -228,12 +251,12 @@ main > .add-row { justify-content: center; }
 .markdown > :last-child { margin-bottom: 0; }
 .markdown h1, .markdown h2, .markdown h3 { font-weight: 500; }
 .markdown .katex-display { overflow-x: auto; overflow-y: hidden; }
-.markdown table { border-collapse: collapse; font-size: 15px; }
+.markdown table { border-collapse: collapse; font-size: 17px; }
 .markdown th, .markdown td { border-bottom: 1px solid var(--line); padding: 4px 14px 4px 0; text-align: left; }
 .markdown th { color: var(--muted); font-weight: 500; }
 .markdown code { background: var(--code-bg); border-radius: 4px; padding: 0 4px; }
 .markdown-edit { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; padding-left: 48px; }
-.markdown-source { width: 100%; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 14px; resize: vertical; background: var(--code-bg); }
+.markdown-source { width: 100%; font-family: var(--mono); font-size: 16px; line-height: 1.6; padding: 10px 12px; resize: vertical; background: var(--code-bg); }
 .markdown-preview { padding-top: 4px; }
 
 /* code */
@@ -250,17 +273,17 @@ main > .add-row { justify-content: center; }
 }
 .cell:hover .gutter .run, .cell.focused .gutter .run { color: var(--bg); background: var(--text); border-color: var(--text); }
 .gutter .run.running { animation: pulse 0.8s ease-in-out infinite alternate; }
-.gutter .execution { font: 11px ui-monospace, monospace; color: var(--faint); }
+.gutter .execution { font: 13px var(--mono); color: var(--faint); }
 .cell-body { flex: 1; min-width: 0; }
-.code-editor .cm-editor { background: var(--code-bg); border-radius: 6px; font-size: 14px; }
-.code-editor .cm-gutters { background: var(--code-bg); border: none; color: var(--faint); }
-.code-editor .cm-editor.cm-focused { outline: 1px solid var(--line); }
+.code-editor .cm-editor { font-size: 16px; }
+.code-editor { border-radius: 8px; transition: box-shadow 0.15s; }
+.cell.focused .code-editor { box-shadow: 0 0 0 1px var(--line); }
 
 .outputs { margin-top: 8px; display: grid; gap: 8px; }
-.output-text, .output-error { margin: 0; padding: 6px 10px; border-radius: 6px; font-size: 14px; overflow-x: auto; white-space: pre-wrap; }
-.output-text { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+.output-text, .output-error { margin: 0; padding: 6px 10px; border-radius: 6px; font-size: 16px; overflow-x: auto; white-space: pre-wrap; }
+.output-text { font-family: var(--mono); }
 .output-error { background: var(--err-bg); color: var(--danger); }
-.output-warning { background: var(--warn-bg); color: var(--warn); padding: 6px 10px; border-radius: 6px; font-size: 14px; }
+.output-warning { background: var(--warn-bg); color: var(--warn); padding: 6px 10px; border-radius: 6px; font-size: 16px; }
 .output-svg { overflow-x: auto; }
 .output-svg svg { max-width: 100%; height: auto; }
 
@@ -280,7 +303,7 @@ main > .add-row { justify-content: center; }
 .island.static { position: static; }
 .code-view .code-editor .cm-editor { min-height: 120px; }
 .code-view-wait { color: var(--muted); margin: 8px; }
-.code-view-note { margin: 0; font-size: 13px; color: var(--muted); }
+.code-view-note { margin: 0; font-size: 14px; color: var(--muted); }
 pre.code-view-note { color: var(--danger); }
 
 .schematic-cell { padding-left: 48px; }
@@ -416,10 +439,10 @@ pre.code-view-note { color: var(--danger); }
 .island.help-panel p { margin: 8px 0 0; color: var(--muted); font-size: 12px; }
 
 .sim-bar { display: flex; margin-top: 8px; }
-.sim-bar label { flex: 1; display: flex; align-items: center; gap: 10px; font-size: 13px; color: var(--muted); }
-.sim-bar input { flex: 1; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 14px; }
+.sim-bar label { flex: 1; display: flex; align-items: center; gap: 10px; font-size: 15px; color: var(--muted); }
+.sim-bar input { flex: 1; font-family: var(--mono); font-size: 15px; }
 .stale > .outputs { opacity: 0.5; }
-.stale-note { margin: 8px 0 0; font-size: 13px; color: var(--warn); }
+.stale-note { margin: 8px 0 0; font-size: 15px; color: var(--warn); }
 
 kbd { font: 11px ui-monospace, monospace; border: 1px solid var(--line); border-radius: 4px; padding: 0 4px; }
 .muted { color: var(--muted); }
@@ -441,9 +464,11 @@ kbd { font: 11px ui-monospace, monospace; border: 1px solid var(--line); border-
   .cell { border: none !important; box-shadow: none !important; padding: 0; margin-bottom: 10pt; break-inside: avoid; }
   .markdown-view, .schematic-cell { padding-left: 0; }
   .schematic-cell .board { display: none; } /* the editor; PrintDrawing prints the drawing */
+  /* pictures centred on the page: the drawing, and schematic(...) pictures from code cells */
   .print-drawing { position: static !important; visibility: visible !important; width: auto !important; height: auto !important;
-                   display: flex; justify-content: center; margin: 4pt 0 8pt; break-inside: avoid; }
-  .print-drawing svg { max-width: 100%; height: auto; }
+                   overflow: visible !important; margin: 4pt 0 8pt; break-inside: avoid; }
+  .print-drawing svg, .output-svg svg { display: block; margin-left: auto; margin-right: auto; max-width: 100%; height: auto; }
+  .output-svg { overflow: visible; }
   .canvas .label.solved { fill: #000; }
   .stale { display: none; } /* results of an older drawing */
   .hide-code-in-print .code-editor { display: none; }

@@ -1,10 +1,9 @@
-import { python } from "@codemirror/lang-python";
-import CodeMirror from "@uiw/react-codemirror";
 import { useEffect, useState } from "react";
 import { CodeIcon, Play, SchematicIcon } from "../icons";
 import { kernel } from "../python/kernel";
 import { PrintDrawing, SchematicEditor } from "../schematic/Editor";
 import type { Cell, SchematicData, SymbolLibrary } from "../types";
+import { CodeEditor } from "./CodeEditor";
 import { Markdown } from "./Markdown";
 import { Outputs } from "./Outputs";
 
@@ -71,12 +70,7 @@ export function CodeCell({ cell, update, run, running }: {
             }
           }}
         >
-          <CodeMirror
-            value={cell.source}
-            extensions={[python()]}
-            basicSetup={{ foldGutter: false, highlightActiveLine: false }}
-            onChange={(source) => update({ source })}
-          />
+          <CodeEditor value={cell.source} onChange={(source) => update({ source })} />
         </div>
         <Outputs outputs={cell.outputs} />
       </div>
@@ -225,8 +219,7 @@ export function SchematicCell({ cell, update, library, toCell, simulate, running
                }}>
             {source === null
               ? <p className="code-view-wait">Zamieniam schemat na kod…</p>
-              : <CodeMirror value={source} extensions={[python()]} basicSetup={{ foldGutter: false, highlightActiveLine: false }}
-                            onChange={setSource} />}
+              : <CodeEditor value={source} onChange={setSource} />}
           </div>
           {error
             ? <pre className="output-error code-view-note">{error}</pre>
