@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { CodeIcon, Play, SchematicIcon, WarningIcon } from "../icons";
 import { kernel } from "../python/kernel";
-import { PrintDrawing, SchematicEditor } from "../schematic/Editor";
+import { PrintDrawing, SchematicEditor, type Camera } from "../schematic/Editor";
 import type { Cell, ElementResult, Problem, SchematicData, SymbolLibrary } from "../types";
 import { CodeEditor } from "./CodeEditor";
 import { Markdown } from "./Markdown";
@@ -85,22 +85,21 @@ function ViewSwitch({ view, onSwitch, busy }: { view: "schematic" | "code"; onSw
   return (
     <div className="view-switch" role="tablist" aria-label="Widok komórki">
       <button role="tab" aria-selected={view === "schematic"} className={view === "schematic" ? "on" : ""}
-              disabled={busy} onClick={() => onSwitch("schematic")} title="Rysunek schematu">
-        <SchematicIcon /> Schemat
+              disabled={busy} onClick={() => onSwitch("schematic")} title="Schemat" aria-label="Schemat">
+        <SchematicIcon />
       </button>
       <button role="tab" aria-selected={view === "code"} className={view === "code" ? "on" : ""}
-              disabled={busy} onClick={() => onSwitch("code")} title="Ten sam układ jako kod electro — można go edytować">
-        <CodeIcon /> Kod
+              disabled={busy} onClick={() => onSwitch("code")} title="Kod — ten sam układ, do edycji" aria-label="Kod">
+        <CodeIcon />
       </button>
     </div>
   );
 }
 
-export function SchematicCell({ cell, update, library, toCell, simulate, running }: {
+export function SchematicCell({ cell, update, library, simulate, running }: {
   cell: Extract<Cell, { type: "schematic" }>;
   update: Update;
   library: SymbolLibrary;
-  toCell: (source: string) => void;
   simulate: (schematic?: SchematicData) => void;
   running: boolean;
 }) {
@@ -115,6 +114,9 @@ export function SchematicCell({ cell, update, library, toCell, simulate, running
   // the drawing `source` describes: the code is written anew only after the drawing was edited
   // on the board — never just because it ran, so the way someone wrote it stays
   const writtenFor = useRef<SchematicData | null>(null);
+  // the board's view survives the trips to the code view; coming back, the board has the keyboard
+  const camera = useRef<Camera | null>(null);
+  const focusBoard = useRef(false);
 
   const load = async () => {
     if (source !== null && writtenFor.current === cell.schematic) return;
@@ -154,6 +156,7 @@ export function SchematicCell({ cell, update, library, toCell, simulate, running
         await load();
         update({ view: "code" });
       } else if (await applied()) {
+        focusBoard.current = true;
         update({ view: "schematic" });
       }
     } catch (e) {
@@ -195,6 +198,8 @@ export function SchematicCell({ cell, update, library, toCell, simulate, running
           topLeft={name}
           topRight={actions}
           status={problems}
+          camera={camera}
+          autoFocus={focusBoard.current}
         />
       ) : (
         <div className="board code-view">
@@ -202,10 +207,6 @@ export function SchematicCell({ cell, update, library, toCell, simulate, running
             <div className="island static name-island">{name}</div>
             <span className="spacer" />
             {problems && <div className="island static status">{problems}</div>}
-            <button className="ghost" onClick={() => source && toCell(source)} disabled={!source}
-                    title="Wstaw ten kod pod spodem jako zwykłą komórkę z kodem">
-              Kopiuj do komórki
-            </button>
             <div className="island static">{actions}</div>
           </div>
           <div className="code-editor"

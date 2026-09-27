@@ -12,7 +12,7 @@ import {
 } from "./model";
 
 type Tool = { type: "select" } | { type: "hand" } | { type: "wire" } | { type: "place"; kind: string };
-type Camera = { x: number; y: number; zoom: number }; // top-left corner of the view, in drawing px
+export type Camera = { x: number; y: number; zoom: number }; // top-left corner of the view, in drawing px
 type Selection =
   | { type: "element"; id: string }
   | { type: "wire"; index: number }
@@ -33,6 +33,8 @@ interface Props {
   topLeft?: ReactNode;
   topRight?: ReactNode;
   status?: ReactNode; // its own island, next to the full screen button (e.g. warnings)
+  camera?: { current: Camera | null }; // where the view was: kept here while the editor is away
+  autoFocus?: boolean; // take the keyboard when shown
 }
 
 const clampZoom = (z: number) => Math.min(3, Math.max(0.25, z));
@@ -47,7 +49,7 @@ function startCamera(sch: SchematicData, lib: SymbolLibrary): Camera {
   return { x: x0 * lib.grid - 80, y: y0 * lib.grid - 110, zoom: 1 };
 }
 
-export function SchematicEditor({ value, onChange, library, results, topLeft, topRight, status }: Props) {
+export function SchematicEditor({ value, onChange, library, results, topLeft, topRight, status, camera, autoFocus }: Props) {
   const G = library.grid;
   const gridId = useId();
   const svgRef = useRef<SVGSVGElement>(null);
@@ -63,7 +65,13 @@ export function SchematicEditor({ value, onChange, library, results, topLeft, to
   const [query, setQuery] = useState("");
   const [full, setFull] = useState(false);
   const [spaceHeld, setSpaceHeld] = useState(false);
-  const [cam, setCam] = useState<Camera>(() => startCamera(value, library));
+  const [cam, setCam] = useState<Camera>(() => camera?.current ?? startCamera(value, library));
+  useEffect(() => { if (camera) camera.current = cam; }, [cam, camera]);
+  useEffect(() => { // eslint-disable-line react-hooks/exhaustive-deps
+    if (!autoFocus) return;
+    svgRef.current?.focus({ preventScroll: true });
+    setActive(true); // as if clicked: keys and the wheel go to the board
+  }, []);
   const pan = useRef<{ x: number; y: number; cam: Camera; moved: boolean; click: boolean } | null>(null);
 
   // the size of the board on screen: the camera shows view.w × view.h screen px

@@ -97,6 +97,12 @@ try {
 
   // Schemat | Kod: a value changed in the code comes back to the same drawing
   {
+    const view = () => bridge.locator(".board .canvas").getAttribute("viewBox");
+    await bridge.locator(".board").hover();
+    const viewStart = await view();
+    await page.mouse.wheel(0, 120); // the board is active (clicked before): scrolling pans it
+    await page.waitForTimeout(100);
+    const viewBefore = await view();
     const places = () => bridge.locator(".board .canvas .element").evaluateAll((els) => els.map((e) => [e.querySelector(".hit").getAttribute("x"), e.querySelector(".hit").getAttribute("y")]));
     const before = await places();
     await bridge.getByRole("tab", { name: "Kod" }).click();
@@ -107,6 +113,8 @@ try {
     await page.keyboard.insertText(text.replace("Resistor(50)", "Resistor(60)"));
     await bridge.getByRole("tab", { name: "Schemat" }).click();
     await bridge.locator(".board .canvas").waitFor();
+    check("back from the code view: same view, the board has the keyboard", viewBefore !== viewStart && (await view()) === viewBefore
+      && await bridge.locator(".board .canvas").evaluate((svg) => document.activeElement === svg));
     check("code view: a new value keeps the drawing", text.startsWith("mostek = net(")
       && (await bridge.locator('.board .element[data-id="R_3"]').textContent()).includes("60")
       && JSON.stringify(await places()) === JSON.stringify(before));

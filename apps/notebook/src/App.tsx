@@ -133,13 +133,6 @@ export function App() {
     setCells((cells) => cells.map((c) => (c.type === "code" ? { ...c, outputs: [], execution: undefined } : c)));
   };
 
-  /** A schematic's code view → an ordinary code cell under it. */
-  const toCell = (index: number, source: string) => {
-    const code = { ...newCell("code"), source } as Cell;
-    setCells((cells) => [...cells.slice(0, index + 1), code, ...cells.slice(index + 1)]);
-    setFocused(code.id);
-  };
-
   const open = async (file: File | undefined) => {
     if (!file) return;
     try {
@@ -221,7 +214,7 @@ export function App() {
             )}
             {cell.type === "schematic" && (
               <SchematicCell cell={cell} update={(p) => update(cell.id, p)} library={library}
-                             toCell={(source) => toCell(index, source)} simulate={(s) => simulate(cell.id, s)}
+                             simulate={(s) => simulate(cell.id, s)}
                              running={running.has(cell.id)} />
             )}
             <AddRow onAdd={(type) => insert(index + 1, type)} />
