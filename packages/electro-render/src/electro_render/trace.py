@@ -20,8 +20,10 @@ class Markdown(str):
 
 
 def name(symbol_name: str) -> str:
-    """``U_R_1`` → ``U_{R_{1}}``."""
+    """``U_R_1`` → ``U_{R_{1}}``; words like ``GND`` are upright: ``V_{\\mathrm{GND}}``."""
     base, _, sub = symbol_name.partition("_")
+    if len(base) > 1 and base.isalpha():
+        base = rf"\mathrm{{{base}}}"
     return f"{base}_{{{name(sub)}}}" if sub else base
 
 

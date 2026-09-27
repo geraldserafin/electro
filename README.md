@@ -8,7 +8,7 @@ schematy, a docelowo notatnik webowy z eksportem sprawozdań do PDF.
 | [`packages/electro`](packages/electro) | rdzeń: obwody jako morfizmy kategorii, kombinatory `+`/`\|`, solver, `find`, `Hole` |
 | [`packages/electro-schematic`](packages/electro-schematic) | rysunek na siatce: model (JSON), rysunek → obwód, auto-layout kodu, edycja (`move`, `rotate`) |
 | [`packages/electro-render`](packages/electro-render) | wygląd: biblioteka symboli (też jako JSON dla edytora), schemat → SVG, ślad rozwiązania → Markdown + LaTeX |
-| `apps/notebook` | (plan) notatnik w przeglądarce na Pyodide: Markdown, kod, edytor schematów na siatce, eksport PDF |
+| [`apps/notebook`](apps/notebook) | notatnik w przeglądarce (React + Pyodide): Markdown, kod, edytor schematów na siatce, eksport PDF |
 
 ```
 electro  ◀──  electro-schematic  ◀──  electro-render  ◀──  apps/notebook (Pyodide + edytor w TS)
@@ -36,8 +36,9 @@ print(steps(sol))                           # Markdown z $...$
 ## Praca w repo
 
 ```sh
-devenv shell    # python + sympy + pytest (+ uv)
-pytest          # testy obu paczek
+devenv shell                       # python + sympy + pytest, node + pnpm
+pytest                             # testy paczek Pythona i kernela notatnika
+cd apps/notebook && pnpm dev       # notatnik na http://localhost:5173
 ```
 
 To jest workspace `uv` (`[tool.uv.workspace]` w `pyproject.toml`), więc działa też `uv sync && uv run pytest`.

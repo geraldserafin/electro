@@ -1,0 +1,33 @@
+{
+  "name": "electro-notebook",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "python": "node scripts/bundle-python.mjs",
+    "dev": "node scripts/bundle-python.mjs && vite",
+    "build": "node scripts/bundle-python.mjs && tsc -b && vite build",
+    "typecheck": "tsc -b",
+    "test:pyodide": "node scripts/bundle-python.mjs && node scripts/test-pyodide.mjs",
+    "test:e2e": "pnpm build && node scripts/test-e2e.mjs"
+  },
+  "dependencies": {
+    "@codemirror/lang-python": "^6.2.1",
+    "@uiw/react-codemirror": "^4.25.12",
+    "katex": "^0.18.9",
+    "react": "^19.3.0",
+    "react-dom": "^19.3.0",
+    "react-markdown": "^10.1.0",
+    "rehype-katex": "^7.0.1",
+    "remark-math": "^6.0.0"
+  },
+  "devDependencies": {
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "@vitejs/plugin-react": "^6.1.1",
+    "playwright": "^1.63.0",
+    "pyodide": "314.0.7",
+    "typescript": "^7.0.2",
+    "vite": "^8.3.1"
+  }
+}
