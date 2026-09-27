@@ -33,7 +33,7 @@ Każdy obwód ma typ `m → n`: `m` zacisków z lewej, `n` z prawej.
 |---|---|---|
 | `Resistor(10)`, `Capacitor("1u")`, `Inductor("2m")` | 1 → 1 | elementy; `Resistor()` = niewiadoma, `Resistor("R")` = symbol |
 | `VoltageSource(12)`, `CurrentSource("0,5")` | 1 → 1 | źródło napięcia (`+` z prawej), źródło prądu (pcha w prawo) |
-| `Ammeter()`, `Voltmeter()` | 1 → 1 | idealne mierniki |
+| `Ammeter(odczyt)`, `Voltmeter(odczyt)` | 1 → 1 | idealne mierniki; odczyt to dana pomiarowa, bez niego — wynik do policzenia |
 | `OpAmp()` | 2 → 1 | idealny wzmacniacz operacyjny: (+, −) → wyjście |
 | `Hole()` | 1 → 1 | nieznany element; solver dobiera najprostszy pasujący |
 | `wire`, `wires(n)`, `swap` | | przewody, skrzyżowanie |

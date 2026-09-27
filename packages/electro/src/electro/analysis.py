@@ -53,7 +53,7 @@ class Relation:
 def blackbox(c: Circuit, *, omega=None) -> Relation:
     ctx = Context(None if omega is None else parse(omega))
     system = compile_circuit(c, ctx=ctx, open_boundary=True, unknowns_as_symbols=True)
-    exprs = [law.expr.xreplace(system.known) for law in system.laws]
+    exprs = [law.expr.xreplace(system.known) for law in system.laws if law.kind != "reading"]
     internal = [u for u in system.unknowns if u not in system.boundary]
     variables = internal + system.boundary
     try:
@@ -97,7 +97,7 @@ def equivalent(c: Circuit, *, omega=None) -> Thevenin:
         raise TypeError(f"equivalent() wymaga obwodu 1 → 1 albo 0 → 1 (względem masy), dostałem {c.type}.")
     ctx = Context(None if omega is None else parse(omega))
     system = compile_circuit(closed, ctx=ctx, unknowns_as_symbols=True)
-    exprs = [law.expr.xreplace(system.known) for law in system.laws]
+    exprs = [law.expr.xreplace(system.known) for law in system.laws if law.kind != "reading"]
     solutions = sp.solve(exprs, system.unknowns, dict=True)
     u = system.parts["TEST"].model.variables["U"]
     if not solutions or u not in solutions[0]:

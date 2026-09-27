@@ -16,7 +16,7 @@ from .circuit import GROUND, Circuit, Netlist
 from .components import Component, Context, Law, Model
 from .values import UNKNOWN
 
-KIND_ORDER = {"given": 0, "law": 1, "kvl": 2, "kcl": 3}
+KIND_ORDER = {"given": 0, "reading": 0, "law": 1, "kvl": 2, "kcl": 3}
 
 
 @dataclass

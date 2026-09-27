@@ -24,7 +24,7 @@ class Law:
 
     expr: sp.Expr
     reason: str
-    kind: str = "law"  # "given" | "law" | "kvl" | "kcl" — also the order the solver tries them
+    kind: str = "law"  # "given" | "reading" | "law" | "kvl" | "kcl" — also the order the solver tries them
 
 
 @dataclass(frozen=True)
@@ -120,10 +120,11 @@ class TwoTerminal(Component):
         U, I = sp.Symbol(f"U_{label}"), sp.Symbol(f"I_{label}")
         drop = V["b"] - V["a"] if self.active else V["a"] - V["b"]
         laws = [Law(U - drop, f"napięcie na {label} (różnica potencjałów)", "kvl")]
-        laws += [Law(e, r.format(label=label)) for e, r in self.law(U, I, param, ctx)]
+        laws += [Law(e, r.format(label=label), *kind) for e, r, *kind in self.law(U, I, param, ctx)]
         return Model({"a": I, "b": -I}, laws, {"U": U, "I": I}, param)
 
-    def law(self, U, I, x, ctx) -> list[tuple[sp.Expr, str]]:
+    def law(self, U, I, x, ctx) -> list[tuple]:
+        """``(expr, reason)`` or ``(expr, reason, kind)`` for each law; ``{label}`` in reason is filled in."""
         raise NotImplementedError
 
 
@@ -170,18 +171,23 @@ class CurrentSource(TwoTerminal):
         return [(I - x, "źródło prądu ({label})")]
 
 
-class Ammeter(NoValue, TwoTerminal):
-    prefix = "A"
+class Ammeter(TwoTerminal):
+    """Ideal ammeter (U = 0); its value is the reading. ``Ammeter(2)`` is a measured current
+    (a datum, unlike ``CurrentSource(2)`` which forces it), ``Ammeter()`` a reading to find."""
+
+    prefix, unit, positive = "A", "A", False
 
     def law(self, U, I, x, ctx):
-        return [(U, "idealny amperomierz: U = 0 ({label})")]
+        return [(U, "idealny amperomierz: U = 0 ({label})"), (I - x, "odczyt amperomierza ({label})", "reading")]
 
 
-class Voltmeter(NoValue, TwoTerminal):
-    prefix = "V"
+class Voltmeter(TwoTerminal):
+    """Ideal voltmeter (I = 0); its value is the reading, like ``Ammeter``."""
+
+    prefix, unit, positive = "V", "V", False
 
     def law(self, U, I, x, ctx):
-        return [(I, "idealny woltomierz: I = 0 ({label})")]
+        return [(I, "idealny woltomierz: I = 0 ({label})"), (U - x, "odczyt woltomierza ({label})", "reading")]
 
 
 class OpAmp(NoValue):

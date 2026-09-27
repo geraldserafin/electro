@@ -233,3 +233,20 @@ def test_two_solutions_are_named():
         loop(VoltageSource(12), Resistor(), Resistor(4)).solve(P_R_1=8)
     sol = loop(VoltageSource(12), Resistor(), Resistor(4)).solve(Eq(P("R_1"), 8), Eq(U("R_1"), 2 * U("R_2")))
     assert sol["R_1"].value == 8  # one more condition picks one
+
+
+def test_ammeter_reading_is_a_datum():
+    """Zadanie 4: I_2 = 2 A measured → the supply voltage; the load's equivalent resistance."""
+    load = Resistor(3) + ((Resistor(18) + Ammeter(2)) | (Resistor(3) + Resistor(6)))
+    assert loop(VoltageSource(label="E"), load).solve(find="E")["E"].value == 54
+    assert electro.resistance(load) == 9
+
+
+def test_meter_without_reading_reads_the_result():
+    sol = loop(VoltageSource(12), Resistor(4), Ammeter(), Voltmeter() | Resistor(2)).solve()
+    assert sol["A_1"].value == 2 and sol["V_1"].value == 4
+
+
+def test_meter_reading_can_contradict():
+    with pytest.raises(Contradiction, match="A_1 = 2 A"):
+        loop(VoltageSource(12), Resistor(4), Ammeter(2)).solve()

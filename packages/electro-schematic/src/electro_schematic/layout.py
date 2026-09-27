@@ -14,7 +14,7 @@ import math
 from dataclasses import dataclass, field
 
 from electro import circuit as ct
-from electro.components import Component
+from electro.components import Ammeter, Component, Voltmeter
 from electro.semantics import compile_circuit
 from electro.values import UNKNOWN, fmt, to_text
 
@@ -203,7 +203,8 @@ def _component(comp: Component, frame: Frame, ctx: _Context, reversed_: bool) ->
     placed = ctx.next()
     axis = (-1, 0) if reversed_ else (1, 0)
     label_side, result_side = label_sides(frame.to_screen(axis))
-    value = "?" if comp.has_value and comp.value is UNKNOWN else fmt(comp.value, comp.unit) if comp.has_value else ""
+    meter = isinstance(comp, (Ammeter, Voltmeter))  # without a reading it is just a meter
+    value = ("" if meter else "?") if comp.value is UNKNOWN else fmt(comp.value, comp.unit) if comp.has_value else ""
     label = f"{placed.label} = {value}" if value else placed.label
     probe = Block(frame)
     probe.reserve((0, 0), *text_box(label_side, text_width(label) + 1.5, 1))  # + room for a solved value

@@ -648,6 +648,7 @@ function label_(e: ElementData): string {
   if (e.kind === "label") return e.text ?? "";
   if (!isComponent(e.kind)) return "";
   if (!hasValue(e.kind)) return e.id;
+  if (kindInfo(e.kind)?.meter && !e.value) return e.id; // no reading: the simulation fills it in
   return `${e.id} = ${e.value ?? "?"}${e.value && /\d$/.test(e.value) ? ` ${unit}` : ""}`;
 }
 
@@ -704,7 +705,7 @@ function ElementView({ element: e, library, wires, result, selected, onPointerDo
     ? [result.I && `I = ${result.I} ${ARROW[e.rotation][result.reversed ? 1 : 0]}`, result.U && `U = ${result.U}`].filter(Boolean) as string[]
     : [];
   return (
-    <g className={`element ${selected ? "selected" : ""}`} onPointerDown={onPointerDown}>
+    <g className={`element ${selected ? "selected" : ""}`} data-id={e.id} onPointerDown={onPointerDown}>
       <rect
         className="hit"
         x={Math.min(...xs) - 12} y={Math.min(...ys) - 12}
@@ -771,8 +772,10 @@ function Inspector({ selection, element, taken, onChange, onRename, onRotate, on
       )}
       {hasValue(element.kind) && (
         <label>
-          Wartość {info?.unit && <small>({info.unit}; puste = niewiadoma, litera = symbol)</small>}
-          <input value={element.value ?? ""} placeholder="?"
+          {info?.meter
+            ? <>Odczyt <small>({info.unit}; wpisz pomiar z zadania, puste = policz)</small></>
+            : <>Wartość {info?.unit && <small>({info.unit}; puste = niewiadoma, litera = symbol)</small>}</>}
+          <input value={element.value ?? ""} placeholder={info?.meter ? "brak pomiaru" : "?"}
                  onChange={(e) => onChange({ value: e.target.value.trim() === "" ? null : e.target.value })} />
         </label>
       )}

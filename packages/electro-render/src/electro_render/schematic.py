@@ -12,7 +12,7 @@ from collections import Counter
 from xml.sax.saxutils import escape
 
 from electro import circuit as ct
-from electro.components import OPEN, Ammeter, Hole
+from electro.components import OPEN, Ammeter, Hole, Voltmeter
 from electro.values import UNKNOWN, fmt
 from electro_schematic import GRID, KINDS, Schematic, layout
 from electro_schematic.layout import label_sides
@@ -74,8 +74,8 @@ def _label_lines(element, solution) -> list[tuple[str, str]]:
         return [(label, "label")]
     if component.value is UNKNOWN:
         value = solution[label].value if solution is not None else None
-        if value is None:
-            return [(f"{label} = ?", "label")]
+        if value is None:  # a meter without a reading is just a meter, not an unknown
+            return [(label if isinstance(component, (Ammeter, Voltmeter)) else f"{label} = ?", "label")]
         return [(f"{label} = {fmt(value, component.unit)}", "solved")]
     return [(f"{label} = {fmt(component.value, component.unit)}", "label")]
 

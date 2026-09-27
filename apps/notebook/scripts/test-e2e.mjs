@@ -39,7 +39,18 @@ try {
   await bridge.locator(".outputs table").waitFor({ timeout: 30_000 });
   check("simulation: table and values on the drawing",
     (await bridge.locator(".outputs table").innerText()).includes("200 Ω")
-    && (await bridge.locator(".canvas .label.solved").textContent()).includes("200"));
+    && (await bridge.locator(".canvas .label.solved").allTextContents()).join(" ").includes("200"));
+
+  // the same measurement typed as the ammeter's reading instead of in "Dane pomiarowe"
+  await bridge.locator('.canvas .element[data-id="A_1"]').click();
+  await bridge.locator(".inspector input").nth(1).fill("0");
+  await bridge.locator(".sim-bar input").fill("");
+  await bridge.getByRole("button", { name: "Symuluj" }).click();
+  await bridge.locator(".stale").waitFor({ state: "detached", timeout: 30_000 });
+  await page.waitForTimeout(300);
+  check("ammeter reading is a measurement",
+    (await bridge.locator(".canvas .label.solved").allTextContents()).join(" ").includes("200")
+    && (await bridge.locator(".canvas").textContent()).includes("A1 = 0 A"));
 
   // moving part of the bridge as a group keeps every connection (edge wires stretch or follow)
   {
@@ -76,8 +87,9 @@ try {
   // editor: place a resistor on the bridge canvas
   const canvas = page.locator(".canvas").first();
   const before = await canvas.locator(".element").count();
-  await page.getByTitle("Rezystor").first().click();
   const box = await canvas.boundingBox();
+  await page.mouse.click(box.x + box.width * 0.6, box.y + box.height * 0.85); // deselect: the inspector would cover the spot
+  await page.getByTitle("Rezystor").first().click();
   await page.mouse.click(box.x + box.width * 0.8, box.y + box.height * 0.5);
   check("element placed", (await canvas.locator(".element").count()) === before + 1);
   check("inspector shows the new label", (await page.locator(".inspector input").first().inputValue()) === "R_5");

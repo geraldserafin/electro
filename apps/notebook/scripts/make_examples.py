@@ -1,13 +1,14 @@
 """Builds apps/notebook/examples/nieznane-i-dziury.electro.json (run from the repo root with PYTHONPATH set, e.g. in devenv shell)."""
 import json, secrets
-from electro import Hole, Resistor, VoltageSource, loop
+from electro import Ammeter, Hole, Resistor, VoltageSource, loop
 from electro_schematic import layout
 
 cells = []
 md = lambda text: cells.append({"id": secrets.token_hex(4), "type": "markdown", "source": text.strip()})
 code = lambda text: cells.append({"id": secrets.token_hex(4), "type": "code", "source": text.strip(), "outputs": []})
-drawing = lambda name, circuit, data="": cells.append({"id": secrets.token_hex(4), "type": "schematic", "name": name,
-                                                       "schematic": json.loads(layout(circuit).to_json()), "data": data})
+drawing = lambda name, circuit, data="", simulate=False: cells.append({
+    "id": secrets.token_hex(4), "type": "schematic", "name": name,
+    "schematic": json.loads(layout(circuit).to_json()), "data": data, "simulate": simulate})
 
 md("""
 Każdy przykład to osobna komórka — uruchom wszystko przyciskiem **▶ Uruchom wszystko** albo pojedynczo (`Shift+Enter`).
@@ -206,6 +207,22 @@ sol = loop(VoltageSource(12), Resistor(), Hole()).solve(I_E_1=1, U_R_1=4)
 sol
 """)
 
+md("""
+## 18. Pomiar na schemacie: amperomierz z odczytem
+Zadanie: $I_2 = 2\\,\\mathrm{A}$, $R_1 = 3\\,Ω$, $R_2 = 18\\,Ω$, $R_3 = 3\\,Ω$, $R_4 = 6\\,Ω$ — jakie jest napięcie
+zasilające i rezystancja zastępcza? Znany prąd to **amperomierz z odczytem** `Ammeter(2)`: dana pomiarowa, a nie źródło
+prądu (`CurrentSource(2)` wymusza prąd, ale jego napięcie byłoby kolejną niewiadomą). Amperomierz bez odczytu
+(`Ammeter()`) solver sam „odczyta”. W edytorze odczyt wpisujesz w polu **Odczyt** amperomierza.
+""")
+drawing("zadanie4", loop(VoltageSource(label="E"), Resistor(3),
+                         (Resistor(18) + Ammeter(2)) | (Resistor(3) + Resistor(6))), simulate=True)
+code("""
+obciazenie = Resistor(3) + ((Resistor(18) + Ammeter(2)) | (Resistor(3) + Resistor(6)))
+zadanie = loop(VoltageSource(label="E"), obciazenie)
+print("Rz =", resistance(obciazenie), "Ω")  # odczyt amperomierza nie zmienia rezystancji
+zadanie.solve(find="E")
+""")
+
 # run every cell (like "Uruchom wszystko") and keep the outputs, so the example opens with its results
 from electro_notebook import kernel
 
@@ -214,7 +231,7 @@ schematics = {c["name"]: json.dumps(c["schematic"]) for c in cells if c["type"] 
 for cell in cells:
     if cell["type"] == "code":
         cell["outputs"] = json.loads(kernel.run(cell["source"], json.dumps(schematics)))
-    if cell["type"] == "schematic" and cell.get("data"):  # as if "Symuluj" was clicked
+    if cell["type"] == "schematic" and (cell.pop("simulate") or cell["data"]):  # as if "Symuluj" was clicked
         cell.update(json.loads(kernel.simulate(json.dumps(cell["schematic"]), cell["data"])), stale=False)
 
 notebook = {"version": 1, "title": "Przykłady: niewiadome i dziury", "codeInPdf": True, "cells": cells}

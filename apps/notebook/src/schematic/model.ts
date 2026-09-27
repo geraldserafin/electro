@@ -10,6 +10,7 @@ export interface KindInfo {
   group: string; // section of the element library
   words: string; // other names, for the library search
   unit?: string;
+  meter?: boolean; // the value is a reading: a measured datum, or left empty to be computed
 }
 
 export const KINDS: KindInfo[] = [
@@ -18,8 +19,8 @@ export const KINDS: KindInfo[] = [
   { kind: "inductor", name: "Cewka", prefix: "L", unit: "H", group: "Pasywne", words: "indukcyjnosc dlawik L" },
   { kind: "voltage_source", name: "Źródło napięcia", prefix: "E", unit: "V", group: "Źródła", words: "bateria akumulator zasilanie SEM E" },
   { kind: "current_source", name: "Źródło prądu", prefix: "J", unit: "A", group: "Źródła", words: "pradowe J" },
-  { kind: "ammeter", name: "Amperomierz", prefix: "A", group: "Mierniki", words: "miernik prad" },
-  { kind: "voltmeter", name: "Woltomierz", prefix: "V", group: "Mierniki", words: "miernik napiecie" },
+  { kind: "ammeter", name: "Amperomierz", prefix: "A", unit: "A", meter: true, group: "Mierniki", words: "miernik prad" },
+  { kind: "voltmeter", name: "Woltomierz", prefix: "V", unit: "V", meter: true, group: "Mierniki", words: "miernik napiecie" },
   { kind: "ground", name: "Masa", prefix: "gnd", group: "Połączenia", words: "GND ziemia uziemienie" },
   { kind: "label", name: "Etykieta węzła", prefix: "lbl", group: "Połączenia", words: "nazwa wezla net label" },
   { kind: "hole", name: "Nieznany element", prefix: "X", group: "Inne", words: "dziura hole ?" },
