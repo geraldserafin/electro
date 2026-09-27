@@ -1,5 +1,5 @@
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
-import { CodeIcon, Eye, Pencil, Play, SchematicIcon, WarningIcon } from "../icons";
+import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
+import { CodeIcon, Eye, Flash, Pencil, Play, SchematicIcon, WarningIcon } from "../icons";
 import { kernel } from "../python/kernel";
 import { PrintDrawing, SchematicEditor, type Camera } from "../schematic/Editor";
 import type { Cell, ElementResult, Problem, SchematicData, SymbolLibrary } from "../types";
@@ -65,15 +65,16 @@ export function MarkdownCell({ cell, update }: { cell: Extract<Cell, { type: "ma
 }
 
 /** Colab-style gutter: a round run button that shows [n] when the cell has run. */
-function RunButton({ run, running, label, execution, done }: {
+function RunButton({ run, running, label, execution, done, icon = <Play /> }: {
   run: () => void; running: boolean; label: string; execution?: number;
   done?: boolean; // nothing changed since the last run: nothing to run
+  icon?: ReactNode;
 }) {
   return (
     <div className="gutter no-print">
       <button className={`run ${running ? "running" : ""} ${done ? "done" : ""}`} onClick={run} disabled={running || done}
               title={done ? "Wyniki są aktualne — zmień coś na schemacie, żeby przeliczyć" : label} aria-label={label}>
-        <Play />
+        {icon}
       </button>
       {execution !== undefined && !running && <span className="execution">[{execution}]</span>}
     </div>
@@ -211,7 +212,7 @@ export function SchematicCell({ cell, update, library, simulate, running }: {
 
   return (
     <div className="schematic-cell">
-      <RunButton run={run} running={running || busy} done={done || empty}
+      <RunButton run={run} running={running || busy} done={done || empty} icon={<Flash />}
                  label="Policz prądy i napięcia (Shift+Enter w kodzie)" />
       <div className="cell-body">
       {view === "schematic" ? (

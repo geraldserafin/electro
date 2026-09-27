@@ -15,17 +15,18 @@
   --warn-bg: #fef7e0;
   --warn: #8a5a00;
   --err-bg: #fce8e6;
-  /* the drawing board */
-  --board: #ffffff;
-  --island: #ffffff;
-  --island-shadow: 0 0 0 1px rgba(0, 0, 0, 0.04), 0 1px 3px rgba(0, 0, 0, 0.1), 0 6px 16px rgba(0, 0, 0, 0.06);
-  --tool-active: #e0dfff;
-  --tool-active-text: #4a47b1;
-  --primary: #6965db;
-  --primary-hover: #5753d0;
-  /* the notebook's floating islands: neutral, one step off the page */
+  /* the app's own colour: yellow, like the bolt — the run buttons for now */
+  --primary: #f5b100;
+  --primary-hover: #e3a400;
+  --on-primary: #ffffff;
+  /* floating islands (the notebook's and the drawing board's): neutral, one step off the page, flat */
   --surface: #ffffff;
   --selected: #eceef1;
+  --board: #ffffff;
+  --island: var(--surface);
+  --island-shadow: 0 0 0 1px var(--line);
+  --tool-active: var(--selected);
+  --tool-active-text: var(--text);
   /* type and code, as in Colab (its colours are VS Code's "Light+" / "Dark+") */
   --sans: "Google Sans", Roboto, ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
   --mono: "Roboto Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
@@ -59,13 +60,8 @@
     --warn-bg: #3a2e12;
     --warn: #fdd663;
     --err-bg: #3c1f1c;
-    --board: #121212;
-    --island: #232329;
-    --island-shadow: 0 0 0 1px rgba(255, 255, 255, 0.06), 0 2px 8px rgba(0, 0, 0, 0.5);
-    --tool-active: #403e6a;
-    --tool-active-text: #d6d4ff;
-    --primary: #a8a5ff;
-    --primary-hover: #bbb8ff;
+    --board: #1a1a1a;
+    --primary-hover: #ffc21a;
     --surface: #262626;
     --selected: #34353a;
     --hl-keyword: #569cd6;
@@ -401,10 +397,11 @@ main > .add-row { justify-content: center; }
   color: var(--muted);
   border: 1px solid var(--line);
 }
-.cell:hover .gutter .run, .cell.focused .gutter .run { color: var(--bg); background: var(--text); border-color: var(--text); }
+.cell:hover .gutter .run, .cell.focused .gutter .run { color: var(--on-primary); background: var(--primary); border-color: var(--primary); }
+.gutter .run:hover:not(:disabled) { background: var(--primary-hover) !important; border-color: var(--primary-hover) !important; }
 .gutter .run.running { animation: pulse 0.8s ease-in-out infinite alternate; }
 /* a schematic's run button says whether there is anything to run: filled when there is, */
-.schematic-cell .gutter .run:not(.done):not(:disabled) { color: #fff; background: var(--primary); border-color: var(--primary); }
+.schematic-cell .gutter .run:not(.done):not(:disabled) { color: var(--on-primary); background: var(--primary); border-color: var(--primary); }
 /* …faint when the results are up to date */
 .gutter .run.done, .cell:hover .gutter .run.done, .cell.focused .gutter .run.done {
   color: var(--faint); background: transparent; border-color: var(--line); opacity: 0.6;
@@ -453,7 +450,7 @@ pre.code-view-note { color: var(--danger); }
 }
 .board.loading { display: grid; place-items: center; color: var(--muted); }
 .board-view { position: absolute; inset: 0; overflow: hidden; }
-.board.active { border-color: var(--primary); }
+.board.active { border-color: var(--accent); }
 .board.panning .canvas { cursor: grab; }
 .board.panning .canvas:active { cursor: grabbing; }
 .canvas { display: block; color: var(--text); touch-action: none; user-select: none; -webkit-user-select: none; }
@@ -463,21 +460,21 @@ pre.code-view-note { color: var(--danger); }
 .canvas .element { cursor: grab; }
 .canvas.tool-select .segment-h { cursor: ns-resize; }
 .canvas.tool-select .segment-v { cursor: ew-resize; }
-.canvas .element.selected .w, .canvas .wire.selected { stroke: var(--primary); }
-.canvas .element.selected .letter { fill: var(--primary); }
-.canvas .draft { stroke: var(--primary); stroke-dasharray: 5 4; pointer-events: none; }
+.canvas .element.selected .w, .canvas .wire.selected { stroke: var(--accent); }
+.canvas .element.selected .letter { fill: var(--accent); }
+.canvas .draft { stroke: var(--accent); stroke-dasharray: 5 4; pointer-events: none; }
 .canvas .open-pin { fill: var(--board); stroke: #e03131; stroke-width: 1.6; pointer-events: none; }
 .canvas .pin-handle { fill: transparent; cursor: crosshair; }
-.canvas.tool-select .pin-handle:hover { fill: var(--tool-active); stroke: var(--primary); stroke-width: 1.2; }
+.canvas.tool-select .pin-handle:hover { fill: var(--tool-active); stroke: var(--accent); stroke-width: 1.2; }
 .canvas:not(.tool-select) .pin-handle { pointer-events: none; }
 .canvas .snap { fill: none; stroke: #2f9e44; stroke-width: 2; pointer-events: none; }
 .canvas .ghost { opacity: 0.4; pointer-events: none; }
-.canvas .rubber-band { fill: var(--tool-active); fill-opacity: 0.35; stroke: var(--primary); stroke-width: 1; stroke-dasharray: 4 3; pointer-events: none; }
+.canvas .rubber-band { fill: var(--tool-active); fill-opacity: 0.35; stroke: var(--accent); stroke-width: 1; stroke-dasharray: 4 3; pointer-events: none; }
 .canvas.tool-wire, .canvas.tool-place { cursor: crosshair; }
 .canvas text { paint-order: stroke; stroke: var(--board); stroke-width: 4px; stroke-linejoin: round; }
 .canvas .label { font-size: 13px; }
 .canvas .label .sub { font-size: 10px; }
-.canvas .label.solved { fill: var(--primary); font-weight: 600; }
+.canvas .label.solved { fill: var(--accent); font-weight: 600; }
 .canvas .reading { font-size: 11px; fill: #2f9e44; }
 
 .island {
@@ -522,7 +519,7 @@ pre.code-view-note { color: var(--danger); }
 .library-list { flex: 1; min-height: 0; overflow-y: auto; overflow-x: hidden; margin: 0 -6px; padding: 0 6px; }
 .library-search { flex: none; display: flex; align-items: center; gap: 6px; padding: 0 8px; border: 1px solid var(--line); border-radius: 8px; color: var(--faint); }
 .library-search input { flex: 1; min-width: 0; border: none; outline: none; background: transparent; padding: 7px 0; }
-.library-search:focus-within { border-color: var(--primary); }
+.library-search:focus-within { border-color: var(--accent); }
 .island.library h5 { margin: 8px 4px 2px; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); }
 .library-head { display: flex; align-items: center; justify-content: space-between; padding: 0 2px 4px 4px; }
 .library-head h4 { margin: 0; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); }
@@ -649,7 +646,7 @@ kbd { font: 11px ui-monospace, monospace; border: 1px solid var(--line); border-
 .results th:first-child, .results td.name { text-align: left; }
 .results td.name { font-weight: 500; }
 .results td.name sub { font-size: 0.72em; }
-.results td.solved { color: var(--primary); font-weight: 600; }
+.results td.solved { color: var(--accent); font-weight: 600; }
 .results tbody tr:hover td { background: var(--hover); }
 .results.stale { opacity: 0.45; } /* from an older drawing: the run button is on again */
 
