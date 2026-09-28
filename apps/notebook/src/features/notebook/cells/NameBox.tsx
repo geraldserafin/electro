@@ -13,7 +13,7 @@ export function NameBox({ name, onRename }: { name: string; onRename: (name: str
   };
   if (!editing)
     return (
-      <button className="px-2.5 py-1 text-[15px] font-medium" onClick={() => { setDraft(name); setEditing(true); }}
+      <button className="px-2.5 py-1 rounded-lg text-[15px] font-medium" onClick={() => { setDraft(name); setEditing(true); }}
               title={t("schematic.nameTitle", { variable: variableName(name) })}>
         {name}
       </button>

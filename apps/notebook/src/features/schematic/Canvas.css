@@ -1,0 +1,33 @@
+/* The drawing itself (an SVG): plain CSS, not utilities — part of it is the symbol library's own
+   SVG (classes w, letter, dot…), and the PDF export copies the drawing with this styling.
+   The class names are the drawing's vocabulary: the e2e test and the export look for them too. */
+@layer components {
+  /* the drawing for the PDF: laid out (so it can measure itself) but not seen on screen */
+  .pdf-drawing { position: absolute; visibility: hidden; width: 0; height: 0; overflow: hidden; pointer-events: none; }
+
+  .canvas { display: block; color: var(--text); touch-action: none; user-select: none; -webkit-user-select: none; }
+  .canvas:focus { outline: none; }
+  .canvas.panning { cursor: grab; }
+  .canvas.panning:active { cursor: grabbing; }
+  .canvas .grid-dot { fill: var(--faint); opacity: 0.5; }
+  .canvas .hit { fill: transparent; stroke: transparent; stroke-width: 10; }
+  .canvas .element { cursor: grab; }
+  .canvas.tool-select .segment-h { cursor: ns-resize; }
+  .canvas.tool-select .segment-v { cursor: ew-resize; }
+  .canvas .element.selected .w, .canvas .wire.selected { stroke: var(--accent); }
+  .canvas .element.selected .letter { fill: var(--accent); }
+  .canvas .draft { stroke: var(--accent); stroke-dasharray: 5 4; pointer-events: none; }
+  .canvas .open-pin { fill: var(--board); stroke: #e03131; stroke-width: 1.6; pointer-events: none; }
+  .canvas .pin-handle { fill: transparent; cursor: crosshair; }
+  .canvas.tool-select .pin-handle:hover { fill: var(--tool-active); stroke: var(--accent); stroke-width: 1.2; }
+  .canvas:not(.tool-select) .pin-handle { pointer-events: none; }
+  .canvas .snap { fill: none; stroke: #2f9e44; stroke-width: 2; pointer-events: none; }
+  .canvas .ghost { opacity: 0.4; pointer-events: none; }
+  .canvas .rubber-band { fill: var(--tool-active); fill-opacity: 0.35; stroke: var(--accent); stroke-width: 1; stroke-dasharray: 4 3; pointer-events: none; }
+  .canvas.tool-wire, .canvas.tool-place { cursor: crosshair; }
+  .canvas text { paint-order: stroke; stroke: var(--board); stroke-width: 4px; stroke-linejoin: round; }
+  .canvas .label { font-size: 13px; }
+  .canvas .label .sub { font-size: 10px; }
+  .canvas .label.solved { fill: var(--accent); font-weight: 600; }
+  .canvas .reading { font-size: 11px; fill: #2f9e44; }
+}

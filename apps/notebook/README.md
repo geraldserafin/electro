@@ -66,7 +66,7 @@ nie `@/features/schematic/Editor`); wewnątrz plastra importy są względne. `@/
 |---|---|
 | `features/notebook/` | edycja notatki: komórki (`cells/`), spis treści, tytuł |
 | `features/notes/` | notatki na serwerze: lista, zapis i konflikty, galeria |
-| `features/schematic/` | edytor siatki; `symbols.json` to wygląd elementów wygenerowany z `electro_render.symbol_library()` (`scripts/make_symbols.py`, test pilnuje zgodności), więc schemat wygląda jak raport i widać go, zanim Python się załaduje |
+| `features/schematic/` | edytor siatki (`Editor`: stan i gesty; wyspy wokół planszy to osobne komponenty; `useCamera`, `useHistory`: widok i cofanie; styl samego rysunku SVG w `Canvas.css`); `symbols.json` to wygląd elementów wygenerowany z `electro_render.symbol_library()` (`scripts/make_symbols.py`, test pilnuje zgodności), więc schemat wygląda jak raport i widać go, zanim Python się załaduje |
 | `features/python/` | `worker.ts` ładuje Pyodide + sympy + nasze paczki (z `bundle.json`), `kernel.ts` — wywołania workera jako obietnice |
 | `features/pdf-export/` | eksport do PDF: dialog, ustawienia, Typst w workerze |
 | `features/examples/` | przykładowe notatki |
@@ -79,7 +79,7 @@ tailwind-merge) — z dwóch klas na tę samą właściwość wygrywa wtedy pó�
 w CSS Tailwinda, nie w atrybucie. To, czego nie da się sensownie zapisać klasami (np. miniatura strony PDF, która
 przestawia tokeny i styluje cudzy Markdown), leży obok komponentu jako `*.css` w `@layer components`.
 
-Przepisane: `notes`, `notebook`, strony, `shared/ui`. `schematic` i `pdf-export` wciąż korzystają z `legacy.css`
+Przepisane: `notes`, `notebook`, `schematic`, strony, `shared/ui`. `pdf-export` wciąż korzysta z `legacy.css`
 (w warstwie `base`, więc każda klasa Tailwinda z nim wygrywa); preflight włączymy, gdy `legacy.css` zniknie.
 
 Testy e2e szukają elementów po rolach, etykietach i atrybutach `data-*` (np. `data-cell`, `data-output`), nie po klasach.

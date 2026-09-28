@@ -21,7 +21,7 @@ export function Problems({ problems, below }: {
   return (
     <div className="relative" ref={ref}>
       <button onClick={() => setOpen((o) => !o)} title={title} aria-label={title} aria-expanded={open}
-              className={cn("p-1.5", color, error ? "bg-err-bg" : "bg-warn-bg")}>
+              className={cn("p-1.5 rounded-lg", color, error ? "bg-err-bg" : "bg-warn-bg")}>
         <WarningIcon />
       </button>
       {open && (

@@ -3,39 +3,34 @@
 // to Python; connectivity and solving stay on the Python side.
 import type { ElementData, Point, SchematicData, SymbolLibrary, WireData } from "@/shared/model/types";
 
+export type KindGroup = "passive" | "sources" | "meters" | "connections" | "other";
+
+/** What an element is, apart from its name (that is in messages.ts: kinds.<kind>). */
 export interface KindInfo {
   kind: string;
-  name: string;
   prefix: string;
-  group: string; // section of the element library
-  words: string; // other names, for the library search
+  group: KindGroup; // section of the element library
   unit?: string;
   meter?: boolean; // the value is a reading: a measured datum, or left empty to be computed
 }
 
-export const KINDS: KindInfo[] = [
-  { kind: "resistor", name: "Rezystor", prefix: "R", unit: "Ω", group: "Pasywne", words: "opornik opor R" },
-  { kind: "capacitor", name: "Kondensator", prefix: "C", unit: "F", group: "Pasywne", words: "pojemnosc C" },
-  { kind: "inductor", name: "Cewka", prefix: "L", unit: "H", group: "Pasywne", words: "indukcyjnosc dlawik L" },
-  { kind: "voltage_source", name: "Źródło napięcia", prefix: "E", unit: "V", group: "Źródła", words: "bateria akumulator zasilanie SEM E" },
-  { kind: "current_source", name: "Źródło prądu", prefix: "J", unit: "A", group: "Źródła", words: "pradowe J" },
-  { kind: "ammeter", name: "Amperomierz", prefix: "A", unit: "A", meter: true, group: "Mierniki", words: "miernik prad" },
-  { kind: "voltmeter", name: "Woltomierz", prefix: "V", unit: "V", meter: true, group: "Mierniki", words: "miernik napiecie" },
-  { kind: "ground", name: "Masa", prefix: "gnd", group: "Połączenia", words: "GND ziemia uziemienie" },
-  { kind: "label", name: "Etykieta węzła", prefix: "lbl", group: "Połączenia", words: "nazwa wezla net label" },
-  { kind: "hole", name: "Nieznany element", prefix: "X", group: "Inne", words: "dziura hole ?" },
-  { kind: "opamp", name: "Wzmacniacz op.", prefix: "OA", group: "Inne", words: "operacyjny opamp" },
-];
+export const KINDS = [
+  { kind: "resistor", prefix: "R", unit: "Ω", group: "passive" },
+  { kind: "capacitor", prefix: "C", unit: "F", group: "passive" },
+  { kind: "inductor", prefix: "L", unit: "H", group: "passive" },
+  { kind: "voltage_source", prefix: "E", unit: "V", group: "sources" },
+  { kind: "current_source", prefix: "J", unit: "A", group: "sources" },
+  { kind: "ammeter", prefix: "A", unit: "A", meter: true, group: "meters" },
+  { kind: "voltmeter", prefix: "V", unit: "V", meter: true, group: "meters" },
+  { kind: "ground", prefix: "gnd", group: "connections" },
+  { kind: "label", prefix: "lbl", group: "connections" },
+  { kind: "hole", prefix: "X", group: "other" },
+  { kind: "opamp", prefix: "OA", group: "other" },
+] as const satisfies readonly KindInfo[];
 
-/** Case- and accent-insensitive: "zrodlo" finds "Źródło napięcia". */
-export const plain = (text: string) => text.normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/ł/g, "l").toLowerCase();
+export type Kind = (typeof KINDS)[number]["kind"];
 
-export function searchKinds(query: string): KindInfo[] {
-  const q = plain(query.trim());
-  return q ? KINDS.filter((k) => plain(`${k.name} ${k.words} ${k.group}`).includes(q)) : KINDS;
-}
-
-export const kindInfo = (kind: string) => KINDS.find((k) => k.kind === kind);
+export const kindInfo = (kind: string): KindInfo | undefined => KINDS.find((k) => k.kind === kind);
 export const hasValue = (kind: string) => kindInfo(kind)?.unit !== undefined;
 export const isComponent = (kind: string) => !["ground", "label", "terminal"].includes(kind);
 

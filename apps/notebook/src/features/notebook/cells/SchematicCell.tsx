@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { usePdf } from "@/features/pdf-export";
 import { kernel } from "@/features/python";
-import { PdfDrawing, SchematicEditor, type Camera } from "@/features/schematic";
+import { board, BoardIsland, PdfDrawing, SchematicEditor, type Camera } from "@/features/schematic";
 import type { Cell, SchematicData, SchematicView, SymbolLibrary } from "@/shared/model/types";
 import { Flash } from "@/shared/ui/icons";
 import { CodeEditor } from "./CodeEditor";
@@ -111,8 +111,7 @@ export function SchematicCell({ cell, update, library, simulate, running }: {
   const problems = !cell.stale && cell.problems?.length ? <Problems problems={cell.problems} below={view === "code"} /> : null;
 
   return (
-    // schematic-cell: the board's islands (legacy.css, the schematic's) fade in while the pointer is over it
-    <div className="schematic-cell flex gap-2 items-start">
+    <div className="flex gap-2 items-start">
       <RunButton run={run} running={running || busy} done={done || empty} eager icon={<Flash />} label={t("schematic.run")} />
       <div className="flex-1 min-w-0">
       {view === "schematic" ? (
@@ -128,12 +127,12 @@ export function SchematicCell({ cell, update, library, simulate, running }: {
           autoFocus={focusBoard.current}
         />
       ) : (
-        <div className="board h-auto min-h-50 p-2.5 flex flex-col gap-2.5">
+        <div data-board className={cn(board, "flex flex-col gap-2.5 min-h-50 p-2.5")}>
           <div className="flex items-center gap-2">
-            <div className="island static">{name}</div>
+            <BoardIsland className="static">{name}</BoardIsland>
             <span className="flex-1" />
-            {problems && <div className="island static status relative">{problems}</div>}
-            <div className="island static">{actions}</div>
+            {problems && <BoardIsland stays className="static border border-line text-[13px] text-muted">{problems}</BoardIsland>}
+            <BoardIsland className="static">{actions}</BoardIsland>
           </div>
           <div className={editorFrame} onKeyDownCapture={runOnShiftEnter(run)}>
             {source === null

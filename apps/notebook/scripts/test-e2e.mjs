@@ -72,7 +72,7 @@ try {
   // pick an element in the side panel, then close the panel (it would cover the left of the board)
   const pick = async (scope, name) => {
     await scope.getByRole("button", { name: "Elementy" }).click();
-    await scope.locator(`.library-item[title="${name}"]`).click();
+    await scope.getByRole("complementary", { name: "Biblioteka elementów" }).locator(`button[title="${name}"]`).click();
     await scope.getByRole("button", { name: "Elementy" }).click();
   };
 
@@ -89,7 +89,7 @@ try {
     await cellLocator.locator(".cm-content").waitFor();
     const text = await cellLocator.locator(".cm-content").innerText();
     await cellLocator.getByRole("tab", { name: "Schemat" }).click();
-    await cellLocator.locator(".board .canvas").waitFor();
+    await cellLocator.locator("[data-board] .canvas").waitFor();
     return text;
   };
 
@@ -97,24 +97,24 @@ try {
   const bridge = page.locator('[data-cell="schematic"]').first();
   const runBridge = bridge.getByRole("button", { name: "Policz prądy i napięcia (Shift+Enter w kodzie)" });
   const reading = async (value) => {
-    await bridge.locator('.board .canvas .element[data-id="A_1"]').click();
-    await bridge.locator(".inspector input").nth(1).fill(value);
+    await bridge.locator('[data-board] .canvas .element[data-id="A_1"]').click();
+    await bridge.getByRole("group", { name: "Właściwości" }).locator("input").nth(1).fill(value);
   };
   await runBridge.click();
   await bridge.locator('table[aria-label="Wyniki"]:not([data-stale])').waitFor({ timeout: 30_000 });
   check("run: table and values on the drawing, then the button rests",
     (await bridge.getByRole("table", { name: "Wyniki" }).innerText()).includes("200 Ω")
-    && (await bridge.locator(".board .canvas .label.solved").allTextContents()).join(" ").includes("200")
+    && (await bridge.locator("[data-board] .canvas .label.solved").allTextContents()).join(" ").includes("200")
     && await runBridge.isDisabled());
 
   // left alone, a schematic keeps its board (grid, drawing, values); its tools come with the pointer
   {
     await page.mouse.move(4, 600); // over no cell
     await page.waitForTimeout(300);
-    const tools = bridge.locator(".board .island.tools");
-    const hidden = (await bridge.locator(".board .canvas .label.solved").count()) > 0
+    const tools = bridge.locator("[data-board]").getByRole("toolbar");
+    const hidden = (await bridge.locator("[data-board] .canvas .label.solved").count()) > 0
       && await tools.evaluate((el) => getComputedStyle(el).opacity === "0");
-    await bridge.locator(".board").hover();
+    await bridge.locator("[data-board]").hover();
     await page.waitForTimeout(300);
     check("a schematic: board always there, its tools on hover", hidden
       && await tools.evaluate((el) => getComputedStyle(el).opacity === "1"));
@@ -135,7 +135,7 @@ try {
 
   // moving part of the bridge as a group keeps every connection (edge wires stretch or follow)
   {
-    const grid = bridge.locator(".board .canvas");
+    const grid = bridge.locator("[data-board] .canvas");
     const at = (gx, gy) => grid.evaluate((svg, [x, y]) => {
       const p = new DOMPoint(x, y).matrixTransform(svg.getScreenCTM());
       return [p.x, p.y];
@@ -154,13 +154,13 @@ try {
 
   // Schemat | Kod: a value changed in the code comes back to the same drawing
   {
-    const view = () => bridge.locator(".board .canvas").getAttribute("viewBox");
-    await bridge.locator(".board").hover();
+    const view = () => bridge.locator("[data-board] .canvas").getAttribute("viewBox");
+    await bridge.locator("[data-board]").hover();
     const viewStart = await view();
     await page.mouse.wheel(0, 120); // the board is active (clicked before): scrolling pans it
     await page.waitForTimeout(100);
     const viewBefore = await view();
-    const places = () => bridge.locator(".board .canvas .element").evaluateAll((els) => els.map((e) => [e.querySelector(".hit").getAttribute("x"), e.querySelector(".hit").getAttribute("y")]));
+    const places = () => bridge.locator("[data-board] .canvas .element").evaluateAll((els) => els.map((e) => [e.querySelector(".hit").getAttribute("x"), e.querySelector(".hit").getAttribute("y")]));
     const before = await places();
     await bridge.getByRole("tab", { name: "Kod" }).click();
     await bridge.locator(".cm-content").waitFor();
@@ -169,11 +169,11 @@ try {
     await page.keyboard.press("Meta+a");
     await page.keyboard.insertText(text.replace("Resistor(50)", "Resistor(60)"));
     await bridge.getByRole("tab", { name: "Schemat" }).click();
-    await bridge.locator(".board .canvas").waitFor();
+    await bridge.locator("[data-board] .canvas").waitFor();
     check("back from the code view: same view, the board has the keyboard", viewBefore !== viewStart && (await view()) === viewBefore
-      && await bridge.locator(".board .canvas").evaluate((svg) => document.activeElement === svg));
+      && await bridge.locator("[data-board] .canvas").evaluate((svg) => document.activeElement === svg));
     check("code view: a new value keeps the drawing", text.startsWith("mostek = net(")
-      && (await bridge.locator('.board .element[data-id="R_3"]').textContent()).includes("60")
+      && (await bridge.locator('[data-board] .element[data-id="R_3"]').textContent()).includes("60")
       && JSON.stringify(await places()) === JSON.stringify(before));
   }
 
@@ -193,19 +193,19 @@ try {
     check("running the code does not reformat it", afterRun.startsWith("# mój komentarz")
       && (await bridge.locator(".cm-content").innerText()).startsWith("# mój komentarz"));
     await bridge.getByRole("tab", { name: "Schemat" }).click();
-    await bridge.locator(".board .canvas").waitFor();
+    await bridge.locator("[data-board] .canvas").waitFor();
   }
 
   // scrolled away from the drawing: a button brings it back (and only then is it there)
   {
     const back = bridge.getByRole("button", { name: /Wróć do schematu/ });
     const shownAtFirst = await back.count();
-    await bridge.locator(".board").hover();
+    await bridge.locator("[data-board]").hover();
     for (let i = 0; i < 12; i++) await page.mouse.wheel(0, 400);
     await back.waitFor({ timeout: 5_000 });
     await back.click();
-    const inView = await bridge.locator('.board .element[data-id="R_1"]').evaluate((el) => {
-      const r = el.getBoundingClientRect(), b = el.closest(".board").getBoundingClientRect();
+    const inView = await bridge.locator('[data-board] .element[data-id="R_1"]').evaluate((el) => {
+      const r = el.getBoundingClientRect(), b = el.closest("[data-board]").getBoundingClientRect();
       return r.top >= b.top && r.bottom <= b.bottom && r.left >= b.left && r.right <= b.right;
     });
     check("scrolled away: a button brings the drawing back", shownAtFirst === 0 && inView && (await back.count()) === 0);
@@ -272,14 +272,14 @@ try {
   }
 
   // the PDF's drawing: cropped to what is drawn, without the editor's selection or the simulation
-  await bridge.locator('.board .element[data-id="R_1"]').click();
+  await bridge.locator('[data-board] .element[data-id="R_1"]').click();
   const drawn = bridge.locator(".pdf-drawing svg");
   check("the PDF's drawing: cropped, no selection, no values of the run",
     (await drawn.locator(".selected").count()) === 0 && Number(await drawn.getAttribute("height")) < 500
     && (await drawn.locator(".reading, .label.solved").count()) === 0);
 
   // editor: place a resistor on the bridge canvas
-  const canvas = page.locator(".board .canvas").first();
+  const canvas = page.locator("[data-board] .canvas").first();
   const before = await canvas.locator(".element").count();
   let box = await canvas.boundingBox();
   await page.mouse.click(box.x + box.width * 0.6, box.y + box.height * 0.85); // deselect: the inspector would cover the spot
@@ -287,14 +287,14 @@ try {
   box = await canvas.boundingBox(); // where it is now
   await page.mouse.click(box.x + box.width * 0.8, box.y + box.height * 0.5);
   check("element placed", (await canvas.locator(".element").count()) === before + 1);
-  check("inspector shows the new label", (await page.locator(".inspector input").first().inputValue()) === "R_5");
+  check("inspector shows the new label", (await page.getByRole("group", { name: "Właściwości" }).locator("input").first().inputValue()) === "R_5");
   await canvas.screenshot({ path: `${shots}/editor.png` });
 
   // wiring by hand in a fresh schematic: drag from a pin, then the wire tool; rotation
   await addAtEnd("Schemat");
   const cell = page.locator('[data-cell="schematic"]').last();  // added at the end of the notebook
   await cell.scrollIntoViewIfNeeded();
-  const grid = cell.locator(".board .canvas");
+  const grid = cell.locator("[data-board] .canvas");
   // grid point → screen point, through the board's camera
   const at = (gx, gy) => grid.evaluate((svg, [x, y]) => {
     const p = new DOMPoint(x, y).matrixTransform(svg.getScreenCTM());
@@ -312,7 +312,7 @@ try {
   await page.keyboard.press("Enter");
   await click(24, 3);
   check("library search places an element", (await grid.locator(".element").count()) === 3
-    && await cell.locator(".island.library").isVisible());
+    && await cell.getByRole("complementary", { name: "Biblioteka elementów" }).isVisible());
   await page.keyboard.press("Delete");  // keep the circuit a simple loop for what follows
   await cell.getByRole("button", { name: "Elementy" }).click();  // close the panel
   const [x1, y1] = await at(8, 6); const [x2, y2] = await at(12, 3);
