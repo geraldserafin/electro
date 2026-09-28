@@ -193,7 +193,7 @@ export function Notebook({ initial, revision, reload, onSaved }: {
             {cell.type === "schematic" && (
               <SchematicCell cell={cell} update={(p) => update(cell.id, p)} library={library}
                              simulate={(s) => simulate(cell.id, s)}
-                             running={running.has(cell.id)} focused={focused === cell.id} />
+                             running={running.has(cell.id)} />
             )}
             <AddRow onAdd={(type) => insert(index + 1, type)} />
           </section>

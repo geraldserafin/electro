@@ -101,15 +101,17 @@ try {
     && (await bridge.locator(".board .canvas .label.solved").allTextContents()).join(" ").includes("200")
     && await runBridge.isDisabled());
 
-  // not being worked on, a schematic is its drawing, as in the PDF; a click brings the board back
+  // left alone, a schematic keeps its board (grid, drawing, values); its tools come with the pointer
   {
-    await page.mouse.click(4, 600); // outside every cell
-    await bridge.locator(".schematic-doc svg").waitFor();
-    const docOnly = (await bridge.locator(".board").count()) === 0 && (await bridge.locator("table.results").count()) === 0;
-    await bridge.locator(".schematic-doc").click();
-    await bridge.locator(".board .canvas").waitFor();
-    check("a schematic: its drawing when left, the board when clicked", docOnly
-      && await bridge.locator(".board .canvas").evaluate((svg) => document.activeElement === svg));
+    await page.mouse.move(4, 600); // over no cell
+    await page.waitForTimeout(300);
+    const tools = bridge.locator(".board .island.tools");
+    const hidden = (await bridge.locator(".board .canvas .label.solved").count()) > 0
+      && await tools.evaluate((el) => getComputedStyle(el).opacity === "0");
+    await bridge.locator(".board").hover();
+    await page.waitForTimeout(300);
+    check("a schematic: board always there, its tools on hover", hidden
+      && await tools.evaluate((el) => getComputedStyle(el).opacity === "1"));
   }
 
   // no reading: not enough data — a warning sign on the board, unfolding into LaTeX

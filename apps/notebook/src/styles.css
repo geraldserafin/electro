@@ -425,14 +425,15 @@ main > .add-row { justify-content: center; }
 /* the drawing for the PDF: laid out (so it can measure itself) but not seen on screen */
 .print-drawing { position: absolute; visibility: hidden; width: 0; height: 0; overflow: hidden; pointer-events: none; }
 
-/* a schematic not being worked on: the drawing alone, as the document (the PDF) has it */
-.schematic-doc { padding: 8px 0; border-radius: 12px; cursor: pointer; }
-.schematic-doc .print-drawing.on-screen {
-  position: static; visibility: visible; width: auto; height: auto; overflow: visible; pointer-events: none;
-  display: flex; justify-content: center;
+/* a schematic's tools (its islands) fade in while the pointer is over its board — or while something
+   in them is being typed into, or the board is full screen; the grid and the drawing always show.
+   What is wrong with the circuit (the status) stays. On touch screens (no hover) they always show. */
+@media (hover: hover) {
+  .schematic-cell .board .island:not(.status) { opacity: 0; transition: opacity 0.18s ease; }
+  .schematic-cell .board:hover .island,
+  .schematic-cell .board.fullscreen .island,
+  .schematic-cell .board:has(input:focus, textarea:focus, .cm-focused) .island { opacity: 1; }
 }
-.schematic-doc .print-drawing.on-screen svg { max-width: 100%; height: auto; }
-.schematic-doc-empty { margin: 0; padding: 28px; text-align: center; color: var(--muted); border: 1.5px dashed var(--line); border-radius: 12px; }
 
 /* Schemat | Kod */
 .view-switch { display: flex; gap: 2px; padding: 2px; border-radius: 8px; background: var(--hover); }

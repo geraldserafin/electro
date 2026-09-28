@@ -660,9 +660,8 @@ const PRINT_PAD = 6;
  * the same scale whatever the zoom on screen. Hidden on screen but laid out (not display:none),
  * so it can measure itself.
  */
-export function PrintDrawing({ value, library, results, onScreen = false }: {
+export function PrintDrawing({ value, library, results }: {
   value: SchematicData; library: SymbolLibrary; results?: Record<string, ElementResult>;
-  onScreen?: boolean; // shown in the page too (a schematic's "document" view), not only printed
 }) {
   const G = library.grid;
   const content = useRef<SVGGElement>(null);
@@ -677,7 +676,7 @@ export function PrintDrawing({ value, library, results, onScreen = false }: {
   const pointsOf = (ps: Point[]) => ps.map(([x, y]) => `${x * G},${y * G}`).join(" ");
   const [x, y, w, h] = box ?? [0, 0, 1, 1];
   return (
-    <div className={`print-drawing ${onScreen ? "on-screen" : ""}`} aria-hidden={!onScreen}>
+    <div className="print-drawing" aria-hidden>
       <svg className="canvas" viewBox={`${x} ${y} ${w} ${h}`} width={w * PRINT_SCALE} height={h * PRINT_SCALE}>
         <style>{library.style}</style>
         <g ref={content}>
