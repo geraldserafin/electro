@@ -2,7 +2,7 @@
 import type { TypstDocument } from "./document";
 
 export type Request =
-  | { type: "warm" } // load the compiler and the fonts now: the dialog opened
+  | { type: "warm" } // load the compiler and the fonts now (the note is open, or the dialog)
   | { type: "compile"; id: number; document: TypstDocument };
 
 export type Reply =

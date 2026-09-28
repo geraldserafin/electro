@@ -31,3 +31,18 @@ export function compile(document: TypstDocument): Promise<Compiled> {
     send({ type: "compile", id, document });
   });
 }
+
+/**
+ * Load Typst ahead, when the browser has nothing else to do (while the note is open, before anyone
+ * exports) — the first export then shows its pages at once. Not on a metered connection ("save
+ * data"): there it waits for the dialog. Returns: cancel (the note closed first).
+ */
+export function warmUpWhenIdle(): () => void {
+  if (worker || (navigator as { connection?: { saveData?: boolean } }).connection?.saveData) return () => {};
+  if ("requestIdleCallback" in window) {
+    const handle = window.requestIdleCallback(warmUp, { timeout: 15_000 });
+    return () => window.cancelIdleCallback(handle);
+  }
+  const timer = setTimeout(warmUp, 3000); // (Safari: no idle callbacks)
+  return () => clearTimeout(timer);
+}

@@ -9,6 +9,7 @@ import { useNoteSync } from "./notes/sync";
 import { Outline } from "./Outline";
 import { TitleBox } from "./TitleBox";
 import { ExportDialog } from "./pdf/ExportDialog";
+import { warmUpWhenIdle } from "./pdf/typst/compile";
 import { PdfContext, pageCss, pdfOf, printClasses, type PdfSettings } from "./pdf/settings";
 import { kernel } from "./python/kernel";
 import { usePython } from "./python/usePython";
@@ -48,6 +49,10 @@ export function Notebook({ initial, revision, reload, onSaved }: {
   useEffect(() => {
     void kernel.ready.then(() => kernel.reset());
   }, []);
+
+  // the PDF's Typst loads in the background once Python is up (not to slow it down): the first
+  // export shows its pages at once
+  useEffect(() => (ready ? warmUpWhenIdle() : undefined), [ready]);
 
   const setCells = (fn: (cells: Cell[]) => Cell[]) => setNotebook((nb) => ({ ...nb, cells: fn(nb.cells) }));
   const update = (id: string, patch: Partial<Cell>) =>

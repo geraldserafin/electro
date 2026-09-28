@@ -57,19 +57,40 @@ function formulasIn(diagnostics: Diagnostic[], main: string): number[] {
   return [...found];
 }
 
+/** The files every document needs: the theme and mitex (after a reset of the last document's). */
+function prepare(compiler: TypstCompiler, mitex: Uint8Array[]) {
+  compiler.reset_shadow();
+  MITEX.forEach((f, i) => compiler.map_shadow(`/mitex/${f}`, mitex[i]));
+  compiler.add_source("/electro.typ", template);
+}
+
+/**
+ * Loaded ahead (while the note is open, before anyone exports): the compiler, the fonts, and one
+ * small document through them — each font and mitex's plugin are read on first use, not on load.
+ */
+let warmed: Promise<void> | null = null;
+const warm = () =>
+  (warmed ??= setup().then(({ compiler, mitex }) => {
+    prepare(compiler, mitex);
+    compiler.add_source("/warm.typ", `#import "mitex/lib.typ": mi
+#text(font: "New Computer Modern")[Aa *Aa* _Aa_] #text(font: "Inter")[Aa *Aa* _Aa_]
+#text(font: "Libertinus Serif")[Aa *Aa* _Aa_ #smallcaps[Aa]] #raw("Aa") #mi("\\\\frac{x^2}{R_1}")`);
+    try {
+      compiler.compile("/warm.typ", null, "vector", 3);
+    } catch {
+      // only a warm-up
+    }
+  }).catch(() => { tools = null; warmed = null; }));
+
 const post = (reply: Reply, transfer: Transferable[] = []) => (self as unknown as Worker).postMessage(reply, transfer);
 
 self.onmessage = async ({ data }: MessageEvent<Request>) => {
-  if (data.type === "warm") {
-    setup().catch(() => { tools = null; });
-    return;
-  }
+  if (data.type === "warm") return void warm();
   const { id, document } = data;
   try {
     const { compiler, renderer, mitex } = await setup();
-    compiler.reset_shadow(); // the files of the last document go
-    MITEX.forEach((f, i) => compiler.map_shadow(`/mitex/${f}`, mitex[i]));
-    compiler.add_source("/electro.typ", template);
+    await warmed; // (a warm-up still running: after it)
+    prepare(compiler, mitex);
     const encoder = new TextEncoder();
     for (const [path, svg] of Object.entries(document.files)) compiler.map_shadow(`/${path}`, encoder.encode(svg));
     compiler.add_source("/main.typ", document.main);

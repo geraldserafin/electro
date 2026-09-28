@@ -35,6 +35,8 @@ try {
   const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
   const errors = [];
   page.on("pageerror", (e) => errors.push(String(e)));
+  const workers = [];
+  page.on("worker", (w) => workers.push(w.url()));
   // / : all notes (none yet) and the examples; an example becomes a note at /notes/:id
   const app = `http://localhost:${port}`;
   // the note on screen: its address (a slug) and, from the server, its id
@@ -208,10 +210,19 @@ try {
 
   // export: the note set by Typst — its pages in the dialog, the PDF to download; the choices are the note's
   {
+    // Typst loads in the background while the note is open: the first export does not wait for it
+    // (two workers: Python, then Typst — built, their files have no telling names)
+    for (let i = 0; i < 120 && workers.length < 2; i++) await page.waitForTimeout(250);
+    const before = workers.length;
+    await page.waitForTimeout(8000); // (the compiler and the fonts: long done on a local server)
+    const opened = Date.now();
     await page.getByRole("button", { name: "Eksport PDF" }).click();
     const dialog = page.getByRole("dialog", { name: "Eksport do PDF" });
     const sheets = dialog.locator(".export-sheets .sheet");
-    await sheets.first().waitFor({ timeout: 90_000 }); // the compiler and the fonts load the first time
+    await sheets.first().waitFor({ timeout: 90_000 });
+    const firstPages = Date.now() - opened;
+    check(`Typst loads in the background: the first export shows its pages at once (${firstPages} ms)`,
+      before >= 2 && workers.length === before && firstPages < 3000);
     await dialog.locator(".export-preview:not(.busy)").waitFor();
     const firstPage = await sheets.first().getAttribute("src");
     const decoded = await sheets.first().evaluate((img) => img.decode().then(() => img.naturalWidth > 0));
