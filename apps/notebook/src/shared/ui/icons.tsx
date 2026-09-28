@@ -70,3 +70,5 @@ export const MicrosoftLogo = () => (
     <path fill="#00a4ef" d="M1 12h10v10H1z" /><path fill="#ffb900" d="M12 12h10v10H12z" />
   </svg>
 );
+export const FolderIcon = () => <Icon size={16}><path d="M3.5 7.5a2 2 0 012-2h3.8l2 2.2h7.2a2 2 0 012 2V17a2 2 0 01-2 2h-13a2 2 0 01-2-2z" /></Icon>;
+export const PageIcon = () => <Icon size={16}><path d="M6.5 3.5h7l4 4v13h-11z" /><path d="M13.5 3.5v4h4M9.5 12.5h5M9.5 16h5" /></Icon>;

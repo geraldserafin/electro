@@ -4,11 +4,17 @@
   "version": "0.1.0",
   "description": "Kontrakt front ↔ backend notatek: schematy (Effect Schema) i HttpApi",
   "type": "module",
-  "exports": { ".": "./src/index.ts" },
-  "scripts": { "typecheck": "tsc --noEmit" },
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
   "dependencies": {
     "@effect/platform": "0.97.2",
     "effect": "3.22.2"
   },
-  "devDependencies": { "typescript": "^7.0.2" }
+  "devDependencies": {
+    "typescript": "^7.0.2"
+  }
 }

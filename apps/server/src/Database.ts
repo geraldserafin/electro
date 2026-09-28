@@ -7,13 +7,17 @@ import { PgClient, PgMigrator } from "@effect/sql-pg"
 import { Config, Effect, Layer, Redacted } from "effect"
 import users from "./migrations/0001_users.js"
 import notes from "./migrations/0002_notes.js"
+import library from "./migrations/0003_library.js"
 
-const migrations = PgMigrator.fromRecord({ "0001_users": users, "0002_notes": notes })
+/** Every migration, by name (a test of one starts the database from those before it: ``layer(url, record)``). */
+export const migrations = { "0001_users": users, "0002_notes": notes, "0003_library": library }
+
+const loaderOf = (record: Partial<typeof migrations>) => PgMigrator.fromRecord(record)
 
 /** Postgres at `url`, migrated to the current schema. */
-export const layer = (url: string) => {
+export const layer = (url: string, record: Partial<typeof migrations> = migrations) => {
   const client = PgClient.layer({ url: Redacted.make(url) })
-  const migrated = PgMigrator.layer({ loader: migrations }).pipe(Layer.provide([client, NodeContext.layer]))
+  const migrated = PgMigrator.layer({ loader: loaderOf(record) }).pipe(Layer.provide([client, NodeContext.layer]))
   return Layer.merge(client, migrated)
 }
 

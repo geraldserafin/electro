@@ -51,25 +51,30 @@ try {
   page.on("pageerror", (e) => errors.push(String(e)));
   const workers = [];
   page.on("worker", (w) => workers.push(w.url()));
-  // / : all notes (none yet) and the examples; an example becomes a note at /notes/:id
+  // / : the user's library (empty) and the examples; an example becomes a note at the top, at /n/:id/:name
   const app = `http://localhost:${port}`;
-  // the note on screen: its address (a slug) and, from the server, its id
-  const noteRef = () => new URL(page.url()).pathname.match(/^\/notes\/([\w-]+)$/)?.[1];
+  // the note on screen: its id (in its address) and, from the server, the note
+  const noteRef = () => new URL(page.url()).pathname.match(/^\/n\/([0-9a-f]{32})/)?.[1];
   const noteOnServer = async (ref = noteRef()) => (await api(`/api/notes/${ref}`)).json();
-  // the home page: the notes, then the examples (lists, a card in each item: data-id, the note's id)
-  const notesList = page.getByRole("list", { name: "Notatki" });
+  // the home page: the library's grid, then the examples (a card in each item: data-id, the note's id)
+  const notesList = page.getByRole("list", { name: "Moje notatki" });
   const examplesList = page.getByRole("list", { name: "Przykłady" });
-  const home = async () => {
-    await page.getByRole("link", { name: "Notatki" }).click();
+  const home = async () => { // a note's way back: the folder it is in (here: the top, the home page)
+    await page.getByRole("link", { name: "Moje notatki" }).first().click();
     await notesList.waitFor();
+  };
+  const start = async () => {
+    await page.goto(`${app}/`);
+    await examplesList.waitFor();
   };
   await page.goto(`${app}/`);
   await page.getByRole("heading", { name: "Przykłady" }).waitFor();
-  check("home: no notes yet, the examples", (await notesList.locator("li[data-id]").count()) === 0 && (await examplesList.getByRole("listitem").count()) > 0);
+  await notesList.waitFor();
+  check("home: nothing yet, the examples", (await notesList.locator("li[data-id]").count()) === 0
+    && (await examplesList.getByRole("listitem").count()) > 0);
   await examplesList.getByRole("button", { name: /^Sprawozdanie: mostek Wheatstone'a/ }).click();
-  await page.waitForURL(/\/notes\/[\w-]+$/);
-  check("an example becomes a note at an address from its title", noteRef() === "sprawozdanie-mostek-wheatstonea"
-    && (await noteOnServer()).document.title === "Sprawozdanie: mostek Wheatstone'a");
+  await page.waitForURL(/\/n\/[0-9a-f]{32}\/sprawozdanie-mostek-wheatstonea$/);
+  check("an example becomes a note, its title in the address", (await noteOnServer()).document.title === "Sprawozdanie: mostek Wheatstone'a");
   const pythonReady = (timeout) => page.locator('button[aria-label="Uruchom wszystko"]:not([disabled])').waitFor({ timeout });
   await pythonReady(120_000);
   check("pyodide starts in the worker", true);
@@ -381,9 +386,9 @@ try {
   check("schematic name is a variable in code", hint === "mójobwód" && (await user.locator('[data-output="error"]').count()) === 0);
 
   // the examples notebook from the menu runs without a single error
-  await home();
+  await start();
   await examplesList.getByRole("button", { name: /^Przykłady: niewiadome i dziury/ }).click();
-  await page.waitForURL(/\/notes\/przyklady-niewiadome-i-dziury$/);
+  await page.waitForURL(/\/n\/[0-9a-f]{32}\/przyklady-niewiadome-i-dziury$/);
   await pythonReady(60_000);
   await page.getByRole("button", { name: "Uruchom wszystko" }).click();
   await page.locator('[data-cell="code"]').last().locator("[data-outputs]").waitFor({ timeout: 60_000 });
@@ -464,7 +469,7 @@ try {
       { id: "a", type: "markdown", source: "Tekst z **wersji 1**" },
       { id: "b", type: "schematic", name: "mostek", schematic: { elements: [], wires: [] }, data: "I_A_1 = 0", outputs: [] },
     ] }));
-    await home();
+    await start(); // opening a file: on the home page, the note at the top
     await page.locator('input[type="file"]').setInputFiles(old);
     await page.getByTitle("Kliknij, żeby zmienić tytuł").filter({ hasText: "Stary notatnik" }).waitFor({ timeout: 10_000 });
     const saved = (await noteOnServer()).document;
@@ -484,7 +489,7 @@ try {
     const titleIs = (t, timeout = 10_000) =>
       page.waitForFunction((t) => document.querySelector('button[title="Kliknij, żeby zmienić tytuł"]')?.textContent === t, t, { timeout });
     const notes = notesList.locator("li[data-id]");
-    const { document: { id }, slug } = await noteOnServer();
+    const { document: { id } } = await noteOnServer();
     const firstTitle = await title.innerText();
     await home();
     const card = notesList.locator(`li[data-id="${id}"]`);
@@ -493,29 +498,37 @@ try {
       (await card.getByText(firstTitle, { exact: true }).count()) === 1 && (await card.locator(".page").innerText()).includes("wersji 1"));
 
     const before = await notes.count();
-    await notesList.getByRole("button", { name: "Nowa notatka", exact: true }).click();
-    await page.waitForURL(/\/notes\/notatka(-\d+)?$/); // no title yet
+    await notesList.getByRole("button", { name: "Nowy", exact: true }).click();
+    await notesList.getByRole("menuitem", { name: "Notatka" }).click();
+    await page.waitForURL(/\/n\/[0-9a-f]{32}\/notatka$/); // no title yet
     await setTitle("Druga notatka");
-    await page.waitForURL(/\/notes\/druga-notatka$/, { timeout: 10_000 }); // the title makes the address
-    const second = (await noteOnServer()).document.id;
-    check("renaming a note changes its address", (await noteOnServer()).document.title === "Druga notatka");
+    await page.waitForURL(/\/n\/[0-9a-f]{32}\/druga-notatka$/, { timeout: 10_000 }); // the title is in the address
+    const second = noteRef();
+    let saved = "";
+    for (let i = 0; i < 40 && saved !== "Druga notatka"; i++) { // the address follows at once, the save a moment later
+      await page.waitForTimeout(250);
+      saved = (await noteOnServer()).document.title;
+    }
+    check("renaming a note changes its address", saved === "Druga notatka");
     await page.goBack(); // the browser's back: the list again
-    await page.waitForFunction((n) => document.querySelectorAll('ul[aria-label="Notatki"] > li[data-id]').length === n, before + 1, { timeout: 10_000 });
+    await page.waitForFunction((n) => document.querySelectorAll('ul[aria-label="Moje notatki"] > li[data-id]').length === n, before + 1, { timeout: 10_000 });
     await card.getByRole("link").click();
     await titleIs(firstTitle);
-    check("a new note; back to the list; the first note opens from its card", noteRef() === slug);
+    check("a new note; back to the list; the first note opens from its card", noteRef() === id);
 
-    await page.goto(`${app}/notes/${second}`); // by id: the note, and the address becomes its slug
+    await page.goto(`${app}/n/${second}`); // the id alone: the note, and its title joins the address
     await titleIs("Druga notatka", 60_000);
-    await page.waitForURL(/\/notes\/druga-notatka$/);
-    await page.goto(`${app}/notes/notatka`); // the slug it had before its title
-    await page.waitForURL(/\/notes\/druga-notatka$/, { timeout: 60_000 });
-    await page.goto(`${app}/notes/nie-ma-takiej`);
+    await page.waitForURL(new RegExp(`/n/${second}/druga-notatka$`));
+    psql(postgres, `SET search_path TO ${schema};
+      INSERT INTO legacy_slugs VALUES ('00000000-0000-0000-0000-00000000e2e0', 'stara-notatka', '${second}')`);
+    await page.goto(`${app}/notes/stara-notatka`); // an address from before folders
+    await page.waitForURL(new RegExp(`/n/${second}/druga-notatka$`), { timeout: 60_000 });
+    await page.goto(`${app}/n/0000000000000000000000000000dead`);
     await page.getByRole("heading", { name: "Nie ma takiej notatki" }).waitFor();
-    check("addresses: by slug, by id, by an older slug; an unknown one says so", true);
+    check("addresses: the id, with or without the title; from before folders; an unknown one says so", true);
 
     // someone saves the note elsewhere (a direct call, as another tab would), then it is edited here
-    await page.goto(`${app}/notes/${slug}`);
+    await page.goto(`${app}/n/${id}`);
     await titleIs(firstTitle, 60_000);
     const note = await (await api(`/api/notes/${id}`)).json();
     await api(`/api/notes/${id}`, { method: "PUT", headers: { "content-type": "application/json" },
@@ -531,9 +544,35 @@ try {
     await drugi.hover();
     await drugi.getByRole("button", { name: "Więcej" }).click();
     page.once("dialog", (d) => d.accept());
-    await drugi.getByRole("menuitem", { name: "Usuń notatkę" }).click();
+    await drugi.getByRole("menuitem", { name: "Usuń" }).click();
     await drugi.waitFor({ state: "detached", timeout: 10_000 });
     check("a note is deleted", (await api(`/api/notes/${second}`)).status === 404);
+  }
+
+  // folders: a new one on the home page, a note moved into it ("Move to…"), its picture, inside and back
+  {
+    await start();
+    page.once("dialog", (d) => d.accept("Laboratorium"));
+    if (process.env.SHOTS) { await notesList.getByRole("button", { name: "Nowy", exact: true }).click(); await page.screenshot({ path: `${process.env.SHOTS}/new-menu.png` }); await page.keyboard.press("Escape"); }
+    await notesList.getByRole("button", { name: "Nowy", exact: true }).click();
+    await notesList.getByRole("menuitem", { name: "Folder" }).click();
+    const lab = notesList.locator("li[data-id]", { hasText: "Laboratorium" });
+    await lab.waitFor({ timeout: 10_000 });
+    const card = notesList.locator("li[data-id]", { hasText: "Zmienione gdzie indziej" }); // the note of the conflict above
+    await card.hover();
+    await card.getByRole("button", { name: "Więcej" }).click();
+    await card.getByRole("menuitem", { name: "Przenieś do…" }).click();
+    await page.getByRole("dialog").getByRole("button", { name: /^Laboratorium/ }).click();
+    await card.waitFor({ state: "detached", timeout: 10_000 });
+    await lab.locator(".page").first().waitFor({ timeout: 10_000 }); // the note's first page, small, in the folder's picture
+    if (process.env.SHOTS) await page.screenshot({ path: `${process.env.SHOTS}/home-folder.png` });
+    await lab.getByRole("link").click();
+    await page.waitForURL(/\/f\/[0-9a-f]{32}\/laboratorium$/);
+    const inside = page.getByRole("list", { name: "Zawartość folderu" });
+    await inside.locator("li[data-id]", { hasText: "Zmienione gdzie indziej" }).waitFor({ timeout: 10_000 });
+    await page.getByRole("navigation", { name: "Ścieżka" }).getByRole("link", { name: "Moje notatki" }).click();
+    await notesList.waitFor();
+    check("folders: a new folder, a note moved into it, its picture on the home page, inside and back", true);
   }
 
   check("no page errors", errors.length === 0);

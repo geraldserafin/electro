@@ -8,7 +8,7 @@ import { useAtomSet } from "@effect-atom/atom-react";
 import { Cause, Exit, Option } from "effect";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { Notebook } from "@/shared/model/types";
-import { NOTES, saveNote, toDocument } from "./atoms";
+import { LIBRARY, saveNote, toDocument } from "./atoms";
 
 export type SyncState =
   | { kind: "idle" } // nothing to send
@@ -31,10 +31,10 @@ const unreachable = (error: { _tag?: string } | null) =>
 
 /**
  * ``revision``: what the note was read at (null: not on the server yet); ``reload``: read the
- * note again (to take the server's version after a conflict).
+ * note again (to take the server's version after a conflict); ``readOnly``: shared with the user
+ * to read — changes stay on the page.
  */
-export function useNoteSync(notebook: Notebook, revision: number | null, reload: () => void,
-                            onSaved: (slug: string) => void = () => {}) {
+export function useNoteSync(notebook: Notebook, revision: number | null, reload: () => void, readOnly = false) {
   const [state, setState] = useState<SyncState>({ kind: "idle" });
   const save = useAtomSet(saveNote, { mode: "promiseExit" });
 
@@ -46,8 +46,6 @@ export function useNoteSync(notebook: Notebook, revision: number | null, reload:
   const inflight = useRef<Promise<void> | null>(null);
   const again = useRef(false);
   const timer = useRef<number | null>(null);
-  const saved = useRef(onSaved);
-  saved.current = onSaved;
 
   const push = useCallback(async (): Promise<void> => {
     if (inflight.current) {
@@ -61,13 +59,12 @@ export function useNoteSync(notebook: Notebook, revision: number | null, reload:
       const exit = await save({
         path: { id: nb.id },
         payload: { document: toDocument(nb), baseRevision: base.current },
-        reactivityKeys: NOTES,
+        reactivityKeys: LIBRARY,
       });
       if (Exit.isSuccess(exit)) {
         base.current = exit.value.revision;
         sent.current = nb;
         setState({ kind: "saved", at: exit.value.savedAt });
-        saved.current(exit.value.slug);
         return;
       }
       const error = failure(exit.cause);
@@ -92,7 +89,7 @@ export function useNoteSync(notebook: Notebook, revision: number | null, reload:
   }, [save]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const schedule = (delay = DELAY) => {
-    if (timer.current !== null) return;
+    if (timer.current !== null || readOnly) return; // a viewer's changes stay on the page
     timer.current = window.setTimeout(() => {
       timer.current = null;
       void push();

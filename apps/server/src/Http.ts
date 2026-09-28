@@ -1,27 +1,33 @@
-/** The HTTP side: the contract's endpoints, implemented with NotesRepo and Accounts. */
+/** The HTTP side: the contract's endpoints, implemented with LibraryRepo and Accounts. */
 import { HttpApiBuilder, HttpServerResponse } from "@effect/platform"
 import type { Cookie } from "@effect/platform/Cookies"
 import {
-  Authentication, CurrentUser, NoteIdMismatch, NotesApi, ProviderUnavailable, session, Unauthorized, type Provider,
+  Authentication, CurrentUser, NoteIdMismatch, NotesApi, ProviderUnavailable, session, Unauthorized, type Provider, type User,
 } from "@electro/notes-api"
 import * as arctic from "arctic"
 import { Config, Effect, Layer, Option, Redacted } from "effect"
 import { Accounts, SESSION_DAYS } from "./Accounts.js"
 import { ArduinoLive } from "./Arduino.js"
-import { NotesRepo } from "./NotesRepo.js"
+import { LibraryRepo } from "./LibraryRepo.js"
 import { Providers } from "./Providers.js"
 
-export const NotesLive = HttpApiBuilder.group(NotesApi, "notes", (handlers) =>
+export const LibraryLive = HttpApiBuilder.group(NotesApi, "library", (handlers) =>
   Effect.gen(function* () {
-    const repo = yield* NotesRepo
+    const repo = yield* LibraryRepo
+    const as = <A, E, R>(f: (user: User) => Effect.Effect<A, E, R>) => Effect.flatMap(CurrentUser, f)
     return handlers
-      .handle("list", () => Effect.flatMap(CurrentUser, (user) => repo.list(user.id)))
-      .handle("get", ({ path }) => Effect.flatMap(CurrentUser, (user) => repo.get(user.id, path.ref)))
+      .handle("home", () => as((u) => repo.home(u.id)))
+      .handle("folder", ({ path }) => as((u) => repo.folder(u.id, path.id)))
+      .handle("destinations", () => as((u) => repo.destinations(u.id)))
+      .handle("createFolder", ({ payload }) => as((u) => repo.createFolder(u.id, payload.name, payload.parentId)))
+      .handle("note", ({ path }) => as((u) => repo.note(u.id, path.id)))
       .handle("save", ({ path, payload }) =>
         payload.document.id !== path.id
           ? Effect.fail(new NoteIdMismatch({ path: path.id, document: payload.document.id }))
-          : Effect.flatMap(CurrentUser, (user) => repo.save(user.id, payload.document, payload.baseRevision)))
-      .handle("remove", ({ path }) => Effect.flatMap(CurrentUser, (user) => repo.remove(user.id, path.id)))
+          : as((u) => repo.save(u.id, payload.document, payload.baseRevision, payload.parentId)))
+      .handle("patch", ({ path, payload }) => as((u) => repo.patch(u.id, path.id, payload)))
+      .handle("remove", ({ path }) => as((u) => repo.remove(u.id, path.id)))
+      .handle("legacy", ({ path }) => as((u) => repo.legacy(u.id, path.ref)))
   }))
 
 /** Only a path on this site: never off to another one after signing in. */
@@ -104,7 +110,7 @@ export const SystemLive = HttpApiBuilder.group(NotesApi, "system", (handlers) =>
 
 /** The whole API; needs a database (SqlClient) and the OAuth Providers. */
 export const ApiLive = HttpApiBuilder.api(NotesApi).pipe(
-  Layer.provide([NotesLive, AuthLive, SystemLive, ArduinoLive]),
+  Layer.provide([LibraryLive, AuthLive, SystemLive, ArduinoLive]),
   Layer.provide(AuthenticationLive),
-  Layer.provide([NotesRepo.Default, Accounts.Default]),
+  Layer.provide([LibraryRepo.Default, Accounts.Default]),
 )

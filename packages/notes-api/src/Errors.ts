@@ -4,16 +4,6 @@ import { HttpApiSchema } from "@effect/platform"
 import { Schema } from "effect"
 import { NoteId } from "./Notebook.js"
 
-export class NoteNotFound extends Schema.TaggedError<NoteNotFound>()(
-  "NoteNotFound",
-  { id: Schema.String }, // the id or slug asked for
-  HttpApiSchema.annotations({ status: 404 }),
-) {
-  get message() {
-    return `No note ${this.id}.`
-  }
-}
-
 /** The note changed on the server since the client read it (or it exists already). */
 export class RevisionConflict extends Schema.TaggedError<RevisionConflict>()(
   "RevisionConflict",

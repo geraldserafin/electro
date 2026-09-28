@@ -28,9 +28,11 @@ import { cn } from "@/shared/lib/cn";
  * ``initial``/``revision``: the note as read from the server; ``reload``: read it again (after a
  * conflict, to take the server's version).
  */
-export function Notebook({ initial, revision, reload, onSaved }: {
+export function Notebook({ initial, revision, reload, onTitle, readOnly = false, back }: {
   initial: NotebookData; revision: number | null; reload: () => void;
-  onSaved?: (slug: string) => void; // after each save: the note's address (a new title may change it)
+  onTitle?: (title: string) => void; // the title changed (the address shows it)
+  readOnly?: boolean; // shared with the user to read: it runs, it is not saved
+  back: { to: string; label: string }; // the way back: the folder it is in
 }) {
   const { t } = useTranslation("notebook");
   const [notebook, setNotebook] = useState<NotebookData>(initial);
@@ -39,7 +41,8 @@ export function Notebook({ initial, revision, reload, onSaved }: {
   const python = usePython();
   const ready = python.kind === "ready";
   const [focused, setFocused] = useState<string | null>(null);
-  const sync = useNoteSync(notebook, revision, reload, onSaved);
+  const sync = useNoteSync(notebook, revision, reload, readOnly);
+  useEffect(() => onTitle?.(notebook.title), [notebook.title]); // eslint-disable-line react-hooks/exhaustive-deps
   const [outline, setOutline] = useOutlineOpen();
   const [exporting, setExporting] = useState(false);
   const pdf = pdfOf(notebook.settings);
@@ -79,7 +82,7 @@ export function Notebook({ initial, revision, reload, onSaved }: {
       {/* left: the way back, and the sidebar's switch (the note's title and its sections);
           right: run, PDF, the settings (theme, language) */}
       <Islands side="left">
-        <IslandLink to="/" title={t("allNotes")} aria-label={t("allNotes")}><Back /></IslandLink>
+        <IslandLink to={back.to} title={back.label} aria-label={back.label}><Back /></IslandLink>
         <IslandButton on={outline} onClick={() => setOutline(!outline)} aria-pressed={outline}
                       title={outline ? t("hideOutline") : t("outline")} aria-label={t("outline")}>
           <OutlineIcon />

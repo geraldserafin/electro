@@ -16,9 +16,6 @@ export const NoteId = Schema.String.pipe(
 )
 export type NoteId = typeof NoteId.Type
 
-/** A note's address: its slug (from the title; also an older one) or its id. */
-export const NoteRef = NoteId.annotations({ identifier: "NoteRef", description: "Slug albo identyfikator notatki" })
-
 export const MarkdownCell = Schema.Struct(
   { id: Schema.NonEmptyString, type: Schema.Literal("markdown"), source: Schema.String },
   Rest,
@@ -78,39 +75,3 @@ export const NotePreview = Schema.Struct({
 }).annotations({ identifier: "NotePreview" })
 export type NotePreview = typeof NotePreview.Type
 
-/** What a list of notes shows, without the documents themselves. */
-export const NoteSummary = Schema.Struct({
-  id: NoteId,
-  slug: Schema.String, // its address: /notes/<slug>
-  title: Schema.String,
-  modified: Schema.String, // as the notebook says (when it was last edited)
-  savedAt: Schema.String, // when the server stored this revision
-  revision: Schema.Int,
-  cells: Schema.Int,
-  schematics: Schema.Int,
-  preview: NotePreview,
-}).annotations({ identifier: "NoteSummary" })
-export type NoteSummary = typeof NoteSummary.Type
-
-/** A stored note: the document and its revision (for saving without overwriting newer work). */
-export const Note = Schema.Struct({
-  document: NotebookDocument,
-  slug: Schema.String,
-  revision: Schema.Int,
-  savedAt: Schema.String,
-}).annotations({ identifier: "Note" })
-export type Note = typeof Note.Type
-
-/**
- * Saving: the revision the client started from — ``null`` for a note the server does not have
- * yet. Anything else than the stored revision is a conflict (someone saved in between).
- */
-export const SaveNote = Schema.Struct({
-  document: NotebookDocument,
-  baseRevision: Schema.NullOr(Schema.Int),
-}).annotations({ identifier: "SaveNote" })
-export type SaveNote = typeof SaveNote.Type
-
-/** A save went through: the new revision, and the address (a new title may have changed it). */
-export const Saved = Schema.Struct({ revision: Schema.Int, savedAt: Schema.String, slug: Schema.String })
-export type Saved = typeof Saved.Type

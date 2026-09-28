@@ -1,14 +1,15 @@
-// / — all notes (newest first) as first pages; a new one, one from a file, one from an example.
-import { Result, useAtomRefresh, useAtomSet, useAtomValue } from "@effect-atom/atom-react";
+// / — the user's library: their own folders and notes, and what others shared with them; a new
+// note or folder; a note from a file or an example (at the top).
+import { Result, useAtomRefresh, useAtomValue } from "@effect-atom/atom-react";
 import { previewOf } from "@electro/notes-api";
-import { Exit } from "effect";
 import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { EXAMPLES, fromExample } from "@/features/examples";
-import { Card, CardSkeletons, NewCard, NOTES, notesAtom, removeNote, toDocument, useCreateNote, useWhen } from "@/features/notes";
+import { LibraryGrid } from "@/features/library";
+import { Card, CardSkeletons, homeAtom, toDocument, useCreateNote } from "@/features/notes";
 import { library } from "@/features/schematic";
 import { SettingsMenu } from "@/features/settings";
-import { blank, copyOf, FormatError, upload } from "@/shared/model/format";
+import { copyOf, FormatError, upload } from "@/shared/model/format";
 import { Upload } from "@/shared/ui/icons";
 import { Brand, IslandButton, Islands } from "@/shared/ui/Island";
 import { cn } from "@/shared/lib/cn";
@@ -18,14 +19,12 @@ const note = "mt-6 mb-3.5 text-[14px] text-muted";
 
 export function Home() {
   const { t } = useTranslation("pages", { keyPrefix: "home" });
-  const { t: tNotes } = useTranslation("notes");
+  const { t: tLibrary } = useTranslation("library");
   const { t: tFile } = useTranslation("pages", { keyPrefix: "file" });
-  const when = useWhen();
-  const notes = useAtomValue(notesAtom);
-  const refresh = useAtomRefresh(notesAtom);
-  useEffect(refresh, [refresh]); // notes change on their own pages: read the list afresh on coming back
+  const items = useAtomValue(homeAtom);
+  const refresh = useAtomRefresh(homeAtom);
+  useEffect(refresh, [refresh]); // things change on their own pages: read the home screen afresh on coming back
   const create = useCreateNote();
-  const remove = useAtomSet(removeNote, { mode: "promiseExit" });
   const fileInput = useRef<HTMLInputElement>(null);
   const [problem, setProblem] = useState<string | null>(null);
 
@@ -49,32 +48,12 @@ export function Home() {
       </Islands>
 
       <div className="mx-auto max-w-310 px-8 pt-21 pb-24">
-        <h1 className="mt-0 mb-5 text-[22px] font-medium">{t("notes")}</h1>
+        <h1 className="mt-0 mb-5 text-[22px] font-medium">{tLibrary("home")}</h1>
         {problem && <p className={cn(note, "text-danger")}>{problem}</p>}
-        <ul className={grid} aria-label={t("notes")}>
-          <NewCard onClick={() => start(async () => blank())} />
-          {Result.builder(notes)
-            .onInitial(() => <CardSkeletons />)
-            .onFailure(() => null)
-            .onSuccess((list) => list.map((n, i) => {
-              const title = n.title || tNotes("untitled");
-              return (
-                <Card key={n.id} index={i} id={n.id} to={`/notes/${n.slug}`} title={title}
-                      meta={when(n.modified)} preview={n.preview} library={library}
-                      actions={[{
-                        label: t("deleteNote"),
-                        danger: true,
-                        run: async () => {
-                          if (!confirm(t("confirmDelete", { title }))) return;
-                          const exit = await remove({ path: { id: n.id }, reactivityKeys: NOTES });
-                          if (Exit.isFailure(exit)) setProblem(t("deleteFailed"));
-                        },
-                      }]} />
-              );
-            }))
-            .render()}
-        </ul>
-        {Result.isFailure(notes) && <p className={note}>{t("listUnavailable")}</p>}
+        {Result.isSuccess(items)
+          ? <LibraryGrid items={items.value} parentId={null} container={null} label={tLibrary("home")} onProblem={setProblem} />
+          : <ul className={grid}>{Result.isFailure(items) ? null : <CardSkeletons />}</ul>}
+        {Result.isFailure(items) && <p className={note}>{t("listUnavailable")}</p>}
 
         <h2 className="mt-12 mb-4 text-[16px] font-medium text-muted">{t("examples")}</h2>
         <ul className={grid} aria-label={t("examples")}>
