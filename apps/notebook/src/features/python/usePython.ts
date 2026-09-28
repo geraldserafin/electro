@@ -1,13 +1,13 @@
-// Whether Python (Pyodide, in a worker) is up: starting, ready, or failed.
+// Whether Python (Pyodide, in a worker) is up: starting, ready, or failed (and why: its own message).
 import { useEffect, useState } from "react";
 import { kernel } from "./kernel";
 
-export type PythonStatus = { kind: "loading" | "ready" | "error"; text: string };
+export type PythonStatus = { kind: "loading" | "ready" } | { kind: "error"; error: string };
 
-let known: PythonStatus = { kind: "loading", text: "Uruchamiam Pythona…" };
+let known: PythonStatus = { kind: "loading" };
 const ready = kernel.ready.then(
-  () => (known = { kind: "ready", text: "Python gotowy" }),
-  (error: Error) => (known = { kind: "error", text: `Python się nie uruchomił: ${error.message}` }),
+  () => (known = { kind: "ready" }),
+  (error: Error) => (known = { kind: "error", error: error.message }),
 );
 
 export function usePython(): PythonStatus {

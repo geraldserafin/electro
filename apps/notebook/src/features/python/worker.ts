@@ -46,7 +46,7 @@ self.onmessage = async (event: MessageEvent<Request>) => {
       self.postMessage({ id: request.id, ok: true, result: null });
       return;
     }
-    if (!kernel) throw new Error("Kernel nie został uruchomiony.");
+    if (!kernel) throw new Error("The kernel was not started (init first).");
     const k = await kernel;
     const result =
       request.type === "run" ? k.run(request.code, request.schematics)

@@ -22,9 +22,9 @@ export function BoardIsland({ className, stays, ...props }: HTMLAttributes<HTMLD
   );
 }
 
-/** A button on an island; ``icon``: just an icon, square. */
+/** A button on an island; ``icon``: just an icon, square. One that is lit (bg-…) stays so under the pointer (hover:bg-…). */
 export function BoardButton({ className, icon, ...props }: ButtonHTMLAttributes<HTMLButtonElement> & { icon?: boolean }) {
-  return <button {...props} className={cn("rounded-lg", icon ? "p-1.5" : "px-2 py-1.5", className)} />;
+  return <button {...props} className={cn("inline-flex items-center gap-1.5 rounded-lg border border-transparent text-[15px] hover:bg-hover disabled:opacity-45", icon ? "p-1.5" : "px-2 py-1.5", className)} />;
 }
 
 /** A thin line between groups of buttons. */

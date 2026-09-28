@@ -74,18 +74,19 @@ nie `@/features/schematic/Editor`); wewnątrz plastra importy są względne. `@/
 | `python/electro_notebook/kernel.py` | (Python) wykonuje komórki, zamienia wyniki na wyjścia (`_repr_svg_`, `_repr_markdown_`, `_repr_latex_`) |
 
 **Style.** Tailwind v4 (`src/app/styles.css`). Kolory to wyłącznie tokeny aplikacji (`bg-surface`, `text-muted`,
-`border-line`…; jasne i ciemne wartości są w `legacy.css`). Klasy składa się przez `cn()` (`shared/lib/cn`: clsx +
+`border-line`…; jasne i ciemne wartości są w `src/app/tokens.css`). Klasy składa się przez `cn()` (`shared/lib/cn`: clsx +
 tailwind-merge) — z dwóch klas na tę samą właściwość wygrywa wtedy późniejsza; bez niego o wyniku decyduje kolejność
 w CSS Tailwinda, nie w atrybucie. To, czego nie da się sensownie zapisać klasami (np. miniatura strony PDF, która
 przestawia tokeny i styluje cudzy Markdown), leży obok komponentu jako `*.css` w `@layer components`.
 
-W `legacy.css` zostały tylko tokeny i style bazowe (`body`, `button`, `input`) — w warstwie `base`, więc każda klasa
-Tailwinda z nimi wygrywa; preflight włączymy, gdy `legacy.css` zniknie.
+Elementy zaczynają od resetu Tailwinda (preflight): przycisk, pole czy nagłówek wygląda tak, jak mówią jego klasy —
+style bazowe to tylko `body`, kursor przycisków i kolor podpowiedzi w polach. Markdown dostaje z powrotem odstępy
+i rozmiary dokumentu w `Markdown.css`.
 
 Testy e2e szukają elementów po rolach, etykietach i atrybutach `data-*` (np. `data-cell`, `data-output`), nie po klasach.
 
 **Języki.** i18next: każdy plaster ma `messages.ts` (`pl` i `en` o tym samym kształcie — pilnuje TypeScript) jako
 swoją przestrzeń nazw; `src/app/i18n.ts` je zbiera. Przełącznik PL/EN jest w wyspach; wybór zostaje w przeglądarce,
-domyślnie polski (język przeglądarki — gdy wszystkie plastry będą przetłumaczone).
+a przed wyborem — język przeglądarki (angielski, gdy nie zna żadnego z naszych). Testy e2e chodzą z `pl-PL`.
 
 Przy `devenv up` zmiany w `packages/` wystarczy odświeżyć w przeglądarce. Przy samym `pnpm dev` `bundle.json` powstaje tylko przy starcie (albo użyj `pnpm python --watch`).

@@ -1,14 +1,22 @@
-/* Tailwind over the app's own colours. Its theme and utilities only: no preflight (the reset) while
-   the styles from before Tailwind are still here — legacy.css, in the base layer so any utility
-   beats it. Slices move to utilities one by one; legacy.css shrinks until it can go. */
+/* Tailwind over the app's own colours (tokens.css). Elements start from Tailwind's reset (preflight):
+   what a button or a heading looks like is in its classes, not here. */
 @layer theme, base, components, utilities;
 @import "tailwindcss/theme.css" layer(theme);
-@import "./legacy.css" layer(base);
+@import "tailwindcss/preflight.css" layer(base);
+@import "./tokens.css" layer(base);
 @import "tailwindcss/utilities.css" layer(utilities);
+
+@layer base {
+  /* the whole app a little smaller: 100% here is 80% of the sizes in the classes */
+  :root { zoom: 0.8; }
+  body { background: var(--bg); color: var(--text); font: 18px/1.6 var(--sans); }
+  button:not(:disabled), [role="button"]:not(:disabled) { cursor: pointer; }
+  ::placeholder { color: var(--faint); }
+}
 
 @custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
 
-/* the colours are legacy.css's tokens (light and dark there), nothing else: bg-surface, text-muted, … */
+/* the colours are the app's tokens (light and dark in tokens.css), nothing else: bg-surface, text-muted, … */
 @theme inline {
   --color-*: initial;
   --color-bg: var(--bg);

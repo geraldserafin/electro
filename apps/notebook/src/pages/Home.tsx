@@ -14,8 +14,8 @@ import { Upload } from "@/shared/ui/icons";
 import { Brand, IslandButton, Islands } from "@/shared/ui/Island";
 import { cn } from "@/shared/lib/cn";
 
-const grid = "m-0 p-0 list-none grid grid-cols-[repeat(auto-fill,212px)] gap-x-6 gap-y-7";
-const note = "mt-6 text-[14px] text-muted";
+const grid = "grid grid-cols-[repeat(auto-fill,212px)] gap-x-6 gap-y-7";
+const note = "mt-6 mb-3.5 text-[14px] text-muted";
 
 export function Home() {
   const { t } = useTranslation("pages", { keyPrefix: "home" });

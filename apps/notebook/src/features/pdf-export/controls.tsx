@@ -27,7 +27,7 @@ export function Toggle({ label, hint, on, set, disabled }: {
                          disabled && "opacity-45 cursor-default")}>
       <span className="grid"><span>{label}</span>{hint && <small className="text-[12px] text-muted">{hint}</small>}</span>
       <input type="checkbox" role="switch" checked={on} disabled={disabled} onChange={(e) => set(e.target.checked)}
-             className="appearance-none relative flex-none w-8.5 h-5 m-0 p-0 border-none rounded-full bg-line checked:bg-primary
+             className="appearance-none relative flex-none w-8.5 h-5 rounded-full bg-line checked:bg-primary
                         cursor-[inherit] transition-colors duration-150 focus:outline-none
                         after:absolute after:top-0.5 after:left-0.5 after:size-4 after:rounded-full after:bg-white
                         after:shadow-[0_1px_2px_rgb(0_0_0/0.25)] after:transition-transform after:duration-150 checked:after:translate-x-3.5" />
@@ -44,7 +44,7 @@ export function Choice<T extends string>({ label, value, set, options }: {
       <div className="flex gap-0.5 p-0.5 rounded-lg bg-hover" role="radiogroup" aria-label={label}>
         {options.map(([v, text]) => (
           <button key={v} role="radio" aria-checked={value === v} onClick={() => set(v)}
-                  className="flex-1 justify-center px-2 py-1.25 whitespace-nowrap rounded-md text-[14px] text-muted
+                  className="flex flex-1 items-center justify-center px-2 py-1.25 border border-transparent whitespace-nowrap rounded-md text-[14px] text-muted
                              aria-checked:bg-surface aria-checked:text-fg aria-checked:shadow-[0_0_0_1px_var(--line)]">
             {text}
           </button>

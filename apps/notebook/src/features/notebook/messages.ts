@@ -5,6 +5,10 @@ export const pl = {
   outlineEmpty: "Nagłówki z tekstu (<code># Tytuł</code>) i schematy pojawią się tutaj.",
   runAll: "Uruchom wszystko",
   exportPdf: "Eksport do PDF",
+  python: {
+    loading: "Uruchamiam Pythona…",
+    failed: "Python się nie uruchomił: {{error}}",
+  },
   untitled: "Bez tytułu",
   title: "Tytuł",
   noteTitle: "Tytuł notatki",
@@ -87,6 +91,10 @@ export const en: typeof pl = {
   outlineEmpty: "Headings from the text (<code># Title</code>) and schematics will show here.",
   runAll: "Run all",
   exportPdf: "Export to PDF",
+  python: {
+    loading: "Starting Python…",
+    failed: "Python did not start: {{error}}",
+  },
   untitled: "Untitled",
   title: "Title",
   noteTitle: "The note's title",

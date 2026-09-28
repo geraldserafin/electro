@@ -10,8 +10,8 @@ import { More, Plus } from "@/shared/ui/icons";
 import { PagePreview } from "./PagePreview";
 import { cn } from "@/shared/lib/cn";
 
-// the card is a link or a button: neither looks like one (legacy.css styles every button)
-const open = "group/open grid content-start gap-0.5 p-0 border-0 rounded-none bg-transparent text-inherit text-left cursor-pointer no-underline";
+// the card: a link (a note) or a button (an example), alike
+const open = "group/open grid content-start gap-0.5 text-left";
 // the page: A4's proportions, 212px wide
 const thumb = "grid place-items-center w-53 aspect-[794/1123] overflow-hidden rounded-md mb-2 transition-[box-shadow,transform] duration-120 group-focus-visible/open:outline-2 group-focus-visible/open:outline-offset-2 group-focus-visible/open:outline-accent";
 const title = "text-[15px] font-medium truncate max-w-53";
@@ -47,7 +47,7 @@ export function Card({ to, onClick, id, title: name, meta, preview, library, act
       {actions && actions.length > 0 && (
         <>
           <button onClick={() => setMenu(!menu)} title={t("more")} aria-label={t("more")} aria-expanded={menu}
-                  className="absolute top-2 right-2 size-7.5 p-0 justify-center rounded-lg bg-island hover:bg-hover shadow-island text-fg
+                  className="absolute top-2 right-2 inline-flex size-7.5 items-center justify-center rounded-lg bg-island hover:bg-hover shadow-island text-fg
                              opacity-0 transition-opacity duration-120 group-hover:opacity-100 aria-expanded:opacity-100">
             <More />
           </button>
@@ -55,7 +55,7 @@ export function Card({ to, onClick, id, title: name, meta, preview, library, act
             <div role="menu" className="absolute z-30 top-10.5 right-2 grid min-w-45 py-1.5 rounded-lg bg-paper shadow-menu">
               {actions.map((a) => (
                 <button key={a.label} role="menuitem" onClick={() => { setMenu(false); a.run(); }}
-                        className={cn("justify-start px-4 py-1.75 rounded-none text-left whitespace-nowrap", a.danger && "text-danger")}>
+                        className={cn("px-4 py-1.75 border border-transparent text-[15px] text-left whitespace-nowrap hover:bg-hover", a.danger && "text-danger")}>
                   {a.label}
                 </button>
               ))}

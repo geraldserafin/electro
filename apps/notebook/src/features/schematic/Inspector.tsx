@@ -17,7 +17,7 @@ export type Selection =
 
 const island = "top-16 right-3 w-62 flex-col items-stretch gap-3 p-3 text-[14px]";
 const caption = "text-[12px] font-medium text-muted";
-const input = "w-full px-2.5 py-1.75 rounded-lg border-transparent bg-hover text-[15px] focus:bg-paper";
+const input = "w-full px-2.5 py-1.75 rounded-lg border border-transparent bg-hover text-[15px] focus:bg-paper focus:outline-2 focus:outline-accent-soft";
 
 function Header({ icon, title, subtitle, children }: { icon?: ReactNode; title: string; subtitle?: ReactNode; children: ReactNode }) {
   return (

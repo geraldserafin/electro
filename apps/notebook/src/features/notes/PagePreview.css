@@ -11,7 +11,7 @@
     background: #fff; color: var(--text); font-size: 15px; line-height: 1.55; pointer-events: none;
   }
   .page .markdown-view { padding: 0; }
-  .page .page-code { font: 13px/1.5 var(--mono); background: var(--code-bg); border-radius: 6px; padding: 10px 12px; white-space: pre-wrap; }
+  .page .page-code { margin: 1em 0; font: 13px/1.5 var(--mono); background: var(--code-bg); border-radius: 6px; padding: 10px 12px; white-space: pre-wrap; }
   .page .pdf-drawing { position: static; visibility: visible; width: auto; height: auto; overflow: visible;
                          display: flex; justify-content: center; margin: 8px 0 12px; }
   .page .pdf-drawing svg { max-width: 100%; height: auto; }

@@ -32,7 +32,7 @@ try {
     await new Promise((r) => setTimeout(r, 250));
   }
   const browser = await webkit.launch();
-  const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
+  const page = await browser.newPage({ viewport: { width: 1440, height: 900 }, locale: "pl-PL" }); // (the app speaks the browser's language)
   const errors = [];
   page.on("pageerror", (e) => errors.push(String(e)));
   const workers = [];

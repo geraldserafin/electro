@@ -9,7 +9,7 @@ export function HelpPanel() {
   const { t } = useTranslation("schematic");
   return (
     <BoardIsland className="bottom-15 right-3 w-75 flex-col items-stretch px-3.5 py-3 text-[13px]">
-      <h4 className="mt-0 mb-1.5">{t("help.title")}</h4>
+      <h4 className="mb-1.5 font-bold">{t("help.title")}</h4>
       <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-0.75 m-0">
         {KEYS.map((k) => (
           <div key={k} className="contents">

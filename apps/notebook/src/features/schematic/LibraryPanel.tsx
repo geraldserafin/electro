@@ -43,7 +43,7 @@ export function LibraryPanel({ library, chosen, onChoose, onClose }: {
       <label className="flex flex-none items-center gap-1.5 px-2 border border-line rounded-lg text-faint focus-within:border-accent">
         <Search />
         <input ref={field} value={query} placeholder={t("library.search")}
-               className="flex-1 min-w-0 px-0 py-1.75 border-none outline-none bg-transparent"
+               className="flex-1 min-w-0 py-1.75 outline-none"
                onChange={(e) => setQuery(e.target.value)}
                onKeyDown={(e) => {
                  if (e.key === "Enter" && found[0]) onChoose(found[0].kind);
@@ -57,7 +57,7 @@ export function LibraryPanel({ library, chosen, onChoose, onClose }: {
             <div className="grid grid-cols-1 gap-px">
               {found.filter((k) => k.groupName === group).map((k) => (
                 <BoardButton key={k.kind} title={k.name} onClick={() => onChoose(k.kind)}
-                             className={cn("w-full min-w-0 justify-start gap-2.5 text-left", chosen === k.kind && "bg-selected text-fg")}>
+                             className={cn("w-full min-w-0 justify-start gap-2.5 text-left", chosen === k.kind && "bg-selected hover:bg-selected text-fg")}>
                   <SymbolIcon kind={k.kind} library={library} />
                   <span className="flex-1 min-w-0 truncate">{k.name}</span>
                   {shortcut(k.kind) && <kbd className="px-1 border border-line rounded font-mono text-[11px] text-faint">{shortcut(k.kind)}</kbd>}
@@ -66,7 +66,7 @@ export function LibraryPanel({ library, chosen, onChoose, onClose }: {
             </div>
           </section>
         ))}
-        {!found.length && <p className="text-muted">{t("library.nothing", { query })}</p>}
+        {!found.length && <p className="my-4.5 text-muted">{t("library.nothing", { query })}</p>}
       </div>
     </BoardIsland>
   );

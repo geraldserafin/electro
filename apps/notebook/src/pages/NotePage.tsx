@@ -83,7 +83,7 @@ export function NotePage() {
       {loaded.kind === "unreachable" && (
         <PageMessage title={t("unreachable")}>
           <p className="text-muted">{t("unreachableText")}</p>
-          <button className="primary" onClick={() => setReads((n) => n + 1)}>{t("retry")}</button>
+          <button className="inline-flex items-center px-2.5 py-1 rounded-md border border-transparent bg-accent text-[15px] text-white hover:brightness-108" onClick={() => setReads((n) => n + 1)}>{t("retry")}</button>
         </PageMessage>
       )}
     </>

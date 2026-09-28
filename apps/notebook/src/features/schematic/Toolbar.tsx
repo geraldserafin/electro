@@ -7,7 +7,7 @@ import { BoardButton, BoardIsland, Separator } from "./Board";
 
 export type Tool = { type: "select" } | { type: "hand" } | { type: "wire" } | { type: "place"; kind: string };
 
-const tool = (on: boolean) => cn("relative flex-none w-10 h-9 p-0 justify-center text-fg", on && "bg-selected");
+const tool = (on: boolean) => cn("relative flex-none w-10 h-9 p-0 justify-center text-fg", on && "bg-selected hover:bg-selected");
 const Key = ({ children }: { children: ReactNode }) => <span className="absolute right-0.75 bottom-px text-[9px] text-faint">{children}</span>;
 
 export function Toolbar({ current, onTool, libraryOpen, onLibrary }: {

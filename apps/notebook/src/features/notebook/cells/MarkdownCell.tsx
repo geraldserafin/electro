@@ -25,7 +25,7 @@ export function MarkdownCell({ cell, update }: { cell: Extract<Cell, { type: "ma
         {/* mouse down would take the focus from the field (and show the text) before the click */}
         <button onMouseDown={(e) => e.preventDefault()} onClick={() => setEditing(!editing)}
                 title={toggle} aria-label={toggle} aria-pressed={editing}
-                className="size-7.5 p-0 justify-center rounded-lg text-faint opacity-0 transition-opacity duration-150
+                className="inline-flex size-7.5 items-center justify-center rounded-lg text-faint opacity-0 transition-opacity duration-150
                            group-hover/cell:opacity-100 group-data-focused/cell:opacity-100 hover:text-fg hover:bg-hover
                            aria-pressed:opacity-100 aria-pressed:text-fg aria-pressed:bg-selected">
           {editing ? <Eye /> : <Pencil />}

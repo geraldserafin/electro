@@ -14,7 +14,8 @@ import { Sheets } from "./Sheets";
 import { ThemeChoice } from "./ThemeChoice";
 import { Choice, Field, Group, Toggle } from "./controls";
 
-const action = "flex-1 justify-center whitespace-nowrap px-3 py-2.25 rounded-[10px] border border-line font-medium";
+const action = "inline-flex flex-1 items-center justify-center gap-1.5 whitespace-nowrap px-3 py-2.25 rounded-[10px] border border-line " +
+  "text-[15px] font-medium hover:enabled:bg-hover disabled:opacity-45";
 
 export function ExportDialog({ notebook, pdf, onChange, onCode, onClose }: {
   notebook: Notebook;
@@ -56,7 +57,7 @@ export function ExportDialog({ notebook, pdf, onChange, onCode, onClose }: {
            className="appear relative grid grid-cols-[1fr_320px] max-[800px]:grid-cols-1 max-[800px]:grid-rows-[1fr_auto]
                       w-[min(1180px,94vw)] h-[min(860px,90vh)] rounded-[14px] overflow-hidden bg-surface border border-line">
         <button onClick={onClose} title={t("closeHint")} aria-label={t("close")}
-                className="absolute top-3 left-3 z-2 size-9 p-0 justify-center rounded-[10px] bg-surface shadow-island text-muted hover:text-fg">
+                className="absolute top-3 left-3 z-2 inline-flex size-9 items-center justify-center rounded-[10px] bg-surface shadow-island text-muted hover:text-fg">
           <Close />
         </button>
         <Sheets preview={preview} busy={busy} />

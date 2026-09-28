@@ -6,7 +6,7 @@ import { cn } from "@/shared/lib/cn";
 /** "R_1" → R with a subscript 1. */
 function Name({ id }: { id: string }) {
   const [base, ...sub] = id.split("_");
-  return <>{base}{sub.length > 0 && <sub className="text-[0.72em]">{sub.join(",")}</sub>}</>;
+  return <>{base}{sub.length > 0 && <sub className="static align-sub text-[0.72em] leading-[inherit]">{sub.join(",")}</sub>}</>;
 }
 
 const cell = "px-4 text-right whitespace-nowrap"; // the numbers right, the names (cn: text-left) left

@@ -1,5 +1,5 @@
-// The app's language: the one chosen, remembered in this browser; Polish until then.
-// (Later, once every slice speaks English too: the browser's language before a choice.)
+// The app's language: the one chosen, remembered in this browser; until then the browser's own
+// (the first of its languages the app speaks), English when it speaks none of them.
 import i18n from "i18next";
 
 export const LANGUAGES = ["pl", "en"] as const;
@@ -12,9 +12,17 @@ export function savedLanguage(): Language {
     const saved = localStorage.getItem(KEY);
     if (LANGUAGES.includes(saved as Language)) return saved as Language;
   } catch {
-    // no storage: the default
+    // no storage: the browser's
   }
-  return "pl";
+  return browserLanguage();
+}
+
+function browserLanguage(): Language {
+  for (const tag of navigator.languages ?? [navigator.language]) {
+    const language = tag.slice(0, 2).toLowerCase() as Language;
+    if (LANGUAGES.includes(language)) return language;
+  }
+  return "en";
 }
 
 export function chooseLanguage(language: Language) {

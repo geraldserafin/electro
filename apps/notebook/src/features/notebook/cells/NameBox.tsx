@@ -13,14 +13,14 @@ export function NameBox({ name, onRename }: { name: string; onRename: (name: str
   };
   if (!editing)
     return (
-      <button className="px-2.5 py-1 rounded-lg text-[15px] font-medium" onClick={() => { setDraft(name); setEditing(true); }}
+      <button className="inline-flex items-center px-2.5 py-1 rounded-lg border border-transparent text-[15px] font-medium hover:bg-hover" onClick={() => { setDraft(name); setEditing(true); }}
               title={t("schematic.nameTitle", { variable: variableName(name) })}>
         {name}
       </button>
     );
   return (
     <span className="flex flex-col gap-0.5 p-0.5">
-      <input className="w-45 px-2 py-1 text-[15px]" autoFocus value={draft} spellCheck={false} aria-label={t("schematic.name")}
+      <input className="w-45 px-2 py-1 rounded-md border border-line bg-paper text-[15px] focus:outline-2 focus:outline-accent-soft focus:border-accent" autoFocus value={draft} spellCheck={false} aria-label={t("schematic.name")}
              onChange={(e) => setDraft(e.target.value)} onBlur={commit}
              onKeyDown={(e) => {
                if (e.key === "Enter") commit();

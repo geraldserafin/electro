@@ -21,7 +21,7 @@ export function Island({ children, className = "" }: { children: ReactNode; clas
 
 // an island that is one button (or link); `on`: its panel is open
 const button = (on?: boolean) =>
-  cn("inline-flex flex-none items-center justify-center size-11.5 p-0 rounded-xl border border-line bg-surface text-fg no-underline",
+  cn("inline-flex flex-none items-center justify-center size-11.5 rounded-xl border border-line bg-surface text-fg no-underline",
      "hover:bg-selected", on && "bg-selected");
 
 export function IslandButton({ on, waiting, className = "", ...props }: ButtonHTMLAttributes<HTMLButtonElement> & {

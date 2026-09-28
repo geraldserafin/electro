@@ -90,7 +90,7 @@ export function Notebook({ initial, revision, reload, onSaved }: {
       <Sidebar open={outline} title={notebook.title} onTitle={setTitle} cells={notebook.cells} />
       <Islands side="right">
         <IslandButton waiting={!ready} onClick={runAll} disabled={!ready}
-                      title={ready ? t("runAll") : python.text} aria-label={t("runAll")}><RunAll /></IslandButton>
+                      title={ready ? t("runAll") : python.kind === "error" ? t("python.failed", { error: python.error }) : t("python.loading")} aria-label={t("runAll")}><RunAll /></IslandButton>
         <IslandButton onClick={() => setExporting(true)} title={t("exportPdf")} aria-label={t("exportPdf")}><Export /></IslandButton>
         <LanguageButton />
         <ThemeButton />
@@ -125,7 +125,7 @@ export function Notebook({ initial, revision, reload, onSaved }: {
             )}
           </CellFrame>
         ))}
-        {!notebook.cells.length && <p className="text-muted text-center">{t("empty")}</p>}
+        {!notebook.cells.length && <p className="my-4.5 text-muted text-center">{t("empty")}</p>}
       </main>
       </PdfContext.Provider>
     </div>

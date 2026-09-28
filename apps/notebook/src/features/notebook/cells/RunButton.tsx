@@ -23,7 +23,7 @@ export function RunButton({ run, running, label, execution, done, eager, icon = 
   return (
     <div className={gutter}>
       <button onClick={run} disabled={running || done} title={done ? t("schematic.upToDate") : label} aria-label={label}
-              className={cn("size-7.5 p-0 justify-center rounded-full border hover:enabled:bg-primary-hover hover:enabled:border-primary-hover",
+              className={cn("inline-flex size-7.5 items-center justify-center rounded-full border hover:enabled:bg-primary-hover hover:enabled:border-primary-hover",
                              look, running && "animate-blink")}>
         {icon}
       </button>

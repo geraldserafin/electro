@@ -448,7 +448,7 @@ export function SchematicEditor({ value, onChange, library, results, topLeft, to
       )}
       {lost && (
         // the drawing is out of view: a way back, bottom centre (like Excalidraw's "scroll back to content")
-        <button className={cn(boardIsland(), "bottom-3 left-1/2 -translate-x-1/2 gap-2 px-3.5 py-2 text-[14px] font-medium text-fg hover:bg-selected")}
+        <button className={cn(boardIsland(), "bottom-3 left-1/2 -translate-x-1/2 gap-2 px-3.5 py-2 border border-transparent text-[14px] font-medium text-fg hover:bg-selected")}
                 onClick={() => setCam(fitted())}>
           <Target /> {t("view.back")}
         </button>

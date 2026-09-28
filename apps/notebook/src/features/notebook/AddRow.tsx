@@ -11,7 +11,7 @@ export function AddRow({ onAdd, edge, shown }: {
   shown?: boolean; // always shown (an empty notebook)
 }) {
   const { t } = useTranslation("notebook");
-  const pill = "gap-1 py-1 pr-3.5 pl-2.5 rounded-full border border-faint bg-bg text-[15px] font-medium text-fg " +
+  const pill = "inline-flex items-center gap-1 py-1 pr-3.5 pl-2.5 rounded-full border border-faint bg-bg text-[15px] font-medium text-fg " +
     "hover:bg-hover hover:border-muted transition-opacity duration-120 " +
     (shown ? "" : "invisible opacity-0 group-hover/add:visible group-hover/add:opacity-100 group-focus-within/add:visible group-focus-within/add:opacity-100");
   return (
