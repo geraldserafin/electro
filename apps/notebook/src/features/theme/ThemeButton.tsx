@@ -2,13 +2,13 @@
 // is always "light" or "dark": styles.css has the dark colours under [data-theme="dark"].
 // Remembered in this browser; index.html sets it before the first paint, so no flash.
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import { Moon, Sun, System } from "@/shared/ui/icons";
 
 type Theme = "system" | "light" | "dark";
 
 const KEY = "electro-theme";
 const NEXT: Record<Theme, Theme> = { system: "light", light: "dark", dark: "system" };
-const LABEL: Record<Theme, string> = { system: "systemowy", light: "jasny", dark: "ciemny" };
 const ICON = { system: <System />, light: <Sun />, dark: <Moon /> };
 const systemDark = matchMedia("(prefers-color-scheme: dark)");
 
@@ -29,6 +29,7 @@ function apply(theme: Theme) {
 systemDark.addEventListener("change", () => apply(saved()));
 
 export function ThemeButton() {
+  const { t } = useTranslation("theme");
   const [theme, setTheme] = useState(saved);
   const choose = (next: Theme) => {
     setTheme(next);
@@ -42,7 +43,7 @@ export function ThemeButton() {
   };
   return (
     <button className="float icon-button" onClick={() => choose(NEXT[theme])}
-            title={`Motyw: ${LABEL[theme]} (kliknij: ${LABEL[NEXT[theme]]})`} aria-label={`Motyw: ${LABEL[theme]}`}>
+            title={t("next", { name: t(theme), next: t(NEXT[theme]) })} aria-label={t("theme", { name: t(theme) })}>
       {ICON[theme]}
     </button>
   );

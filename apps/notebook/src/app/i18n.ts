@@ -3,12 +3,14 @@
 // only keys the Polish messages have.
 import i18n from "i18next";
 import { initReactI18next } from "react-i18next";
+import { messages as language, savedLanguage } from "@/features/language";
 import { messages as notes } from "@/features/notes";
+import { messages as theme } from "@/features/theme";
 import * as home from "@/pages/Home.messages";
 
 const resources = {
-  pl: { notes: notes.pl, home: home.pl },
-  en: { notes: notes.en, home: home.en },
+  pl: { notes: notes.pl, theme: theme.pl, language: language.pl, home: home.pl },
+  en: { notes: notes.en, theme: theme.en, language: language.en, home: home.en },
 };
 
 declare module "i18next" {
@@ -19,7 +21,7 @@ declare module "i18next" {
 
 void i18n.use(initReactI18next).init({
   resources,
-  lng: "pl", // Polish only, until every slice has its messages; then the browser's, and a switch
+  lng: savedLanguage(),
   fallbackLng: "pl",
   interpolation: { escapeValue: false }, // React escapes
   initAsync: false, // the messages are here already: ready before the first render

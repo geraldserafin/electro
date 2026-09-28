@@ -7,6 +7,7 @@ import { useTranslation } from "react-i18next";
 import { EXAMPLES, fromExample } from "@/features/examples";
 import { Card, CardSkeletons, NewCard, NOTES, notesAtom, removeNote, toDocument, useCreateNote, useWhen } from "@/features/notes";
 import { library } from "@/features/schematic";
+import { LanguageButton } from "@/features/language";
 import { ThemeButton } from "@/features/theme";
 import { blank, copyOf, upload } from "@/shared/model/format";
 import { Bolt, Upload } from "@/shared/ui/icons";
@@ -46,6 +47,7 @@ export function Home() {
                 title={t("openFileTitle")} aria-label={t("openFile")}><Upload /></button>
         <input ref={fileInput} type="file" accept=".json" hidden
                onChange={(e) => { const file = e.target.files?.[0]; e.target.value = ""; if (file) void start(async () => copyOf(await upload(file))); }} />
+        <LanguageButton />
         <ThemeButton />
       </div>
 

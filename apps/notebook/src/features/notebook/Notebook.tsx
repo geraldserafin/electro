@@ -6,6 +6,7 @@ import { ExportDialog, PdfContext, pdfOf, warmUpWhenIdle, type PdfSettings } fro
 import { kernel, usePython } from "@/features/python";
 import { SyncNotice, useNoteSync } from "@/features/notes";
 import { library } from "@/features/schematic";
+import { LanguageButton } from "@/features/language";
 import { ThemeButton } from "@/features/theme";
 import { newCell } from "@/shared/model/cells";
 import type { Cell, CellType, Notebook as NotebookData, SchematicData } from "@/shared/model/types";
@@ -165,6 +166,7 @@ export function Notebook({ initial, revision, reload, onSaved }: {
         <button className="float icon-button" onClick={() => setExporting(true)} title="Eksport do PDF" aria-label="Eksport PDF">
           <Export />
         </button>
+        <LanguageButton />
         <ThemeButton />
       </div>
       <SyncNotice state={sync.state} onKeepMine={sync.keepMine} onTakeTheirs={sync.takeTheirs} />
