@@ -3,14 +3,21 @@ import { Result, useAtomRefresh, useAtomSet, useAtomValue } from "@effect-atom/a
 import { previewOf } from "@electro/notes-api";
 import { Exit } from "effect";
 import { useEffect, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { EXAMPLES, fromExample } from "@/features/examples";
-import { Card, CardSkeletons, NOTES, notesAtom, removeNote, toDocument, useCreateNote, when } from "@/features/notes";
+import { Card, CardSkeletons, NewCard, NOTES, notesAtom, removeNote, toDocument, useCreateNote, useWhen } from "@/features/notes";
 import { library } from "@/features/schematic";
 import { ThemeButton } from "@/features/theme";
 import { blank, copyOf, upload } from "@/shared/model/format";
-import { Bolt, Plus, Upload } from "@/shared/ui/icons";
+import { Bolt, Upload } from "@/shared/ui/icons";
+
+const grid = "m-0 p-0 list-none grid grid-cols-[repeat(auto-fill,212px)] gap-x-6 gap-y-7";
+const note = "mt-6 text-[14px] text-muted";
 
 export function Home() {
+  const { t } = useTranslation("home");
+  const { t: tNotes } = useTranslation("notes");
+  const when = useWhen();
   const notes = useAtomValue(notesAtom);
   const refresh = useAtomRefresh(notesAtom);
   useEffect(refresh, [refresh]); // notes change on their own pages: read the list afresh on coming back
@@ -22,7 +29,7 @@ export function Home() {
   const start = async (make: () => Promise<Parameters<typeof create>[0]>) => {
     try {
       setProblem(null);
-      if (!(await create(await make()))) setProblem("Serwer notatek nie odpowiada — spróbuj za chwilę.");
+      if (!(await create(await make()))) setProblem(t("createFailed"));
     } catch (error) {
       setProblem(String((error as Error).message ?? error));
     }
@@ -31,55 +38,53 @@ export function Home() {
   return (
     <div className="notebook">
       <div className="float top-left">
-        <span className="brand" title="electro — notatnik elektroniki"><Bolt /></span>
+        <span className="brand" title={t("brand")}><Bolt /></span>
         <span className="app-name">electro</span>
       </div>
       <div className="float-group top-right">
         <button className="float icon-button" onClick={() => fileInput.current?.click()}
-                title="Otwórz plik .electro.json jako nową notatkę" aria-label="Otwórz plik"><Upload /></button>
+                title={t("openFileTitle")} aria-label={t("openFile")}><Upload /></button>
         <input ref={fileInput} type="file" accept=".json" hidden
                onChange={(e) => { const file = e.target.files?.[0]; e.target.value = ""; if (file) void start(async () => copyOf(await upload(file))); }} />
         <ThemeButton />
       </div>
 
-      <div className="gallery">
-        <h1>Notatki</h1>
-        {problem && <p className="gallery-note error">{problem}</p>}
-        <div className="gallery-grid">
-          <button className="card new" onClick={() => start(async () => blank())}>
-            <span className="thumb"><Plus /></span>
-            <span className="card-title">Nowa notatka</span>
-          </button>
+      <div className="mx-auto max-w-310 px-8 pt-21 pb-24">
+        <h1 className="mt-0 mb-5 text-[22px] font-medium">{t("notes")}</h1>
+        {problem && <p className={`${note} text-danger`}>{problem}</p>}
+        <ul className={grid} aria-label={t("notes")}>
+          <NewCard onClick={() => start(async () => blank())} />
           {Result.builder(notes)
             .onInitial(() => <CardSkeletons />)
             .onFailure(() => null)
-            .onSuccess((list) => list.map((note, i) => (
-              <Card key={note.id} index={i} id={note.id} to={`/notes/${note.slug}`} title={note.title || "Bez tytułu"}
-                    meta={when(note.modified)} preview={note.preview} library={library}
-                    actions={[{
-                      label: "Usuń notatkę",
-                      danger: true,
-                      run: async () => {
-                        if (!confirm(`Usunąć notatkę „${note.title || "Bez tytułu"}”? Tego nie da się cofnąć.`)) return;
-                        const exit = await remove({ path: { id: note.id }, reactivityKeys: NOTES });
-                        if (Exit.isFailure(exit)) setProblem("Nie udało się usunąć — serwer notatek nie odpowiada.");
-                      },
-                    }]} />
-            )))
+            .onSuccess((list) => list.map((n, i) => {
+              const title = n.title || tNotes("untitled");
+              return (
+                <Card key={n.id} index={i} id={n.id} to={`/notes/${n.slug}`} title={title}
+                      meta={when(n.modified)} preview={n.preview} library={library}
+                      actions={[{
+                        label: t("deleteNote"),
+                        danger: true,
+                        run: async () => {
+                          if (!confirm(t("confirmDelete", { title }))) return;
+                          const exit = await remove({ path: { id: n.id }, reactivityKeys: NOTES });
+                          if (Exit.isFailure(exit)) setProblem(t("deleteFailed"));
+                        },
+                      }]} />
+              );
+            }))
             .render()}
-        </div>
-        {Result.isFailure(notes) && (
-          <p className="gallery-note">Serwer notatek nie odpowiada — notatki pojawią się, gdy wróci.</p>
-        )}
+        </ul>
+        {Result.isFailure(notes) && <p className={note}>{t("listUnavailable")}</p>}
 
-        <h2>Przykłady</h2>
-        <div className="gallery-grid">
+        <h2 className="mt-12 mb-4 text-[16px] font-medium text-muted">{t("examples")}</h2>
+        <ul className={grid} aria-label={t("examples")}>
           {EXAMPLES.map(({ name, notebook }) => (
-            <Card key={name} title={notebook.title} meta="nowa notatka z przykładu" library={library}
+            <Card key={name} title={notebook.title} meta={t("fromExample")} library={library}
                   preview={previewOf(toDocument(notebook))}
                   onClick={() => start(async () => fromExample(name)!)} />
           ))}
-        </div>
+        </ul>
       </div>
     </div>
   );

@@ -1,3 +1,4 @@
+import tailwindcss from "@tailwindcss/vite";
 import react from "@vitejs/plugin-react";
 import { fileURLToPath } from "node:url";
 import { defineConfig, type Plugin } from "vite";
@@ -22,7 +23,7 @@ function reloadOnPython(): Plugin {
 const notesServer = process.env.NOTES_SERVER ?? "http://localhost:5191";
 
 export default defineConfig({
-  plugins: [react(), reloadOnPython()],
+  plugins: [tailwindcss(), react(), reloadOnPython()],
   resolve: { alias: { "@": fileURLToPath(new URL("./src", import.meta.url)) } }, // @/features/…, @/shared/…
   worker: { format: "es" },
   base: "/", // routes like /notes/:id: assets from the root

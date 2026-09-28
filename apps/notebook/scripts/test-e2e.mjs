@@ -42,14 +42,17 @@ try {
   // the note on screen: its address (a slug) and, from the server, its id
   const noteRef = () => new URL(page.url()).pathname.match(/^\/notes\/([\w-]+)$/)?.[1];
   const noteOnServer = async (ref = noteRef()) => (await fetch(`${notesUrl}/api/notes/${ref}`)).json();
+  // the home page: the notes, then the examples (lists, a card in each item: data-id, the note's id)
+  const notesList = page.getByRole("list", { name: "Notatki" });
+  const examplesList = page.getByRole("list", { name: "Przykłady" });
   const home = async () => {
     await page.getByRole("link", { name: "Notatki" }).click();
-    await page.locator(".gallery").waitFor();
+    await notesList.waitFor();
   };
   await page.goto(`${app}/`);
-  await page.locator(".gallery h2", { hasText: "Przykłady" }).waitFor();
-  check("home: no notes yet, the examples", (await page.locator(".gallery .card:not(.new)").count()) === (await page.locator(".gallery h2 ~ .gallery-grid .card").count()));
-  await page.locator(".card", { hasText: "Sprawozdanie: mostek Wheatstone'a" }).locator(".card-open").click();
+  await page.getByRole("heading", { name: "Przykłady" }).waitFor();
+  check("home: no notes yet, the examples", (await notesList.locator("li[data-id]").count()) === 0 && (await examplesList.getByRole("listitem").count()) > 0);
+  await examplesList.getByRole("button", { name: /^Sprawozdanie: mostek Wheatstone'a/ }).click();
   await page.waitForURL(/\/notes\/[\w-]+$/);
   check("an example becomes a note at an address from its title", noteRef() === "sprawozdanie-mostek-wheatstonea"
     && (await noteOnServer()).document.title === "Sprawozdanie: mostek Wheatstone'a");
@@ -365,7 +368,7 @@ try {
 
   // the examples notebook from the menu runs without a single error
   await home();
-  await page.locator(".card", { hasText: "Przykłady: niewiadome i dziury" }).locator(".card-open").click();
+  await examplesList.getByRole("button", { name: /^Przykłady: niewiadome i dziury/ }).click();
   await page.waitForURL(/\/notes\/przyklady-niewiadome-i-dziury$/);
   await pythonReady(60_000);
   await page.getByRole("button", { name: "Uruchom wszystko" }).click();
@@ -466,26 +469,25 @@ try {
     };
     const titleIs = (t, timeout = 10_000) =>
       page.waitForFunction((t) => document.querySelector(".title-box")?.textContent === t, t, { timeout });
-    const gallery = page.locator(".gallery");
-    const notes = gallery.locator(".gallery-grid").first().locator(".card:not(.new)");
+    const notes = notesList.locator("li[data-id]");
     const { document: { id }, slug } = await noteOnServer();
     const firstTitle = await title.innerText();
     await home();
-    const card = gallery.locator(`.card[data-id="${id}"]`);
+    const card = notesList.locator(`li[data-id="${id}"]`);
     await card.waitFor({ timeout: 10_000 });
     check("home: the notes with their first pages as thumbnails",
-      (await card.locator(".card-title").innerText()) === firstTitle && (await card.locator(".page").innerText()).includes("wersji 1"));
+      (await card.getByText(firstTitle, { exact: true }).count()) === 1 && (await card.locator(".page").innerText()).includes("wersji 1"));
 
     const before = await notes.count();
-    await gallery.getByRole("button", { name: "Nowa notatka", exact: true }).click();
+    await notesList.getByRole("button", { name: "Nowa notatka", exact: true }).click();
     await page.waitForURL(/\/notes\/notatka(-\d+)?$/); // no title yet
     await setTitle("Druga notatka");
     await page.waitForURL(/\/notes\/druga-notatka$/, { timeout: 10_000 }); // the title makes the address
     const second = (await noteOnServer()).document.id;
     check("renaming a note changes its address", (await noteOnServer()).document.title === "Druga notatka");
     await page.goBack(); // the browser's back: the list again
-    await page.waitForFunction((n) => document.querySelectorAll(".gallery .gallery-grid:first-of-type .card:not(.new)").length === n, before + 1, { timeout: 10_000 });
-    await card.locator(".card-open").click();
+    await page.waitForFunction((n) => document.querySelectorAll('ul[aria-label="Notatki"] > li[data-id]').length === n, before + 1, { timeout: 10_000 });
+    await card.getByRole("link").click();
     await titleIs(firstTitle);
     check("a new note; back to the list; the first note opens from its card", noteRef() === slug);
 
@@ -505,13 +507,13 @@ try {
     await fetch(`${notesUrl}/api/notes/${id}`, { method: "PUT", headers: { "content-type": "application/json" },
       body: JSON.stringify({ document: { ...note.document, title: "Zmienione gdzie indziej" }, baseRevision: note.revision }) });
     await setTitle(`${firstTitle} (tutaj)`);
-    await page.locator(".notice.conflict").waitFor({ timeout: 10_000 });
-    await page.locator(".notice.conflict").getByRole("button", { name: "Z serwera" }).click();
+    await page.getByRole("alert").waitFor({ timeout: 10_000 });
+    await page.getByRole("alert").getByRole("button", { name: "Z serwera" }).click();
     await titleIs("Zmienione gdzie indziej");
-    check("a conflict is shown and resolved by taking the server's version", (await page.locator(".notice.conflict").count()) === 0);
+    check("a conflict is shown and resolved by taking the server's version", (await page.getByRole("alert").count()) === 0);
 
     await home();
-    const drugi = gallery.locator(`.card[data-id="${second}"]`);
+    const drugi = notesList.locator(`li[data-id="${second}"]`);
     await drugi.hover();
     await drugi.getByRole("button", { name: "Więcej" }).click();
     page.once("dialog", (d) => d.accept());

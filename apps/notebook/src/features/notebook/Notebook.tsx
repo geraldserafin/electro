@@ -138,7 +138,7 @@ export function Notebook({ initial, revision, reload, onSaved }: {
          // a click outside every cell (and the app's islands) leaves the cell being worked on
          onPointerDownCapture={(e) => {
            // (the export dialog is a portal: its clicks bubble here too, and are not outside)
-           if (!(e.target as Element).closest(".cell, .float, .float-group, .note-nav, .notice, .menu-items, .export-backdrop")) setFocused(null);
+           if (!(e.target as Element).closest(".cell, .float, .float-group, .note-nav, [data-notice], .export-backdrop")) setFocused(null);
          }}>
       {/* left: the way back and the app (as on the home screen), under it a sidebar — the note's
           title and its sections; right: run, PDF */}

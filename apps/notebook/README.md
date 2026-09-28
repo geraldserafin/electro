@@ -73,4 +73,15 @@ nie `@/features/schematic/Editor`); wewnątrz plastra importy są względne. `@/
 | `features/theme/` | motyw jasny / ciemny / systemowy |
 | `python/electro_notebook/kernel.py` | (Python) wykonuje komórki, zamienia wyniki na wyjścia (`_repr_svg_`, `_repr_markdown_`, `_repr_latex_`) |
 
+**Style.** Tailwind v4 (`src/app/styles.css`): kolory to tokeny aplikacji (`bg-surface`, `text-muted`,
+`border-line`… — jasne i ciemne w `legacy.css`), innych kolorów nie ma. Plastry przepisane na Tailwinda:
+`notes`. Reszta wciąż korzysta z `legacy.css` (w warstwie `base`, więc każda klasa Tailwinda z nim wygrywa);
+bez preflightu, dopóki `legacy.css` nie zniknie. To, czego nie da się sensownie zapisać klasami (np. strona
+PDF w miniaturze, która przestawia tokeny i styluje cudzy Markdown), leży obok komponentu jako `*.css` w
+`@layer components`. Testy e2e szukają elementów po rolach i tekstach, nie po klasach.
+
+**Języki.** i18next: każdy plaster ma `messages.ts` (`pl` i `en` o tym samym kształcie — pilnuje TypeScript)
+jako swoją przestrzeń nazw; `src/app/i18n.ts` je zbiera. Na razie tylko polski, dopóki wszystkie plastry
+nie mają swoich tekstów.
+
 Przy `devenv up` zmiany w `packages/` wystarczy odświeżyć w przeglądarce. Przy samym `pnpm dev` `bundle.json` powstaje tylko przy starcie (albo użyj `pnpm python --watch`).

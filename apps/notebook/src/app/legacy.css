@@ -1,0 +1,681 @@
+/* Notebook: light and quiet, like Colab. Schematics: floating islands, like Excalidraw. */
+:root {
+  --bg: #ffffff;
+  --paper: #ffffff;
+  --text: #1f1f1f;
+  --muted: #5f6368;
+  --faint: #9aa0a6;
+  --line: #e0e0e0;
+  --hover: #f1f3f4;
+  --code-bg: #f7f7f7;
+  --accent: #1a73e8;
+  --accent-soft: #e8f0fe;
+  --ok: #188038;
+  --danger: #d93025;
+  --warn-bg: #fef7e0;
+  --warn: #8a5a00;
+  --err-bg: #fce8e6;
+  /* the app's own colour: yellow, like the bolt — the run buttons for now */
+  --primary: #f5b100;
+  --primary-hover: #e3a400;
+  --on-primary: #ffffff;
+  /* floating islands (the notebook's and the drawing board's): neutral, one step off the page, flat */
+  --surface: #ffffff;
+  --selected: #eceef1;
+  --board: #ffffff;
+  --island: var(--surface);
+  --island-shadow: 0 0 0 1px var(--line);
+  --tool-active: var(--selected);
+  --tool-active-text: var(--text);
+  /* type and code, as in Colab (its colours are VS Code's "Light+" / "Dark+") */
+  --sans: "Google Sans", Roboto, ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --mono: "Roboto Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+  --hl-keyword: #0000ff;
+  --hl-control: #af00db;
+  --hl-string: #a31515;
+  --hl-number: #098658;
+  --hl-comment: #008000;
+  --hl-function: #795e26;
+  --hl-class: #267f99;
+  --hl-property: #001080;
+  --selection: #add6ff;
+  --bracket: #d6e9ff;
+  color-scheme: light;
+}
+
+/* dark: chosen, or the system's (features/theme sets data-theme either way) */
+:root[data-theme="dark"] {
+  --bg: #1e1e1e;
+  --paper: #1e1e1e;
+  --text: #e8eaed;
+  --muted: #9aa0a6;
+  --faint: #6f7378;
+  --line: #3c4043;
+  --hover: #2a2b2e;
+  --code-bg: #262729;
+  --accent: #8ab4f8;
+  --accent-soft: #1f2a3c;
+  --ok: #81c995;
+  --danger: #f28b82;
+  --warn-bg: #3a2e12;
+  --warn: #fdd663;
+  --err-bg: #3c1f1c;
+  --board: #1a1a1a;
+  --primary-hover: #ffc21a;
+  --surface: #262626;
+  --selected: #34353a;
+  --hl-keyword: #569cd6;
+  --hl-control: #c586c0;
+  --hl-string: #ce9178;
+  --hl-number: #b5cea8;
+  --hl-comment: #6a9955;
+  --hl-function: #dcdcaa;
+  --hl-class: #4ec9b0;
+  --hl-property: #9cdcfe;
+  --selection: #264f78;
+  --bracket: #3a3d41;
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+
+/* the whole app a little smaller: 100% here is 80% of the sizes below */
+:root { zoom: 0.8; }
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font: 18px/1.6 var(--sans);
+}
+
+button {
+  font: inherit;
+  font-size: 15px;
+  color: var(--text);
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  padding: 4px 10px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+button:hover:not(:disabled) { background: var(--hover); }
+button:disabled { opacity: 0.45; cursor: default; }
+button.primary { background: var(--accent); color: #fff; }
+button.primary:hover:not(:disabled) { background: var(--accent); filter: brightness(1.08); }
+button.danger { color: var(--danger); }
+
+input, textarea {
+  font: inherit;
+  color: var(--text);
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 5px 8px;
+}
+input:focus, textarea:focus { outline: 2px solid var(--accent-soft); border-color: var(--accent); }
+
+/* ---------------------------------------------------------------- floating islands (no bar, like Excalidraw) */
+
+.float {
+  position: fixed;
+  top: 12px;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 4px;
+  border-radius: 12px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+}
+.float.top-left { left: 12px; max-width: calc(50vw - 24px); }
+.float .icon-button { border-radius: 8px; }
+/* separate buttons, each its own island, in a row */
+.float-group { position: fixed; top: 12px; z-index: 20; display: flex; gap: 8px; }
+.float-group.top-left { left: 12px; }
+.float-group.top-right { right: 12px; }
+.float-group .float { position: static; }
+.float.icon-button { width: 46px; height: 46px; padding: 0; border-radius: 12px; color: var(--text); }
+.float.icon-button:hover:not(:disabled) { background: var(--selected); }
+.float.icon-button.open { background: var(--selected); }
+.float.icon-button.waiting { animation: pulse 0.9s ease-in-out infinite alternate; } /* Python is starting */
+.brand {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  display: grid;
+  place-items: center;
+  color: #f9ab00;
+  flex: none;
+}
+.app-name { font-size: 16px; font-weight: 500; padding: 0 10px 0 2px; }
+/* the note's title: a plain box, a click edits it */
+.title-box {
+  min-width: 0; max-width: 420px; height: 36px; line-height: 24px; padding: 6px 10px; border-radius: 8px; text-align: left;
+  font-size: 16px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: block;
+}
+.title-box.untitled { color: var(--muted); font-weight: 400; }
+.title-edit { height: 36px; font-size: 16px; font-weight: 500; padding: 5px 9px; border-radius: 8px; max-width: 420px; }
+.icon-button {
+  display: inline-flex; align-items: center; justify-content: center; flex: none; /* also on links */
+  width: 36px; height: 36px; padding: 0; border-radius: 50%; color: var(--muted);
+}
+.icon-button:hover:not(:disabled), .icon-button.open { color: var(--text); background: var(--hover); }
+.status {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-right: 6px;
+  font-size: 13px;
+  color: var(--muted);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 3px 10px;
+  white-space: nowrap;
+}
+.status .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--faint); }
+.status.loading .dot { animation: pulse 1s ease-in-out infinite alternate; }
+.status.ready .dot { background: var(--ok); }
+.status.error { color: var(--danger); }
+.status.error .dot { background: var(--danger); }
+@keyframes pulse { to { opacity: 0.3; } }
+
+.app-name { font-size: 17px; font-weight: 500; }
+/* a note that could not be shown: loading, missing, server down */
+.page-message { max-width: 560px; margin: 96px auto; padding: 0 24px; text-align: center; }
+.page-message h1 { font-size: 22px; font-weight: 500; margin: 0 0 8px; }
+/* a note's sidebar, under the app's island: the title, the sections under it; the note beside it */
+.note-nav {
+  position: fixed; top: 68px; left: 12px; bottom: 12px; z-index: 20; width: 300px; /* under the app's islands */
+  opacity: 0; visibility: hidden; transform: translateX(-12px);
+  transition: opacity 0.2s ease, transform 0.25s cubic-bezier(0.2, 0.8, 0.2, 1), visibility 0s linear 0.25s;
+  display: flex; flex-direction: column; padding: 4px;
+  overflow: hidden; border-radius: 12px; background: var(--surface); border: 1px solid var(--line);
+}
+.note-nav.open { opacity: 1; visibility: visible; transform: none;
+  transition: opacity 0.2s ease, transform 0.25s cubic-bezier(0.2, 0.8, 0.2, 1), visibility 0s; }
+.note-nav-head { flex: none; display: flex; align-items: center; gap: 2px; height: 36px; min-width: 0; }
+.note-nav-head .title-box { flex: 1; }
+.note-nav-head .icon-button { border-radius: 8px; }
+.outline { flex: 1; min-height: 0; overflow-y: auto; margin-top: 10px; padding: 0 0 8px; font-size: 14px; }
+main { transition: padding-left 0.25s cubic-bezier(0.2, 0.8, 0.2, 1), max-width 0.25s cubic-bezier(0.2, 0.8, 0.2, 1); }
+main.with-nav { max-width: calc(1120px + 312px); padding-left: calc(24px + 312px); }
+/* narrow: no room for both — the sidebar covers the note while open */
+@media (max-width: 900px) { main.with-nav { padding-left: 24px; max-width: none; } }
+@media (prefers-reduced-motion: reduce) { .note-nav, .note-nav.open, main { transition: none; } }
+/* the title, the note's first heading (in the PDF too) */
+input.doc-title {
+  display: block; width: 100%; margin: 0 0 4px; padding: 4px 8px 4px 65px; border: none; border-radius: 8px; /* in line with the cells' text */
+  background: transparent; font-size: 34px; font-weight: 600; line-height: 1.25;
+}
+input.doc-title::placeholder { color: var(--faint); }
+input.doc-title:focus { outline: none; background: var(--hover); }
+.outline-empty { margin: 0 12px; color: var(--muted); font-size: 13px; }
+.outline ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 1px; }
+.outline a {
+  display: flex; align-items: center; gap: 8px; padding: 7px 12px; border-radius: 8px;
+  color: var(--muted); text-decoration: none; line-height: 1.35; transition: background 0.1s, color 0.1s;
+}
+.outline a.depth-0 { color: var(--text); font-weight: 500; }
+.outline a:hover { background: var(--selected); color: var(--text); }
+.outline a.active { background: var(--selected); color: var(--text); font-weight: 500; }
+.outline a svg { flex: none; width: 15px; height: 15px; }
+.cell, .cell .markdown-view :is(h1, h2, h3) { scroll-margin-top: 72px; } /* below the islands */
+
+
+/* an empty notebook: the add buttons are always there */
+main > .add-row:only-child button, main > .add-row:has(+ .empty) button { visibility: visible; opacity: 1; }
+
+/* ---------------------------------------------------------------- cells */
+
+main {
+  max-width: 1120px;
+  margin: 0 auto;
+  padding: 72px 24px 120px; /* under the floating islands */
+}
+.empty { color: var(--muted); text-align: center; }
+
+.cell {
+  position: relative;
+  border-radius: 8px;
+  padding: 8px;
+  margin-bottom: 12px;
+  border: 1px solid transparent;
+}
+.cell:hover { border-color: var(--line); }
+.cell.focused { border-color: var(--line); box-shadow: 0 1px 6px rgba(0, 0, 0, 0.08); }
+.cell-tools {
+  position: absolute;
+  top: -14px;
+  right: 12px;
+  z-index: 5;
+  display: flex;
+  padding: 2px;
+  border-radius: 8px;
+  background: var(--paper);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.18);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.12s;
+}
+.cell:hover .cell-tools, .cell.focused .cell-tools { opacity: 1; pointer-events: auto; }
+.cell-tools button { padding: 4px; color: var(--muted); }
+
+/* "+ Kod  + Tekst  + Schemat", as in Colab: pills on the edge between cells. The row is a thin
+   strip along the whole edge; the pills show only while the pointer is in it. */
+.add-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  height: 28px;
+}
+.add-row button { visibility: hidden; opacity: 0; transition: opacity 0.12s; }
+.add-row:hover button, .add-row:focus-within button { visibility: visible; opacity: 1; }
+.add-row button {
+  gap: 4px;
+  padding: 4px 14px 4px 10px;
+  font-size: 15px;
+  font-weight: 500;
+  color: var(--text);
+  border: 1px solid var(--faint);
+  border-radius: 999px;
+  background: var(--bg);
+}
+.add-row button:hover { background: var(--hover); border-color: var(--muted); }
+/* only in the middle, so it never covers the next cell's tools on the right */
+/* from the bottom padding of this cell, over the gap, to the top padding of the next one */
+.cell > .add-row { position: absolute; left: 0; right: 0; bottom: -20px; z-index: 4; }
+main > .add-row { justify-content: center; }
+
+/* text cells: the rendered text, or its Markdown while editing; a mode button on the side */
+.markdown-cell { display: flex; gap: 8px; align-items: flex-start; }
+.markdown-cell .markdown-view { padding: 4px 8px; cursor: text; min-height: 1.6em; border-radius: 8px; }
+.markdown-cell .gutter .mode {
+  width: 30px; height: 30px; padding: 0; justify-content: center; border-radius: 8px;
+  color: var(--faint); opacity: 0; transition: opacity 0.15s;
+}
+.cell:hover .markdown-cell .gutter .mode, .cell.focused .markdown-cell .gutter .mode, .markdown-cell .gutter .mode[aria-pressed="true"] { opacity: 1; }
+.markdown-cell .gutter .mode:hover { color: var(--text); background: var(--hover); }
+.markdown-cell .gutter .mode[aria-pressed="true"] { color: var(--tool-active-text); background: var(--tool-active); }
+.markdown-source {
+  display: block; width: 100%; resize: none; overflow: hidden;
+  font-family: var(--mono); font-size: 16px; line-height: 1.6; padding: 10px 12px;
+  background: var(--code-bg); border: none; border-radius: 8px;
+}
+.markdown-source:focus { outline: 1px solid var(--line); }
+.markdown > :first-child { margin-top: 0; }
+.markdown > :last-child { margin-bottom: 0; }
+.markdown h1, .markdown h2, .markdown h3 { font-weight: 500; }
+.markdown .katex-display { overflow-x: auto; overflow-y: hidden; }
+.markdown table { border-collapse: collapse; font-size: 17px; }
+.markdown th, .markdown td { border-bottom: 1px solid var(--line); padding: 4px 14px 4px 0; text-align: left; }
+.markdown th { color: var(--muted); font-weight: 500; }
+.markdown code { background: var(--code-bg); border-radius: 4px; padding: 0 4px; }
+
+/* code */
+.code-cell { display: flex; gap: 8px; align-items: flex-start; }
+.gutter { width: 40px; flex: none; display: grid; justify-items: center; gap: 2px; padding-top: 2px; }
+.gutter .run {
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  justify-content: center;
+  border-radius: 50%;
+  color: var(--muted);
+  border: 1px solid var(--line);
+}
+.cell:hover .gutter .run, .cell.focused .gutter .run { color: var(--on-primary); background: var(--primary); border-color: var(--primary); }
+.gutter .run:hover:not(:disabled) { background: var(--primary-hover) !important; border-color: var(--primary-hover) !important; }
+.gutter .run.running { animation: pulse 0.8s ease-in-out infinite alternate; }
+/* a schematic's run button says whether there is anything to run: filled when there is, */
+.schematic-cell .gutter .run:not(.done):not(:disabled) { color: var(--on-primary); background: var(--primary); border-color: var(--primary); }
+/* …faint when the results are up to date */
+.gutter .run.done, .cell:hover .gutter .run.done, .cell.focused .gutter .run.done {
+  color: var(--faint); background: transparent; border-color: var(--line); opacity: 0.6;
+}
+.gutter .execution { font: 13px var(--mono); color: var(--faint); }
+.cell-body { flex: 1; min-width: 0; }
+.code-editor .cm-editor { font-size: 16px; }
+.code-editor { border-radius: 8px; transition: box-shadow 0.15s; }
+.cell.focused .code-editor { box-shadow: 0 0 0 1px var(--line); }
+
+.outputs { margin-top: 8px; display: grid; gap: 8px; }
+.output-text, .output-error { margin: 0; padding: 6px 10px; border-radius: 6px; font-size: 16px; overflow-x: auto; white-space: pre-wrap; }
+.output-text { font-family: var(--mono); }
+.output-error { background: var(--err-bg); color: var(--danger); }
+.output-warning { background: var(--warn-bg); color: var(--warn); padding: 6px 10px; border-radius: 6px; font-size: 16px; }
+.output-svg { overflow-x: auto; }
+.output-svg svg { max-width: 100%; height: auto; }
+
+/* ---------------------------------------------------------------- schematic board (Excalidraw-like) */
+
+/* the drawing for the PDF: laid out (so it can measure itself) but not seen on screen */
+.pdf-drawing { position: absolute; visibility: hidden; width: 0; height: 0; overflow: hidden; pointer-events: none; }
+
+/* a schematic's tools (its islands) fade in while the pointer is over its board — or while something
+   in them is being typed into, or the board is full screen; the grid and the drawing always show.
+   What is wrong with the circuit (the status) stays. On touch screens (no hover) they always show. */
+@media (hover: hover) {
+  .schematic-cell .board .island:not(.status) { opacity: 0; transition: opacity 0.18s ease; }
+  .schematic-cell .board:hover .island,
+  .schematic-cell .board.fullscreen .island,
+  .schematic-cell .board:has(input:focus, textarea:focus, .cm-focused) .island { opacity: 1; }
+}
+
+/* Schemat | Kod */
+.view-switch { display: flex; gap: 2px; padding: 2px; border-radius: 8px; background: var(--hover); }
+.view-switch button { padding: 4px 10px; border-radius: 6px; color: var(--muted); }
+.view-switch button.on { background: var(--paper); color: var(--text); box-shadow: 0 1px 2px rgba(0, 0, 0, 0.15); }
+.island .view-switch button { padding: 4px 10px; }
+.board.code-view { height: auto; min-height: 200px; padding: 10px; display: flex; flex-direction: column; gap: 10px; }
+.code-view-bar { display: flex; align-items: center; gap: 8px; }
+.code-view-bar .spacer { flex: 1; }
+.island.static { position: static; }
+.code-view .code-editor .cm-scroller { min-height: 120px; } /* the scroller fills it: its scrollbar sits at the bottom */
+.code-view-wait { color: var(--muted); margin: 8px; }
+.code-view-note { margin: 0; font-size: 14px; color: var(--muted); }
+pre.code-view-note { color: var(--danger); }
+
+.schematic-cell { display: flex; gap: 8px; align-items: flex-start; }
+.board {
+  position: relative;
+  height: 480px; /* overridden by the editor to fit the drawing */
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--board);
+  overflow: hidden;
+}
+.board.loading { display: grid; place-items: center; color: var(--muted); }
+.board-view { position: absolute; inset: 0; overflow: hidden; }
+.board.active { border-color: var(--accent); }
+.board.panning .canvas { cursor: grab; }
+.board.panning .canvas:active { cursor: grabbing; }
+.canvas { display: block; color: var(--text); touch-action: none; user-select: none; -webkit-user-select: none; }
+.canvas:focus { outline: none; }
+.canvas .grid-dot { fill: var(--faint); opacity: 0.5; }
+.canvas .hit { fill: transparent; stroke: transparent; stroke-width: 10; }
+.canvas .element { cursor: grab; }
+.canvas.tool-select .segment-h { cursor: ns-resize; }
+.canvas.tool-select .segment-v { cursor: ew-resize; }
+.canvas .element.selected .w, .canvas .wire.selected { stroke: var(--accent); }
+.canvas .element.selected .letter { fill: var(--accent); }
+.canvas .draft { stroke: var(--accent); stroke-dasharray: 5 4; pointer-events: none; }
+.canvas .open-pin { fill: var(--board); stroke: #e03131; stroke-width: 1.6; pointer-events: none; }
+.canvas .pin-handle { fill: transparent; cursor: crosshair; }
+.canvas.tool-select .pin-handle:hover { fill: var(--tool-active); stroke: var(--accent); stroke-width: 1.2; }
+.canvas:not(.tool-select) .pin-handle { pointer-events: none; }
+.canvas .snap { fill: none; stroke: #2f9e44; stroke-width: 2; pointer-events: none; }
+.canvas .ghost { opacity: 0.4; pointer-events: none; }
+.canvas .rubber-band { fill: var(--tool-active); fill-opacity: 0.35; stroke: var(--accent); stroke-width: 1; stroke-dasharray: 4 3; pointer-events: none; }
+.canvas.tool-wire, .canvas.tool-place { cursor: crosshair; }
+.canvas text { paint-order: stroke; stroke: var(--board); stroke-width: 4px; stroke-linejoin: round; }
+.canvas .label { font-size: 13px; }
+.canvas .label .sub { font-size: 10px; }
+.canvas .label.solved { fill: var(--accent); font-weight: 600; }
+.canvas .reading { font-size: 11px; fill: #2f9e44; }
+
+.island {
+  position: absolute;
+  z-index: 3;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 4px;
+  border-radius: 10px;
+  background: var(--island);
+  box-shadow: var(--island-shadow);
+}
+.island button { padding: 6px 8px; border-radius: 8px; }
+.island button.icon { padding: 6px; }
+.island .sep { width: 1px; align-self: stretch; margin: 4px; background: var(--line); }
+.island button.primary { background: var(--primary); color: #fff; }
+.island button.primary:hover:not(:disabled) { background: var(--primary-hover); }
+.island.tools { top: 12px; left: 50%; transform: translateX(-50%); max-width: calc(100% - 24px); overflow-x: auto; scrollbar-width: none; }
+.island.tools .tool { position: relative; flex: none; width: 40px; height: 36px; padding: 0; justify-content: center; color: var(--text); }
+.island.tools .tool.active { background: var(--tool-active); color: var(--tool-active-text); }
+.island.tools .tool.sep-after { margin-right: 9px; }
+.island.tools .tool.sep-after::after { content: ""; position: absolute; right: -6px; top: 6px; bottom: 6px; width: 1px; background: var(--line); }
+.island.tools .key { position: absolute; right: 3px; bottom: 1px; font-size: 9px; color: var(--faint); }
+.island.tools .tool-symbol { color: currentColor; }
+.island.tools .tool-text { font: italic 600 14px ui-sans-serif, system-ui; }
+.island.tools .library-button { width: auto; padding: 0 12px 0 10px; gap: 6px; }
+
+/* element library: a side panel on the left (like Excalidraw's), open while "Elementy" is on */
+.island.library {
+  top: 60px;
+  left: 12px;
+  bottom: 64px;
+  z-index: 6;
+  width: 236px;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 8px;
+  padding: 10px;
+  overflow: hidden; /* the list scrolls, the header and the search stay put */
+}
+.library-list { flex: 1; min-height: 0; overflow-y: auto; overflow-x: hidden; margin: 0 -6px; padding: 0 6px; }
+.library-search { flex: none; display: flex; align-items: center; gap: 6px; padding: 0 8px; border: 1px solid var(--line); border-radius: 8px; color: var(--faint); }
+.library-search input { flex: 1; min-width: 0; border: none; outline: none; background: transparent; padding: 7px 0; }
+.library-search:focus-within { border-color: var(--accent); }
+.island.library h5 { margin: 8px 4px 2px; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); }
+.library-head { display: flex; align-items: center; justify-content: space-between; padding: 0 2px 4px 4px; }
+.library-head h4 { margin: 0; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); }
+.library-head .icon { font-size: 18px; line-height: 1; padding: 2px 8px; color: var(--muted); }
+.library-grid { display: grid; grid-template-columns: 1fr; gap: 1px; }
+.island .library-item.active { background: var(--tool-active); color: var(--tool-active-text); }
+.island .library-item { justify-content: flex-start; gap: 10px; padding: 6px 8px; text-align: left; }
+.island .library-item { width: 100%; min-width: 0; }
+.library-item span { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.library-item kbd { color: var(--faint); }
+.library-item .tool-symbol { color: var(--text); flex: none; }
+
+.board.fullscreen { position: fixed; inset: 12px; z-index: 100; height: auto; box-shadow: 0 10px 40px rgba(0, 0, 0, 0.25); }
+.island.top-left { top: 12px; left: 12px; padding: 4px; }
+.island.top-right { top: 12px; right: 12px; }
+.island.bottom-left { bottom: 12px; left: 12px; }
+/* the drawing is out of view: a way back, bottom centre (like Excalidraw's "scroll back to content") */
+.island.back-to-drawing { bottom: 12px; left: 50%; transform: translateX(-50%); padding: 8px 14px; gap: 8px; font-size: 14px; font-weight: 500; color: var(--tool-active-text); }
+.island.back-to-drawing:hover { background: var(--tool-active); }
+.island.bottom-right { bottom: 12px; right: 12px; }
+.island .zoom { min-width: 52px; justify-content: center; font-variant-numeric: tabular-nums; }
+/* the schematic's name: a plain box in the corner, a click edits it */
+.island .name-box { font-size: 15px; font-weight: 500; padding: 4px 10px; }
+.name-edit { display: flex; flex-direction: column; gap: 2px; padding: 2px; }
+.name-edit input { width: 180px; font-size: 15px; padding: 4px 8px; }
+.name-edit small { font-size: 12px; color: var(--muted); padding: 0 4px 2px; }
+.name-edit code { font-family: var(--mono); color: var(--text); }
+
+.island.inspector {  /* on the right: drawings start top-left, so this side is usually free */
+  top: 64px;
+  right: 12px;
+  width: 248px;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 12px;
+  padding: 12px;
+  font-size: 14px;
+}
+.inspector header { display: flex; align-items: center; gap: 10px; }
+.inspector .kind-icon {
+  flex: none; width: 40px; height: 40px; display: grid; place-items: center;
+  border-radius: 10px; background: var(--hover); color: var(--text);
+}
+.inspector .kind-icon .tool-symbol { color: var(--text); }
+.inspector .title { flex: 1; min-width: 0; display: grid; }
+.inspector h4 { margin: 0; font-size: 12px; font-weight: 500; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.inspector .subtitle { font-size: 16px; font-weight: 600; }
+.inspector .actions { display: flex; gap: 2px; }
+.inspector .actions button { padding: 6px; }
+.inspector .actions .danger:hover { background: var(--err-bg); }
+.inspector .field { display: grid; gap: 4px; }
+.inspector .field > span:first-child { font-size: 12px; font-weight: 500; color: var(--muted); }
+.inspector input { width: 100%; padding: 7px 10px; border-radius: 8px; background: var(--hover); border-color: transparent; font-size: 15px; }
+.inspector input:focus { background: var(--paper); }
+.inspector .with-unit { position: relative; display: block; }
+.inspector .with-unit input { padding-right: 34px; }
+.inspector .unit { position: absolute; right: 10px; top: 50%; transform: translateY(-50%); color: var(--muted); pointer-events: none; }
+.inspector small { font-size: 12px; color: var(--faint); line-height: 1.35; }
+.inspector .hint { margin: 0; font-size: 13px; color: var(--muted); }
+
+.island.help-panel { bottom: 60px; right: 12px; width: 300px; flex-direction: column; align-items: stretch; padding: 12px 14px; font-size: 13px; }
+.island.help-panel h4 { margin: 0 0 6px; }
+.island.help-panel dl { display: grid; grid-template-columns: auto 1fr; gap: 3px 12px; margin: 0; }
+.island.help-panel dt { font: 12px ui-monospace, monospace; color: var(--tool-active-text); background: var(--tool-active); border-radius: 4px; padding: 0 5px; justify-self: start; }
+.island.help-panel dd { margin: 0; color: var(--muted); }
+.island.help-panel p { margin: 8px 0 0; color: var(--muted); font-size: 12px; }
+
+
+kbd { font: 11px ui-monospace, monospace; border: 1px solid var(--line); border-radius: 4px; padding: 0 4px; }
+.muted { color: var(--muted); }
+
+@media (max-width: 760px) {
+  .markdown-edit { grid-template-columns: 1fr; }
+  .schematic-cell, .markdown-view, .markdown-edit { padding-left: 0; }
+  .gutter { width: 32px; }
+}
+
+/* ---------------------------------------------------------------- results of a run */
+
+.results {
+  margin-top: 12px;
+  border-collapse: separate;
+  border-spacing: 0;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  overflow: hidden;
+  font-size: 16px;
+  font-variant-numeric: tabular-nums;
+  transition: opacity 0.15s;
+}
+.results th {
+  padding: 8px 16px;
+  background: var(--hover);
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 500;
+  text-align: right;
+  white-space: nowrap;
+}
+.results td { padding: 7px 16px; border-top: 1px solid var(--line); text-align: right; white-space: nowrap; }
+.results th:first-child, .results td.name { text-align: left; }
+.results td.name { font-weight: 500; }
+.results td.name sub { font-size: 0.72em; }
+.results td.solved { color: var(--accent); font-weight: 600; }
+.results tbody tr:hover td { background: var(--hover); }
+.results.stale { opacity: 0.45; } /* from an older drawing: the run button is on again */
+
+/* warnings / errors: a sign on the board, next to the full screen button; a click unfolds them */
+.island.status { bottom: 12px; right: 104px; padding: 4px; }
+.island.static.status { position: relative; }
+.problems { position: relative; }
+.problems-sign { padding: 6px; }
+.problems.warning .problems-sign { color: var(--warn); background: var(--warn-bg); }
+.problems.error .problems-sign { color: var(--danger); background: var(--err-bg); }
+.problems-panel {
+  position: absolute;
+  bottom: calc(100% + 12px);
+  right: -4px;
+  z-index: 8;
+  width: min(420px, 80vw);
+  max-height: 320px;
+  overflow-y: auto;
+  padding: 12px 14px;
+  border-radius: 10px;
+  background: var(--island);
+  box-shadow: var(--island-shadow);
+  font-size: 15px;
+  white-space: normal; /* the island around it keeps its buttons on one line; text wraps */
+}
+.code-view .problems-panel { bottom: auto; top: calc(100% + 12px); }
+.problems-panel h4 { margin: 0 0 6px; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; }
+.problems.warning .problems-panel h4 { color: var(--warn); }
+.problems.error .problems-panel h4 { color: var(--danger); }
+.problems-panel .markdown p { margin: 4px 0; }
+.problems-panel .katex { white-space: nowrap; } /* break between names, never inside one */
+
+/* ---------------------------------------------------------------- loading: skeletons, then the content fades in */
+
+.note-skeleton .note-nav { opacity: 1; visibility: visible; transform: none; }
+.note-skeleton main { padding-top: 88px; }
+@media (max-width: 900px) { .note-skeleton .note-nav { display: none; } }
+
+/* ---------------------------------------------------------------- export to PDF */
+
+.export-backdrop {
+  position: fixed; inset: 0; z-index: 100; display: grid; place-items: center;
+  background: rgba(0, 0, 0, 0.45); animation: fade-in 0.15s ease both;
+}
+@keyframes fade-in { from { opacity: 0; } }
+.export-dialog {
+  position: relative;
+  display: grid; grid-template-columns: 1fr 320px; width: min(1180px, 94vw); height: min(860px, 90vh);
+  border-radius: 14px; overflow: hidden; background: var(--surface); border: 1px solid var(--line);
+  animation: appear 0.25s cubic-bezier(0.2, 0.8, 0.2, 1) backwards;
+}
+.export-preview { position: relative; min-height: 0; background: var(--hover); }
+/* the pages, as Typst set them (images), one under another; a new layout fades in over the old */
+.export-sheets { height: 100%; overflow-y: auto; padding: 24px 32px 64px; display: grid; justify-items: center; align-content: start; gap: 20px; }
+.export-sheets .sheet { width: min(100%, 640px); height: auto; background: #fff; border-radius: 2px;
+                        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.16), 0 6px 20px rgba(0, 0, 0, 0.1); transition: opacity 0.2s; }
+.export-preview.busy .sheet { opacity: 0.6; }
+.export-wait { margin: 0; position: absolute; inset: 0; display: grid; place-items: center; padding: 32px; text-align: center; color: var(--muted); }
+.export-wait.error { color: var(--danger); }
+/* the themes: a sample of each one's type */
+.theme-choice { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+.theme-choice button { display: grid; justify-items: start; gap: 0; padding: 8px 10px; border-radius: 10px; border: 1px solid var(--line); text-align: left; }
+.theme-choice button.on { border-color: var(--text); background: var(--selected); }
+.theme-choice .theme-sample { font-size: 22px; line-height: 1.2; }
+.theme-choice .theme-name { font-size: 13px; font-weight: 500; }
+.theme-choice small { font-size: 11px; line-height: 1.3; color: var(--muted); }
+.theme-classic .theme-sample { font-family: "Latin Modern Roman", "Computer Modern", Georgia, serif; }
+.theme-modern .theme-sample { font-family: Inter, var(--sans); font-weight: 600; }
+.theme-modern .theme-sample::after { content: ""; display: block; width: 16px; height: 3px; background: var(--primary); }
+.theme-elegant .theme-sample { font-family: "Libertinus Serif", "Palatino Linotype", Palatino, serif; font-variant: small-caps; }
+.export-pages {
+  position: absolute; left: 50%; bottom: 12px; transform: translateX(-50%); padding: 4px 12px; border-radius: 999px;
+  font-size: 13px; background: var(--surface); border: 1px solid var(--line); color: var(--muted);
+}
+.export-options { display: flex; flex-direction: column; gap: 18px; padding: 20px; overflow-y: auto; border-left: 1px solid var(--line); }
+.export-options h2 { margin: 0; font-size: 18px; font-weight: 600; }
+.export-group { display: grid; gap: 4px; }
+.export-group h3 { margin: 0 0 4px; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: var(--faint); }
+.export-toggle { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 7px 8px; border-radius: 8px; cursor: pointer; font-size: 15px; }
+.export-toggle:hover { background: var(--selected); }
+.export-toggle.disabled { opacity: 0.45; cursor: default; }
+.export-toggle > span { display: grid; }
+.export-toggle small { font-size: 12px; color: var(--muted); }
+/* a switch */
+.export-toggle input { appearance: none; flex: none; width: 34px; height: 20px; margin: 0; padding: 0; border: none; border-radius: 999px;
+                       background: var(--line); position: relative; cursor: inherit; transition: background 0.15s; }
+.export-toggle input::after { content: ""; position: absolute; top: 2px; left: 2px; width: 16px; height: 16px; border-radius: 50%;
+                              background: #fff; transition: transform 0.15s; box-shadow: 0 1px 2px rgba(0,0,0,.25); }
+.export-toggle input:checked { background: var(--primary); }
+.export-toggle input:checked::after { transform: translateX(14px); }
+.export-toggle input:focus { outline: none; }
+.export-choice { display: grid; gap: 6px; padding: 6px 8px; font-size: 15px; }
+.export-field { display: grid; gap: 6px; padding: 6px 8px; font-size: 15px; }
+.export-field.disabled { opacity: 0.45; }
+.export-field input { font: inherit; font-size: 14px; padding: 6px 10px; border-radius: 8px; border: 1px solid var(--line); background: var(--surface); color: var(--text); }
+.export-field input:focus { outline: none; border-color: var(--text); }
+.swatches { display: flex; flex-wrap: wrap; gap: 8px; }
+.swatches button { width: 24px; height: 24px; padding: 0; border-radius: 50%; border: 2px solid var(--surface); box-shadow: 0 0 0 1px var(--line); }
+.swatches button.on { box-shadow: 0 0 0 2px var(--text); }
+.segmented { display: flex; gap: 2px; padding: 2px; border-radius: 8px; background: var(--hover); }
+.segmented button { flex: 1; justify-content: center; padding: 5px 8px; white-space: nowrap; border-radius: 6px; font-size: 14px; color: var(--muted); }
+.segmented button.on { background: var(--surface); color: var(--text); box-shadow: 0 0 0 1px var(--line); }
+/* the downloads: always in view at the bottom of the options, however far they are scrolled */
+.export-actions { display: flex; gap: 8px; margin: auto -20px -20px; padding: 12px 20px 20px; position: sticky; bottom: -20px;
+                  background: var(--surface); border-top: 1px solid var(--line); }
+.export-actions button { flex: 1; justify-content: center; padding: 9px 12px; border-radius: 10px; border: 1px solid var(--line); font-weight: 500; }
+.export-actions button.primary { background: var(--primary); border-color: var(--primary); color: var(--on-primary); }
+.export-actions button.primary:hover { background: var(--primary-hover); }
+.export-note { margin: 0; font-size: 12px; color: var(--faint); }
+/* closing: an X in the top left corner, over the pages */
+.export-close { position: absolute; top: 12px; left: 12px; z-index: 2; width: 36px; height: 36px; padding: 0; border-radius: 10px;
+                background: var(--surface); box-shadow: var(--island-shadow); }
+@media (max-width: 800px) { .export-dialog { grid-template-columns: 1fr; grid-template-rows: 1fr auto; } }
