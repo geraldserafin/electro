@@ -43,39 +43,38 @@
   color-scheme: light;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --bg: #1e1e1e;
-    --paper: #1e1e1e;
-    --text: #e8eaed;
-    --muted: #9aa0a6;
-    --faint: #6f7378;
-    --line: #3c4043;
-    --hover: #2a2b2e;
-    --code-bg: #262729;
-    --accent: #8ab4f8;
-    --accent-soft: #1f2a3c;
-    --ok: #81c995;
-    --danger: #f28b82;
-    --warn-bg: #3a2e12;
-    --warn: #fdd663;
-    --err-bg: #3c1f1c;
-    --board: #1a1a1a;
-    --primary-hover: #ffc21a;
-    --surface: #262626;
-    --selected: #34353a;
-    --hl-keyword: #569cd6;
-    --hl-control: #c586c0;
-    --hl-string: #ce9178;
-    --hl-number: #b5cea8;
-    --hl-comment: #6a9955;
-    --hl-function: #dcdcaa;
-    --hl-class: #4ec9b0;
-    --hl-property: #9cdcfe;
-    --selection: #264f78;
-    --bracket: #3a3d41;
-    color-scheme: dark;
-  }
+/* dark: chosen, or the system's (theme.tsx sets data-theme either way) */
+:root[data-theme="dark"] {
+  --bg: #1e1e1e;
+  --paper: #1e1e1e;
+  --text: #e8eaed;
+  --muted: #9aa0a6;
+  --faint: #6f7378;
+  --line: #3c4043;
+  --hover: #2a2b2e;
+  --code-bg: #262729;
+  --accent: #8ab4f8;
+  --accent-soft: #1f2a3c;
+  --ok: #81c995;
+  --danger: #f28b82;
+  --warn-bg: #3a2e12;
+  --warn: #fdd663;
+  --err-bg: #3c1f1c;
+  --board: #1a1a1a;
+  --primary-hover: #ffc21a;
+  --surface: #262626;
+  --selected: #34353a;
+  --hl-keyword: #569cd6;
+  --hl-control: #c586c0;
+  --hl-string: #ce9178;
+  --hl-number: #b5cea8;
+  --hl-comment: #6a9955;
+  --hl-function: #dcdcaa;
+  --hl-class: #4ec9b0;
+  --hl-property: #9cdcfe;
+  --selection: #264f78;
+  --bracket: #3a3d41;
+  color-scheme: dark;
 }
 
 * { box-sizing: border-box; }

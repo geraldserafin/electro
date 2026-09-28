@@ -15,6 +15,7 @@ import { kernel } from "./python/kernel";
 import { usePython } from "./python/usePython";
 import symbols from "./schematic/symbols.json";
 import { newCell } from "./storage";
+import { ThemeButton } from "./theme";
 import type { Cell, CellType, Notebook as NotebookData, SchematicData, SymbolLibrary } from "./types";
 
 // generated from electro_render.symbol_library() (scripts/make_symbols.py), so drawings
@@ -172,6 +173,7 @@ export function Notebook({ initial, revision, reload, onSaved }: {
         <button className="float icon-button" onClick={() => setExporting(true)} title="Eksport do PDF" aria-label="Eksport PDF">
           <Export />
         </button>
+        <ThemeButton />
       </div>
       <SyncNotice state={sync.state} onKeepMine={sync.keepMine} onTakeTheirs={sync.takeTheirs} />
       {exporting && (

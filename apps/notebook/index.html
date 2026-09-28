@@ -7,6 +7,14 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Roboto+Mono:wght@400;500&family=Roboto:wght@400;500;700&display=swap" />
     <title>Notatnik elektroniki</title>
+    <script>
+      // the theme (as theme.tsx sets it), before the first paint: the one chosen, or the system's
+      {
+        let theme; try { theme = localStorage.getItem("electro-theme"); } catch {}
+        document.documentElement.dataset.theme = theme === "light" || theme === "dark" ? theme
+          : matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+      }
+    </script>
   </head>
   <body>
     <div id="root"></div>

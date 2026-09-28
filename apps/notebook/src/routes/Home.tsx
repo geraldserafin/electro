@@ -12,6 +12,7 @@ import { useCreateNote } from "../notes/create";
 import { Card, when } from "../notes/Gallery";
 import { CardSkeletons } from "../Skeletons";
 import { upload } from "../storage";
+import { ThemeButton } from "../theme";
 
 export function Home() {
   const notes = useAtomValue(notesAtom);
@@ -42,6 +43,7 @@ export function Home() {
                 title="Otwórz plik .electro.json jako nową notatkę" aria-label="Otwórz plik"><Upload /></button>
         <input ref={fileInput} type="file" accept=".json" hidden
                onChange={(e) => { const file = e.target.files?.[0]; e.target.value = ""; if (file) void start(async () => copyOf(await upload(file))); }} />
+        <ThemeButton />
       </div>
 
       <div className="gallery">
