@@ -12,9 +12,10 @@ import { ThemeButton } from "@/features/theme";
 import { blank, copyOf, upload } from "@/shared/model/format";
 import { Upload } from "@/shared/ui/icons";
 import { Brand, IslandButton, Islands } from "@/shared/ui/Island";
+import { cn } from "@/shared/lib/cn";
 
 const grid = "m-0 p-0 list-none grid grid-cols-[repeat(auto-fill,212px)] gap-x-6 gap-y-7";
-const note = "mt-6 text-[14px]";
+const note = "mt-6 text-[14px] text-muted";
 
 export function Home() {
   const { t } = useTranslation("pages", { keyPrefix: "home" });
@@ -50,7 +51,7 @@ export function Home() {
 
       <div className="mx-auto max-w-310 px-8 pt-21 pb-24">
         <h1 className="mt-0 mb-5 text-[22px] font-medium">{t("notes")}</h1>
-        {problem && <p className={`${note} text-danger`}>{problem}</p>}
+        {problem && <p className={cn(note, "text-danger")}>{problem}</p>}
         <ul className={grid} aria-label={t("notes")}>
           <NewCard onClick={() => start(async () => blank())} />
           {Result.builder(notes)
@@ -74,7 +75,7 @@ export function Home() {
             }))
             .render()}
         </ul>
-        {Result.isFailure(notes) && <p className={`${note} text-muted`}>{t("listUnavailable")}</p>}
+        {Result.isFailure(notes) && <p className={note}>{t("listUnavailable")}</p>}
 
         <h2 className="mt-12 mb-4 text-[16px] font-medium text-muted">{t("examples")}</h2>
         <ul className={grid} aria-label={t("examples")}>

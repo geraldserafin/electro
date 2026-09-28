@@ -1,9 +1,10 @@
 // What a code cell printed. data-output: which kind (the tests find them by it).
 import type { Output } from "@/shared/model/types";
 import { Markdown } from "@/shared/ui/Markdown";
+import { cn } from "@/shared/lib/cn";
 
-const box = (size = "text-[16px]") => `m-0 px-2.5 py-1.5 rounded-md ${size}`;
-export const errorBox = (size?: string) => `${box(size)} overflow-x-auto whitespace-pre-wrap bg-err-bg text-danger`;
+const box = "m-0 px-2.5 py-1.5 rounded-md text-[16px]";
+export const errorBox = cn(box, "overflow-x-auto whitespace-pre-wrap bg-err-bg text-danger");
 
 export function Outputs({ outputs }: { outputs: Output[] }) {
   if (!outputs.length) return null;
@@ -18,11 +19,11 @@ export function Outputs({ outputs }: { outputs: Output[] }) {
           case "markdown":
             return <Markdown key={i} source={o.data} />;
           case "error":
-            return <pre key={i} data-output="error" className={errorBox()}>{o.data}</pre>;
+            return <pre key={i} data-output="error" className={errorBox}>{o.data}</pre>;
           case "warning":
-            return <div key={i} data-output="warning" className={`${box()} bg-warn-bg text-warn`}>⚠ {o.data}</div>;
+            return <div key={i} data-output="warning" className={cn(box, "bg-warn-bg text-warn")}>⚠ {o.data}</div>;
           default:
-            return <pre key={i} data-output="text" className={`${box()} overflow-x-auto whitespace-pre-wrap font-mono`}>{o.data}</pre>;
+            return <pre key={i} data-output="text" className={cn(box, "overflow-x-auto whitespace-pre-wrap font-mono")}>{o.data}</pre>;
         }
       })}
     </div>

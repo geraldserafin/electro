@@ -2,8 +2,8 @@
 // screens the sidebar covers the note instead). Shared with the skeleton shown while it loads.
 const ease = "ease-[cubic-bezier(0.2,0.8,0.2,1)] duration-250 motion-reduce:transition-none";
 
-export const column = (withSidebar: boolean, top = "pt-18") =>
-  `mx-auto max-w-280 px-6 ${top} pb-30 transition-[padding-left,max-width] ${ease} ` +
+export const column = (withSidebar: boolean) =>
+  `mx-auto max-w-280 px-6 pt-18 pb-30 transition-[padding-left,max-width] ${ease} ` +
   (withSidebar ? "min-[901px]:max-w-[calc(1120px+312px)] min-[901px]:pl-[calc(24px+312px)]" : "");
 
 export const sidebar = (open: boolean) =>

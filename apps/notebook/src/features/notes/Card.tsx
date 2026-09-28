@@ -8,6 +8,7 @@ import type { SymbolLibrary } from "@/shared/model/types";
 import { useClickOutside } from "@/shared/hooks/useClickOutside";
 import { More, Plus } from "@/shared/ui/icons";
 import { PagePreview } from "./PagePreview";
+import { cn } from "@/shared/lib/cn";
 
 // the card is a link or a button: neither looks like one (legacy.css styles every button)
 const open = "group/open grid content-start gap-0.5 p-0 border-0 rounded-none bg-transparent text-inherit text-left cursor-pointer no-underline";
@@ -33,7 +34,7 @@ export function Card({ to, onClick, id, title: name, meta, preview, library, act
   useClickOutside(ref, menu, useCallback(() => setMenu(false), []));
   const body: ReactNode = (
     <>
-      <span className={`${thumb} bg-white shadow-island group-hover:shadow-lift`}>
+      <span className={cn(thumb, "bg-white shadow-island group-hover:shadow-lift")}>
         <PagePreview preview={preview} library={library} />
       </span>
       <span className={title}>{name}</span>
@@ -54,7 +55,7 @@ export function Card({ to, onClick, id, title: name, meta, preview, library, act
             <div role="menu" className="absolute z-30 top-10.5 right-2 grid min-w-45 py-1.5 rounded-lg bg-paper shadow-menu">
               {actions.map((a) => (
                 <button key={a.label} role="menuitem" onClick={() => { setMenu(false); a.run(); }}
-                        className={`justify-start px-4 py-1.75 rounded-none text-left whitespace-nowrap ${a.danger ? "text-danger" : ""}`}>
+                        className={cn("justify-start px-4 py-1.75 rounded-none text-left whitespace-nowrap", a.danger && "text-danger")}>
                   {a.label}
                 </button>
               ))}
@@ -71,8 +72,8 @@ export function NewCard({ onClick }: { onClick: () => void }) {
   const { t } = useTranslation("notes");
   return (
     <li className="grid">
-      <button className={`group ${open}`} onClick={onClick}>
-        <span className={`${thumb} border-[1.5px] border-dashed border-faint text-muted group-hover:border-fg group-hover:text-fg [&_svg]:size-7`}>
+      <button className={cn("group", open)} onClick={onClick}>
+        <span className={cn(thumb, "border-[1.5px] border-dashed border-faint text-muted group-hover:border-fg group-hover:text-fg [&_svg]:size-7")}>
           <Plus />
         </span>
         <span className={title}>{t("newNote")}</span>

@@ -3,31 +3,32 @@
 import type { ButtonHTMLAttributes, ReactNode } from "react";
 import { Link, type LinkProps } from "react-router";
 import { Bolt } from "./icons";
+import { cn } from "@/shared/lib/cn";
 
 const corner = { left: "left-3", right: "right-3" };
 
 /** A row of islands in a top corner of the page. */
 export function Islands({ side, children }: { side: "left" | "right"; children: ReactNode }) {
-  return <div data-keep-focus className={`fixed top-3 z-20 flex gap-2 ${corner[side]}`}>{children}</div>;
+  return <div data-keep-focus className={cn("fixed top-3 z-20 flex gap-2", corner[side])}>{children}</div>;
 }
 
 /** An island: a flat tile one step off the page, holding a few things in a row. */
 export function Island({ children, className = "" }: { children: ReactNode; className?: string }) {
   return (
-    <div className={`flex items-center gap-0.5 p-1 rounded-xl border border-line bg-surface ${className}`}>{children}</div>
+    <div className={cn("flex items-center gap-0.5 p-1 rounded-xl border border-line bg-surface", className)}>{children}</div>
   );
 }
 
 // an island that is one button (or link); `on`: its panel is open
 const button = (on?: boolean) =>
-  "inline-flex flex-none items-center justify-center size-11.5 p-0 rounded-xl border border-line text-fg no-underline " +
-  `hover:bg-selected ${on ? "bg-selected" : "bg-surface"}`;
+  cn("inline-flex flex-none items-center justify-center size-11.5 p-0 rounded-xl border border-line bg-surface text-fg no-underline",
+     "hover:bg-selected", on && "bg-selected");
 
 export function IslandButton({ on, waiting, className = "", ...props }: ButtonHTMLAttributes<HTMLButtonElement> & {
   on?: boolean;
   waiting?: boolean; // what it does is not ready yet (Python is starting): it blinks
 }) {
-  return <button {...props} className={`${button(on)} ${waiting ? "animate-blink" : ""} ${className}`} />;
+  return <button {...props} className={cn(button(on), waiting && "animate-blink", className)} />;
 }
 
 export function IslandLink(props: LinkProps) {

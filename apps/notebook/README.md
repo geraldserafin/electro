@@ -73,17 +73,19 @@ nie `@/features/schematic/Editor`); wewnątrz plastra importy są względne. `@/
 | `features/theme/` | motyw jasny / ciemny / systemowy |
 | `python/electro_notebook/kernel.py` | (Python) wykonuje komórki, zamienia wyniki na wyjścia (`_repr_svg_`, `_repr_markdown_`, `_repr_latex_`) |
 
-**Style.** Tailwind v4 (`src/app/styles.css`): kolory to tokeny aplikacji (`bg-surface`, `text-muted`,
-`border-line`… — jasne i ciemne w `legacy.css`), innych kolorów nie ma. Plastry przepisane na Tailwinda:
-`notes`, `notebook` (i strony, i wyspy w `shared/ui/Island`). Reszta (`schematic`, `pdf-export`) wciąż korzysta z `legacy.css` (w warstwie `base`, więc każda klasa Tailwinda z nim wygrywa);
-bez preflightu, dopóki `legacy.css` nie zniknie. To, czego nie da się sensownie zapisać klasami (np. strona
-PDF w miniaturze, która przestawia tokeny i styluje cudzy Markdown), leży obok komponentu jako `*.css` w
-`@layer components`. Dwie klasy na tę samą właściwość na jednym elemencie (np. `text-left` i `text-right`) się
-gryzą — o wyniku decyduje kolejność w CSS Tailwinda, nie w atrybucie — więc warianty wybiera się warunkiem.
+**Style.** Tailwind v4 (`src/app/styles.css`). Kolory to wyłącznie tokeny aplikacji (`bg-surface`, `text-muted`,
+`border-line`…; jasne i ciemne wartości są w `legacy.css`). Klasy składa się przez `cn()` (`shared/lib/cn`: clsx +
+tailwind-merge) — z dwóch klas na tę samą właściwość wygrywa wtedy późniejsza; bez niego o wyniku decyduje kolejność
+w CSS Tailwinda, nie w atrybucie. To, czego nie da się sensownie zapisać klasami (np. miniatura strony PDF, która
+przestawia tokeny i styluje cudzy Markdown), leży obok komponentu jako `*.css` w `@layer components`.
+
+Przepisane: `notes`, `notebook`, strony, `shared/ui`. `schematic` i `pdf-export` wciąż korzystają z `legacy.css`
+(w warstwie `base`, więc każda klasa Tailwinda z nim wygrywa); preflight włączymy, gdy `legacy.css` zniknie.
+
 Testy e2e szukają elementów po rolach, etykietach i atrybutach `data-*` (np. `data-cell`, `data-output`), nie po klasach.
 
-**Języki.** i18next: każdy plaster ma `messages.ts` (`pl` i `en` o tym samym kształcie — pilnuje TypeScript)
-jako swoją przestrzeń nazw; `src/app/i18n.ts` je zbiera. Na razie tylko polski, dopóki wszystkie plastry
-nie mają swoich tekstów.
+**Języki.** i18next: każdy plaster ma `messages.ts` (`pl` i `en` o tym samym kształcie — pilnuje TypeScript) jako
+swoją przestrzeń nazw; `src/app/i18n.ts` je zbiera. Przełącznik PL/EN jest w wyspach; wybór zostaje w przeglądarce,
+domyślnie polski (język przeglądarki — gdy wszystkie plastry będą przetłumaczone).
 
 Przy `devenv up` zmiany w `packages/` wystarczy odświeżyć w przeglądarce. Przy samym `pnpm dev` `bundle.json` powstaje tylko przy starcie (albo użyj `pnpm python --watch`).

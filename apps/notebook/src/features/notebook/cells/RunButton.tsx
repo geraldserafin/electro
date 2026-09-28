@@ -2,6 +2,7 @@
 import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { Play } from "@/shared/ui/icons";
+import { cn } from "@/shared/lib/cn";
 
 export const gutter = "w-10 max-[760px]:w-8 flex-none grid justify-items-center gap-0.5 pt-0.5";
 
@@ -22,8 +23,8 @@ export function RunButton({ run, running, label, execution, done, eager, icon = 
   return (
     <div className={gutter}>
       <button onClick={run} disabled={running || done} title={done ? t("schematic.upToDate") : label} aria-label={label}
-              className={`size-7.5 p-0 justify-center rounded-full border hover:enabled:bg-primary-hover hover:enabled:border-primary-hover
-                          ${look} ${running ? "animate-blink" : ""}`}>
+              className={cn("size-7.5 p-0 justify-center rounded-full border hover:enabled:bg-primary-hover hover:enabled:border-primary-hover",
+                             look, running && "animate-blink")}>
         {icon}
       </button>
       {execution !== undefined && !running && <span className="font-mono text-[13px] text-faint">[{execution}]</span>}

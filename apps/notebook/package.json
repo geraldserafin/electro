@@ -24,6 +24,7 @@
     "@myriaddreamin/typst-ts-renderer": "0.7.0",
     "@myriaddreamin/typst-ts-web-compiler": "0.7.0",
     "@uiw/react-codemirror": "^4.25.12",
+    "clsx": "^2.1.1",
     "effect": "3.22.2",
     "i18next": "^26.4.2",
     "katex": "^0.18.9",
@@ -37,6 +38,7 @@
     "remark-math": "^6.0.0",
     "remark-parse": "^11.0.0",
     "scheduler": "^0.28.0",
+    "tailwind-merge": "^3.7.0",
     "unified": "^11.0.5"
   },
   "devDependencies": {

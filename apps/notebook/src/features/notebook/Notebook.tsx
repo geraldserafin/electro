@@ -23,6 +23,7 @@ import { Sidebar } from "./Sidebar";
 import { useOutlineOpen } from "./useOutlineOpen";
 import { usePrintKey } from "./usePrintKey";
 import { useRunner } from "./useRunner";
+import { cn } from "@/shared/lib/cn";
 
 /**
  * ``initial``/``revision``: the note as read from the server; ``reload``: read it again (after a
@@ -102,7 +103,7 @@ export function Notebook({ initial, revision, reload, onSaved }: {
       )}
 
       <PdfContext.Provider value={pdf}>
-      <main className={`appear ${column(outline)}`}>
+      <main className={cn("appear", column(outline))}>
         {/* the title is the note's first heading too (and the PDF's); in line with the cells' text */}
         <input className="block w-full mt-0 mb-1 py-1 pr-2 pl-16.25 rounded-lg border-none bg-transparent text-[34px] font-semibold leading-tight
                           placeholder:text-faint focus:outline-none focus:bg-hover"

@@ -13,6 +13,7 @@ import { Problems } from "./Problems";
 import { ResultsTable } from "./ResultsTable";
 import { RunButton } from "./RunButton";
 import { ViewSwitch } from "./ViewSwitch";
+import { cn } from "@/shared/lib/cn";
 
 /**
  * A schematic: the board to draw it on (or its code). The board is always there — its grid, the
@@ -139,7 +140,7 @@ export function SchematicCell({ cell, update, library, simulate, running }: {
               ? <p className="m-2 text-muted">{t("schematic.toCode")}</p>
               : <CodeEditor value={source} onChange={setSource} minHeight={120} />}
           </div>
-          {error && <pre data-output="error" className={errorBox("text-[14px]")}>{error}</pre>}
+          {error && <pre data-output="error" className={cn(errorBox, "text-[14px]")}>{error}</pre>}
         </div>
       )}
       {/* the PDF shows the circuit as drawn; results belong to code cells: schematic(układ1, sol) */}
