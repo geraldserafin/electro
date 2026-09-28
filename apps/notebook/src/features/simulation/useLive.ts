@@ -92,6 +92,8 @@ export function useLive(schematic: SchematicData) {
   const serialText = useRef("");
   const statusRef = useRef(status);
   statusRef.current = status;
+  // each LED's charge since the board was last drawn: its glow is the average current, so PWM dims it
+  const glow = useRef({ since: 0, last: 0, charge: new Map<string, number>() });
 
   const applyInputs = useCallback(() => {
     const s = session.current;
@@ -113,7 +115,11 @@ export function useLive(schematic: SchematicData) {
       const current = quantities.I ?? quantities.I_C ?? quantities.I_5V;
       const voltage = quantities.U ?? quantities.U_BE;
       const I = current === undefined ? null : sim.x[current];
-      if (kind === "LED" && I !== null) leds[id] = Math.min(1, Math.max(0, I / 0.02));
+      if (kind === "LED" && I !== null) {
+        const span = sim.t - glow.current.since;
+        const mean = span > 0 && glow.current.charge.has(id) ? glow.current.charge.get(id)! / span : I;
+        leds[id] = Math.min(1, Math.max(0, mean / 0.02));
+      }
       results[id] = {
         value: "", solved: false,
         U: voltage === undefined ? null : si(Math.abs(sim.x[voltage]), "V"),
@@ -122,6 +128,7 @@ export function useLive(schematic: SchematicData) {
         reversed: I !== null && I < 0,
       };
     }
+    glow.current = { since: sim.t, last: sim.t, charge: new Map() };
     setFrame((f) => ({
       t: sim.t, voltages, scale, leds, results, behind: f?.behind ?? false,
       wires: c.wires.map((node) => (node === null ? null : voltages[node] ?? null)),
@@ -131,8 +138,16 @@ export function useLive(schematic: SchematicData) {
 
   /** Samples for the scope: at most SCOPE_POINTS over its window (the last second, at the speed chosen). */
   const record = useCallback(() => {
-    const s = session.current;
-    if (!s) return;
+    const s = session.current, c = circuit.current;
+    if (!s || !c) return;
+    const g = glow.current, dt = s.sim.t - g.last;
+    if (dt > 0) {
+      for (const [id, kind] of Object.entries(c.program.kinds)) {
+        const i = c.program.parts[id]?.I;
+        if (kind === "LED" && i !== undefined) g.charge.set(id, (g.charge.get(id) ?? 0) + Math.max(0, s.sim.x[i]) * dt);
+      }
+      g.last = s.sim.t;
+    }
     const window = Math.max(1e-4, speedRef.current * 2);
     for (const name of scopeRef.current) {
       let trace = history.current.get(name);
@@ -186,6 +201,7 @@ export function useLive(schematic: SchematicData) {
       }
       circuit.current = compiled;
       session.current = new Session(compiled);
+      glow.current = { since: 0, last: 0, charge: new Map() };
       built.current = structure(latest.current);
       history.current.clear();
       serialText.current = "";
@@ -294,6 +310,8 @@ export function useLive(schematic: SchematicData) {
     },
     upload,
     clearSerial: () => { serialText.current = ""; setSerial(""); },
+    /** Text typed into the serial monitor: to every Arduino's Serial.read(). */
+    sendSerial: (text: string) => { for (const board of session.current?.boards ?? []) board.uno.send(text); },
   };
 }
 

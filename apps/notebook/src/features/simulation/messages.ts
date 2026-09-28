@@ -34,6 +34,8 @@ export const pl = {
     serial: "Monitor portu szeregowego",
     clear: "Wyczyść",
     serialEmpty: "Nic jeszcze nie przyszło (Serial.begin(9600) i Serial.println(…) w szkicu).",
+    sendPlaceholder: "Tekst do Arduino (Serial.read)…",
+    send: "Wyślij",
   },
 };
 
@@ -73,5 +75,7 @@ export const en: typeof pl = {
     serial: "Serial monitor",
     clear: "Clear",
     serialEmpty: "Nothing yet (Serial.begin(9600) and Serial.println(…) in the sketch).",
+    sendPlaceholder: "Text to the Arduino (Serial.read)…",
+    send: "Send",
   },
 };

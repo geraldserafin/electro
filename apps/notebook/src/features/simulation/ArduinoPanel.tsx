@@ -1,5 +1,6 @@
 // Under a schematic with an Arduino: its sketch (C++, kept in the element's text), uploaded to the
 // emulated chip while the circuit runs, and what the chip writes to its serial port.
+import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { CodeEditor } from "@/features/notebook/cells/CodeEditor";
 import { editorFrame } from "@/features/notebook/cells/CodeCell";
@@ -13,6 +14,7 @@ export function ArduinoPanel({ element, live, onChange }: {
   onChange: (sketch: string) => void;
 }) {
   const { t } = useTranslation("simulation");
+  const [typed, setTyped] = useState("");
   const state = live.sketches[element.id];
   const running = live.status === "running" || live.status === "paused";
   const sketch = element.text ?? "";
@@ -53,6 +55,12 @@ export function ArduinoPanel({ element, live, onChange }: {
                ref={(el) => { if (el) el.scrollTop = el.scrollHeight; }}>
             {live.serial || <span className="text-faint">{t("arduino.serialEmpty")}</span>}
           </pre>
+          <form className="flex gap-1.5" onSubmit={(e) => { e.preventDefault(); live.sendSerial(`${typed}\n`); setTyped(""); }}>
+            <input className="flex-1 rounded-lg bg-hover px-2.5 py-1 font-mono text-[13px] focus:bg-paper focus:outline-2 focus:outline-accent-soft"
+                   value={typed} onChange={(e) => setTyped(e.target.value)} placeholder={t("arduino.sendPlaceholder")}
+                   aria-label={t("arduino.sendPlaceholder")} spellCheck={false} />
+            <button className="rounded-lg bg-hover px-2.5 py-1 text-[13px] hover:bg-selected">{t("arduino.send")}</button>
+          </form>
         </div>
       )}
     </section>

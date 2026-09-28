@@ -9,7 +9,8 @@
     "build": "node scripts/bundle-python.mjs && tsc -b && vite build",
     "typecheck": "tsc -b",
     "test:pyodide": "node scripts/bundle-python.mjs && node scripts/test-pyodide.mjs",
-    "test:e2e": "pnpm build && node scripts/test-e2e.mjs"
+    "test:e2e": "pnpm build && node scripts/test-e2e.mjs",
+    "test": "vitest run"
   },
   "dependencies": {
     "@codemirror/autocomplete": "6.20.3",
@@ -53,6 +54,7 @@
     "pyodide": "314.0.7",
     "tailwindcss": "^4.3.3",
     "typescript": "^7.0.2",
-    "vite": "^8.3.1"
+    "vite": "^8.3.1",
+    "vitest": "^5.0.2"
   }
 }
