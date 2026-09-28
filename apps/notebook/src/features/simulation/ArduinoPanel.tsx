@@ -1,11 +1,12 @@
 // Under a schematic with an Arduino: its sketch (C++, kept in the element's text), uploaded to the
 // emulated chip while the circuit runs, and what the chip writes to its serial port.
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { CodeEditor } from "@/features/notebook/cells/CodeEditor";
 import { editorFrame } from "@/features/notebook/cells/CodeCell";
 import type { ElementData } from "@/shared/model/types";
 import { Upload } from "@/shared/ui/icons";
+import { compiler } from "./compiler";
 import type { Live } from "./useLive";
 
 export function ArduinoPanel({ element, live, onChange }: {
@@ -15,6 +16,8 @@ export function ArduinoPanel({ element, live, onChange }: {
 }) {
   const { t } = useTranslation("simulation");
   const [typed, setTyped] = useState("");
+  // an Arduino on the board: the compiler starts loading now, so the first upload does not wait for it
+  useEffect(() => { compiler.load().catch(() => {}); }, []);
   const state = live.sketches[element.id];
   const running = live.status === "running" || live.status === "paused";
   const sketch = element.text ?? "";
@@ -25,6 +28,7 @@ export function ArduinoPanel({ element, live, onChange }: {
     : state.kind === "compiling" ? t("arduino.compiling")
     : state.kind === "running" ? (changed ? t("arduino.changed") : t("arduino.running"))
     : state.kind === "failed" ? t("arduino.failed")
+    : state.kind === "tooBig" ? t("arduino.tooBig", { size: state.size, flash: state.flash })
     : t(`arduino.${state.kind}`);
   return (
     <section className="mt-2 grid gap-2 rounded-xl border border-line p-2.5" aria-label={t("arduino.title", { id: element.id })}>

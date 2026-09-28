@@ -17,7 +17,7 @@ let
   };
 in
 {
-  packages = [ pkgs.uv pkgs.arduino-cli ];
+  packages = [ pkgs.uv pkgs.arduino-cli pkgs.git-lfs ]; # git-lfs: the in-page Arduino compiler (public/arduino/*.wasm)
 
   env = pkgs.lib.optionalAttrs (pkgs.stdenv.isDarwin && pkgs.stdenv.isAarch64) {
     ARDUINO_COMPILER_PATH = "${avrToolchain}/bin/";

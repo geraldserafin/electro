@@ -9,6 +9,7 @@ import { kernel } from "@/features/python";
 import type { ElementData, ElementResult, SchematicData } from "@/shared/model/types";
 import type { Failure } from "@/shared/model/issues";
 import { compileSketch } from "./atoms";
+import { compiler } from "./compiler";
 import { NoConvergence, type LiveCircuit } from "./engine";
 import { si } from "./format";
 import { Session } from "./session";
@@ -36,8 +37,9 @@ export interface ScopeTrace {
 /** An Arduino's sketch as it goes to the chip: compiling, running, or what the compiler said. */
 export type SketchState =
   | { kind: "compiling" }
-  | { kind: "running"; sketch: string }
+  | { kind: "running"; sketch: string; where: "page" | "server" } // where it was compiled
   | { kind: "failed"; output: string }
+  | { kind: "tooBig"; size: number; flash: number }
   | { kind: "unavailable" | "signedOut" | "unreachable" };
 
 const FRAME_BUDGET = 12; // ms of computing per frame at most (else the simulation falls behind)
@@ -169,8 +171,26 @@ export function useLive(schematic: SchematicData) {
     if (!s || !element) return;
     const sketch = element.text ?? "";
     setSketches((all) => ({ ...all, [id]: { kind: "compiling" } }));
-    const exit = await compile({ payload: { sketch } });
+    const run = (hex: string, where: "page" | "server") => {
+      const at = s.boards.findIndex((b) => b.label === id);
+      if (at >= 0) s.boards.splice(at, 1); // a new sketch: the chip starts over
+      s.attach(id, hex).uno.onSerial = (c) => {
+        serialText.current = (serialText.current + c).slice(-4000);
+      };
+      setSketches((all) => ({ ...all, [id]: { kind: "running", sketch, where } }));
+    };
+    // in the page first; the server only if the page's compiler could not be loaded
+    const local = await compiler.compile(sketch).catch(() => null);
     if (session.current !== s) return; // stopped meanwhile
+    if (local) {
+      if ("hex" in local) run(local.hex, "page");
+      else setSketches((all) => ({
+        ...all, [id]: "failed" in local ? { kind: "failed", output: local.failed } : { kind: "tooBig", size: local.tooBig, flash: local.flash },
+      }));
+      return;
+    }
+    const exit = await compile({ payload: { sketch } });
+    if (session.current !== s) return;
     if (exit._tag === "Failure") {
       const e = failure(exit.cause);
       const state: SketchState = e?._tag === "CompileFailed" ? { kind: "failed", output: (e as { output: string }).output }
@@ -180,12 +200,7 @@ export function useLive(schematic: SchematicData) {
       setSketches((all) => ({ ...all, [id]: state }));
       return;
     }
-    const at = s.boards.findIndex((b) => b.label === id);
-    if (at >= 0) s.boards.splice(at, 1); // a new sketch: the chip starts over
-    s.attach(id, exit.value.hex).uno.onSerial = (c) => {
-      serialText.current = (serialText.current + c).slice(-4000);
-    };
-    setSketches((all) => ({ ...all, [id]: { kind: "running", sketch } }));
+    run(exit.value.hex, "server");
   }, [compile]);
 
   const start = useCallback(async () => {

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import { prepare } from "../src/Arduino.js"
+import { prepareSketch as prepare } from "@electro/notes-api"
 
 describe("prepare", () => {
   it("declares every function above the first one, keeping the sketch's line numbers", () => {

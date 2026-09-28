@@ -1,10 +1,10 @@
 /** Sketches compiled with arduino-cli (board arduino:avr:uno), one at a time, each in a directory of
  *  its own that is removed afterwards; the same sketch twice is compiled once (kept in memory).
  *
- *  The sketch goes in as C++ (prepared here, like the Arduino IDE would), so arduino-cli's own
+ *  The sketch goes in as C++ (prepareSketch, @electro/notes-api: as the Arduino IDE would), so arduino-cli's own
  *  preprocessing — ctags, which differs from build to build — has nothing to do. */
 import { HttpApiBuilder } from "@effect/platform"
-import { CompileFailed, CompilerUnavailable, NotesApi } from "@electro/notes-api"
+import { CompileFailed, CompilerUnavailable, NotesApi, prepareSketch } from "@electro/notes-api"
 import { Config, Effect } from "effect"
 import { execFile } from "node:child_process"
 import { createHash } from "node:crypto"
@@ -18,40 +18,6 @@ const CACHE_SIZE = 200
 
 type Outcome = { hex: string } | { failed: string } | { unavailable: true }
 
-/** What the Arduino IDE does to a sketch: ``#include <Arduino.h>`` on top, and a prototype of each
- *  function before the first one, so a function may be called above its definition. ``#line``
- *  keeps the compiler's line numbers the sketch's own. */
-export function prepare(sketch: string): string {
-  const blank = (m: string) => m.replace(/[^\n]/g, " ")
-  // what to look at: no comments, strings or preprocessor lines (same length, same lines)
-  const code = sketch
-    .replace(/\/\*[\s\S]*?\*\/|\/\/[^\n]*|"(?:\\.|[^"\\\n])*"|'(?:\\.|[^'\\\n])*'/g, blank)
-    .replace(/^[ \t]*#[^\n]*/gm, blank)
-  const prototypes: string[] = []
-  let first = -1, depth = 0, start = 0
-  for (let i = 0; i < code.length; i++) {
-    const c = code[i]
-    if (c === "{") {
-      if (depth === 0) {
-        const head = code.slice(start, i).replace(/\s+/g, " ").trim()
-        const m = head.match(/^((?:[A-Za-z_][\w:<>,]*[\s*&]+)+)([A-Za-z_]\w*)\s*\(([^()]*)\)(\s*const)?$/)
-        if (m && !/\b(struct|class|enum|union|namespace|typedef|if|while|for|switch|return)\b/.test(m[1]) && !m[3].includes("=")) {
-          prototypes.push(`${m[1].trim()} ${m[2]}(${m[3].trim()});`)
-          if (first < 0) first = start + code.slice(start, i).search(/\S/)
-        }
-      }
-      depth++
-    } else if (c === "}") {
-      depth--
-      if (depth === 0) start = i + 1
-    } else if (c === ";" && depth === 0) start = i + 1
-  }
-  // the prototypes go on their own lines, just above the line the first function starts on
-  const at = first < 0 ? sketch.length : sketch.lastIndexOf("\n", first - 1) + 1
-  const line = sketch.slice(0, at).split("\n").length
-  return `#include <Arduino.h>\n#line 1 "sketch.ino"\n${sketch.slice(0, at)}${prototypes.map((p) => `${p}\n`).join("")}` +
-    `#line ${line} "sketch.ino"\n${sketch.slice(at)}`
-}
 
 function compile(cli: string, properties: string[], sketch: string): Promise<Outcome> {
   return (async () => {
@@ -60,7 +26,7 @@ function compile(cli: string, properties: string[], sketch: string): Promise<Out
       const src = join(dir, "sketch")
       await mkdir(src)
       await writeFile(join(src, "sketch.ino"), "") // the sketch itself is the C++ file next to it
-      await writeFile(join(src, "sketch_code.cpp"), prepare(sketch))
+      await writeFile(join(src, "sketch_code.cpp"), prepareSketch(sketch))
       const out = join(dir, "out")
       return await new Promise<Outcome>((resolve) => {
         const args = ["compile", "--fqbn", FQBN, "--output-dir", out, ...properties.flatMap((p) => ["--build-property", p]), src]
