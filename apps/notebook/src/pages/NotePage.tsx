@@ -3,11 +3,14 @@
 import { useAtomSet } from "@effect-atom/atom-react";
 import { Exit } from "effect";
 import { useEffect, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { Link, useNavigate, useParams } from "react-router";
 import { Notebook, NoteSkeleton } from "@/features/notebook";
 import { failure, fromDocument, getNote } from "@/features/notes";
 import type { Notebook as NotebookData } from "@/shared/model/types";
 import { Back } from "@/shared/ui/icons";
+import { IslandLink, Islands } from "@/shared/ui/Island";
+import { PageMessage } from "@/shared/ui/PageMessage";
 
 type Loaded =
   | { kind: "loading" }
@@ -16,6 +19,8 @@ type Loaded =
   | { kind: "unreachable" };
 
 export function NotePage() {
+  const { t } = useTranslation("pages", { keyPrefix: "note" });
+  const { t: tNote } = useTranslation("notebook");
   const { ref = "" } = useParams();
   const navigate = useNavigate();
   const get = useAtomSet(getNote, { mode: "promiseExit" });
@@ -61,35 +66,26 @@ export function NotePage() {
       />
     );
   }
-  if (loaded.kind === "loading")
-    return (
-      <div className="notebook">
-        <div className="float top-left">
-          <Link className="icon-button" to="/" title="Wszystkie notatki" aria-label="Wszystkie notatki"><Back /></Link>
-        </div>
-        <NoteSkeleton />
-      </div>
-    );
+  const back = (
+    <Islands side="left">
+      <IslandLink to="/" title={tNote("allNotes")} aria-label={tNote("allNotes")}><Back /></IslandLink>
+    </Islands>
+  );
+  if (loaded.kind === "loading") return <>{back}<NoteSkeleton /></>;
   return (
-    <div className="notebook">
-      <div className="float top-left">
-        <Link className="icon-button" to="/" title="Wszystkie notatki" aria-label="Wszystkie notatki"><Back /></Link>
-      </div>
-      <div className="page-message">
-        {loaded.kind === "missing" && (
-          <>
-            <h1>Nie ma takiej notatki</h1>
-            <p className="muted">Może została usunięta. <Link to="/">Wszystkie notatki</Link></p>
-          </>
-        )}
-        {loaded.kind === "unreachable" && (
-          <>
-            <h1>Serwer notatek nie odpowiada</h1>
-            <p className="muted">Notatka jest na serwerze, a ten jest teraz niedostępny.</p>
-            <button className="primary" onClick={() => setReads((n) => n + 1)}>Spróbuj ponownie</button>
-          </>
-        )}
-      </div>
-    </div>
+    <>
+      {back}
+      {loaded.kind === "missing" && (
+        <PageMessage title={t("missing")}>
+          <p className="text-muted">{t("maybeDeleted")} <Link to="/">{tNote("allNotes")}</Link></p>
+        </PageMessage>
+      )}
+      {loaded.kind === "unreachable" && (
+        <PageMessage title={t("unreachable")}>
+          <p className="text-muted">{t("unreachableText")}</p>
+          <button className="primary" onClick={() => setReads((n) => n + 1)}>{t("retry")}</button>
+        </PageMessage>
+      )}
+    </>
   );
 }

@@ -7,28 +7,28 @@ import { HighlightStyle, syntaxHighlighting } from "@codemirror/language";
 import { EditorView } from "@codemirror/view";
 import { tags as t } from "@lezer/highlight";
 import CodeMirror from "@uiw/react-codemirror";
+import type { TFunction } from "i18next";
+import { useMemo } from "react";
+import { useTranslation } from "react-i18next";
+import type { pl } from "../messages";
 
 // boost: above Python's own names (ResourceWarning, …) in the list
 const doc = (label: string, detail: string, type = "class"): Completion => ({ label, detail, type, boost: 50 });
 
-/** What a student types most: electro's components, combinators and helpers. */
-const ELECTRO: Completion[] = [
-  doc("Resistor", "(wartość, label=…) — opornik, Ω"),
-  doc("Capacitor", "(wartość) — kondensator, F"),
-  doc("Inductor", "(wartość) — cewka, H"),
-  doc("VoltageSource", "(wartość) — źródło napięcia, V"),
-  doc("CurrentSource", "(wartość) — źródło prądu, A"),
-  doc("Ammeter", "(odczyt) — amperomierz; odczyt to dana pomiarowa"),
-  doc("Voltmeter", "(odczyt) — woltomierz"),
-  doc("Hole", "() — nieznany element; solver dobierze, czym jest"),
-  doc("OpAmp", "() — wzmacniacz operacyjny"),
-  ...["loop", "net", "series", "parallel", "shunt", "supply", "node"].map((f) => doc(f, "układ", "function")),
-  ...["solve", "resistance", "equivalent", "blackbox", "code", "schematic", "steps", "schemat", "display"]
-    .map((f) => doc(f, "electro", "function")),
-  ...["ground", "wire", "split", "join", "open_end"].map((f) => doc(f, "połączenie", "variable")),
-  ...["I", "U", "V", "P"].map((f) => doc(f, `(\"R_1\") — ${{ I: "prąd", U: "napięcie", V: "potencjał", P: "moc" }[f]}`, "function")),
-  doc("find", "= \"R_2\" — czego szukać", "keyword"),
-];
+/** What a student types most: electro's components, combinators and helpers (hints in the app's language). */
+function electro(t: TFunction<"notebook">): Completion[] {
+  const hint = (name: keyof typeof pl.completion) => t(`completion.${name}`);
+  return [
+    ...(["Resistor", "Capacitor", "Inductor", "VoltageSource", "CurrentSource", "Ammeter", "Voltmeter", "Hole", "OpAmp"] as const)
+      .map((c) => doc(c, hint(c))),
+    ...["loop", "net", "series", "parallel", "shunt", "supply", "node"].map((f) => doc(f, hint("circuit"), "function")),
+    ...["solve", "resistance", "equivalent", "blackbox", "code", "schematic", "steps", "schemat", "display"]
+      .map((f) => doc(f, "electro", "function")),
+    ...["ground", "wire", "split", "join", "open_end"].map((f) => doc(f, hint("connection"), "variable")),
+    ...(["I", "U", "V", "P"] as const).map((f) => doc(f, hint(f), "function")),
+    doc("find", hint("find"), "keyword"),
+  ];
+}
 
 const colab = HighlightStyle.define([
   { tag: [t.keyword, t.bool, t.null, t.self], color: "var(--hl-keyword)" },
@@ -43,7 +43,7 @@ const colab = HighlightStyle.define([
 ]);
 
 const look = EditorView.theme({
-  "&": { background: "var(--code-bg)", color: "var(--text)", borderRadius: "8px" },
+  "&": { background: "var(--code-bg)", color: "var(--text)", borderRadius: "8px", fontSize: "16px" },
   "&.cm-focused": { outline: "none" },
   ".cm-scroller": { fontFamily: "var(--mono)", lineHeight: "1.6", padding: "8px 0" },
   ".cm-content": { caretColor: "var(--text)" },
@@ -58,15 +58,20 @@ const look = EditorView.theme({
   ".cm-completionDetail": { fontFamily: "var(--sans)", fontStyle: "normal", color: "var(--muted)", marginLeft: "12px" },
 });
 
-const extensions = [
-  python(),
-  pythonLanguage.data.of({ autocomplete: completeFromList(ELECTRO) }),
-  autocompletion({ icons: false }),
-  syntaxHighlighting(colab),
-  look,
-];
-
-export function CodeEditor({ value, onChange, autoFocus }: { value: string; onChange: (v: string) => void; autoFocus?: boolean }) {
+export function CodeEditor({ value, onChange, autoFocus, minHeight }: {
+  value: string; onChange: (v: string) => void; autoFocus?: boolean;
+  minHeight?: number; // px: the scroller fills it, so its scrollbar sits at the bottom
+}) {
+  const { t, i18n } = useTranslation("notebook");
+  const extensions = useMemo(() => [
+    python(),
+    pythonLanguage.data.of({ autocomplete: completeFromList(electro(t)) }),
+    autocompletion({ icons: false }),
+    syntaxHighlighting(colab),
+    look,
+    ...(minHeight ? [EditorView.theme({ ".cm-scroller": { minHeight: `${minHeight}px` } })] : []),
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- t changes with the language
+  ], [i18n.language, minHeight]);
   return (
     <CodeMirror
       value={value}

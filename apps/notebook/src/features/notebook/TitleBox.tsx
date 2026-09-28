@@ -1,7 +1,11 @@
-// A note's title in the top-left island: a plain box; a click edits it (like a schematic's name).
+// A note's title in the sidebar: a plain box; a click edits it (like a schematic's name).
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
+
+const box = "h-9 max-w-105 rounded-lg text-[16px]";
 
 export function TitleBox({ title, onChange }: { title: string; onChange: (title: string) => void }) {
+  const { t } = useTranslation("notebook");
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(title);
   const commit = () => {
@@ -10,13 +14,13 @@ export function TitleBox({ title, onChange }: { title: string; onChange: (title:
   };
   if (!editing)
     return (
-      <button className={`title-box ${title ? "" : "untitled"}`} onClick={() => { setDraft(title); setEditing(true); }}
-              title="Kliknij, żeby zmienić tytuł">
-        {title || "Bez tytułu"}
+      <button className={`${box} block flex-1 min-w-0 px-2.5 py-1.5 leading-6 text-left truncate ${title ? "font-medium" : "text-muted"}`}
+              onClick={() => { setDraft(title); setEditing(true); }} title={t("editTitle")}>
+        {title || t("untitled")}
       </button>
     );
   return (
-    <input className="title-edit" autoFocus value={draft} placeholder="Bez tytułu" aria-label="Tytuł notatki"
+    <input className={`${box} font-medium px-2.25 py-1.25`} autoFocus value={draft} placeholder={t("untitled")} aria-label={t("noteTitle")}
            spellCheck={false} size={Math.max(12, draft.length + 1)}
            onChange={(e) => setDraft(e.target.value)} onBlur={commit}
            onKeyDown={(e) => {

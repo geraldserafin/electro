@@ -61,12 +61,12 @@ try {
   check("pyodide starts in the worker", true);
 
   await page.getByRole("button", { name: "Uruchom wszystko" }).click();
-  await page.locator(".output-svg svg").nth(1).waitFor({ timeout: 60_000 });
-  const text = await page.locator(".outputs").allInnerTexts();
-  check("steps() rendered with KaTeX", (await page.locator(".outputs .katex").count()) > 0);
+  await page.locator('[data-output="svg"] svg').nth(1).waitFor({ timeout: 60_000 });
+  const text = await page.locator("[data-outputs]").allInnerTexts();
+  check("steps() rendered with KaTeX", (await page.locator("[data-outputs] .katex").count()) > 0);
   check("answer R_2 = 200 Ω", text.join(" ").includes("200"));
-  check("schematic outputs", (await page.locator(".output-svg svg").count()) === 2);
-  check("no error outputs", (await page.locator(".output-error").count()) === 0);
+  check("schematic outputs", (await page.locator('[data-output="svg"] svg').count()) === 2);
+  check("no error outputs", (await page.locator('[data-output="error"]').count()) === 0);
   await page.screenshot({ path: `${shots}/notebook.png`, fullPage: true });
 
   // pick an element in the side panel, then close the panel (it would cover the left of the board)
@@ -78,7 +78,7 @@ try {
 
   // a new cell at the end: the add buttons on the last cell's bottom edge
   const addAtEnd = async (name) => {
-    const edge = page.locator(".cell").last().locator(":scope > .add-row");
+    const edge = page.locator("[data-cell]").last().getByRole("group", { name: "Dodaj komórkę" });
     await edge.hover();
     await edge.getByRole("button", { name }).click();
   };
@@ -94,16 +94,16 @@ try {
   };
 
   // the run button of a schematic: values on the drawing and a table; the ammeter's reading (0) is the datum
-  const bridge = page.locator(".cell-schematic").first();
-  const runBridge = bridge.locator(".gutter .run");
+  const bridge = page.locator('[data-cell="schematic"]').first();
+  const runBridge = bridge.getByRole("button", { name: "Policz prądy i napięcia (Shift+Enter w kodzie)" });
   const reading = async (value) => {
     await bridge.locator('.board .canvas .element[data-id="A_1"]').click();
     await bridge.locator(".inspector input").nth(1).fill(value);
   };
   await runBridge.click();
-  await bridge.locator("table.results:not(.stale)").waitFor({ timeout: 30_000 });
+  await bridge.locator('table[aria-label="Wyniki"]:not([data-stale])').waitFor({ timeout: 30_000 });
   check("run: table and values on the drawing, then the button rests",
-    (await bridge.locator("table.results").innerText()).includes("200 Ω")
+    (await bridge.getByRole("table", { name: "Wyniki" }).innerText()).includes("200 Ω")
     && (await bridge.locator(".board .canvas .label.solved").allTextContents()).join(" ").includes("200")
     && await runBridge.isDisabled());
 
@@ -123,15 +123,15 @@ try {
   // no reading: not enough data — a warning sign on the board, unfolding into LaTeX
   await reading("");
   check("a change turns the run button back on", !(await runBridge.isDisabled())
-    && (await bridge.locator("table.results.stale").count()) === 1);
+    && (await bridge.locator('table[aria-label="Wyniki"][data-stale]').count()) === 1);
   await runBridge.click();
-  await bridge.locator(".problems.warning .problems-sign").click();
+  await bridge.getByRole("button", { name: "Nie wszystko da się wyznaczyć" }).click();
   check("missing data: a warning sign, names in LaTeX",
-    (await bridge.locator(".problems-panel .katex").count()) > 0
-    && (await bridge.locator(".problems-panel").innerText()).includes("brakuje"));
+    (await bridge.getByRole("dialog", { name: "Nie wszystko da się wyznaczyć" }).locator(".katex").count()) > 0
+    && (await bridge.getByRole("dialog", { name: "Nie wszystko da się wyznaczyć" }).innerText()).includes("brakuje"));
   await reading("0");
   await runBridge.click();
-  await bridge.locator(".problems").waitFor({ state: "detached", timeout: 30_000 });
+  await bridge.getByRole("button", { name: /Nie wszystko da się wyznaczyć|Błąd — nie da się policzyć/ }).waitFor({ state: "detached", timeout: 30_000 });
 
   // moving part of the bridge as a group keeps every connection (edge wires stretch or follow)
   {
@@ -184,8 +184,8 @@ try {
     await bridge.locator(".cm-content").click();
     await page.keyboard.press("Meta+ArrowUp");
     await page.keyboard.insertText("# mój komentarz\n");
-    await bridge.locator(".gutter .run").click();
-    await bridge.locator("table.results:not(.stale)").waitFor({ timeout: 30_000 });
+    await bridge.getByRole("button", { name: "Policz prądy i napięcia (Shift+Enter w kodzie)" }).click();
+    await bridge.locator('table[aria-label="Wyniki"]:not([data-stale])').waitFor({ timeout: 30_000 });
     const afterRun = await bridge.locator(".cm-content").innerText();
     await bridge.getByRole("tab", { name: "Schemat" }).click();
     await bridge.getByRole("tab", { name: "Kod" }).click();
@@ -219,7 +219,7 @@ try {
     const before = workers.length;
     await page.waitForTimeout(8000); // (the compiler and the fonts: long done on a local server)
     const opened = Date.now();
-    await page.getByRole("button", { name: "Eksport PDF" }).click();
+    await page.getByRole("button", { name: "Eksport do PDF" }).click();
     const dialog = page.getByRole("dialog", { name: "Eksport do PDF" });
     const sheets = dialog.locator(".export-sheets .sheet");
     await sheets.first().waitFor({ timeout: 90_000 });
@@ -292,7 +292,7 @@ try {
 
   // wiring by hand in a fresh schematic: drag from a pin, then the wire tool; rotation
   await addAtEnd("Schemat");
-  const cell = page.locator(".cell-schematic").last();  // added at the end of the notebook
+  const cell = page.locator('[data-cell="schematic"]').last();  // added at the end of the notebook
   await cell.scrollIntoViewIfNeeded();
   const grid = cell.locator(".board .canvas");
   // grid point → screen point, through the board's camera
@@ -354,17 +354,17 @@ try {
     && (await grid.locator(".open-pin").count()) === 0);
 
   // the name in the corner is a variable in code: "Układ 1" → układ1; renaming renames it
-  await cell.locator(".name-box").click();
-  await cell.locator(".name-edit input").fill("Mój obwód");
-  const hint = await cell.locator(".name-edit code").textContent();
+  await cell.getByTitle(/^W kodzie:/).click();
+  await cell.getByRole("textbox", { name: "Nazwa schematu" }).fill("Mój obwód");
+  const hint = await cell.getByText("w kodzie:").locator("code").textContent();
   await page.keyboard.press("Enter");
   await addAtEnd("Kod");
-  const user = page.locator(".cell-code").last();
+  const user = page.locator('[data-cell="code"]').last();
   await user.locator(".cm-content").click();
   await page.keyboard.insertText("mójobwód.solve(I_R_1=1)\ndisplay(schematic(mójobwód))");
   await user.getByRole("button", { name: /Uruchom/ }).click();
-  await user.locator(".output-svg svg").waitFor({ timeout: 30_000 });
-  check("schematic name is a variable in code", hint === "mójobwód" && (await user.locator(".output-error").count()) === 0);
+  await user.locator('[data-output="svg"] svg').waitFor({ timeout: 30_000 });
+  check("schematic name is a variable in code", hint === "mójobwód" && (await user.locator('[data-output="error"]').count()) === 0);
 
   // the examples notebook from the menu runs without a single error
   await home();
@@ -372,14 +372,14 @@ try {
   await page.waitForURL(/\/notes\/przyklady-niewiadome-i-dziury$/);
   await pythonReady(60_000);
   await page.getByRole("button", { name: "Uruchom wszystko" }).click();
-  await page.locator(".cell-code").last().locator(".outputs").waitFor({ timeout: 60_000 });
-  check("examples run without errors", (await page.locator(".output-error").count()) === 0
-    && (await page.locator(".cell-code .outputs").count()) === (await page.locator(".cell-code").count()));
+  await page.locator('[data-cell="code"]').last().locator("[data-outputs]").waitFor({ timeout: 60_000 });
+  check("examples run without errors", (await page.locator('[data-output="error"]').count()) === 0
+    && (await page.locator('[data-cell="code"] [data-outputs]').count()) === (await page.locator('[data-cell="code"]').count()));
 
   // the table of contents: on a wide screen, headings of the text cells; a click scrolls there
   {
     await page.setViewportSize({ width: 1700, height: 900 });
-    const outline = page.locator("nav.outline");
+    const outline = page.getByRole("navigation", { name: "Spis treści" });
     const toggle = page.getByRole("button", { name: "Spis treści" });
     if (!(await outline.isVisible())) await toggle.click(); // open (it is, at first, on wide screens)
     await outline.waitFor();
@@ -389,7 +389,7 @@ try {
     const top = await page.locator("h2", { hasText: "5. Za mało danych" }).evaluate((h) => h.getBoundingClientRect().top);
     check("table of contents: headings, a click scrolls there, the section is marked",
       entries.includes("1. Nieznany opór z pomiaru napięcia") && top > 40 && top < 140
-      && (await outline.locator("a.active").innerText()) === "5. Za mało danych");
+      && (await outline.locator('a[aria-current="location"]').innerText()) === "5. Za mało danych");
     await toggle.click();
     await page.waitForTimeout(400); // it slides away
     check("table of contents: its switch hides it", !(await outline.isVisible()));
@@ -400,15 +400,15 @@ try {
 
   // text cells: rendered; a click shows the plain Markdown; leaving it renders it again
   {
-    const cell = page.locator(".markdown-cell").first();
-    const rendered = (await cell.locator(".markdown-view").first().innerText());
-    await cell.locator(".markdown-view").first().click();
-    const field = cell.locator("textarea.markdown-source");
+    const cell = page.locator('[data-cell="markdown"]').first();
+    const rendered = (await cell.getByTitle("Kliknij, żeby edytować").innerText());
+    await cell.getByTitle("Kliknij, żeby edytować").click();
+    const field = cell.locator("textarea");
     const source = await field.inputValue();
     await field.press("Meta+ArrowDown");
     await page.keyboard.insertText("\n\nNowe zdanie z **pogrubieniem** i wzorem $U = R I$");
     await page.mouse.click(4, 400); // leave the field: a click in the empty margin
-    const view = cell.locator(".markdown-view").first();
+    const view = cell.getByTitle("Kliknij, żeby edytować");
     check("text cells: click edits the Markdown, leaving renders it",
       source.includes("**▶ Uruchom wszystko**") && !rendered.includes("**")
       && (await view.locator("strong").last().innerText()) === "pogrubieniem" && (await view.locator(".katex").count()) > 0);
@@ -417,13 +417,13 @@ try {
     const editing = await field.isVisible();
     await cell.getByRole("button", { name: /Pokaż tekst/ }).click();
     check("text cells: the side button switches edit / view", editing && !(await field.isVisible())
-      && await cell.locator(".markdown-view").first().isVisible());
+      && await cell.getByTitle("Kliknij, żeby edytować").isVisible());
   }
 
   // "+ Kod / + Tekst / + Schemat" only on the edge between cells
   {
-    const first = page.locator(".cell").first();
-    const pill = first.locator(":scope > .add-row button").first();
+    const first = page.locator("[data-cell]").first();
+    const pill = first.getByRole("group", { name: "Dodaj komórkę" }).getByRole("button").first();
     await first.hover({ position: { x: 300, y: 20 } });
     const hiddenInside = !(await pill.isVisible());
     const box = await first.boundingBox();
@@ -451,8 +451,8 @@ try {
       { id: "b", type: "schematic", name: "mostek", schematic: { elements: [], wires: [] }, data: "I_A_1 = 0", outputs: [] },
     ] }));
     await home();
-    await page.locator('.float-group input[type="file"]').setInputFiles(old);
-    await page.locator(".title-box", { hasText: "Stary notatnik" }).waitFor({ timeout: 10_000 });
+    await page.locator('input[type="file"]').setInputFiles(old);
+    await page.getByTitle("Kliknij, żeby zmienić tytuł").filter({ hasText: "Stary notatnik" }).waitFor({ timeout: 10_000 });
     const saved = (await noteOnServer()).document;
     check("an old (v1) file becomes a note, migrated to the current format", saved.version === 2
       && saved.format === "electro-notebook" && saved.title === "Stary notatnik" && !("data" in saved.cells[1]));
@@ -461,14 +461,14 @@ try {
   // notes at their addresses: the list with thumbnails; a new note; back and forth; a conflict
   {
     // the title: a box in the top-left island; a click edits it, Enter keeps it
-    const title = page.locator(".title-box");
+    const title = page.getByTitle("Kliknij, żeby zmienić tytuł");
     const setTitle = async (text) => {
       await title.click();
-      await page.locator(".title-edit").fill(text);
+      await page.getByRole("textbox", { name: "Tytuł notatki" }).fill(text);
       await page.keyboard.press("Enter");
     };
     const titleIs = (t, timeout = 10_000) =>
-      page.waitForFunction((t) => document.querySelector(".title-box")?.textContent === t, t, { timeout });
+      page.waitForFunction((t) => document.querySelector('button[title="Kliknij, żeby zmienić tytuł"]')?.textContent === t, t, { timeout });
     const notes = notesList.locator("li[data-id]");
     const { document: { id }, slug } = await noteOnServer();
     const firstTitle = await title.innerText();

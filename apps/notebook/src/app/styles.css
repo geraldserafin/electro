@@ -66,3 +66,15 @@
   --animate-rise: rise 0.2s ease both;
   @keyframes rise { from { opacity: 0; transform: translateY(8px); } }
 }
+
+/* something is working (Python starting, a cell running): fading in and out */
+@theme {
+  --animate-blink: blink 0.9s ease-in-out infinite alternate;
+  @keyframes blink { to { opacity: 0.3; } }
+}
+
+/* raised off the page: a cell being worked on, the tools on its edge */
+@theme {
+  --shadow-raised: 0 1px 6px rgb(0 0 0 / 0.08);
+  --shadow-tools: 0 1px 4px rgb(0 0 0 / 0.18);
+}

@@ -4,6 +4,7 @@
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Moon, Sun, System } from "@/shared/ui/icons";
+import { IslandButton } from "@/shared/ui/Island";
 
 type Theme = "system" | "light" | "dark";
 
@@ -42,9 +43,9 @@ export function ThemeButton() {
     }
   };
   return (
-    <button className="float icon-button" onClick={() => choose(NEXT[theme])}
+    <IslandButton onClick={() => choose(NEXT[theme])}
             title={t("next", { name: t(theme), next: t(NEXT[theme]) })} aria-label={t("theme", { name: t(theme) })}>
       {ICON[theme]}
-    </button>
+    </IslandButton>
   );
 }

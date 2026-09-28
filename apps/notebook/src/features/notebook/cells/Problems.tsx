@@ -1,0 +1,37 @@
+// A warning / error sign on the board; a click unfolds what is wrong (with the names in LaTeX).
+import { useCallback, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
+import type { Problem } from "@/shared/model/types";
+import { useClickOutside } from "@/shared/hooks/useClickOutside";
+import { WarningIcon } from "@/shared/ui/icons";
+import { Markdown } from "@/shared/ui/Markdown";
+
+export function Problems({ problems, below }: {
+  problems: Problem[];
+  below?: boolean; // unfolds downwards (at the top of the code view), not upwards
+}) {
+  const { t } = useTranslation("notebook");
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  useClickOutside(ref, open, useCallback(() => setOpen(false), []));
+  const error = problems.some((p) => p.kind === "error");
+  const title = error ? t("problems.error") : t("problems.warning");
+  const color = error ? "text-danger" : "text-warn";
+  return (
+    <div className="relative" ref={ref}>
+      <button onClick={() => setOpen((o) => !o)} title={title} aria-label={title} aria-expanded={open}
+              className={`p-1.5 ${color} ${error ? "bg-err-bg" : "bg-warn-bg"}`}>
+        <WarningIcon />
+      </button>
+      {open && (
+        <div role="dialog" aria-label={title}
+             className={`absolute ${below ? "top-[calc(100%+12px)]" : "bottom-[calc(100%+12px)]"} -right-1 z-8 w-[min(420px,80vw)] max-h-80
+                         overflow-y-auto px-3.5 py-3 rounded-[10px] bg-island shadow-island text-[15px] whitespace-normal
+                         [&_.markdown_p]:my-1 [&_.katex]:whitespace-nowrap`}>
+          <h4 className={`mt-0 mb-1.5 text-[12px] font-semibold uppercase tracking-[0.05em] ${color}`}>{title}</h4>
+          {problems.map((p, i) => <Markdown key={i} source={p.text} />)}
+        </div>
+      )}
+    </div>
+  );
+}

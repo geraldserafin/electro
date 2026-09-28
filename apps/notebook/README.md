@@ -75,10 +75,12 @@ nie `@/features/schematic/Editor`); wewnątrz plastra importy są względne. `@/
 
 **Style.** Tailwind v4 (`src/app/styles.css`): kolory to tokeny aplikacji (`bg-surface`, `text-muted`,
 `border-line`… — jasne i ciemne w `legacy.css`), innych kolorów nie ma. Plastry przepisane na Tailwinda:
-`notes`. Reszta wciąż korzysta z `legacy.css` (w warstwie `base`, więc każda klasa Tailwinda z nim wygrywa);
+`notes`, `notebook` (i strony, i wyspy w `shared/ui/Island`). Reszta (`schematic`, `pdf-export`) wciąż korzysta z `legacy.css` (w warstwie `base`, więc każda klasa Tailwinda z nim wygrywa);
 bez preflightu, dopóki `legacy.css` nie zniknie. To, czego nie da się sensownie zapisać klasami (np. strona
 PDF w miniaturze, która przestawia tokeny i styluje cudzy Markdown), leży obok komponentu jako `*.css` w
-`@layer components`. Testy e2e szukają elementów po rolach i tekstach, nie po klasach.
+`@layer components`. Dwie klasy na tę samą właściwość na jednym elemencie (np. `text-left` i `text-right`) się
+gryzą — o wyniku decyduje kolejność w CSS Tailwinda, nie w atrybucie — więc warianty wybiera się warunkiem.
+Testy e2e szukają elementów po rolach, etykietach i atrybutach `data-*` (np. `data-cell`, `data-output`), nie po klasach.
 
 **Języki.** i18next: każdy plaster ma `messages.ts` (`pl` i `en` o tym samym kształcie — pilnuje TypeScript)
 jako swoją przestrzeń nazw; `src/app/i18n.ts` je zbiera. Na razie tylko polski, dopóki wszystkie plastry

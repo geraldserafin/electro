@@ -4,13 +4,14 @@
 import i18n from "i18next";
 import { initReactI18next } from "react-i18next";
 import { messages as language, savedLanguage } from "@/features/language";
+import { messages as notebook } from "@/features/notebook";
 import { messages as notes } from "@/features/notes";
 import { messages as theme } from "@/features/theme";
-import * as home from "@/pages/Home.messages";
+import * as pages from "@/pages/messages";
 
 const resources = {
-  pl: { notes: notes.pl, theme: theme.pl, language: language.pl, home: home.pl },
-  en: { notes: notes.en, theme: theme.en, language: language.en, home: home.en },
+  pl: { notebook: notebook.pl, notes: notes.pl, theme: theme.pl, language: language.pl, pages: pages.pl },
+  en: { notebook: notebook.en, notes: notes.en, theme: theme.en, language: language.en, pages: pages.en },
 };
 
 declare module "i18next" {

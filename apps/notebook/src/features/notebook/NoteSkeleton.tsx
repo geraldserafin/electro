@@ -1,14 +1,17 @@
+import { useTranslation } from "react-i18next";
 import { Bone } from "@/shared/ui/Skeleton";
+import { column, sidebar } from "./layout";
 
 /** A note on its way: the sidebar, the title, a few paragraphs and a block. */
 export function NoteSkeleton() {
+  const { t } = useTranslation("notebook");
   return (
-    <div className="note-skeleton" aria-busy aria-label="Wczytuję notatkę">
-      <aside className="note-nav open">
+    <div aria-busy aria-label={t("loading")}>
+      <aside className={`${sidebar(true)} max-[900px]:hidden`}>
         <Bone w="75%" h={16} style={{ margin: "10px 10px 18px" }} />
         {[62, 80, 54, 70, 45].map((w, i) => <Bone key={i} w={`${w}%`} h={12} style={{ margin: "9px 12px" }} />)}
       </aside>
-      <main className="with-nav">
+      <main className={column(true, "pt-22")}>
         <Bone w="55%" h={34} style={{ marginLeft: 65, marginBottom: 32 }} />
         {[96, 88, 72].map((w, i) => <Bone key={i} w={`calc(${w}% - 65px)`} style={{ marginLeft: 65, marginBottom: 12 }} />)}
         <Bone w="calc(100% - 56px)" h={140} style={{ marginLeft: 56, margin: "28px 0 28px 56px", borderRadius: 10 }} />

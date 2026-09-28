@@ -2,6 +2,7 @@ import ReactMarkdown from "react-markdown";
 import rehypeKatex from "rehype-katex";
 import remarkGfm from "remark-gfm";
 import remarkMath from "remark-math";
+import "./Markdown.css";
 
 /** Markdown (with tables) and $math$ — used for text cells and for rich outputs (e.g. steps()). */
 export function Markdown({ source }: { source: string }) {

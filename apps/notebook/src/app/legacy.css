@@ -118,48 +118,7 @@ input, textarea {
 }
 input:focus, textarea:focus { outline: 2px solid var(--accent-soft); border-color: var(--accent); }
 
-/* ---------------------------------------------------------------- floating islands (no bar, like Excalidraw) */
-
-.float {
-  position: fixed;
-  top: 12px;
-  z-index: 20;
-  display: flex;
-  align-items: center;
-  gap: 2px;
-  padding: 4px;
-  border-radius: 12px;
-  background: var(--surface);
-  border: 1px solid var(--line);
-}
-.float.top-left { left: 12px; max-width: calc(50vw - 24px); }
-.float .icon-button { border-radius: 8px; }
-/* separate buttons, each its own island, in a row */
-.float-group { position: fixed; top: 12px; z-index: 20; display: flex; gap: 8px; }
-.float-group.top-left { left: 12px; }
-.float-group.top-right { right: 12px; }
-.float-group .float { position: static; }
-.float.icon-button { width: 46px; height: 46px; padding: 0; border-radius: 12px; color: var(--text); }
-.float.icon-button:hover:not(:disabled) { background: var(--selected); }
-.float.icon-button.open { background: var(--selected); }
-.float.icon-button.waiting { animation: pulse 0.9s ease-in-out infinite alternate; } /* Python is starting */
-.brand {
-  width: 32px;
-  height: 32px;
-  border-radius: 8px;
-  display: grid;
-  place-items: center;
-  color: #f9ab00;
-  flex: none;
-}
-.app-name { font-size: 16px; font-weight: 500; padding: 0 10px 0 2px; }
-/* the note's title: a plain box, a click edits it */
-.title-box {
-  min-width: 0; max-width: 420px; height: 36px; line-height: 24px; padding: 6px 10px; border-radius: 8px; text-align: left;
-  font-size: 16px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: block;
-}
-.title-box.untitled { color: var(--muted); font-weight: 400; }
-.title-edit { height: 36px; font-size: 16px; font-weight: 500; padding: 5px 9px; border-radius: 8px; max-width: 420px; }
+/* a round icon button (the export dialog's close) and a status pill (the board's): theirs, until they move */
 .icon-button {
   display: inline-flex; align-items: center; justify-content: center; flex: none; /* also on links */
   width: 36px; height: 36px; padding: 0; border-radius: 50%; color: var(--muted);
@@ -184,174 +143,6 @@ input:focus, textarea:focus { outline: 2px solid var(--accent-soft); border-colo
 .status.error .dot { background: var(--danger); }
 @keyframes pulse { to { opacity: 0.3; } }
 
-.app-name { font-size: 17px; font-weight: 500; }
-/* a note that could not be shown: loading, missing, server down */
-.page-message { max-width: 560px; margin: 96px auto; padding: 0 24px; text-align: center; }
-.page-message h1 { font-size: 22px; font-weight: 500; margin: 0 0 8px; }
-/* a note's sidebar, under the app's island: the title, the sections under it; the note beside it */
-.note-nav {
-  position: fixed; top: 68px; left: 12px; bottom: 12px; z-index: 20; width: 300px; /* under the app's islands */
-  opacity: 0; visibility: hidden; transform: translateX(-12px);
-  transition: opacity 0.2s ease, transform 0.25s cubic-bezier(0.2, 0.8, 0.2, 1), visibility 0s linear 0.25s;
-  display: flex; flex-direction: column; padding: 4px;
-  overflow: hidden; border-radius: 12px; background: var(--surface); border: 1px solid var(--line);
-}
-.note-nav.open { opacity: 1; visibility: visible; transform: none;
-  transition: opacity 0.2s ease, transform 0.25s cubic-bezier(0.2, 0.8, 0.2, 1), visibility 0s; }
-.note-nav-head { flex: none; display: flex; align-items: center; gap: 2px; height: 36px; min-width: 0; }
-.note-nav-head .title-box { flex: 1; }
-.note-nav-head .icon-button { border-radius: 8px; }
-.outline { flex: 1; min-height: 0; overflow-y: auto; margin-top: 10px; padding: 0 0 8px; font-size: 14px; }
-main { transition: padding-left 0.25s cubic-bezier(0.2, 0.8, 0.2, 1), max-width 0.25s cubic-bezier(0.2, 0.8, 0.2, 1); }
-main.with-nav { max-width: calc(1120px + 312px); padding-left: calc(24px + 312px); }
-/* narrow: no room for both — the sidebar covers the note while open */
-@media (max-width: 900px) { main.with-nav { padding-left: 24px; max-width: none; } }
-@media (prefers-reduced-motion: reduce) { .note-nav, .note-nav.open, main { transition: none; } }
-/* the title, the note's first heading (in the PDF too) */
-input.doc-title {
-  display: block; width: 100%; margin: 0 0 4px; padding: 4px 8px 4px 65px; border: none; border-radius: 8px; /* in line with the cells' text */
-  background: transparent; font-size: 34px; font-weight: 600; line-height: 1.25;
-}
-input.doc-title::placeholder { color: var(--faint); }
-input.doc-title:focus { outline: none; background: var(--hover); }
-.outline-empty { margin: 0 12px; color: var(--muted); font-size: 13px; }
-.outline ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 1px; }
-.outline a {
-  display: flex; align-items: center; gap: 8px; padding: 7px 12px; border-radius: 8px;
-  color: var(--muted); text-decoration: none; line-height: 1.35; transition: background 0.1s, color 0.1s;
-}
-.outline a.depth-0 { color: var(--text); font-weight: 500; }
-.outline a:hover { background: var(--selected); color: var(--text); }
-.outline a.active { background: var(--selected); color: var(--text); font-weight: 500; }
-.outline a svg { flex: none; width: 15px; height: 15px; }
-.cell, .cell .markdown-view :is(h1, h2, h3) { scroll-margin-top: 72px; } /* below the islands */
-
-
-/* an empty notebook: the add buttons are always there */
-main > .add-row:only-child button, main > .add-row:has(+ .empty) button { visibility: visible; opacity: 1; }
-
-/* ---------------------------------------------------------------- cells */
-
-main {
-  max-width: 1120px;
-  margin: 0 auto;
-  padding: 72px 24px 120px; /* under the floating islands */
-}
-.empty { color: var(--muted); text-align: center; }
-
-.cell {
-  position: relative;
-  border-radius: 8px;
-  padding: 8px;
-  margin-bottom: 12px;
-  border: 1px solid transparent;
-}
-.cell:hover { border-color: var(--line); }
-.cell.focused { border-color: var(--line); box-shadow: 0 1px 6px rgba(0, 0, 0, 0.08); }
-.cell-tools {
-  position: absolute;
-  top: -14px;
-  right: 12px;
-  z-index: 5;
-  display: flex;
-  padding: 2px;
-  border-radius: 8px;
-  background: var(--paper);
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.18);
-  opacity: 0;
-  pointer-events: none;
-  transition: opacity 0.12s;
-}
-.cell:hover .cell-tools, .cell.focused .cell-tools { opacity: 1; pointer-events: auto; }
-.cell-tools button { padding: 4px; color: var(--muted); }
-
-/* "+ Kod  + Tekst  + Schemat", as in Colab: pills on the edge between cells. The row is a thin
-   strip along the whole edge; the pills show only while the pointer is in it. */
-.add-row {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  height: 28px;
-}
-.add-row button { visibility: hidden; opacity: 0; transition: opacity 0.12s; }
-.add-row:hover button, .add-row:focus-within button { visibility: visible; opacity: 1; }
-.add-row button {
-  gap: 4px;
-  padding: 4px 14px 4px 10px;
-  font-size: 15px;
-  font-weight: 500;
-  color: var(--text);
-  border: 1px solid var(--faint);
-  border-radius: 999px;
-  background: var(--bg);
-}
-.add-row button:hover { background: var(--hover); border-color: var(--muted); }
-/* only in the middle, so it never covers the next cell's tools on the right */
-/* from the bottom padding of this cell, over the gap, to the top padding of the next one */
-.cell > .add-row { position: absolute; left: 0; right: 0; bottom: -20px; z-index: 4; }
-main > .add-row { justify-content: center; }
-
-/* text cells: the rendered text, or its Markdown while editing; a mode button on the side */
-.markdown-cell { display: flex; gap: 8px; align-items: flex-start; }
-.markdown-cell .markdown-view { padding: 4px 8px; cursor: text; min-height: 1.6em; border-radius: 8px; }
-.markdown-cell .gutter .mode {
-  width: 30px; height: 30px; padding: 0; justify-content: center; border-radius: 8px;
-  color: var(--faint); opacity: 0; transition: opacity 0.15s;
-}
-.cell:hover .markdown-cell .gutter .mode, .cell.focused .markdown-cell .gutter .mode, .markdown-cell .gutter .mode[aria-pressed="true"] { opacity: 1; }
-.markdown-cell .gutter .mode:hover { color: var(--text); background: var(--hover); }
-.markdown-cell .gutter .mode[aria-pressed="true"] { color: var(--tool-active-text); background: var(--tool-active); }
-.markdown-source {
-  display: block; width: 100%; resize: none; overflow: hidden;
-  font-family: var(--mono); font-size: 16px; line-height: 1.6; padding: 10px 12px;
-  background: var(--code-bg); border: none; border-radius: 8px;
-}
-.markdown-source:focus { outline: 1px solid var(--line); }
-.markdown > :first-child { margin-top: 0; }
-.markdown > :last-child { margin-bottom: 0; }
-.markdown h1, .markdown h2, .markdown h3 { font-weight: 500; }
-.markdown .katex-display { overflow-x: auto; overflow-y: hidden; }
-.markdown table { border-collapse: collapse; font-size: 17px; }
-.markdown th, .markdown td { border-bottom: 1px solid var(--line); padding: 4px 14px 4px 0; text-align: left; }
-.markdown th { color: var(--muted); font-weight: 500; }
-.markdown code { background: var(--code-bg); border-radius: 4px; padding: 0 4px; }
-
-/* code */
-.code-cell { display: flex; gap: 8px; align-items: flex-start; }
-.gutter { width: 40px; flex: none; display: grid; justify-items: center; gap: 2px; padding-top: 2px; }
-.gutter .run {
-  width: 30px;
-  height: 30px;
-  padding: 0;
-  justify-content: center;
-  border-radius: 50%;
-  color: var(--muted);
-  border: 1px solid var(--line);
-}
-.cell:hover .gutter .run, .cell.focused .gutter .run { color: var(--on-primary); background: var(--primary); border-color: var(--primary); }
-.gutter .run:hover:not(:disabled) { background: var(--primary-hover) !important; border-color: var(--primary-hover) !important; }
-.gutter .run.running { animation: pulse 0.8s ease-in-out infinite alternate; }
-/* a schematic's run button says whether there is anything to run: filled when there is, */
-.schematic-cell .gutter .run:not(.done):not(:disabled) { color: var(--on-primary); background: var(--primary); border-color: var(--primary); }
-/* …faint when the results are up to date */
-.gutter .run.done, .cell:hover .gutter .run.done, .cell.focused .gutter .run.done {
-  color: var(--faint); background: transparent; border-color: var(--line); opacity: 0.6;
-}
-.gutter .execution { font: 13px var(--mono); color: var(--faint); }
-.cell-body { flex: 1; min-width: 0; }
-.code-editor .cm-editor { font-size: 16px; }
-.code-editor { border-radius: 8px; transition: box-shadow 0.15s; }
-.cell.focused .code-editor { box-shadow: 0 0 0 1px var(--line); }
-
-.outputs { margin-top: 8px; display: grid; gap: 8px; }
-.output-text, .output-error { margin: 0; padding: 6px 10px; border-radius: 6px; font-size: 16px; overflow-x: auto; white-space: pre-wrap; }
-.output-text { font-family: var(--mono); }
-.output-error { background: var(--err-bg); color: var(--danger); }
-.output-warning { background: var(--warn-bg); color: var(--warn); padding: 6px 10px; border-radius: 6px; font-size: 16px; }
-.output-svg { overflow-x: auto; }
-.output-svg svg { max-width: 100%; height: auto; }
-
 /* ---------------------------------------------------------------- schematic board (Excalidraw-like) */
 
 /* the drawing for the PDF: laid out (so it can measure itself) but not seen on screen */
@@ -367,21 +158,6 @@ main > .add-row { justify-content: center; }
   .schematic-cell .board:has(input:focus, textarea:focus, .cm-focused) .island { opacity: 1; }
 }
 
-/* Schemat | Kod */
-.view-switch { display: flex; gap: 2px; padding: 2px; border-radius: 8px; background: var(--hover); }
-.view-switch button { padding: 4px 10px; border-radius: 6px; color: var(--muted); }
-.view-switch button.on { background: var(--paper); color: var(--text); box-shadow: 0 1px 2px rgba(0, 0, 0, 0.15); }
-.island .view-switch button { padding: 4px 10px; }
-.board.code-view { height: auto; min-height: 200px; padding: 10px; display: flex; flex-direction: column; gap: 10px; }
-.code-view-bar { display: flex; align-items: center; gap: 8px; }
-.code-view-bar .spacer { flex: 1; }
-.island.static { position: static; }
-.code-view .code-editor .cm-scroller { min-height: 120px; } /* the scroller fills it: its scrollbar sits at the bottom */
-.code-view-wait { color: var(--muted); margin: 8px; }
-.code-view-note { margin: 0; font-size: 14px; color: var(--muted); }
-pre.code-view-note { color: var(--danger); }
-
-.schematic-cell { display: flex; gap: 8px; align-items: flex-start; }
 .board {
   position: relative;
   height: 480px; /* overridden by the editor to fit the drawing */
@@ -483,12 +259,6 @@ pre.code-view-note { color: var(--danger); }
 .island.back-to-drawing:hover { background: var(--tool-active); }
 .island.bottom-right { bottom: 12px; right: 12px; }
 .island .zoom { min-width: 52px; justify-content: center; font-variant-numeric: tabular-nums; }
-/* the schematic's name: a plain box in the corner, a click edits it */
-.island .name-box { font-size: 15px; font-weight: 500; padding: 4px 10px; }
-.name-edit { display: flex; flex-direction: column; gap: 2px; padding: 2px; }
-.name-edit input { width: 180px; font-size: 15px; padding: 4px 8px; }
-.name-edit small { font-size: 12px; color: var(--muted); padding: 0 4px 2px; }
-.name-edit code { font-family: var(--mono); color: var(--text); }
 
 .island.inspector {  /* on the right: drawings start top-left, so this side is usually free */
   top: 64px;
@@ -533,76 +303,8 @@ pre.code-view-note { color: var(--danger); }
 kbd { font: 11px ui-monospace, monospace; border: 1px solid var(--line); border-radius: 4px; padding: 0 4px; }
 .muted { color: var(--muted); }
 
-@media (max-width: 760px) {
-  .markdown-edit { grid-template-columns: 1fr; }
-  .schematic-cell, .markdown-view, .markdown-edit { padding-left: 0; }
-  .gutter { width: 32px; }
-}
-
-/* ---------------------------------------------------------------- results of a run */
-
-.results {
-  margin-top: 12px;
-  border-collapse: separate;
-  border-spacing: 0;
-  border: 1px solid var(--line);
-  border-radius: 10px;
-  overflow: hidden;
-  font-size: 16px;
-  font-variant-numeric: tabular-nums;
-  transition: opacity 0.15s;
-}
-.results th {
-  padding: 8px 16px;
-  background: var(--hover);
-  color: var(--muted);
-  font-size: 13px;
-  font-weight: 500;
-  text-align: right;
-  white-space: nowrap;
-}
-.results td { padding: 7px 16px; border-top: 1px solid var(--line); text-align: right; white-space: nowrap; }
-.results th:first-child, .results td.name { text-align: left; }
-.results td.name { font-weight: 500; }
-.results td.name sub { font-size: 0.72em; }
-.results td.solved { color: var(--accent); font-weight: 600; }
-.results tbody tr:hover td { background: var(--hover); }
-.results.stale { opacity: 0.45; } /* from an older drawing: the run button is on again */
-
 /* warnings / errors: a sign on the board, next to the full screen button; a click unfolds them */
 .island.status { bottom: 12px; right: 104px; padding: 4px; }
-.island.static.status { position: relative; }
-.problems { position: relative; }
-.problems-sign { padding: 6px; }
-.problems.warning .problems-sign { color: var(--warn); background: var(--warn-bg); }
-.problems.error .problems-sign { color: var(--danger); background: var(--err-bg); }
-.problems-panel {
-  position: absolute;
-  bottom: calc(100% + 12px);
-  right: -4px;
-  z-index: 8;
-  width: min(420px, 80vw);
-  max-height: 320px;
-  overflow-y: auto;
-  padding: 12px 14px;
-  border-radius: 10px;
-  background: var(--island);
-  box-shadow: var(--island-shadow);
-  font-size: 15px;
-  white-space: normal; /* the island around it keeps its buttons on one line; text wraps */
-}
-.code-view .problems-panel { bottom: auto; top: calc(100% + 12px); }
-.problems-panel h4 { margin: 0 0 6px; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; }
-.problems.warning .problems-panel h4 { color: var(--warn); }
-.problems.error .problems-panel h4 { color: var(--danger); }
-.problems-panel .markdown p { margin: 4px 0; }
-.problems-panel .katex { white-space: nowrap; } /* break between names, never inside one */
-
-/* ---------------------------------------------------------------- loading: skeletons, then the content fades in */
-
-.note-skeleton .note-nav { opacity: 1; visibility: visible; transform: none; }
-.note-skeleton main { padding-top: 88px; }
-@media (max-width: 900px) { .note-skeleton .note-nav { display: none; } }
 
 /* ---------------------------------------------------------------- export to PDF */
 

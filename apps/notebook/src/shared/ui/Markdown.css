@@ -1,0 +1,11 @@
+/* Rendered Markdown: what the text in it is, not where it sits (that is up to the one showing it). */
+@layer components {
+  .markdown > :first-child { margin-top: 0; }
+  .markdown > :last-child { margin-bottom: 0; }
+  .markdown :is(h1, h2, h3) { font-weight: 500; }
+  .markdown .katex-display { overflow-x: auto; overflow-y: hidden; }
+  .markdown table { border-collapse: collapse; font-size: 17px; }
+  .markdown :is(th, td) { border-bottom: 1px solid var(--line); padding: 4px 14px 4px 0; text-align: left; }
+  .markdown th { color: var(--muted); font-weight: 500; }
+  .markdown code { background: var(--code-bg); border-radius: 4px; padding: 0 4px; }
+}

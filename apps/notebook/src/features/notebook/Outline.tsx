@@ -2,6 +2,7 @@
 // each, indented by level, under the title in the note's sidebar. A click scrolls there; the
 // section being read is lit.
 import { useEffect, useMemo, useState } from "react";
+import { Trans, useTranslation } from "react-i18next";
 import { SchematicIcon } from "@/shared/ui/icons";
 import type { Cell } from "@/shared/model/types";
 
@@ -25,13 +26,14 @@ function headings(cell: Cell): Entry[] {
 function place(e: Entry): HTMLElement | null {
   const cell = document.getElementById(`cell-${e.cell}`);
   if (!cell || e.schematic) return cell;
-  const found = cell.querySelectorAll<HTMLElement>(".markdown-view :is(h1, h2, h3)");
+  const found = cell.querySelectorAll<HTMLElement>(":is(h1, h2, h3)");
   return found[e.nth] ?? cell;
 }
 
 const plain = (s: string) => s.replace(/[*_`$]/g, "").replace(/\[(.*?)\]\(.*?\)/g, "$1").replace(/\\,/g, " ");
 
 export function Outline({ cells }: { cells: Cell[] }) {
+  const { t } = useTranslation("notebook");
   const entries = useMemo(() => cells.flatMap(headings), [cells]);
   const [active, setActive] = useState<string | null>(null);
 
@@ -52,13 +54,17 @@ export function Outline({ cells }: { cells: Cell[] }) {
 
   const top = Math.min(...entries.map((e) => e.level));
   return (
-    <>
-    <nav className="outline" aria-label="Spis treści">
-      {entries.length === 0 && <p className="outline-empty">Nagłówki z tekstu (<code># Tytuł</code>) i schematy pojawią się tutaj.</p>}
-      <ul>
+    <nav className="flex-1 min-h-0 overflow-y-auto mt-2.5 pb-2 text-[14px]" aria-label={t("outline")}>
+      {entries.length === 0 && (
+        <p className="mx-3 my-0 text-[13px] text-muted"><Trans t={t} i18nKey="outlineEmpty" components={{ code: <code /> }} /></p>
+      )}
+      <ul className="m-0 p-0 list-none grid gap-px">
         {entries.map((e) => (
           <li key={e.key}>
-            <a href={`#cell-${e.cell}`} className={`depth-${e.level - top} ${active === e.key ? "active" : ""}`}
+            <a href={`#cell-${e.cell}`} aria-current={active === e.key ? "location" : undefined}
+               className={`flex items-center gap-2 py-1.75 pr-3 rounded-lg leading-[1.35] no-underline transition-colors duration-100
+                           hover:bg-selected hover:text-fg aria-[current]:bg-selected aria-[current]:text-fg aria-[current]:font-medium
+                           [&>svg]:flex-none [&>svg]:size-3.75 ${e.level === top ? "text-fg font-medium" : "text-muted"}`}
                style={{ paddingLeft: 12 + (e.level - top) * 16 }}
                onClick={(event) => {
                  event.preventDefault();
@@ -71,6 +77,5 @@ export function Outline({ cells }: { cells: Cell[] }) {
         ))}
       </ul>
     </nav>
-    </>
   );
 }

@@ -1,10 +1,14 @@
 // /examples/:name — a new note from that example, then its address (the example stays as it is).
 import { useEffect, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { Link, useParams } from "react-router";
 import { fromExample } from "@/features/examples";
 import { useCreateNote } from "@/features/notes";
+import { PageMessage } from "@/shared/ui/PageMessage";
 
 export function ExamplePage() {
+  const { t } = useTranslation("pages", { keyPrefix: "example" });
+  const { t: tNote } = useTranslation("notebook");
   const { name = "" } = useParams();
   const create = useCreateNote();
   const [problem, setProblem] = useState<string | null>(null);
@@ -15,15 +19,13 @@ export function ExamplePage() {
     started.current = true;
     const notebook = fromExample(name);
     if (!notebook) {
-      setProblem(`Nie ma przykładu „${name}”.`);
+      setProblem(t("missing", { name }));
       return;
     }
-    void create(notebook, { replace: true }).then((ok) => ok || setProblem("Serwer notatek nie odpowiada."));
-  }, [name, create]);
+    void create(notebook, { replace: true }).then((ok) => ok || setProblem(t("unreachable")));
+  }, [name, create, t]);
 
-  return (
-    <div className="page-message">
-      {problem ? <><h1>{problem}</h1><p><Link to="/">Wszystkie notatki</Link></p></> : <p className="muted">Tworzę notatkę z przykładu…</p>}
-    </div>
-  );
+  return problem
+    ? <PageMessage title={problem}><p><Link to="/">{tNote("allNotes")}</Link></p></PageMessage>
+    : <PageMessage><p className="text-muted">{t("creating")}</p></PageMessage>;
 }
