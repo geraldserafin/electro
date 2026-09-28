@@ -1,0 +1,33 @@
+// The page's handle on the Typst worker: started when first needed, then kept (the compiler and
+// the fonts load once). Every document is an answer to wait for.
+import type { TypstDocument } from "./document";
+import type { Reply, Request } from "./protocol";
+
+export type Compiled = Extract<Reply, { ok: true }> | Extract<Reply, { ok: false }>;
+
+let worker: Worker | null = null;
+let next = 0;
+const waiting = new Map<number, (reply: Reply) => void>();
+
+function start(): Worker {
+  if (worker) return worker;
+  worker = new Worker(new URL("./worker.ts", import.meta.url), { type: "module" });
+  worker.onmessage = ({ data }: MessageEvent<Reply>) => {
+    waiting.get(data.id)?.(data);
+    waiting.delete(data.id);
+  };
+  return worker;
+}
+
+const send = (request: Request) => start().postMessage(request);
+
+/** Load Typst ahead of the first document (it is some megabytes). */
+export const warmUp = () => send({ type: "warm" });
+
+export function compile(document: TypstDocument): Promise<Compiled> {
+  const id = ++next;
+  return new Promise((resolve) => {
+    waiting.set(id, resolve);
+    send({ type: "compile", id, document });
+  });
+}

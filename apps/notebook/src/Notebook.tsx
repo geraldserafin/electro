@@ -159,7 +159,7 @@ export function Notebook({ initial, revision, reload, onSaved }: {
       <SyncNotice state={sync.state} onKeepMine={sync.keepMine} onTakeTheirs={sync.takeTheirs} />
       <style>{pageCss(pdf)}</style>
       {exporting && (
-        <ExportDialog pdf={pdf} codeInPdf={notebook.settings.codeInPdf} title={notebook.title} onChange={setPdf}
+        <ExportDialog notebook={notebook} pdf={pdf} onChange={setPdf}
                       onCode={(codeInPdf) => setNotebook((nb) => ({ ...nb, settings: { ...nb.settings, codeInPdf } }))}
                       onClose={() => setExporting(false)} />
       )}

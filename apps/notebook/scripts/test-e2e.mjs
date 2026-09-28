@@ -2,6 +2,7 @@
 // notebook runs, outputs appear, and a schematic element can be placed and dragged.
 import { execFileSync, spawn } from "node:child_process";
 import { writeFileSync } from "node:fs";
+import { readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { webkit } from "playwright";
@@ -205,23 +206,33 @@ try {
     check("scrolled away: a button brings the drawing back", shownAtFirst === 0 && inView && (await back.count()) === 0);
   }
 
-  // export: a dialog with the pages and what goes in; the choices are the note's
+  // export: the note set by Typst — its pages in the dialog, the PDF to download; the choices are the note's
   {
     await page.getByRole("button", { name: "Eksport PDF" }).click();
     const dialog = page.getByRole("dialog", { name: "Eksport do PDF" });
-    await dialog.locator(".export-pages").waitFor({ timeout: 10_000 });
-    const frame = dialog.locator("iframe");
-    const codeShown = () => frame.evaluate((f) => [...f.contentDocument.querySelectorAll(".sheet .code-editor")]
-      .some((el) => getComputedStyle(el).display !== "none"));
-    const before = await codeShown();
+    const sheets = dialog.locator(".export-sheets .sheet");
+    await sheets.first().waitFor({ timeout: 90_000 }); // the compiler and the fonts load the first time
+    await dialog.locator(".export-preview:not(.busy)").waitFor();
+    const firstPage = await sheets.first().getAttribute("src");
+    const decoded = await sheets.first().evaluate((img) => img.decode().then(() => img.naturalWidth > 0));
+    if (process.env.SHOTS) await dialog.screenshot({ path: `${process.env.SHOTS}/export-classic.png` });
+    await dialog.getByRole("radio", { name: /Nowoczesny/ }).click();
     await dialog.getByRole("switch", { name: "Kod komórek" }).uncheck();
-    await page.waitForTimeout(800);
-    const after = await codeShown();
+    await page.waitForFunction((src) => {
+      const img = document.querySelector(".export-sheets .sheet");
+      return img && img.getAttribute("src") !== src && !document.querySelector(".export-preview.busy");
+    }, firstPage, { timeout: 30_000 });
+    if (process.env.SHOTS) await dialog.screenshot({ path: `${process.env.SHOTS}/export-modern.png` });
+    const [download] = await Promise.all([page.waitForEvent("download"), dialog.getByRole("button", { name: "Pobierz PDF" }).click()]);
+    const file = await readFile(await download.path());
+    if (process.env.SHOTS) await writeFile(`${process.env.SHOTS}/export.pdf`, file);
     await page.keyboard.press("Escape");
     await page.waitForTimeout(1500); // saved with the note
     const settings = (await noteOnServer()).document.settings;
-    check("export: pages in a preview; code off leaves it out, and the note keeps it",
-      before && !after && settings.codeInPdf === false && !(await dialog.isVisible()));
+    check("export: Typst's pages in the dialog, a PDF to download; the note keeps the choices",
+      decoded && file.subarray(0, 5).toString() === "%PDF-" && file.length > 10_000
+      && download.suggestedFilename().endsWith(".pdf") && settings.codeInPdf === false && settings.pdf.theme === "modern"
+      && !(await dialog.isVisible()));
     await page.getByRole("button", { name: "Eksport PDF" }).click();
     await dialog.getByRole("switch", { name: "Kod komórek" }).check();
     await page.keyboard.press("Escape");

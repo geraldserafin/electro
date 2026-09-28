@@ -21,6 +21,8 @@
     "@effect/platform": "0.97.2",
     "@electro/notes-api": "workspace:*",
     "@lezer/highlight": "1.2.4",
+    "@myriaddreamin/typst-ts-renderer": "0.7.0",
+    "@myriaddreamin/typst-ts-web-compiler": "0.7.0",
     "@uiw/react-codemirror": "^4.25.12",
     "effect": "3.22.2",
     "katex": "^0.18.9",
@@ -31,9 +33,12 @@
     "rehype-katex": "^7.0.1",
     "remark-gfm": "^4.0.1",
     "remark-math": "^6.0.0",
-    "scheduler": "^0.28.0"
+    "remark-parse": "^11.0.0",
+    "scheduler": "^0.28.0",
+    "unified": "^11.0.5"
   },
   "devDependencies": {
+    "@types/mdast": "^4.0.4",
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
     "@vitejs/plugin-react": "^6.1.1",

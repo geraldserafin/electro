@@ -1,43 +1,119 @@
-// Export to PDF: the pages as they will print, next to what can be set — what goes in (code,
-// outputs, title, date, values on drawings) and how (paper, orientation, margins, text, page
-// numbers). The settings stay with the note; printing is the browser's ("Save as PDF").
+// Export to PDF: the note set by Typst (typst/) in the chosen theme, next to what can be set —
+// what goes in (code, outputs, title, contents, values on drawings) and how (theme, paper, margins,
+// text, page numbers). The pages shown are the file's own pages; the settings stay with the note.
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { Export } from "../icons";
-import { geometry, textCss, type PdfSettings } from "./settings";
+import type { Notebook } from "../types";
+import type { PdfSettings, Theme } from "./settings";
+import { compile, warmUp } from "./typst/compile";
+import { toTypst } from "./typst/document";
 
-const MM = 96 / 25.4; // CSS px per mm
+const THEMES: [Theme, string, string][] = [
+  ["classic", "Klasyczny", "jak LaTeX"],
+  ["modern", "Nowoczesny", "bezszeryfowy, żółty akcent"],
+  ["elegant", "Elegancki", "jak książka"],
+];
 
-export function ExportDialog({ pdf, codeInPdf, title, onChange, onCode, onClose }: {
+type State =
+  | { kind: "loading" }
+  | { kind: "ready"; pdf: Uint8Array; pages: Page[]; unreadable: number }
+  | { kind: "failed"; error: string };
+
+interface Page { url: string; width: number; height: number }
+
+export function ExportDialog({ notebook, pdf, onChange, onCode, onClose }: {
+  notebook: Notebook;
   pdf: PdfSettings;
-  codeInPdf: boolean;
-  title: string;
   onChange: (patch: Partial<PdfSettings>) => void;
   onCode: (on: boolean) => void;
   onClose: () => void;
 }) {
+  const [state, setState] = useState<State>({ kind: "loading" });
+  const [busy, setBusy] = useState(true);
+  const codeInPdf = notebook.settings.codeInPdf;
+  const settings = JSON.stringify(pdf); // (a new object every render: compared by what it says)
+  const shown = useRef<Page[]>([]); // the pages' images, freed when replaced and when closing
+
   useEffect(() => {
     const esc = (e: KeyboardEvent) => e.key === "Escape" && onClose();
     window.addEventListener("keydown", esc);
     return () => window.removeEventListener("keydown", esc);
   }, [onClose]);
 
-  const print = () => {
-    const before = document.title;
-    document.title = title || "notatka"; // the browser offers it as the PDF's file name
-    window.addEventListener("afterprint", () => (document.title = before), { once: true });
-    window.print();
+  useEffect(warmUp, []);
+
+  // the document again after every change (a moment later: the drawings take the new settings first)
+  useEffect(() => {
+    let alive = true;
+    setBusy(true);
+    const timer = window.setTimeout(async () => {
+      const document = toTypst(notebook, pdf, drawingOf);
+      const out = await compile(document);
+      if (!alive) return;
+      setBusy(false);
+      if (!out.ok) return setState({ kind: "failed", error: out.error });
+      shown.current.forEach((p) => URL.revokeObjectURL(p.url));
+      shown.current = pagesOf(out.svg);
+      if (!shown.current.length) return setState({ kind: "failed", error: "podgląd stron się nie wczytał" });
+      setState({ kind: "ready", pdf: out.pdf, pages: shown.current, unreadable: out.unreadable });
+    }, 150);
+    return () => {
+      alive = false;
+      clearTimeout(timer);
+    };
+    // the note's content and the settings (compared by value)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [notebook.cells, notebook.title, codeInPdf, settings]);
+
+  useEffect(() => () => shown.current.forEach((p) => URL.revokeObjectURL(p.url)), []);
+
+  const download = () => {
+    if (state.kind !== "ready") return;
+    const url = URL.createObjectURL(new Blob([state.pdf as BlobPart], { type: "application/pdf" }));
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `${fileName(notebook.title)}.pdf`;
+    link.click();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
   };
 
+  const pages = state.kind === "ready" ? state.pages.length : 0;
   return createPortal(
     <div className="export-backdrop no-print" onPointerDown={(e) => e.target === e.currentTarget && onClose()}>
       <div className="export-dialog" role="dialog" aria-label="Eksport do PDF">
-        <Preview pdf={pdf} codeInPdf={codeInPdf} />
+        <div className={`export-preview ${busy ? "busy" : ""}`}>
+          {state.kind === "loading" && <p className="export-wait">Przygotowuję skład PDF…</p>}
+          {state.kind === "failed" && <p className="export-wait error">Nie udało się złożyć PDF: {state.error}</p>}
+          {state.kind === "ready" && (
+            <div className="export-sheets">
+              {state.pages.map((page, i) => (
+                <img key={page.url} className="sheet" src={page.url} alt={`Strona ${i + 1}`}
+                     style={{ aspectRatio: `${page.width} / ${page.height}` }} />
+              ))}
+            </div>
+          )}
+          {pages > 0 && <span className="export-pages">{pages} {plural(pages, "strona", "strony", "stron")}</span>}
+        </div>
         <aside className="export-options">
           <h2>Eksport do PDF</h2>
+          <Group label="Motyw">
+            <div className="theme-choice" role="radiogroup" aria-label="Motyw">
+              {THEMES.map(([theme, name, hint]) => (
+                <button key={theme} role="radio" aria-checked={pdf.theme === theme} className={`theme-${theme} ${pdf.theme === theme ? "on" : ""}`}
+                        onClick={() => onChange({ theme })}>
+                  <span className="theme-sample">Aa</span>
+                  <span className="theme-name">{name}</span>
+                  <small>{hint}</small>
+                </button>
+              ))}
+            </div>
+          </Group>
           <Group label="W dokumencie">
             <Toggle label="Tytuł" on={pdf.title} set={(title) => onChange({ title })} />
             <Toggle label="Data pod tytułem" on={pdf.date} set={(date) => onChange({ date })} disabled={!pdf.title} />
+            <Toggle label="Spis treści" on={pdf.outline} set={(outline) => onChange({ outline })} />
+            <Toggle label="Numerowane nagłówki" hint="1., 1.1., …" on={pdf.numbering} set={(numbering) => onChange({ numbering })} />
             <Toggle label="Kod komórek" on={codeInPdf} set={onCode} />
             <Toggle label="Wyniki kodu" hint="to, co komórki wypisały i narysowały" on={pdf.outputs} set={(outputs) => onChange({ outputs })} />
             <Toggle label="Wartości na schematach" hint="prądy i napięcia z ostatniego uruchomienia" on={pdf.results}
@@ -52,18 +128,54 @@ export function ExportDialog({ pdf, codeInPdf, title, onChange, onCode, onClose 
                     options={[["narrow", "Wąskie"], ["normal", "Zwykłe"], ["wide", "Szerokie"]]} />
             <Choice label="Tekst" value={pdf.text} set={(text) => onChange({ text })}
                     options={[["small", "Mały"], ["normal", "Zwykły"], ["large", "Duży"]]} />
-            <Toggle label="Numery stron" hint="Chrome i Edge" on={pdf.pageNumbers} set={(pageNumbers) => onChange({ pageNumbers })} />
+            <Toggle label="Numery stron" on={pdf.pageNumbers} set={(pageNumbers) => onChange({ pageNumbers })} />
           </Group>
+          {state.kind === "ready" && state.unreadable > 0 && (
+            <p className="export-note">
+              Nie każdy wzór dało się złożyć ({state.unreadable}): Typst nie zna któregoś z poleceń LaTeX, więc w PDF jest sam zapis.
+            </p>
+          )}
           <div className="export-actions">
             <button onClick={onClose}>Zamknij</button>
-            <button className="primary" onClick={print}><Export /> Drukuj / zapisz PDF</button>
+            <button className="primary" onClick={download} disabled={state.kind !== "ready"}><Export /> Pobierz PDF</button>
           </div>
-          <p className="export-note">Podgląd dzieli strony w przybliżeniu — ostateczne podziały ustala przeglądarka.</p>
         </aside>
       </div>
     </div>,
     document.body,
   );
+}
+
+/** A schematic cell's drawing, as the page has it (the hidden print drawing). */
+const drawingOf = (id: string) => document.querySelector<SVGSVGElement>(`#cell-${CSS.escape(id)} .print-drawing svg`);
+
+/** Polish plurals: 1 strona, 2–4 (22–24, …) strony, 5+ (and 12–14) stron. */
+const plural = (n: number, one: string, few: string, many: string) =>
+  n === 1 ? one : n % 10 >= 2 && n % 10 <= 4 && (n % 100 < 12 || n % 100 > 14) ? few : many;
+
+/** A file name from the title: without the characters file systems refuse. */
+const fileName = (title: string) => title.trim().replace(/[\\/:*?"<>|]+/g, " ").replace(/\s+/g, " ").trim() || "notatka";
+
+/**
+ * The pages of Typst's SVG (one tall picture: the pages one under another), each an image of its
+ * own — its glyphs and styles with it, so nothing of it touches the app's own styles.
+ */
+function pagesOf(svg: string): Page[] {
+  // (its script, for text selection in a live view, is not XML-safe — and not needed in an image)
+  const doc = new DOMParser().parseFromString(svg.replace(/<script[\s\S]*?<\/script>/g, ""), "image/svg+xml");
+  const root = doc.documentElement;
+  const shared = Array.from(root.children).filter((el) => !el.classList.contains("typst-page"));
+  const serializer = new XMLSerializer();
+  const common = shared.map((el) => serializer.serializeToString(el)).join("");
+  let y = 0;
+  return Array.from(root.querySelectorAll(":scope > g.typst-page")).map((page) => {
+    const width = Number(page.getAttribute("data-page-width"));
+    const height = Number(page.getAttribute("data-page-height"));
+    const top = Number(/translate\([^,]+,\s*([\d.]+)\)/.exec(page.getAttribute("transform") ?? "")?.[1] ?? y);
+    y = top + height;
+    const source = `<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 ${top} ${width} ${height}" width="${width}" height="${height}"><rect x="0" y="${top}" width="${width}" height="${height}" fill="#fff"/>${common}${serializer.serializeToString(page)}</svg>`;
+    return { url: URL.createObjectURL(new Blob([source], { type: "image/svg+xml" })), width, height };
+  });
 }
 
 function Group({ label, children }: { label: string; children: ReactNode }) {
@@ -94,89 +206,6 @@ function Choice<T extends string>({ label, value, set, options }: {
           </button>
         ))}
       </div>
-    </div>
-  );
-}
-
-// ------------------------------------------------------------------ the preview
-
-/** The app's styles as the printer sees them: print rules always on, the dark theme off, no @page. */
-function printStyles(): string {
-  const out: string[] = [];
-  const walk = (rules: CSSRuleList) => {
-    for (const rule of Array.from(rules)) {
-      if (rule instanceof CSSMediaRule) {
-        const media = rule.media.mediaText;
-        if (media.includes("print")) walk(rule.cssRules);
-        else if (!media.includes("prefers-color-scheme")) out.push(rule.cssText);
-      } else if (!(rule instanceof CSSPageRule)) out.push(rule.cssText);
-    }
-  };
-  for (const sheet of Array.from(document.styleSheets)) {
-    try {
-      walk(sheet.cssRules);
-    } catch {
-      // a sheet from elsewhere (fonts): not needed for the layout
-    }
-  }
-  return out.join("\n");
-}
-
-/** The notebook as it prints: a copy of the page without what is never printed. */
-function printedNotebook(): string {
-  const source = document.querySelector(".notebook");
-  if (!source) return "";
-  const copy = source.cloneNode(true) as HTMLElement;
-  copy.querySelectorAll(".no-print, .cell-tools, .add-row, .island").forEach((el) => el.remove());
-  return copy.outerHTML;
-}
-
-function Preview({ pdf, codeInPdf }: { pdf: PdfSettings; codeInPdf: boolean }) {
-  const frame = useRef<HTMLIFrameElement>(null);
-  const [pages, setPages] = useState(0);
-
-  useEffect(() => {
-    // after the notebook took the new settings (its classes, the date line) — then lay out pages
-    const timer = window.setTimeout(() => {
-      const doc = frame.current?.contentDocument;
-      if (!doc || !frame.current) return;
-      const g = geometry(pdf);
-      const content = printedNotebook();
-      doc.open();
-      doc.write(`<!doctype html><html><head><style>${printStyles()}</style><style>${textCss(pdf)}</style><style>
-        html { background: transparent; } body { margin: 0; padding: 16px; background: transparent; }
-        .measure { width: ${g.contentWidth}mm; position: absolute; visibility: hidden; }
-        .sheet { position: relative; width: ${g.width}mm; height: ${g.height}mm; margin: 0 auto 16px; background: #fff;
-                 box-shadow: 0 1px 3px rgba(0,0,0,.18), 0 6px 20px rgba(0,0,0,.12); overflow: hidden; }
-        .sheet-inner { position: absolute; left: ${g.marginX}mm; top: ${g.marginY}mm; width: ${g.contentWidth}mm;
-                       height: ${g.contentHeight}mm; overflow: hidden; }
-        .page-number { position: absolute; bottom: ${g.marginY / 2}mm; left: 0; right: 0; text-align: center;
-                       font: 9pt system-ui, sans-serif; color: #666; }
-      </style></head><body><div class="measure">${content}</div></body></html>`);
-      doc.close();
-      const layout = () => {
-        const measure = doc.querySelector<HTMLElement>(".measure");
-        if (!measure || !frame.current) return;
-        const pageHeight = g.contentHeight * MM;
-        const count = Math.max(1, Math.ceil(measure.scrollHeight / pageHeight));
-        measure.remove();
-        doc.body.innerHTML = Array.from({ length: count }, (_, i) => `
-          <div class="sheet"><div class="sheet-inner"><div style="margin-top: ${-i * pageHeight}px">${content}</div></div>
-          ${pdf.pageNumbers ? `<div class="page-number">${i + 1} / ${count}</div>` : ""}</div>`).join("");
-        const fit = Math.min(1, (frame.current.clientWidth - 32) / (g.width * MM));
-        doc.documentElement.style.zoom = String(fit);
-        setPages(count);
-      };
-      // KaTeX fonts and the like: lay out once they are in
-      void (doc.fonts?.ready ?? Promise.resolve()).then(layout);
-    }, 120);
-    return () => clearTimeout(timer);
-  }, [pdf, codeInPdf]);
-
-  return (
-    <div className="export-preview">
-      <iframe ref={frame} title="Podgląd PDF" />
-      {pages > 0 && <span className="export-pages">{pages} {pages === 1 ? "strona" : pages < 5 ? "strony" : "stron"}</span>}
     </div>
   );
 }

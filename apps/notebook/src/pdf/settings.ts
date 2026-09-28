@@ -1,10 +1,15 @@
-// What goes into the PDF and how it is set: kept with the note (settings.pdf), so the export —
-// and plain Ctrl+P — look the same every time.
+// What goes into the PDF and how it is set: kept with the note (settings.pdf), so the export looks
+// the same every time. The PDF is set by Typst (typst/): these choose its theme and its parts.
 import { createContext, useContext } from "react";
 
+export type Theme = "classic" | "modern" | "elegant";
+
 export interface PdfSettings {
+  theme: Theme;
   title: boolean; // the title at the top
   date: boolean; // today's date under it
+  outline: boolean; // a table of contents after the title
+  numbering: boolean; // headings numbered: 1., 1.1., …
   outputs: boolean; // what code cells printed / drew
   results: boolean; // values found by a run, on the drawings
   paper: "A4" | "Letter";
@@ -15,7 +20,7 @@ export interface PdfSettings {
 }
 
 export const DEFAULTS: PdfSettings = {
-  title: true, date: false, outputs: true, results: false,
+  theme: "classic", title: true, date: false, outline: false, numbering: false, outputs: true, results: false,
   paper: "A4", orientation: "portrait", margins: "normal", text: "normal", pageNumbers: false,
 };
 
