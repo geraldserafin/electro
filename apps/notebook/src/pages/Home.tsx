@@ -7,8 +7,7 @@ import { useTranslation } from "react-i18next";
 import { EXAMPLES, fromExample } from "@/features/examples";
 import { Card, CardSkeletons, NewCard, NOTES, notesAtom, removeNote, toDocument, useCreateNote, useWhen } from "@/features/notes";
 import { library } from "@/features/schematic";
-import { LanguageButton } from "@/features/language";
-import { ThemeButton } from "@/features/theme";
+import { SettingsMenu } from "@/features/settings";
 import { blank, copyOf, FormatError, upload } from "@/shared/model/format";
 import { Upload } from "@/shared/ui/icons";
 import { Brand, IslandButton, Islands } from "@/shared/ui/Island";
@@ -46,8 +45,7 @@ export function Home() {
         <IslandButton onClick={() => fileInput.current?.click()} title={t("openFileTitle")} aria-label={t("openFile")}><Upload /></IslandButton>
         <input ref={fileInput} type="file" accept=".json" hidden
                onChange={(e) => { const file = e.target.files?.[0]; e.target.value = ""; if (file) void start(async () => copyOf(await upload(file))); }} />
-        <LanguageButton />
-        <ThemeButton />
+        <SettingsMenu />
       </Islands>
 
       <div className="mx-auto max-w-310 px-8 pt-21 pb-24">

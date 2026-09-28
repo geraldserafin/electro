@@ -1,16 +1,12 @@
 // Light, dark, or as the system has it (and following it when it changes). data-theme on <html>
-// is always "light" or "dark": styles.css has the dark colours under [data-theme="dark"].
+// is always "light" or "dark": tokens.css has the dark colours under [data-theme="dark"].
 // Remembered in this browser; index.html sets it before the first paint, so no flash.
 import { useState } from "react";
-import { useTranslation } from "react-i18next";
-import { Moon, Sun, System } from "@/shared/ui/icons";
-import { IslandButton } from "@/shared/ui/Island";
 
-type Theme = "system" | "light" | "dark";
+export const THEMES = ["system", "light", "dark"] as const;
+export type Theme = (typeof THEMES)[number];
 
 const KEY = "electro-theme";
-const NEXT: Record<Theme, Theme> = { system: "light", light: "dark", dark: "system" };
-const ICON = { system: <System />, light: <Sun />, dark: <Moon /> };
 const systemDark = matchMedia("(prefers-color-scheme: dark)");
 
 function saved(): Theme {
@@ -29,8 +25,8 @@ function apply(theme: Theme) {
 
 systemDark.addEventListener("change", () => apply(saved()));
 
-export function ThemeButton() {
-  const { t } = useTranslation("theme");
+/** The theme chosen, and choosing one (shown at once, remembered). */
+export function useTheme(): [Theme, (theme: Theme) => void] {
   const [theme, setTheme] = useState(saved);
   const choose = (next: Theme) => {
     setTheme(next);
@@ -42,10 +38,5 @@ export function ThemeButton() {
       // not remembered — fine
     }
   };
-  return (
-    <IslandButton onClick={() => choose(NEXT[theme])}
-            title={t("next", { name: t(theme), next: t(NEXT[theme]) })} aria-label={t("theme", { name: t(theme) })}>
-      {ICON[theme]}
-    </IslandButton>
-  );
+  return [theme, choose];
 }

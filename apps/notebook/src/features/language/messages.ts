@@ -1,8 +1,10 @@
-// each in its own language: the button says, in the next language, what a click does
+// the languages go by their own names, whatever the page speaks
 export const pl = {
-  switch: "Zmień język na polski",
+  label: "Język",
+  name: { pl: "Polski", en: "English" },
 };
 
 export const en: typeof pl = {
-  switch: "Switch the language to English",
+  label: "Language",
+  name: { pl: "Polski", en: "English" },
 };

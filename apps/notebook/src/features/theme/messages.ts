@@ -1,15 +1,13 @@
 export const pl = {
-  theme: "Motyw: {{name}}",
-  next: "Motyw: {{name}} (kliknij: {{next}})",
-  system: "systemowy",
-  light: "jasny",
-  dark: "ciemny",
+  label: "Motyw",
+  system: "Systemowy",
+  light: "Jasny",
+  dark: "Ciemny",
 };
 
 export const en: typeof pl = {
-  theme: "Theme: {{name}}",
-  next: "Theme: {{name}} (click: {{next}})",
-  system: "system",
-  light: "light",
-  dark: "dark",
+  label: "Theme",
+  system: "System",
+  light: "Light",
+  dark: "Dark",
 };

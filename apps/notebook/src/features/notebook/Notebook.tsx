@@ -2,16 +2,15 @@
 // The page (pages/NotePage.tsx) reads the note by its address and hands it over.
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { LanguageButton } from "@/features/language";
 import { SyncNotice, useNoteSync } from "@/features/notes";
 import { ExportDialog, PdfContext, pdfOf, warmUpWhenIdle, type PdfSettings } from "@/features/pdf-export";
 import { kernel, usePython } from "@/features/python";
 import { library } from "@/features/schematic";
-import { ThemeButton } from "@/features/theme";
+import { SettingsMenu } from "@/features/settings";
 import { newCell } from "@/shared/model/cells";
 import type { Cell, CellType, Notebook as NotebookData } from "@/shared/model/types";
 import { Back, Export, OutlineIcon, RunAll } from "@/shared/ui/icons";
-import { Brand, IslandButton, IslandLink, Islands } from "@/shared/ui/Island";
+import { IslandButton, IslandLink, Islands } from "@/shared/ui/Island";
 import { AddRow } from "./AddRow";
 import { CellFrame } from "./CellFrame";
 import { freeName, moveCell } from "./cellList";
@@ -77,11 +76,10 @@ export function Notebook({ initial, revision, reload, onSaved }: {
       onPointerDownCapture={(e) => {
         if (!(e.target as Element).closest("[data-cell], [data-keep-focus]")) setFocused(null);
       }}>
-      {/* left: the way back and the app (as on the home screen), under it a sidebar — the note's
-          title and its sections; right: run, PDF, language, theme */}
+      {/* left: the way back, and the sidebar's switch (the note's title and its sections);
+          right: run, PDF, the settings (theme, language) */}
       <Islands side="left">
         <IslandLink to="/" title={t("allNotes")} aria-label={t("allNotes")}><Back /></IslandLink>
-        <Brand />
         <IslandButton on={outline} onClick={() => setOutline(!outline)} aria-pressed={outline}
                       title={outline ? t("hideOutline") : t("outline")} aria-label={t("outline")}>
           <OutlineIcon />
@@ -92,8 +90,7 @@ export function Notebook({ initial, revision, reload, onSaved }: {
         <IslandButton waiting={!ready} onClick={runAll} disabled={!ready}
                       title={ready ? t("runAll") : python.kind === "error" ? t("python.failed", { error: python.error }) : t("python.loading")} aria-label={t("runAll")}><RunAll /></IslandButton>
         <IslandButton onClick={() => setExporting(true)} title={t("exportPdf")} aria-label={t("exportPdf")}><Export /></IslandButton>
-        <LanguageButton />
-        <ThemeButton />
+        <SettingsMenu />
       </Islands>
       <SyncNotice state={sync.state} onKeepMine={sync.keepMine} onTakeTheirs={sync.takeTheirs} />
       {exporting && (

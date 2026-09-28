@@ -71,7 +71,8 @@ nie `@/features/schematic/Editor`); wewnątrz plastra importy są względne. `@/
 | `features/pdf-export/` | eksport do PDF: dialog (`usePreview`: skład po każdej zmianie i strony jako obrazki), ustawienia, Typst w workerze; PDF jest w języku aplikacji (dzielenie wyrazów, tytuł spisu treści, data) |
 | `features/examples/` | przykładowe notatki |
 | `features/solution/` | co mówi solver: typy z Pythona (błędy, ostrzeżenia, powody kroków, rozwiązanie krok po kroku — `shared/model/issues.ts`) słowami, w języku czytającego; też w PDF |
-| `features/theme/` | motyw jasny / ciemny / systemowy |
+| `features/theme/`, `features/language/` | motyw (jasny / ciemny / systemowy) i język (PL / EN): wybór, zapamiętany w przeglądarce, i jego grupa w menu |
+| `features/settings/` | menu ⋯ w prawym górnym rogu (strona główna i notatka): motyw i język |
 | `python/electro_notebook/kernel.py` | (Python) wykonuje komórki, zamienia wyniki na wyjścia (`_repr_svg_`, `_repr_markdown_`, `_repr_latex_`) |
 
 **Style.** Tailwind v4 (`src/app/styles.css`). Kolory to wyłącznie tokeny aplikacji (`bg-surface`, `text-muted`,
@@ -87,7 +88,7 @@ i rozmiary dokumentu w `Markdown.css`.
 Testy e2e szukają elementów po rolach, etykietach i atrybutach `data-*` (np. `data-cell`, `data-output`), nie po klasach.
 
 **Języki.** i18next: każdy plaster ma `messages.ts` (`pl` i `en` o tym samym kształcie — pilnuje TypeScript) jako
-swoją przestrzeń nazw; `src/app/i18n.ts` je zbiera. Przełącznik PL/EN jest w wyspach; wybór zostaje w przeglądarce,
+swoją przestrzeń nazw; `src/app/i18n.ts` je zbiera. Język wybiera się w menu ⋯; wybór zostaje w przeglądarce,
 a przed wyborem — język przeglądarki (angielski, gdy nie zna żadnego z naszych). Testy e2e chodzą z `pl-PL`.
 
 Python nie mówi nic słowami: to, co poszło nie tak, to typ (`electro.issues`, np. `MissingData(targets, needed,
