@@ -59,7 +59,7 @@ def test_the_editors_symbol_file_is_up_to_date():
 
     from electro_render import symbol_library
 
-    path = Path(__file__).parent.parent / "src/schematic/symbols.json"
+    path = Path(__file__).parent.parent / "src/features/schematic/symbols.json"
     assert json.loads(path.read_text(encoding="utf-8")) == symbol_library(), "run scripts/make_symbols.py"
 
 

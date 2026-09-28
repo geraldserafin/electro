@@ -1,4 +1,5 @@
 import react from "@vitejs/plugin-react";
+import { fileURLToPath } from "node:url";
 import { defineConfig, type Plugin } from "vite";
 
 /**
@@ -22,6 +23,7 @@ const notesServer = process.env.NOTES_SERVER ?? "http://localhost:5191";
 
 export default defineConfig({
   plugins: [react(), reloadOnPython()],
+  resolve: { alias: { "@": fileURLToPath(new URL("./src", import.meta.url)) } }, // @/features/…, @/shared/…
   worker: { format: "es" },
   base: "/", // routes like /notes/:id: assets from the root
   // the notes server (apps/server) behind /api, in development and in the preview build

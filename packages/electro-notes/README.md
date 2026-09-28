@@ -1,6 +1,6 @@
 # electro-notes
 
-Plik notatnika electro, `*.electro.json` — ten sam format w notatniku webowym (`apps/notebook/src/format.ts`),
+Plik notatnika electro, `*.electro.json` — ten sam format w notatniku webowym (`apps/notebook/src/shared/model/format.ts`),
 w Pythonie i (docelowo) na serwerze z notatkami użytkowników.
 
 ```python

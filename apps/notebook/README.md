@@ -50,12 +50,27 @@ Testy kernela w zwykłym Pythonie (`python/test_kernel.py`) chodzą razem z resz
 
 ## Jak to jest zbudowane
 
-| plik | rola |
+Front jest pocięty na warstwy; każda importuje tylko z warstw pod sobą:
+
+```
+src/app/        wejście (main.tsx: routing), style globalne
+src/pages/      strony pod adresami — składają funkcje w całość (Home, NotePage, ExamplePage)
+src/features/   pionowe plastry: każdy ma swoje komponenty, stan i logikę
+src/shared/     to, co nie wie o żadnej funkcji: model notatki (typy, format pliku), ui (ikony, Markdown, szkielety)
+```
+
+Plaster z innego plastra bierze tylko to, co ten wystawia w swoim `index.ts` (`@/features/schematic`,
+nie `@/features/schematic/Editor`); wewnątrz plastra importy są względne. `@/` to `src/`.
+
+| plaster | rola |
 |---|---|
-| `python/electro_notebook/kernel.py` | wykonuje komórki, zamienia wyniki na wyjścia (`_repr_svg_`, `_repr_markdown_`, `_repr_latex_`) |
-| `src/python/worker.ts` | ładuje Pyodide + sympy + nasze paczki (z `bundle.json`) |
-| `src/python/kernel.ts` | wywołania workera jako obietnice |
-| `src/schematic/` | edytor siatki; `symbols.json` to wygląd elementów wygenerowany z `electro_render.symbol_library()` (`scripts/make_symbols.py`, test pilnuje zgodności), więc schemat wygląda jak raport i widać go, zanim Python się załaduje |
-| `src/cells/` | komórki i wyjścia |
+| `features/notebook/` | edycja notatki: komórki (`cells/`), spis treści, tytuł |
+| `features/notes/` | notatki na serwerze: lista, zapis i konflikty, galeria |
+| `features/schematic/` | edytor siatki; `symbols.json` to wygląd elementów wygenerowany z `electro_render.symbol_library()` (`scripts/make_symbols.py`, test pilnuje zgodności), więc schemat wygląda jak raport i widać go, zanim Python się załaduje |
+| `features/python/` | `worker.ts` ładuje Pyodide + sympy + nasze paczki (z `bundle.json`), `kernel.ts` — wywołania workera jako obietnice |
+| `features/pdf-export/` | eksport do PDF: dialog, ustawienia, Typst w workerze |
+| `features/examples/` | przykładowe notatki |
+| `features/theme/` | motyw jasny / ciemny / systemowy |
+| `python/electro_notebook/kernel.py` | (Python) wykonuje komórki, zamienia wyniki na wyjścia (`_repr_svg_`, `_repr_markdown_`, `_repr_latex_`) |
 
 Przy `devenv up` zmiany w `packages/` wystarczy odświeżyć w przeglądarce. Przy samym `pnpm dev` `bundle.json` powstaje tylko przy starcie (albo użyj `pnpm python --watch`).
