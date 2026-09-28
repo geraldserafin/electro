@@ -4,11 +4,12 @@ import { usePdf } from "@/features/pdf-export";
 import { kernel } from "@/features/python";
 import { board, BoardIsland, PdfDrawing, SchematicEditor, type Camera } from "@/features/schematic";
 import type { Cell, SchematicData, SchematicView, SymbolLibrary } from "@/shared/model/types";
+import type { Failure } from "@/shared/model/issues";
+import { FailureBox } from "@/features/solution";
 import { Flash } from "@/shared/ui/icons";
 import { CodeEditor } from "./CodeEditor";
 import { editorFrame, runOnShiftEnter } from "./CodeCell";
 import { NameBox } from "./NameBox";
-import { errorBox } from "./Outputs";
 import { Problems } from "./Problems";
 import { ResultsTable } from "./ResultsTable";
 import { RunButton } from "./RunButton";
@@ -34,7 +35,7 @@ export function SchematicCell({ cell, update, library, simulate, running }: {
   // the code view: `generated` is the drawing as code, `source` what is in the editor now
   const [source, setSource] = useState<string | null>(null);
   const [generated, setGenerated] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<Failure | null>(null);
   const [busy, setBusy] = useState(false);
 
   // the drawing `source` describes: the code is written anew only after the drawing was edited
@@ -54,7 +55,7 @@ export function SchematicCell({ cell, update, library, simulate, running }: {
   };
   // opened in the code view (saved like that): show the code once Python is up
   useEffect(() => {
-    if (view === "code" && source === null) kernel.ready.then(load).catch((e) => setError(String(e)));
+    if (view === "code" && source === null) kernel.ready.then(load).catch((e) => setError({ data: String(e) }));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [view]);
 
@@ -86,7 +87,7 @@ export function SchematicCell({ cell, update, library, simulate, running }: {
         update({ view: "schematic" });
       }
     } catch (e) {
-      setError(String(e));
+      setError({ data: String(e) });
     } finally {
       setBusy(false);
     }
@@ -139,7 +140,7 @@ export function SchematicCell({ cell, update, library, simulate, running }: {
               ? <p className="m-2 text-muted">{t("schematic.toCode")}</p>
               : <CodeEditor value={source} onChange={setSource} minHeight={120} />}
           </div>
-          {error && <pre data-output="error" className={cn(errorBox, "text-[14px]")}>{error}</pre>}
+          {error && <FailureBox failure={error} className="text-[14px]" />}
         </div>
       )}
       {/* the PDF shows the circuit as drawn; results belong to code cells: schematic(układ1, sol) */}

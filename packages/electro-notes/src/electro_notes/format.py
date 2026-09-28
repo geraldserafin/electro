@@ -37,12 +37,14 @@ from typing import Any, Union
 
 from electro_schematic import Schematic
 
+from .issues import (
+    BrokenDrawing, FormatError, NewerVersion, NoCellId, NoSuchSchematic, NotADrawing, NotAnObject, NotANotebook, NotJson,
+    NotText, NoVersion, OtherFormat, RepeatedCellId, RepeatedSchematicName, SchematicExists, UnknownCellType,
+    UnnamedSchematic,
+)
+
 FORMAT = "electro-notebook"
 VERSION = 2
-
-
-class FormatError(ValueError):
-    """The file is not a notebook (or a broken one); the message says where."""
 
 
 def now() -> str:
@@ -135,7 +137,7 @@ class Notebook:
 
             drawing = layout(drawing)
         if name in self.schematics:
-            raise ValueError(f"Schemat „{name}” już jest w notatniku.")
+            raise SchematicExists(name)
         return self._add(SchematicCell(name, drawing))
 
     def _add(self, cell):
@@ -154,7 +156,7 @@ class Notebook:
         for c in self.cells:
             if isinstance(c, SchematicCell) and name in (c.name, c.variable):
                 return c.schematic
-        raise KeyError(f"Nie ma schematu {name!r}. Są: {', '.join(self.schematics) or 'żadne'}.")
+        raise NoSuchSchematic(name, list(self.schematics))
 
     def strip_outputs(self) -> Notebook:
         """Forget what runs left behind (outputs, results): the document alone."""
@@ -223,7 +225,7 @@ def loads(text: str) -> Notebook:
     try:
         data = json.loads(text)
     except json.JSONDecodeError as err:
-        raise FormatError(f"To nie jest JSON (linia {err.lineno}): {err.msg}") from None
+        raise NotJson(err.lineno, err.msg) from None
     return from_dict(data)
 
 
@@ -247,11 +249,11 @@ def from_dict(data: Any) -> Notebook:
 def migrate(data: Any) -> dict[str, Any]:
     """Any known version → the current one (a new dict; the input is left alone)."""
     if not isinstance(data, dict) or not isinstance(data.get("cells"), list):
-        raise FormatError("To nie jest plik notatnika: brak listy „cells”.")
+        raise NotANotebook()
     data = json.loads(json.dumps(data))  # a deep copy
     version = data.get("version")
     if data.get("format", FORMAT) != FORMAT:
-        raise FormatError(f"To plik „{data['format']}”, a nie notatnik electro.")
+        raise OtherFormat(str(data["format"]))
     if version == 1:  # before the file format had a name, an id and settings
         stamp = now()
         data = {
@@ -262,9 +264,9 @@ def migrate(data: Any) -> dict[str, Any]:
         }
         version = 2
     if not isinstance(version, int):
-        raise FormatError("W pliku nie ma wersji formatu („version”).")
+        raise NoVersion()
     if version > VERSION:
-        raise FormatError(f"Plik jest w nowszej wersji formatu ({version}); ta wersja electro zna {VERSION}.")
+        raise NewerVersion(version, VERSION)
     return data
 
 
@@ -279,34 +281,34 @@ def _cell_v1(cell: Any) -> Any:
 def _check(data: dict[str, Any]) -> None:
     for key, kind in (("id", str), ("title", str), ("created", str), ("modified", str)):
         if not isinstance(data.get(key), kind):
-            raise FormatError(f"{key}: brak albo zły typ (oczekiwano tekstu).")
+            raise NotText(key)
     if not isinstance(data.get("settings", {}), dict):
-        raise FormatError("settings: oczekiwano obiektu.")
+        raise NotAnObject("settings")
     ids: set[str] = set()
     names: set[str] = set()
     for i, c in enumerate(data["cells"]):
         where = f"cells[{i}]"
         if not isinstance(c, dict):
-            raise FormatError(f"{where}: oczekiwano obiektu.")
+            raise NotAnObject(where)
         if not isinstance(c.get("id"), str) or not c["id"]:
-            raise FormatError(f"{where}.id: brak identyfikatora komórki.")
+            raise NoCellId(f"{where}.id")
         if c["id"] in ids:
-            raise FormatError(f"{where}.id: identyfikator „{c['id']}” się powtarza.")
+            raise RepeatedCellId(f"{where}.id", c["id"])
         ids.add(c["id"])
         if c.get("type") not in ("markdown", "code", "schematic"):
-            raise FormatError(f"{where}.type: nieznany rodzaj komórki {c.get('type')!r}.")
+            raise UnknownCellType(f"{where}.type", repr(c.get("type")))
         if c["type"] != "schematic" and not isinstance(c.get("source"), str):
-            raise FormatError(f"{where}.source: oczekiwano tekstu.")
+            raise NotText(f"{where}.source")
         if c["type"] == "schematic":
             if not isinstance(c.get("name"), str) or not c["name"].strip():
-                raise FormatError(f"{where}.name: schemat bez nazwy.")
+                raise UnnamedSchematic(f"{where}.name")
             if c["name"] in names:
-                raise FormatError(f"{where}.name: dwa schematy nazywają się „{c['name']}”.")
+                raise RepeatedSchematicName(f"{where}.name", c["name"])
             names.add(c["name"])
             drawing = c.get("schematic")
             if not isinstance(drawing, dict) or not isinstance(drawing.get("elements"), list) \
                     or not isinstance(drawing.get("wires"), list):
-                raise FormatError(f"{where}.schematic: oczekiwano {{\"elements\": [...], \"wires\": [...]}}.")
+                raise NotADrawing(f"{where}.schematic")
 
 
 def _cell_from_dict(c: dict[str, Any], where: str) -> Cell:
@@ -318,7 +320,7 @@ def _cell_from_dict(c: dict[str, Any], where: str) -> Cell:
     try:
         drawing = Schematic.from_json(json.dumps(c["schematic"]))
     except (TypeError, KeyError) as err:
-        raise FormatError(f"{where}.schematic: zepsuty schemat ({err}).") from None
+        raise BrokenDrawing(f"{where}.schematic", repr(err)) from None
     return SchematicCell(c["name"], drawing, c["id"], c.get("view", "schematic"), c.get("results"),
                          c.get("problems"), bool(c.get("stale", False)),
                          _rest(c, "name", "schematic", "view", "results", "problems", "stale"))

@@ -1,6 +1,8 @@
 // A note as a Typst document: main.typ (the cells, in order), config.typ (the settings and the
 // formulas) and the drawings as SVG files. electro.typ (the theme) gives the pieces their look.
 import type { Notebook, Output } from "@/shared/model/types";
+import type { Failure } from "@/shared/model/issues";
+import { sayIn } from "@/features/solution";
 import type { PdfSettings } from "../settings";
 import { markdownToTypst, str, text, topHeading } from "./markdown";
 import template from "./electro.typ?raw";
@@ -45,11 +47,19 @@ export function toTypst(notebook: Notebook, pdf: PdfSettings, drawingOf: (cellId
     files[path] = source;
     return `#drawing(${str(path)}, ${(width * PX).toFixed(1)}pt)`;
   };
+  const say = sayIn(lang);
+  // what went wrong: an issue in the document's language (its math set by Typst), else Python's words
+  const failure = (f: Failure, kind: "error" | "warning"): string => {
+    if (f.issue) return kind === "error" ? `#failed[${md(say.line(f.line) + say.issue(f.issue))}]` : `#warning[${md(say.issue(f.issue))}]`;
+    return kind === "error" ? `#error(${str((say.line(f.line) + f.data).trimEnd())})` : `#warning[${text(f.data)}]`;
+  };
   const output = (o: Output): string => {
     switch (o.type) {
       case "markdown": return md(o.data);
-      case "error": return `#error(${str(o.data.trimEnd())})`;
-      case "warning": return `#warning[${text(o.data)}]`;
+      case "solution": return md(say.steps(o.data));
+      case "error":
+      case "warning": return failure(o, o.type);
+      case "issue": return failure(o, o.kind);
       case "svg": {
         const svg = parseSvg(o.data);
         return svg ? image(svg, false) : "";

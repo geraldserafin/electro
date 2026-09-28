@@ -26,7 +26,7 @@ export function SyncNotice({ state, onKeepMine, onTakeTheirs }: {
     return (
       <div className={notice} data-notice role="status">
         <WarningIcon />
-        <span>{state.kind === "offline" ? t("sync.offline") : t("sync.failed", { message: state.message })}</span>
+        <span>{state.kind === "offline" ? t("sync.offline") : state.tag === "NoteIdMismatch" ? t("sync.mismatch") : t("sync.failed", { tag: state.tag })}</span>
       </div>
     );
   return null;

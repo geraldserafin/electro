@@ -12,7 +12,7 @@ from collections import Counter
 from xml.sax.saxutils import escape
 
 from electro import circuit as ct
-from electro.components import OPEN, Ammeter, Hole, Voltmeter
+from electro.components import Ammeter, Hole, Voltmeter, notation
 from electro.values import UNKNOWN, fmt
 from electro_schematic import GRID, KINDS, Schematic, layout
 from electro_schematic.layout import label_sides
@@ -51,25 +51,12 @@ def _neg(v: Vec) -> Vec:
     return (-v[0], -v[1])
 
 
-def _short(c: ct.Circuit) -> str:
-    """Compact description of a filled hole: ``R = 2 Ω``, ``E = 17 V (odwr.)``, ``przerwa``."""
-    if c is OPEN:
-        return "przerwa"
-    if isinstance(c, ct.Transpose):
-        return f"{_short(c.part)} (odwr.)"
-    if isinstance(c, ct.Seq):
-        return ", ".join(_short(p) for p in c.parts)
-    if hasattr(c, "prefix"):
-        return f"{c.prefix} = {fmt(c.value, c.unit)}"
-    return "przewód"
-
-
 def _label_lines(element, solution) -> list[tuple[str, str]]:
     component = element.component()
     label = element.id
     if isinstance(component, Hole):
         realized = solution.realize(label) if solution is not None else None
-        return [(f"{label} = ?", "label")] if realized is None else [(f"{label}: {_short(realized)}", "solved")]
+        return [(f"{label} = ?", "label")] if realized is None else [(f"{label}: {notation(realized)}", "solved")]
     if not component.has_value:
         return [(label, "label")]
     if component.value is UNKNOWN:

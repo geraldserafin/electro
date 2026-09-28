@@ -1,6 +1,7 @@
 import pytest
 from electro import *
 from electro_schematic import Element, Schematic, Unsupported, Wire, layout
+from electro_schematic.issues import SkewedWire, UnknownKind
 
 BOARD = (VoltageSource(12) + Resistor(2)) | Resistor(4) | ((Resistor(6) | CurrentSource(1)) + VoltageSource(6).transpose())
 
@@ -100,9 +101,9 @@ def test_json_round_trip():
 
 
 def test_invalid_input_is_rejected():
-    with pytest.raises(ValueError, match="poziomo albo pionowo"):
+    with pytest.raises(SkewedWire):
         Wire([(0, 0), (1, 1)])
-    with pytest.raises(ValueError, match="Nieznany rodzaj"):
+    with pytest.raises(UnknownKind):
         Element("X", "transistor", (0, 0))
     with pytest.raises(Unsupported):
         layout(net((Resistor(1), "A", "B")))

@@ -6,6 +6,8 @@ import sympy as sp
 import electro
 
 from electro import *
+from electro.issues import ConflictingData, Equals, ParallelMismatch, SeriesMismatch
+from electro.reasons import OhmsLaw
 
 
 def test_divider_with_unknown_resistor():
@@ -111,16 +113,25 @@ def test_two_solutions_from_power():
         loop(VoltageSource(12), Resistor(), Resistor(4)).solve(P_R1=8)
 
 
-def test_type_errors_are_readable():
-    with pytest.raises(TypeError, match="szeregowo"):
+def test_type_errors_say_which():
+    with pytest.raises(SeriesMismatch) as err:
         Resistor(1) + split + Resistor(1)
-    with pytest.raises(TypeError, match="równoległe"):
+    assert (err.value.outputs, err.value.inputs) == (2, 1)
+    with pytest.raises(ParallelMismatch):
+        Resistor(1) | split
+    with pytest.raises(TypeError):  # still the built-in error they stand for
         Resistor(1) | split
 
 
-def test_explain_mentions_laws():
-    text = (supply(12) + Resistor(10) + Resistor() + ground).solve(I_R1=0.5).explain()
-    assert "prawo Ohma (R_2)" in text and "R_2 = U_R_2/I_R_2 = 7/0.5 = 14 Ω" in text
+def _step(sol, name):
+    return next(s for s in sol.shown_steps() if name in {t.name for t in s.targets})
+
+
+def test_steps_keep_their_laws():
+    sol = (supply(12) + Resistor(10) + Resistor() + ground).solve(I_R1=0.5)
+    step = _step(sol, "R_2")
+    assert step.laws[0].reason == OhmsLaw(sp.Symbol("R_2"))
+    assert str(step.formula) == "U_R_2/I_R_2" and list(step.targets.values()) == [14]
 
 
 def test_three_sources_as_parallel_branches():
@@ -162,26 +173,26 @@ def _three_unknowns():
 def test_find_several_unknowns():
     sol = _three_unknowns().solve(I_R_1=2, U_R_2=8, U_R_3=5, find=["R_1", "R_3", "E_2"])
     assert sol.answers == {"R_1": 2, "R_3": 5, "E_2": -3}
-    assert "Odpowiedź:" in sol.explain()
 
 
 def test_find_prunes_the_trace():
-    text = _three_unknowns().solve(I_R_1=2, U_R_2=8, find="R_1").explain()
-    assert "R_1 = U_R_1/I_R_1 = 4/2 = 2 Ω" in text
-    assert "I_J_1" not in text  # not needed for R_1
+    sol = _three_unknowns().solve(I_R_1=2, U_R_2=8, find="R_1")
+    assert str(_step(sol, "R_1").formula) == "U_R_1/I_R_1"
+    assert "I_J_1" not in {t.name for s in sol.shown_steps() for t in s.targets}  # not needed for R_1
 
 
 def test_missing_data_says_what_would_help():
     with pytest.raises(MissingData) as err:
         _three_unknowns().solve(I_R_1=2, U_R_2=8, find=["R_1", "R_3", "E_2"])
-    message = str(err.value)
-    assert "R_3, E_2" in message and "brakuje 1 danej" in message and "U_R_3" in message
+    assert [t.name for t in err.value.targets] == ["R_3", "E_2"] and err.value.needed == 1
+    assert any(s.name == "U_R_3" for option in err.value.options for s in option)
     assert err.value.solution.answers["R_1"] == 2  # the part that could be found is kept
 
 
 def test_missing_data_counts_redundant_givens_once():
-    with pytest.raises(MissingData, match="brakuje 2 danych"):
+    with pytest.raises(MissingData) as err:
         _three_unknowns().solve(U_R_2=8, I_R_2=2, find=["R_1", "R_3", "E_2"])
+    assert err.value.needed == 2
 
 
 def test_hole_becomes_the_simplest_element():
@@ -216,9 +227,9 @@ def test_unknown_source_can_come_out_positive():
 def test_contradiction_names_the_clashing_data():
     with pytest.raises(Contradiction) as err:
         loop(VoltageSource(12), Resistor(10)).solve(I_R_1=5)
-    message = str(err.value)
-    assert message.startswith("Sprzeczne dane:") and "E_1 = 12 V" in message and "I_R_1 = 5 A" in message
-    assert "\n" not in message  # one line, not a dump of the equations
+    assert isinstance(err.value, ConflictingData)
+    shown = lambda data: {(d.symbol.name, d.value, d.unit) for d in data if isinstance(d, Equals)}
+    assert shown(err.value.conditions) == {("I_R_1", 5, "A")} and ("E_1", 12, "V") in shown(err.value.values)
 
 
 def test_hole_with_no_current_is_a_break():
@@ -229,8 +240,9 @@ def test_hole_with_no_current_is_a_break():
 
 
 def test_two_solutions_are_named():
-    with pytest.raises(Ambiguous, match=r"R_1 = 8 Ω albo R_1 = 2 Ω"):
+    with pytest.raises(Ambiguous) as err:
         loop(VoltageSource(12), Resistor(), Resistor(4)).solve(P_R_1=8)
+    assert [[(d.symbol.name, d.value) for d in option] for option in err.value.options] == [[("R_1", 8)], [("R_1", 2)]]
     sol = loop(VoltageSource(12), Resistor(), Resistor(4)).solve(Eq(P("R_1"), 8), Eq(U("R_1"), 2 * U("R_2")))
     assert sol["R_1"].value == 8  # one more condition picks one
 
@@ -248,5 +260,6 @@ def test_meter_without_reading_reads_the_result():
 
 
 def test_meter_reading_can_contradict():
-    with pytest.raises(Contradiction, match="A_1 = 2 A"):
+    with pytest.raises(Contradiction) as err:
         loop(VoltageSource(12), Resistor(4), Ammeter(2)).solve()
+    assert ("A_1", 2) in {(d.symbol.name, d.value) for d in err.value.values}

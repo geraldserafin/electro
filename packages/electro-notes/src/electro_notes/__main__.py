@@ -20,7 +20,7 @@ def main(argv: list[str]) -> int:
         try:
             nb = load(path)
         except (FormatError, OSError) as err:
-            print(f"{path}: BŁĄD — {err}")
+            print(f"{path}: {err!r}")
             failed += 1
             continue
         if command == "upgrade":

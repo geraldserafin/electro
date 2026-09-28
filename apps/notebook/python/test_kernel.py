@@ -17,7 +17,8 @@ def test_rich_outputs():
     kernel.reset()
     run("c = supply(12) + Resistor(10) + Resistor() + ground\nsol = c.solve(I_R_1=0.5)")
     assert run("schematic(c, sol)")[0]["type"] == "svg"
-    assert run("steps(sol)")[0]["type"] == "markdown"
+    [shown] = run("steps(sol)")
+    assert shown["type"] == "solution" and shown["data"]["steps"][-1]["reason"] == {"type": "OhmsLaw", "label": "R_{2}"}
     out = run("print('hej')\ndisplay(schematic(c))\n1")
     assert [o["type"] for o in out] == ["stream", "svg", "text"]
 
@@ -25,13 +26,14 @@ def test_rich_outputs():
 def test_errors_point_at_the_cell_line():
     kernel.reset()
     [out] = run("a = 1\nloop(VoltageSource(12), Resistor(10)).solve(I_R_1=5)")
-    assert out["type"] == "error" and out["data"].startswith("linia 2: Sprzeczne dane:")
+    assert out["type"] == "error" and out["line"] == 2 and out["issue"]["type"] == "ConflictingData"
+    assert out["issue"]["conditions"] == [r"I_{R_{1}} = 5\,\mathrm{A}"]  # math in LaTeX
 
 
 def test_warnings_are_shown():
     kernel.reset()
     out = run("(supply(12) + Resistor(10) + Resistor() + ground).solve()")
-    assert out[-1]["type"] == "warning" and "brakuje" in out[-1]["data"]
+    assert out[-1]["type"] == "warning" and out[-1]["issue"]["type"] == "Underdetermined"
 
 
 def test_schematic_cells_are_available_by_name():
@@ -42,7 +44,7 @@ def test_schematic_cells_are_available_by_name():
     drawing = layout(loop(VoltageSource(12), Resistor(4))).to_json()
     out = run('schemat("petla").to_circuit().solve()["R_1"].I', petla=drawing)
     assert out == [{"type": "markdown", "data": "$\\displaystyle 3$"}]
-    assert "Nie ma schematu" in run('schemat("inny")', petla=drawing)[0]["data"]
+    assert run('schemat("inny")', petla=drawing)[0]["issue"] == {"type": "NoSuchSchematic", "name": "inny", "available": ["petla"]}
 
 
 def test_code_of_a_drawing():
@@ -87,10 +89,10 @@ def test_simulate_reports_problems():
 
     drawing = layout(loop(VoltageSource(12), Resistor())).to_json()
     [problem] = json.loads(kernel.simulate(drawing))["problems"]  # R_1 unknown and no data
-    assert problem["kind"] == "warning" and "$R_{1}$" in problem["text"]  # names in LaTeX
+    assert problem["kind"] == "warning" and "R_{1}" in problem["issue"]["targets"]  # names in LaTeX
     contradiction = layout(loop(VoltageSource(12), Resistor(4), Ammeter(2))).to_json()
     [problem] = json.loads(kernel.simulate(contradiction))["problems"]
-    assert problem["kind"] == "error" and r"$E_{1} = 12\,\mathrm{V}$" in problem["text"]
+    assert problem["kind"] == "error" and r"E_{1} = 12\,\mathrm{V}" in problem["issue"]["values"]
 
 
 def test_code_view_round_trip():
@@ -106,8 +108,9 @@ def test_code_view_round_trip():
 
 
 def test_code_view_errors_name_the_line():
-    assert json.loads(kernel.from_code("x = 1\nuklad = Resistr(1)", "uklad"))["error"].startswith("linia 2: NameError")
-    assert "przypisz go do zmiennej" in json.loads(kernel.from_code("x = 1", "uklad"))["error"]
+    error = json.loads(kernel.from_code("x = 1\nuklad = Resistr(1)", "uklad"))["error"]
+    assert error["line"] == 2 and error["data"].startswith("NameError") and "issue" not in error  # Python's own words
+    assert json.loads(kernel.from_code("x = 1", "uklad"))["error"]["issue"] == {"type": "NoCircuitInCode", "variable": "uklad"}
 
 
 def test_code_view_keeps_the_drawing_when_only_values_change():
@@ -125,7 +128,7 @@ def test_code_view_keeps_the_drawing_when_only_values_change():
     assert "150" in [e["value"] for e in back["elements"]]
     # a new element in a net(...) (no automatic layout for it): says to add elements on the drawing
     grown = source.replace("Resistor(100)", "Resistor(100) + Resistor(1)", 1)
-    assert "elementy dodawaj na schemacie" in json.loads(kernel.from_code(grown, "mostek", old.to_json()))["error"]
+    assert json.loads(kernel.from_code(grown, "mostek", old.to_json()))["error"]["issue"]["type"] == "OnlyValuesInCode"
 
 
 def test_a_schematic_is_a_variable_named_after_it():

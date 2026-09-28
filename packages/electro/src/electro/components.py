@@ -12,7 +12,11 @@ from dataclasses import dataclass, field
 
 import sympy as sp
 
-from .circuit import GROUND, Circuit, Netlist, ground, open_end, wire
+from .circuit import GROUND, Circuit, Netlist, Seq, Transpose, ground, open_end, wire
+from .reasons import (
+    AmmeterReading, CapacitorImpedance, CapacitorOpenDC, IdealAmmeter, IdealOpAmp, IdealVoltmeter, InductorImpedance,
+    InductorShortDC, OhmsLaw, Reason, SourceCurrent, SourceVoltage, UnknownElement, VoltageAcross, VoltmeterReading,
+)
 
 OPEN = open_end + open_end.transpose()  # 1 → 1 with nothing between: a break in the circuit
 from .values import UNKNOWN, fmt, parse
@@ -20,10 +24,10 @@ from .values import UNKNOWN, fmt, parse
 
 @dataclass(frozen=True)
 class Law:
-    """``expr == 0``, with a human-readable justification used in the solution trace."""
+    """``expr == 0``, with why it holds (a ``reasons`` type) for the solution's steps."""
 
     expr: sp.Expr
-    reason: str
+    reason: Reason
     kind: str = "law"  # "given" | "reading" | "law" | "kvl" | "kcl" — also the order the solver tries them
 
 
@@ -119,12 +123,12 @@ class TwoTerminal(Component):
     def build(self, label, V, param, ctx):
         U, I = sp.Symbol(f"U_{label}"), sp.Symbol(f"I_{label}")
         drop = V["b"] - V["a"] if self.active else V["a"] - V["b"]
-        laws = [Law(U - drop, f"napięcie na {label} (różnica potencjałów)", "kvl")]
-        laws += [Law(e, r.format(label=label), *kind) for e, r, *kind in self.law(U, I, param, ctx)]
+        laws = [Law(U - drop, VoltageAcross(sp.Symbol(label)), "kvl")]
+        laws += [Law(e, reason(sp.Symbol(label)), *kind) for e, reason, *kind in self.law(U, I, param, ctx)]
         return Model({"a": I, "b": -I}, laws, {"U": U, "I": I}, param)
 
     def law(self, U, I, x, ctx) -> list[tuple]:
-        """``(expr, reason)`` or ``(expr, reason, kind)`` for each law; ``{label}`` in reason is filled in."""
+        """``(expr, reason)`` or ``(expr, reason, kind)`` for each law; ``reason``: a ``reasons`` type, given the label."""
         raise NotImplementedError
 
 
@@ -132,7 +136,7 @@ class Resistor(TwoTerminal):
     prefix, unit = "R", "Ω"
 
     def law(self, U, I, x, ctx):
-        return [(U - x * I, "prawo Ohma ({label})")]
+        return [(U - x * I, OhmsLaw)]
 
 
 class Capacitor(TwoTerminal):
@@ -140,8 +144,8 @@ class Capacitor(TwoTerminal):
 
     def law(self, U, I, x, ctx):
         if ctx.omega is None:
-            return [(I, "kondensator w stanie ustalonym DC nie przewodzi ({label})")]
-        return [(U - I / (sp.I * ctx.omega * x), "impedancja kondensatora 1/(jωC) ({label})")]
+            return [(I, CapacitorOpenDC)]
+        return [(U - I / (sp.I * ctx.omega * x), CapacitorImpedance)]
 
 
 class Inductor(TwoTerminal):
@@ -149,8 +153,8 @@ class Inductor(TwoTerminal):
 
     def law(self, U, I, x, ctx):
         if ctx.omega is None:
-            return [(U, "cewka w stanie ustalonym DC to zwarcie ({label})")]
-        return [(U - sp.I * ctx.omega * x * I, "impedancja cewki jωL ({label})")]
+            return [(U, InductorShortDC)]
+        return [(U - sp.I * ctx.omega * x * I, InductorImpedance)]
 
 
 class VoltageSource(TwoTerminal):
@@ -159,7 +163,7 @@ class VoltageSource(TwoTerminal):
     prefix, unit, active, positive = "E", "V", True, False
 
     def law(self, U, I, x, ctx):
-        return [(U - x, "źródło napięcia ({label})")]
+        return [(U - x, SourceVoltage)]
 
 
 class CurrentSource(TwoTerminal):
@@ -168,7 +172,7 @@ class CurrentSource(TwoTerminal):
     prefix, unit, active, positive = "J", "A", True, False
 
     def law(self, U, I, x, ctx):
-        return [(I - x, "źródło prądu ({label})")]
+        return [(I - x, SourceCurrent)]
 
 
 class Ammeter(TwoTerminal):
@@ -178,7 +182,7 @@ class Ammeter(TwoTerminal):
     prefix, unit, positive = "A", "A", False
 
     def law(self, U, I, x, ctx):
-        return [(U, "idealny amperomierz: U = 0 ({label})"), (I - x, "odczyt amperomierza ({label})", "reading")]
+        return [(U, IdealAmmeter), (I - x, AmmeterReading, "reading")]
 
 
 class Voltmeter(TwoTerminal):
@@ -187,7 +191,7 @@ class Voltmeter(TwoTerminal):
     prefix, unit, positive = "V", "V", False
 
     def law(self, U, I, x, ctx):
-        return [(I, "idealny woltomierz: I = 0 ({label})"), (U - x, "odczyt woltomierza ({label})", "reading")]
+        return [(I, IdealVoltmeter), (U - x, VoltmeterReading, "reading")]
 
 
 class OpAmp(NoValue):
@@ -201,7 +205,7 @@ class OpAmp(NoValue):
 
     def build(self, label, V, param, ctx):
         I = sp.Symbol(f"I_{label}")
-        laws = [Law(V["plus"] - V["minus"], f"idealny wzmacniacz: V+ = V− ({label})")]
+        laws = [Law(V["plus"] - V["minus"], IdealOpAmp(sp.Symbol(label)))]
         return Model({"plus": sp.Integer(0), "minus": sp.Integer(0), "out": -I}, laws, {"I": I})
 
 
@@ -221,7 +225,7 @@ class Hole(NoValue, TwoTerminal):
         E = sp.Symbol(f"E_{label}")
         Z = sp.Symbol(f"Z_{label}", nonnegative=True) if ctx.omega is None else sp.Symbol(f"Z_{label}")
         U, I = model.variables["U"], model.variables["I"]
-        model.laws.append(Law(U - (Z * I - E), f"nieznany element: U = Z·I − E ({label})"))
+        model.laws.append(Law(U - (Z * I - E), UnknownElement(sp.Symbol(label))))
         model.variables |= {"E": E, "Z": Z}
         return model
 
@@ -235,6 +239,20 @@ class Hole(NoValue, TwoTerminal):
         if Z == 0:
             return wire if E == 0 else source
         return Resistor(Z) if E == 0 else source + Resistor(Z)
+
+
+def notation(c: Circuit, sign: int = 1) -> str:
+    """What a filled hole turned out to be, in values rather than words: ``R = 2 Ω``, ``E = −17 V``
+    (a source the other way round), ``R = ∞`` (a break), ``R = 0 Ω`` (a wire)."""
+    if c is OPEN:
+        return "R = ∞"
+    if isinstance(c, Transpose):
+        return notation(c.part, -sign)
+    if isinstance(c, Seq):
+        return ", ".join(notation(p, sign) for p in c.parts)
+    if isinstance(c, Component) and c.has_value:
+        return f"{c.prefix} = {fmt(sign * c.value if c.active else c.value, c.unit)}"
+    return f"R = {fmt(0, 'Ω')}"
 
 
 def supply(value=None, label: str | None = None) -> Circuit:

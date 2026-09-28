@@ -18,6 +18,7 @@ from electro.components import Ammeter, Component, Voltmeter
 from electro.semantics import compile_circuit
 from electro.values import UNKNOWN, fmt, to_text
 
+from .issues import CannotLayOut, CannotLayOutElement, CannotLayOutLoop, CannotLayOutParallel, Unsupported
 from .model import Element, Schematic, Wire, kind_of
 
 Vec = tuple[float, float]
@@ -30,10 +31,6 @@ GAP = 1  # free space between stacked branches
 LINE = 0.8  # text line height, in grid units (16 px)
 CHAR = 0.37  # average glyph width, in grid units (7.4 px)
 RESULT_CHARS = 14  # room for "I = 12.55 mA ↓"
-
-
-class Unsupported(NotImplementedError):
-    pass
 
 
 def _neg(v: Vec) -> Vec:
@@ -191,15 +188,12 @@ def _layout(c: ct.Circuit, frame: Frame, ctx: _Context) -> Block:
         elif c.dom + c.cod == 1:
             block.items.append(Item("terminal", [(0, 0)], (-0.3, 0.3, -0.3, 0.3)))
         return block
-    raise Unsupported(
-        f"Nie umiem jeszcze ułożyć {c!r}. Obsługiwane są: elementy dwuzaciskowe, +, |, shunt, "
-        "transpose, close/loop, node, ground, wire. Resztę narysuj na siatce."
-    )
+    raise CannotLayOut(repr(c))
 
 
 def _component(comp: Component, frame: Frame, ctx: _Context, reversed_: bool) -> Block:
     if (comp.dom, comp.cod) != (1, 1):
-        raise Unsupported(f"Nie umiem jeszcze ułożyć {comp!r} ({comp.type}) — narysuj go na siatce.")
+        raise CannotLayOutElement(repr(comp), str(comp.type))
     placed = ctx.next()
     axis = (-1, 0) if reversed_ else (1, 0)
     label_side, result_side = label_sides(frame.to_screen(axis))
@@ -224,7 +218,7 @@ def _component(comp: Component, frame: Frame, ctx: _Context, reversed_: bool) ->
 
 def _parallel(c: ct.Par, frame: Frame, ctx: _Context, outer: bool = True) -> Block:
     if (c.dom, c.cod) != (1, 1):
-        raise Unsupported(f"Nie umiem jeszcze ułożyć połączenia równoległego typu {c.type}.")
+        raise CannotLayOutParallel(str(c.type))
     children = [_layout(p, frame, ctx) for p in c.parts]
     inner = max(ch.length for ch in children)
     block = Block(frame, inner + 2 * STUB)
@@ -262,7 +256,7 @@ def _shunt(c: ct.Shunt, frame: Frame, ctx: _Context) -> Block:
 
 def _close(c: ct.Close, frame: Frame, ctx: _Context) -> Block:
     if c.part.dom != 1:
-        raise Unsupported(f"Nie umiem jeszcze ułożyć pętli typu {c.part.type}.")
+        raise CannotLayOutLoop(str(c.part.type))
     child = _layout(c.part, frame, ctx)
     _, _, _, vmax = child.extent()
     back = math.ceil(vmax) + GAP

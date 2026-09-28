@@ -8,7 +8,8 @@ export const pl = {
     keepMine: "Moją",
     takeTheirs: "Z serwera",
     offline: "Serwer notatek nie odpowiada — zmiany wyślę, gdy wróci.",
-    failed: "Nie udało się zapisać: {{message}}",
+    failed: "Nie udało się zapisać ({{tag}}).",
+    mismatch: "Nie udało się zapisać: adres wskazuje inną notatkę niż dokument.",
   },
 };
 
@@ -22,6 +23,7 @@ export const en: typeof pl = {
     keepMine: "Mine",
     takeTheirs: "The server's",
     offline: "The notes server is not responding — changes will be sent when it is back.",
-    failed: "Could not save: {{message}}",
+    failed: "Could not save ({{tag}}).",
+    mismatch: "Could not save: the address names a different note than the document.",
   },
 };

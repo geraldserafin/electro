@@ -41,6 +41,9 @@
 #let error(s) = block(width: 100%, inset: (left: 10pt, y: 3pt), stroke: (left: 1.5pt + rgb("#d93025")),
   text(fill: rgb("#b3261e"), raw(block: true, s)))
 
+#let failed(body) = block(width: 100%, inset: (left: 10pt, y: 3pt), stroke: (left: 1.5pt + rgb("#d93025")),
+  text(fill: rgb("#b3261e"), body))
+
 #let warning(body) = block(width: 100%, fill: rgb("#fef7e0"), inset: (x: 10pt, y: 7pt), radius: theme.radius,
   text(fill: rgb("#7a5200"))[⚠ #body])
 

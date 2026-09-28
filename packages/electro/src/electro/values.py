@@ -7,6 +7,8 @@ from fractions import Fraction
 
 import sympy as sp
 
+from .issues import BadValue, NotAValue
+
 PREFIXES = {
     "p": sp.Rational(1, 10**12),
     "n": sp.Rational(1, 10**9),
@@ -49,7 +51,7 @@ def parse(value, *, positive: bool = False):
     if isinstance(value, sp.Basic):
         return value
     if isinstance(value, bool):
-        raise TypeError(f"Niepoprawna wartość: {value!r}")
+        raise NotAValue(repr(value))
     if isinstance(value, int):
         return sp.Integer(value)
     if isinstance(value, float):
@@ -70,9 +72,7 @@ def parse(value, *, positive: bool = False):
             return sp.Rational(number.replace(",", ".")) * PREFIXES[prefix]
         if _IDENT.match(value):
             return sp.Symbol(value, positive=True) if positive else sp.Symbol(value)
-    raise ValueError(
-        f"Nie rozumiem wartości {value!r}. Przykłady: 10, 4.7, '4.7k', '4k7', '0,5 A', 'R' (symbol)."
-    )
+    raise BadValue(str(value))
 
 
 def to_text(value) -> str | None:

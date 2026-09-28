@@ -14,6 +14,8 @@ import sympy as sp
 
 from .circuit import GROUND, Circuit, Netlist
 from .components import Component, Context, Law, Model
+from .issues import DuplicateLabel, NoSuchElement, NoSuchQuantity
+from .reasons import KirchhoffCurrent, Terminal
 from .values import UNKNOWN
 
 KIND_ORDER = {"given": 0, "reading": 0, "law": 1, "kvl": 2, "kcl": 3}
@@ -50,10 +52,7 @@ class System:
         for s in symbols:
             if _loose(s.name) == _loose(name):
                 return s
-        raise KeyError(
-            f"Nie ma wielkości {name!r} w tym obwodzie. Dostępne: "
-            + ", ".join(sorted(s.name for s in self._symbols()))
-        )
+        raise NoSuchQuantity(name, sorted(self._symbols(), key=lambda s: s.name))
 
     def part(self, label: str) -> Placed:
         """Find a component by label; ``"R1"`` also finds ``R_1``."""
@@ -62,7 +61,7 @@ class System:
         for key, placed in self.parts.items():
             if _loose(key) == _loose(label):
                 return placed
-        raise KeyError(f"Nie ma elementu {label!r}. Elementy: {', '.join(self.parts)}")
+        raise NoSuchElement(label, [sp.Symbol(p) for p in self.parts])
 
     def _symbols(self):
         seen = set(self.unknowns) | set(self.known) | set(self.potentials.values())
@@ -79,7 +78,7 @@ def _labels(parts) -> list[str]:
     explicit = [c.label for c, _ in parts if c.label]
     dupes = [name for name, n in Counter(explicit).items() if n > 1]
     if dupes:
-        raise ValueError(f"Etykieta {dupes[0]!r} użyta więcej niż raz w obwodzie.")
+        raise DuplicateLabel(sp.Symbol(dupes[0]))
     taken, counters, out = {_loose(e) for e in explicit}, Counter(), []
     for c, _ in parts:
         if c.label:
@@ -145,7 +144,7 @@ def compile_netlist(
             for i, n in enumerate(nodes, 1):
                 v, cur = sp.Symbol(f"V_{side}{i}"), sp.Symbol(f"I_{side}{i}")
                 boundary += [v, cur]
-                laws.append(Law(v - V[names[n]], f"zacisk {side}{i}", "kvl"))
+                laws.append(Law(v - V[names[n]], Terminal(side, i), "kvl"))
                 external[n].append(sign * cur)
 
     # potential references: ground, or one node per floating piece
@@ -177,7 +176,7 @@ def compile_netlist(
             continue  # KCL at the reference node is implied by the others
         total = sp.Add(*inflow[n]) - sp.Add(*external[n])
         if total != 0:
-            laws.append(Law(total, f"I prawo Kirchhoffa (węzeł {names[n]})", "kcl"))
+            laws.append(Law(total, KirchhoffCurrent(sp.Symbol(names[n])), "kcl"))
 
     unknowns += [V[names[n]] for n in range(net.size) if n not in references]
     unknowns += [s for s in boundary if s not in unknowns]

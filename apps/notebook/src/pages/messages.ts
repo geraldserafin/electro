@@ -24,6 +24,22 @@ export const pl = {
     unreachable: "Serwer notatek nie odpowiada.",
     creating: "Tworzę notatkę z przykładu…",
   },
+  // a file that is not a note (opening one on the home page); {{where}}: e.g. cells[2].id
+  file: {
+    NotJson: "To nie jest JSON: {{reason}}",
+    NotANotebook: "To nie jest plik notatnika: brak listy „cells”.",
+    OtherFormat: "To plik „{{format}}”, a nie notatnik electro.",
+    NoVersion: "W pliku nie ma wersji formatu („version”).",
+    NewerVersion: "Plik jest w nowszej wersji formatu ({{version}}); ta aplikacja zna {{known}}.",
+    NotText: "{{where}}: brak albo zły typ (oczekiwano tekstu).",
+    NotAnObject: "{{where}}: oczekiwano obiektu.",
+    NoCellId: "{{where}}: brak identyfikatora komórki.",
+    RepeatedCellId: "{{where}}: identyfikator „{{id}}” się powtarza.",
+    UnknownCellType: "{{where}}: nieznany rodzaj komórki „{{found}}”.",
+    UnnamedSchematic: "{{where}}: schemat bez nazwy.",
+    RepeatedSchematicName: "{{where}}: dwa schematy nazywają się „{{name}}”.",
+    NotADrawing: "{{where}}: oczekiwano {\"elements\": [...], \"wires\": [...]}.",
+  },
 };
 
 export const en: typeof pl = {
@@ -51,5 +67,20 @@ export const en: typeof pl = {
     missing: "There is no example “{{name}}”.",
     unreachable: "The notes server is not responding.",
     creating: "Creating a note from the example…",
+  },
+  file: {
+    NotJson: "This is not JSON: {{reason}}",
+    NotANotebook: "This is not a notebook file: there is no list of “cells”.",
+    OtherFormat: "This is a “{{format}}” file, not an electro notebook.",
+    NoVersion: "The file has no format version (“version”).",
+    NewerVersion: "The file is in a newer format version ({{version}}); this app knows {{known}}.",
+    NotText: "{{where}}: missing or of the wrong type (text expected).",
+    NotAnObject: "{{where}}: an object expected.",
+    NoCellId: "{{where}}: the cell has no id.",
+    RepeatedCellId: "{{where}}: the id “{{id}}” is used twice.",
+    UnknownCellType: "{{where}}: an unknown kind of cell “{{found}}”.",
+    UnnamedSchematic: "{{where}}: a schematic without a name.",
+    RepeatedSchematicName: "{{where}}: two schematics are called “{{name}}”.",
+    NotADrawing: "{{where}}: {\"elements\": [...], \"wires\": [...]} expected.",
   },
 };

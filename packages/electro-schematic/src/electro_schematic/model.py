@@ -17,6 +17,8 @@ from electro import circuit as ct
 from electro import components as comp
 from electro.values import parse
 
+from .issues import BadRotation, EmptySchematic, NoKindFor, NotOnSchematic, SkewedWire, UnknownKind
+
 Point = tuple[int, int]  # grid units; x to the right, y down (like the screen)
 GRID = 20  # suggested pixels per grid unit, for renderers and editors
 
@@ -51,7 +53,7 @@ def kind_of(component: comp.Component) -> str:
     for name, kind in KINDS.items():
         if kind.component is type(component):
             return name
-    raise KeyError(f"Brak rodzaju elementu dla {type(component).__name__} — dodaj go do KINDS.")
+    raise NoKindFor(type(component).__name__)
 
 
 def rotate(p: Point, rotation: int) -> Point:
@@ -74,9 +76,9 @@ class Element:
     def __post_init__(self):
         self.at = tuple(self.at)
         if self.kind not in KINDS:
-            raise ValueError(f"Nieznany rodzaj elementu {self.kind!r}. Dostępne: {', '.join(KINDS)}")
+            raise UnknownKind(self.kind, list(KINDS))
         if self.rotation % 90:
-            raise ValueError("Obrót musi być wielokrotnością 90°.")
+            raise BadRotation(self.rotation)
         self.rotation %= 360
 
     def pins(self) -> list[Point]:
@@ -99,7 +101,7 @@ class Wire:
         self.points = [tuple(p) for p in self.points]
         for (x1, y1), (x2, y2) in zip(self.points, self.points[1:]):
             if x1 != x2 and y1 != y2:
-                raise ValueError(f"Przewód musi iść poziomo albo pionowo: {(x1, y1)} → {(x2, y2)}")
+                raise SkewedWire((x1, y1), (x2, y2))
 
     def segments(self):
         return list(zip(self.points, self.points[1:]))
@@ -132,7 +134,7 @@ class Schematic:
         for e in self.elements:
             if e.id == id:
                 return e
-        raise KeyError(f"Nie ma elementu {id!r} na schemacie.")
+        raise NotOnSchematic(id)
 
     def components(self) -> list[Element]:
         return [e for e in self.elements if KINDS[e.kind].component is not None]
@@ -215,7 +217,7 @@ class Schematic:
                 node_names.append(names[root])
             items.append((e.component(), *node_names))
         if not items:
-            raise ValueError("Schemat nie ma żadnych elementów.")
+            raise EmptySchematic()
         return ct.net(*items)
 
     def to_code(self, name: str = "uklad") -> str:

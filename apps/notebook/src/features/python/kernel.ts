@@ -1,5 +1,6 @@
 // The page's handle on the Python worker: every call is a message and a promise.
 import type { ElementResult, Output, Problem, SchematicData } from "@/shared/model/types";
+import type { Failure } from "@/shared/model/issues";
 
 type Reply = { id: number; ok: true; result: unknown } | { id: number; ok: false; error: string };
 
@@ -45,7 +46,7 @@ class Kernel {
 
   /** Code edited in a schematic's code view, laid out back into a drawing (or the error in it). */
   async fromCode(source: string, name: string, old: SchematicData):
-    Promise<{ schematic: SchematicData } | { error: string }> {
+    Promise<{ schematic: SchematicData } | { error: Failure }> {
     return JSON.parse((await this.call("fromCode", { source, name, old: JSON.stringify(old) })) as string);
   }
 

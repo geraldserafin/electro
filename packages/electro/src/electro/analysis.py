@@ -13,6 +13,7 @@ import sympy as sp
 
 from .circuit import Circuit, Close, Seq, ground
 from .components import Context, CurrentSource
+from .issues import NoThevenin, NotAPort, NotLinear
 from .semantics import compile_circuit
 from .values import fmt, parse
 
@@ -59,7 +60,7 @@ def blackbox(c: Circuit, *, omega=None) -> Relation:
     try:
         A, b = sp.linear_eq_to_matrix(exprs, variables)
     except sp.solvers.solveset.NonlinearError as err:
-        raise ValueError("blackbox działa tylko dla obwodów liniowych.") from err
+        raise NotLinear() from err
     reduced, pivots = A.row_join(b).rref(simplify=True)
     k, n = len(internal), len(variables)
     if n in pivots:
@@ -94,14 +95,14 @@ def equivalent(c: Circuit, *, omega=None) -> Thevenin:
     elif (c.dom, c.cod) == (0, 1):
         closed = Seq((c, probe.transpose(), ground))
     else:
-        raise TypeError(f"equivalent() wymaga obwodu 1 → 1 albo 0 → 1 (względem masy), dostałem {c.type}.")
+        raise NotAPort(str(c.type))
     ctx = Context(None if omega is None else parse(omega))
     system = compile_circuit(closed, ctx=ctx, unknowns_as_symbols=True)
     exprs = [law.expr.xreplace(system.known) for law in system.laws if law.kind != "reading"]
     solutions = sp.solve(exprs, system.unknowns, dict=True)
     u = system.parts["TEST"].model.variables["U"]
     if not solutions or u not in solutions[0]:
-        raise ValueError("Obwód jest rozwarty między zaciskami (R_th = ∞) — nie ma zastępczego Thévenina.")
+        raise NoThevenin()
     voltage = sp.expand(solutions[0][u])
     return Thevenin(sp.simplify(voltage.subs(t, 0)), sp.simplify(sp.diff(voltage, t)))
 

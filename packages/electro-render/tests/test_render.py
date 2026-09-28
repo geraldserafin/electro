@@ -53,8 +53,11 @@ def test_symbol_library_matches_the_model():
     assert lib["kinds"]["resistor"]["pins"] == [[0, 0], [80, 0]]
 
 
-def test_steps_are_markdown_with_latex():
-    md = steps((supply(12) + Resistor(10) + Resistor() + ground).solve(I_R_1=0.5, find="R_2"))
-    assert r"$R_{2} = \frac{U_{R_{2}}}{I_{R_{2}}} = \frac{7}{0.5} = 14\,\mathrm{\Omega}$" in md
-    assert "**Odpowiedź:** $R_{2} = 14\\,\\mathrm{\\Omega}$" in md
-    assert md._repr_markdown_() == md
+def test_steps_are_data_with_latex():
+    from electro.reasons import OhmsLaw
+
+    shown = steps((supply(12) + Resistor(10) + Resistor() + ground).solve(I_R_1=0.5, find="R_2"))
+    last = shown.steps[-1]
+    assert last.chain == r"R_{2} = \frac{U_{R_{2}}}{I_{R_{2}}} = \frac{7}{0.5} = 14\,\mathrm{\Omega}"
+    assert last.reason == OhmsLaw(Symbol("R_2"))
+    assert shown.answer == [r"R_{2} = 14\,\mathrm{\Omega}"] and shown.missing is None

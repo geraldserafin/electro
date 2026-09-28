@@ -6,6 +6,10 @@ from electro import Ammeter, Resistor, VoltageSource, loop
 
 from electro_notes import FORMAT, VERSION, CodeCell, FormatError, Notebook, SchematicCell, load, loads, migrate
 from electro_notes.__main__ import main
+from electro_notes.issues import (
+    NewerVersion, NoSuchSchematic, NotADrawing, NotANotebook, NotJson, OtherFormat, RepeatedCellId, SchematicExists,
+    UnknownCellType, UnnamedSchematic,
+)
 
 EXAMPLE = Path(__file__).parents[3] / "apps/notebook/examples/nieznane-i-dziury.electro.json"
 
@@ -31,9 +35,10 @@ def test_schematics_are_circuits_by_name_or_variable():
     nb = zadanie()
     assert nb.schematic("Układ 1") is nb.schematic("układ1")
     assert nb.schematic("układ1").solve(find="E")["E"].value == 54
-    with pytest.raises(KeyError, match="Są: Układ 1"):
+    with pytest.raises(NoSuchSchematic) as err:
         nb.schematic("Układ 2")
-    with pytest.raises(ValueError, match="już jest"):
+    assert err.value.available == ["Układ 1"]
+    with pytest.raises(SchematicExists):
         nb.add_schematic("Układ 1", Resistor(1))
 
 
@@ -59,21 +64,22 @@ def test_unknown_keys_survive():
     assert again["tags"] == ["lab"] and again["settings"]["theme"] == "dark" and again["cells"][0]["collapsed"]
 
 
-@pytest.mark.parametrize("mutate, message", [
-    (lambda d: d.update(version=99), "nowszej wersji"),
-    (lambda d: d.update(format="coś"), "a nie notatnik"),
-    (lambda d: d.pop("cells"), "brak listy"),
-    (lambda d: d["cells"][0].update(type="wideo"), r"cells\[0\]\.type"),
-    (lambda d: d["cells"][2].update(id=d["cells"][0]["id"]), r"cells\[2\]\.id: identyfikator .* się powtarza"),
-    (lambda d: d["cells"][1].update(schematic={"elements": []}), r"cells\[1\]\.schematic"),
-    (lambda d: d["cells"][1].update(name=" "), r"cells\[1\]\.name"),
+@pytest.mark.parametrize("mutate, expected", [
+    (lambda d: d.update(version=99), NewerVersion(99, VERSION)),
+    (lambda d: d.update(format="coś"), OtherFormat("coś")),
+    (lambda d: d.pop("cells"), NotANotebook()),
+    (lambda d: d["cells"][0].update(type="wideo"), UnknownCellType("cells[0].type", "'wideo'")),
+    (lambda d: d["cells"][2].update(id=d["cells"][0]["id"]), RepeatedCellId("cells[2].id", "?")),
+    (lambda d: d["cells"][1].update(schematic={"elements": []}), NotADrawing("cells[1].schematic")),
+    (lambda d: d["cells"][1].update(name=" "), UnnamedSchematic("cells[1].name")),
 ])
-def test_broken_files_say_what_and_where(mutate, message):
+def test_broken_files_say_what_and_where(mutate, expected):
     data = zadanie().to_dict()
     mutate(data)
-    with pytest.raises(FormatError, match=message):
+    with pytest.raises(FormatError) as err:
         loads(json.dumps(data))
-    with pytest.raises(FormatError, match="To nie jest JSON"):
+    assert type(err.value) is type(expected) and getattr(err.value, "where", None) == getattr(expected, "where", None)
+    with pytest.raises(NotJson):
         loads("{nie json")
 
 
@@ -103,5 +109,5 @@ def test_command_line(tmp_path, capsys):
     bad.write_text('{"version": 1}')
     assert main(["check", str(good), str(bad)]) == 1
     out = capsys.readouterr().out
-    assert "Notebook('Zadanie 4': 1 markdown, 1 code, 1 schematic)" in out and "b.electro.json: BŁĄD" in out
+    assert "Notebook('Zadanie 4': 1 markdown, 1 code, 1 schematic)" in out and "b.electro.json: NotANotebook()" in out
     assert main(["strip", str(good)]) == 0

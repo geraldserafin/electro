@@ -19,6 +19,7 @@ from .components import (
     Ammeter, Capacitor, Component, CurrentSource, Hole, Inductor, Law, Model, NoValue, OpAmp, Resistor,
     TwoTerminal, VoltageSource, Voltmeter, supply,
 )
+from .issues import Issue
 from .solver import Ambiguous, CircuitError, Contradiction, Diagnosis, I, MissingData, P, Solution, U, V, solve
 from .values import fmt, parse
 

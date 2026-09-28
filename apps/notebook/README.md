@@ -70,6 +70,7 @@ nie `@/features/schematic/Editor`); wewnątrz plastra importy są względne. `@/
 | `features/python/` | `worker.ts` ładuje Pyodide + sympy + nasze paczki (z `bundle.json`), `kernel.ts` — wywołania workera jako obietnice |
 | `features/pdf-export/` | eksport do PDF: dialog (`usePreview`: skład po każdej zmianie i strony jako obrazki), ustawienia, Typst w workerze; PDF jest w języku aplikacji (dzielenie wyrazów, tytuł spisu treści, data) |
 | `features/examples/` | przykładowe notatki |
+| `features/solution/` | co mówi solver: typy z Pythona (błędy, ostrzeżenia, powody kroków, rozwiązanie krok po kroku — `shared/model/issues.ts`) słowami, w języku czytającego; też w PDF |
 | `features/theme/` | motyw jasny / ciemny / systemowy |
 | `python/electro_notebook/kernel.py` | (Python) wykonuje komórki, zamienia wyniki na wyjścia (`_repr_svg_`, `_repr_markdown_`, `_repr_latex_`) |
 
@@ -88,5 +89,11 @@ Testy e2e szukają elementów po rolach, etykietach i atrybutach `data-*` (np. `
 **Języki.** i18next: każdy plaster ma `messages.ts` (`pl` i `en` o tym samym kształcie — pilnuje TypeScript) jako
 swoją przestrzeń nazw; `src/app/i18n.ts` je zbiera. Przełącznik PL/EN jest w wyspach; wybór zostaje w przeglądarce,
 a przed wyborem — język przeglądarki (angielski, gdy nie zna żadnego z naszych). Testy e2e chodzą z `pl-PL`.
+
+Python nie mówi nic słowami: to, co poszło nie tak, to typ (`electro.issues`, np. `MissingData(targets, needed,
+options)`), powód kroku rozwiązania też (`electro.reasons`, np. `OhmsLaw(label)`), a `steps(sol)` to dane.
+Kernel wysyła je jako JSON (`{"type": "MissingData", …}`, wzory w LaTeX), a `features/solution` mówi je po polsku
+albo po angielsku — nowy typ w Pythonie bez tłumaczenia to błąd TypeScriptu. Błędy samego Pythona (`NameError`…)
+zostają jego słowami.
 
 Przy `devenv up` zmiany w `packages/` wystarczy odświeżyć w przeglądarce. Przy samym `pnpm dev` `bundle.json` powstaje tylko przy starcie (albo użyj `pnpm python --watch`).

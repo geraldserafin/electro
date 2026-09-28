@@ -1,22 +1,16 @@
-"""The solution trace as Markdown with LaTeX math (``$...$``).
-
-That format works in Jupyter, in a web notebook (markdown + KaTeX) and in a PDF export.
+"""The solution trace as data, its math in LaTeX — the same in every language; the words around
+it ("Data:", why each step holds) are up to whoever shows it.
 """
 
 from __future__ import annotations
 
-import re
+from dataclasses import dataclass
 
 import sympy as sp
+from electro.issues import Underdetermined
+from electro.reasons import Reason
 from electro.values import fmt
 from sympy.printing.latex import LatexPrinter
-
-
-class Markdown(str):
-    """Markdown text; shows itself in Jupyter-like notebooks."""
-
-    def _repr_markdown_(self) -> str:
-        return str(self)
 
 
 def name(symbol_name: str) -> str:
@@ -67,27 +61,45 @@ class _Latex(LatexPrinter):
         return sorted(super()._as_ordered_terms(expr, order), key=lambda t: t.could_extract_minus_sign())
 
 
-_LABEL = re.compile(r"\b([A-Z]+_\w+)\b")
+@dataclass
+class FormulaStep:
+    """One quantity from one law: ``chain`` is target = formula = with the numbers = value."""
+
+    chain: str
+    reason: Reason
 
 
-def _reason(text: str) -> str:
-    return _LABEL.sub(lambda m: f"${name(m.group(1))}$", text)
+@dataclass
+class SystemStep:
+    """Quantities from equations solved together: each ``… = 0``, and what came out."""
+
+    equations: list[str]
+    results: list[str]
 
 
-def _pairs(solution, items) -> str:
-    return ", ".join(f"${name(s.name)} = {value(v, solution.unit(s))}$" for s, v in items)
+@dataclass
+class Steps:
+    """The worked solution as data — whoever shows it says it (the notebook: in the reader's
+    language). Math is LaTeX: ``R_{2} = 14\\,\\mathrm{\\Omega}``. ``assumed``: how holes were
+    filled (the simplest element that fits); ``answer``: what ``find`` asked for; ``missing``:
+    what is not determined, when nothing was asked."""
+
+    data: list[str]
+    assumed: list[str]
+    steps: list[FormulaStep | SystemStep]
+    answer: list[str] | None
+    missing: Underdetermined | None
 
 
-def steps(solution) -> Markdown:
+def _pairs(solution, items) -> list[str]:
+    return [f"{name(s.name)} = {value(v, solution.unit(s))}" for s, v in items]
+
+
+def steps(solution) -> Steps:
     """The whole worked solution: data, assumptions, numbered steps, answer."""
-    out = []
-    if solution.data:
-        out.append(f"**Dane:** {_pairs(solution, solution.data.items())}")
-    if solution.assumed:
-        out.append(f"**Założenia** (najprostszy element zgodny z danymi): {_pairs(solution, solution.assumed.items())}")
     values = dict(solution.system.known) | solution.given | solution.assumed
-    lines = []
-    for i, step in enumerate(solution.shown_steps(), 1):
+    shown: list[FormulaStep | SystemStep] = []
+    for step in solution.shown_steps():
         if step.formula is not None:
             (target, result), = step.targets.items()
             chain = [name(target.name)]
@@ -99,16 +111,10 @@ def steps(solution) -> Markdown:
                 chain.append(final)
             else:
                 chain[-1] = final
-            lines.append(f"{i}. ${' = '.join(chain)}$ — {_reason(step.laws[0].reason)}")
+            shown.append(FormulaStep(" = ".join(chain), step.laws[0].reason))
         else:
-            rows = r" \\ ".join(f"{expr(law.expr)} &= 0" for law in step.laws)
-            results = _pairs(solution, step.targets.items())
-            lines.append(f"{i}. Układ równań:\n\n   $$\\begin{{aligned}} {rows} \\end{{aligned}}$$\n\n   Stąd: {results}")
+            shown.append(SystemStep([f"{expr(law.expr)} = 0" for law in step.laws], _pairs(solution, step.targets.items())))
         values.update(step.targets)
-    if lines:
-        out.append("**Rozwiązanie:**\n\n" + "\n".join(lines))
-    if solution.find:
-        out.append(f"**Odpowiedź:** {_pairs(solution, ((s, solution._value(s)) for s in solution.find))}")
-    elif solution.missing:
-        out.append(f"**Brakuje danych:** {_reason(str(solution.diagnose()))}")
-    return Markdown("\n\n".join(out) + "\n")
+    answer = _pairs(solution, ((s, solution._value(s)) for s in solution.find)) if solution.find else None
+    missing = Underdetermined(**solution.diagnose().fields()) if not solution.find and solution.missing else None
+    return Steps(_pairs(solution, solution.data.items()), _pairs(solution, solution.assumed.items()), shown, answer, missing)

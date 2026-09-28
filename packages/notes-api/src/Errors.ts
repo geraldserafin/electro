@@ -1,4 +1,5 @@
-/** What can go wrong, as the client sees it: each error has its HTTP status and a message. */
+/** What can go wrong, as the client sees it: each error has its HTTP status; the client says it
+ *  by its _tag (in the reader's language). ``message``: for logs, in English. */
 import { HttpApiSchema } from "@effect/platform"
 import { Schema } from "effect"
 import { NoteId } from "./Notebook.js"
@@ -9,7 +10,7 @@ export class NoteNotFound extends Schema.TaggedError<NoteNotFound>()(
   HttpApiSchema.annotations({ status: 404 }),
 ) {
   get message() {
-    return `Nie ma notatki ${this.id}.`
+    return `No note ${this.id}.`
   }
 }
 
@@ -21,8 +22,8 @@ export class RevisionConflict extends Schema.TaggedError<RevisionConflict>()(
 ) {
   get message() {
     return this.base === null
-      ? `Notatka ${this.id} już jest na serwerze (wersja ${this.current}).`
-      : `Notatka ${this.id} zmieniła się w międzyczasie: na serwerze jest wersja ${this.current}, a zapis był od ${this.base}.`
+      ? `Note ${this.id} is already on the server (revision ${this.current}).`
+      : `Note ${this.id} changed meanwhile: the server has revision ${this.current}, the save was based on ${this.base}.`
   }
 }
 
@@ -33,6 +34,6 @@ export class NoteIdMismatch extends Schema.TaggedError<NoteIdMismatch>()(
   HttpApiSchema.annotations({ status: 400 }),
 ) {
   get message() {
-    return `Adres wskazuje notatkę ${this.path}, a dokument to ${this.document}.`
+    return `The address names note ${this.path}, the document is ${this.document}.`
   }
 }

@@ -13,6 +13,6 @@ this package only draws them, with one symbol library shared with the web editor
 
 from .schematic import Svg, schematic
 from .symbols import symbol_library, symbol_library_json
-from .trace import Markdown, steps
+from .trace import FormulaStep, Steps, SystemStep, steps
 
-__all__ = ["Markdown", "Svg", "schematic", "steps", "symbol_library", "symbol_library_json"]
+__all__ = ["FormulaStep", "Steps", "Svg", "SystemStep", "schematic", "steps", "symbol_library", "symbol_library_json"]

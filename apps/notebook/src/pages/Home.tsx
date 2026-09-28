@@ -9,7 +9,7 @@ import { Card, CardSkeletons, NewCard, NOTES, notesAtom, removeNote, toDocument,
 import { library } from "@/features/schematic";
 import { LanguageButton } from "@/features/language";
 import { ThemeButton } from "@/features/theme";
-import { blank, copyOf, upload } from "@/shared/model/format";
+import { blank, copyOf, FormatError, upload } from "@/shared/model/format";
 import { Upload } from "@/shared/ui/icons";
 import { Brand, IslandButton, Islands } from "@/shared/ui/Island";
 import { cn } from "@/shared/lib/cn";
@@ -20,6 +20,7 @@ const note = "mt-6 mb-3.5 text-[14px] text-muted";
 export function Home() {
   const { t } = useTranslation("pages", { keyPrefix: "home" });
   const { t: tNotes } = useTranslation("notes");
+  const { t: tFile } = useTranslation("pages", { keyPrefix: "file" });
   const when = useWhen();
   const notes = useAtomValue(notesAtom);
   const refresh = useAtomRefresh(notesAtom);
@@ -34,7 +35,7 @@ export function Home() {
       setProblem(null);
       if (!(await create(await make()))) setProblem(t("createFailed"));
     } catch (error) {
-      setProblem(String((error as Error).message ?? error));
+      setProblem(error instanceof FormatError ? tFile(error.issue.type, error.issue) : String((error as Error).message ?? error));
     }
   };
 

@@ -1,12 +1,30 @@
 // The notebook file (*.electro.json): the same format as Python's electro_notes (format.py there
-// describes it in full). Reading migrates older versions and checks the shape, with messages
-// that say where a file is broken; keys this version does not know are kept.
+// describes it in full). Reading migrates older versions and checks the shape — a broken file is a
+// FormatError with what and where (the types of electro_notes.issues); keys this version does not
+// know are kept.
 import type { Cell, Notebook } from "./types";
 
 export const FORMAT = "electro-notebook";
 export const VERSION = 2;
 
-export class FormatError extends Error {}
+/** What is wrong with a file; `where`: the place in it, e.g. `cells[2].id`. */
+export type FileIssue =
+  | { type: "NotJson"; reason: string } // (the parser's own words)
+  | { type: "NotANotebook" | "NoVersion" }
+  | { type: "OtherFormat"; format: string }
+  | { type: "NewerVersion"; version: number; known: number }
+  | { type: "NotText" | "NotAnObject" | "NoCellId" | "UnnamedSchematic" | "NotADrawing"; where: string }
+  | { type: "RepeatedCellId"; where: string; id: string }
+  | { type: "UnknownCellType"; where: string; found: string }
+  | { type: "RepeatedSchematicName"; where: string; name: string };
+
+export class FormatError extends Error {
+  constructor(readonly issue: FileIssue) {
+    super(issue.type);
+  }
+}
+
+const broken = (issue: FileIssue) => new FormatError(issue);
 
 export const now = () => new Date().toISOString().replace(/\.\d{3}Z$/, "Z");
 export const newNotebookId = () => crypto.randomUUID().replaceAll("-", "");
@@ -29,7 +47,7 @@ export function deserialize(text: string): Notebook {
   try {
     data = JSON.parse(text);
   } catch (error) {
-    throw new FormatError(`To nie jest JSON: ${(error as Error).message}`);
+    throw broken({ type: "NotJson", reason: (error as Error).message });
   }
   return fromData(data);
 }
@@ -56,9 +74,9 @@ const isObj = (x: unknown): x is Obj => typeof x === "object" && x !== null && !
 
 /** Any known version → the current one (a copy; the input is left alone). */
 export function migrate(input: unknown): Notebook {
-  if (!isObj(input) || !Array.isArray(input.cells)) throw new FormatError("To nie jest plik notatnika: brak listy „cells”.");
+  if (!isObj(input) || !Array.isArray(input.cells)) throw broken({ type: "NotANotebook" });
   let data = structuredClone(input) as Obj;
-  if ((data.format ?? FORMAT) !== FORMAT) throw new FormatError(`To plik „${data.format}”, a nie notatnik electro.`);
+  if ((data.format ?? FORMAT) !== FORMAT) throw broken({ type: "OtherFormat", format: String(data.format) });
   if (data.version === 1) {
     // before the file had a name, an id and settings; schematic cells had a measurements field
     // and a Markdown table of results — both went away
@@ -73,34 +91,34 @@ export function migrate(input: unknown): Notebook {
       }),
     };
   }
-  if (typeof data.version !== "number") throw new FormatError("W pliku nie ma wersji formatu („version”).");
+  if (typeof data.version !== "number") throw broken({ type: "NoVersion" });
   if (data.version > VERSION)
-    throw new FormatError(`Plik jest w nowszej wersji formatu (${data.version}); ta aplikacja zna ${VERSION}.`);
+    throw broken({ type: "NewerVersion", version: data.version, known: VERSION });
   return data as unknown as Notebook;
 }
 
 function check(nb: Notebook) {
   for (const key of ["id", "title", "created", "modified"] as const)
-    if (typeof nb[key] !== "string") throw new FormatError(`${key}: brak albo zły typ (oczekiwano tekstu).`);
-  if (!isObj(nb.settings)) throw new FormatError("settings: oczekiwano obiektu.");
+    if (typeof nb[key] !== "string") throw broken({ type: "NotText", where: key });
+  if (!isObj(nb.settings)) throw broken({ type: "NotAnObject", where: "settings" });
   const ids = new Set<string>();
   const names = new Set<string>();
   nb.cells.forEach((c: Cell, i) => {
     const where = `cells[${i}]`;
-    if (!isObj(c)) throw new FormatError(`${where}: oczekiwano obiektu.`);
-    if (typeof c.id !== "string" || !c.id) throw new FormatError(`${where}.id: brak identyfikatora komórki.`);
-    if (ids.has(c.id)) throw new FormatError(`${where}.id: identyfikator „${c.id}” się powtarza.`);
+    if (!isObj(c)) throw broken({ type: "NotAnObject", where });
+    if (typeof c.id !== "string" || !c.id) throw broken({ type: "NoCellId", where: `${where}.id` });
+    if (ids.has(c.id)) throw broken({ type: "RepeatedCellId", where: `${where}.id`, id: c.id });
     ids.add(c.id);
     if (!["markdown", "code", "schematic"].includes(c.type))
-      throw new FormatError(`${where}.type: nieznany rodzaj komórki „${(c as { type: unknown }).type}”.`);
-    if (c.type !== "schematic" && typeof c.source !== "string") throw new FormatError(`${where}.source: oczekiwano tekstu.`);
+      throw broken({ type: "UnknownCellType", where: `${where}.type`, found: String((c as { type: unknown }).type) });
+    if (c.type !== "schematic" && typeof c.source !== "string") throw broken({ type: "NotText", where: `${where}.source` });
     if (c.type === "code" && !Array.isArray(c.outputs)) c.outputs = [];
     if (c.type === "schematic") {
-      if (typeof c.name !== "string" || !c.name.trim()) throw new FormatError(`${where}.name: schemat bez nazwy.`);
-      if (names.has(c.name)) throw new FormatError(`${where}.name: dwa schematy nazywają się „${c.name}”.`);
+      if (typeof c.name !== "string" || !c.name.trim()) throw broken({ type: "UnnamedSchematic", where: `${where}.name` });
+      if (names.has(c.name)) throw broken({ type: "RepeatedSchematicName", where: `${where}.name`, name: c.name });
       names.add(c.name);
       if (!isObj(c.schematic) || !Array.isArray(c.schematic.elements) || !Array.isArray(c.schematic.wires))
-        throw new FormatError(`${where}.schematic: oczekiwano {"elements": [...], "wires": [...]}.`);
+        throw broken({ type: "NotADrawing", where: `${where}.schematic` });
     }
   });
 }

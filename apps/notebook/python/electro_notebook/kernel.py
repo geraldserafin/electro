@@ -2,7 +2,13 @@
 
 Every cell sees what earlier cells defined, like in Jupyter. The value of the last
 expression is shown; objects with ``_repr_svg_`` / ``_repr_markdown_`` show as a
-picture / formatted text. Schematic cells are available as ``schemat("name")``.
+picture / formatted text, a worked solution (``steps(sol)``) as data. Schematic cells are
+available as ``schemat("name")``.
+
+Nothing here is said in words: what goes wrong is an issue type (``electro.issues``), sent
+as JSON — ``{"type": "MissingData", "targets": ["R_{2}"], …}``, math in LaTeX — and the
+notebook says it in the reader's language. Python's own errors (NameError, …) stay as
+Python says them.
 """
 
 from __future__ import annotations
@@ -14,13 +20,17 @@ import json
 import re
 import traceback
 import warnings
+from dataclasses import fields, is_dataclass
 
-from electro import CircuitError
+import sympy as sp
+from electro.components import Law
+from electro.issues import Equals, Issue, IsZero, issue
 from sympy import I as sp_I
-from electro_render import symbol_library
+from electro_render import Steps, symbol_library
 from electro_schematic import Schematic
+from electro_schematic.issues import Unsupported
 
-CELL = "<komórka>"
+CELL = "<cell>"
 PRELUDE = """
 from electro import *
 from electro_render import schematic, steps
@@ -28,6 +38,34 @@ from electro_schematic import Schematic, layout
 """
 
 namespace: dict = {}
+
+
+@issue
+class NoCircuitInCode(Issue, ValueError):
+    """The code view defines no circuit: it should assign one, e.g. ``variable = loop(...)``."""
+
+    variable: str
+
+
+@issue
+class OnlyValuesInCode(Issue, ValueError):
+    """The code view made a circuit layout() cannot draw: in code, change only the values
+    (add elements on the drawing)."""
+
+    cause: Unsupported
+
+
+@issue
+class BadDataEntry(Issue, ValueError):
+    """An entry of a schematic's data that is not ``name = value`` (e.g. ``I_R_1 = 0,5``)."""
+
+    entry: str
+
+
+@issue
+class NoSuchSchematic(Issue, KeyError):
+    name: str
+    available: list
 
 
 def reset() -> None:
@@ -59,7 +97,7 @@ def from_code(source: str, name: str, old_json: str = "") -> str:
     The circuit is the variable called like the schematic (``uklad``), else the last one the
     code defines. When only values changed, the old drawing (``old_json``) keeps its layout
     with the new values; otherwise the circuit is laid out anew.
-    Returns JSON ``{"schematic": ...}`` or ``{"error": "..."}``.
+    Returns JSON ``{"schematic": ...}`` or ``{"error": {...}}`` (an error output).
     """
     from electro import Circuit
     from electro_schematic import layout
@@ -75,7 +113,7 @@ def from_code(source: str, name: str, old_json: str = "") -> str:
         if not isinstance(found, Circuit):
             defined = [v for k, v in scope.items() if k not in prelude and isinstance(v, Circuit)]
             if not defined:
-                raise ValueError(f"W kodzie nie ma układu — przypisz go do zmiennej, np. {var} = loop(...)")
+                raise NoCircuitInCode(var)
             found = defined[-1]
         kept = _same_but_values(Schematic.from_json(old_json), found, var) if old_json else None
         if kept is not None:
@@ -83,7 +121,7 @@ def from_code(source: str, name: str, old_json: str = "") -> str:
         try:
             fresh = layout(found)
         except Unsupported as err:
-            raise ValueError(f"{err} Tu zmieniaj w kodzie tylko wartości, a elementy dodawaj na schemacie.") from None
+            raise OnlyValuesInCode(err) from None
         return json.dumps({"schematic": json.loads(fresh.to_json())}, ensure_ascii=False)
     except Exception as err:  # noqa: BLE001 — any mistake in the code is shown to the user
         return json.dumps({"error": _error(err)}, ensure_ascii=False)
@@ -117,7 +155,7 @@ def _parse_data(text: str) -> dict[str, str]:
             continue
         name, sep, value = entry.partition("=")
         if not sep or not name.strip() or not value.strip():
-            raise ValueError(f"Nie rozumiem „{entry.strip()}” — wpisz np. I_R_1 = 0,5")
+            raise BadDataEntry(entry.strip())
         given[name.strip()] = value.strip()
     return given
 
@@ -125,31 +163,28 @@ def _parse_data(text: str) -> dict[str, str]:
 def simulate(schematic_json: str, data: str = "") -> str:
     """The run button of a schematic cell: solve the drawing and report every element's values.
 
-    Returns JSON ``{"results": {id: {...}}, "problems": [{"kind": "warning" | "error", "text": ...}]}``:
-    ``results`` go on the drawing and in the table under it; ``problems`` (Markdown, names in
-    LaTeX) behind the warning button on the board.
+    Returns JSON ``{"results": {id: {...}}, "problems": [{"kind": "warning" | "error", "issue": {...}}]}``:
+    ``results`` go on the drawing and in the table under it; ``problems`` behind the warning
+    button on the board (``text`` instead of ``issue`` for an error that is not ours).
     """
+    from electro.components import notation
     from electro.values import UNKNOWN, fmt
-    from electro_render.schematic import _short
 
     sch = Schematic.from_json(schematic_json)
-    labels = [e.id for e in sch.components()]
     results: dict[str, dict] = {}
     with warnings.catch_warnings(record=True) as caught:
         warnings.simplefilter("always")
         try:
             solution = sch.to_circuit().solve(**_parse_data(data))
-        except (CircuitError, ValueError, KeyError) as err:
-            message = err.args[0] if isinstance(err, KeyError) and err.args else err
-            return json.dumps({"results": {}, "problems": [{"kind": "error", "text": _math(str(message), labels)}]},
-                              ensure_ascii=False)
+        except (Issue, ValueError, KeyError) as err:
+            return json.dumps({"results": {}, "problems": [_problem("error", err)]}, ensure_ascii=False)
     for label in solution.system.parts:
         r = solution[label]
         comp = r.component
         current = r.I if r.I is not None and r.I.is_real and r.I.is_number else None
         sign = -1 if current is not None and current < 0 else 1
         if r.realized is not None:
-            value = _short(r.realized)
+            value = notation(r.realized)
         elif comp.has_value:
             value = fmt(r.value, comp.unit) if r.value is not None else "?"
         else:
@@ -162,30 +197,36 @@ def simulate(schematic_json: str, data: str = "") -> str:
             "P": fmt(r.P, "W") if r.P is not None and not r.P.has(sp_I) else None,
             "reversed": sign < 0,  # the current really flows from the second pin to the first
         }
-    problems = [{"kind": "warning", "text": _math(str(w.message), labels)} for w in caught]
+    problems = [_problem("warning", w.message) for w in caught]
     return json.dumps({"results": results, "problems": problems}, ensure_ascii=False)
 
 
-# a quantity's name, maybe with its value: "U_R_1", "E_1 = 12 V", "I_A_1 = -666.7 mA"
-_NAME = re.compile(r"\b([A-Za-z]+(?:_[A-Za-z0-9]+)+)\b(?: = (-?[0-9][0-9.,/]*) ?([a-zA-ZΩµ°]*))?")
+def to_json(x):
+    """An issue, a reason or a solution's steps as JSON: ``{"type": "OhmsLaw", "label": "R_{1}"}``.
+    Quantities and expressions become LaTeX (``R_{1}``, ``\\frac{U}{I}``), the rest stays as it is."""
+    from electro_render.trace import expr, name, value
+
+    if isinstance(x, Law):
+        return {"equation": f"{expr(x.expr)} = 0", "reason": to_json(x.reason)}
+    if isinstance(x, Equals):
+        return f"{name(x.symbol.name)} = {value(x.value, x.unit)}"
+    if isinstance(x, IsZero):
+        return f"{expr(x.expr)} = 0"
+    if isinstance(x, Issue) or (is_dataclass(x) and not isinstance(x, type)):
+        shown = [f for f in fields(x) if f.metadata.get("shown", True)] if is_dataclass(x) else []
+        return {"type": type(x).__name__, **{f.name: to_json(getattr(x, f.name)) for f in shown}}
+    if isinstance(x, sp.Symbol):
+        return name(x.name)
+    if isinstance(x, sp.Basic):
+        return expr(x)
+    if isinstance(x, (list, tuple)):
+        return [to_json(v) for v in x]
+    return x
 
 
-def _math(message: str, labels=()) -> str:
-    """A solver message as Markdown, quantities in LaTeX: ``E_1 = 12 V`` → ``$E_{1} = 12\\,\\mathrm{V}$``.
-
-    ``labels``: element names, so that one without an index (``E``) is set in LaTeX too.
-    """
-    from electro_render.trace import _unit, name
-
-    plain = [re.escape(label) for label in labels if "_" not in label]
-    pattern = _NAME if not plain else re.compile(
-        _NAME.pattern.replace(r"\b([A-Za-z]+(?:_[A-Za-z0-9]+)+)\b", rf"\b((?:{'|'.join(plain)})|[A-Za-z]+(?:_[A-Za-z0-9]+)+)\b"))
-
-    def tex(m: re.Match) -> str:
-        quantity, number, unit = m.groups()
-        return f"${name(quantity)}" + (f" = {number}{_unit(unit)}" if number else "") + "$"
-
-    return pattern.sub(tex, message)
+def _problem(kind: str, err) -> dict:
+    """For the board's warning button: our issue as data, anything else as its text."""
+    return {"kind": kind, "issue": to_json(err)} if isinstance(err, Issue) else {"kind": kind, "text": str(err)}
 
 
 def to_output(obj) -> dict:
@@ -193,6 +234,11 @@ def to_output(obj) -> dict:
         from electro_render import schematic
 
         obj = schematic(obj)
+    if isinstance(obj, Steps):
+        return {"type": "solution", "data": to_json(obj)}
+    if isinstance(obj, Issue):  # an error caught and shown on purpose: display(e)
+        kind = "warning" if isinstance(obj, Warning) else "error"
+        return {"type": "issue", "kind": kind, "data": repr(obj), "issue": to_json(obj)}
     for method, kind in (("_repr_svg_", "svg"), ("_repr_markdown_", "markdown"), ("_repr_latex_", "markdown")):
         data = getattr(obj, method, lambda: None)()  # sympy defines some of these and returns None
         if data is not None:
@@ -200,13 +246,22 @@ def to_output(obj) -> dict:
     return {"type": "text", "data": repr(obj)}
 
 
-def _error(err: BaseException) -> str:
-    """The exception, plus the line of the cell it came from (not the library internals)."""
+def _error(err: BaseException) -> dict:
+    """An error output: our issue as data (``issue``), anything else as Python says it; ``line``:
+    the line of the cell it came from (not the library internals)."""
     lines = [frame.lineno for frame in traceback.extract_tb(err.__traceback__) if frame.filename == CELL]
-    where = f"linia {lines[-1]}: " if lines else ""
-    if isinstance(err, CircuitError):  # our own messages already say what is wrong
-        return f"{where}{err}"
-    return f"{where}{type(err).__name__}: {err}"
+    out: dict = {"type": "error", "data": repr(err) if isinstance(err, Issue) else f"{type(err).__name__}: {err}"}
+    if isinstance(err, Issue):
+        out["issue"] = to_json(err)
+    if lines:
+        out["line"] = lines[-1]
+    return out
+
+
+def _warning(message) -> dict:
+    if isinstance(message, Issue):
+        return {"type": "warning", "data": repr(message), "issue": to_json(message)}
+    return {"type": "warning", "data": str(message)}
 
 
 def run(code: str, schematics_json: str = "{}") -> str:
@@ -216,7 +271,7 @@ def run(code: str, schematics_json: str = "{}") -> str:
 
     def schemat(name: str) -> Schematic:
         if name not in drawings:
-            raise KeyError(f"Nie ma schematu {name!r}. Są: {', '.join(drawings) or 'żadne'}.")
+            raise NoSuchSchematic(name, list(drawings))
         return drawings[name]
 
     namespace["schemat"] = schemat
@@ -235,11 +290,11 @@ def run(code: str, schematics_json: str = "{}") -> str:
                 if value is not None:
                     outputs.append(to_output(value))
         except Exception as err:  # noqa: BLE001 — every error is shown to the user
-            outputs.append({"type": "error", "data": _error(err)})
+            outputs.append(_error(err))
     printed = stdout.getvalue()
     if printed:
         outputs.insert(0, {"type": "stream", "data": printed})
-    outputs += [{"type": "warning", "data": str(w.message)} for w in caught]
+    outputs += [_warning(w.message) for w in caught]
     return json.dumps(outputs, ensure_ascii=False)
 
 

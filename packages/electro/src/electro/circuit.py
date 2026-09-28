@@ -15,6 +15,10 @@ from dataclasses import dataclass
 from functools import cached_property
 from typing import TYPE_CHECKING
 
+from .issues import (
+    CloseNeedsNToN, NotACircuit, ParallelMismatch, SeriesMismatch, ShuntNeedsOneToOne, WrongNodeCount,
+)
+
 if TYPE_CHECKING:
     from .components import Component
 
@@ -161,7 +165,7 @@ class Circuit:
 
 def _check(x) -> Circuit:
     if not isinstance(x, Circuit):
-        raise TypeError(f"Oczekiwano obwodu, dostałem {x!r}")
+        raise NotACircuit(repr(x))
     return x
 
 
@@ -235,10 +239,7 @@ class Seq(Circuit):
         parts = _flatten(Seq, self.parts)
         for f, g in zip(parts, parts[1:]):
             if f.cod != g.dom:
-                raise TypeError(
-                    f"Nie mogę połączyć szeregowo {f!r} ({f.type}) z {g!r} ({g.type}): "
-                    f"{f.cod} zacisk(ów) wyjściowych vs {g.dom} wejściowych."
-                )
+                raise SeriesMismatch(repr(f), repr(g), f.cod, g.dom)
         object.__setattr__(self, "parts", parts)
         object.__setattr__(self, "dom", parts[0].dom)
         object.__setattr__(self, "cod", parts[-1].cod)
@@ -291,10 +292,7 @@ class Par(Circuit):
         first = parts[0]
         for p in parts[1:]:
             if (p.dom, p.cod) != (first.dom, first.cod):
-                raise TypeError(
-                    f"Połączenie równoległe wymaga tych samych typów: {first!r} ({first.type}) "
-                    f"vs {p!r} ({p.type})."
-                )
+                raise ParallelMismatch(repr(first), str(first.type), repr(p), str(p.type))
         object.__setattr__(self, "parts", parts)
         object.__setattr__(self, "dom", first.dom)
         object.__setattr__(self, "cod", first.cod)
@@ -326,7 +324,7 @@ class Shunt(Circuit):
 
     def __post_init__(self):
         if (self.part.dom, self.part.cod) != (1, 1):
-            raise TypeError(f"shunt wymaga elementu 1 → 1, dostałem {self.part!r} ({self.part.type}).")
+            raise ShuntNeedsOneToOne(repr(self.part), str(self.part.type))
 
     def _netlist(self):
         return (Spider(1, 2) + (Id(1) @ (self.part + ground))).netlist
@@ -367,7 +365,7 @@ class Close(Circuit):
 
     def __post_init__(self):
         if self.part.dom != self.part.cod:
-            raise TypeError(f"close() wymaga typu n → n, dostałem {self.part.type}.")
+            raise CloseNeedsNToN(str(self.part.type))
 
     def _netlist(self):
         n = self.part.netlist
@@ -391,7 +389,7 @@ class Net(Circuit):
     def __post_init__(self):
         for c, names in self.items:
             if len(names) != c.dom + c.cod:
-                raise TypeError(f"{c!r} ma {c.dom + c.cod} zacisków, a podano węzły {names}.")
+                raise WrongNodeCount(repr(c), c.dom + c.cod, [str(n) for n in names])
 
     def _netlist(self):
         nets = [c.netlist for c, _ in self.items]

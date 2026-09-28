@@ -1,3 +1,5 @@
+import type { Failure, Issue, Steps } from "./issues";
+
 export type Point = [number, number];
 
 /** Mirrors electro_schematic.Element / Wire / Schematic (the JSON the Python side reads). */
@@ -26,10 +28,11 @@ export interface SymbolLibrary {
   kinds: Record<string, { pins: Point[]; svg: string; letter: string | null; upright: boolean }>;
 }
 
-export type Output = {
-  type: "text" | "stream" | "svg" | "markdown" | "error" | "warning";
-  data: string;
-};
+export type Output =
+  | { type: "text" | "stream" | "svg" | "markdown"; data: string }
+  | ({ type: "error" | "warning" } & Failure)
+  | ({ type: "issue"; kind: "error" | "warning" } & Failure) // display(err): an issue shown on purpose
+  | { type: "solution"; data: Steps }; // steps(sol)
 
 /** What "Symuluj" found for one element (already formatted, e.g. "33.33 mA"). */
 export interface ElementResult {
@@ -41,10 +44,12 @@ export interface ElementResult {
   reversed: boolean; // the current really flows from the second pin to the first
 }
 
-/** A warning (not everything could be found) or an error, as Markdown with LaTeX. */
+/** A warning (not everything could be found) or an error: our issue, else its text (older notes:
+ *  the text alone, in Markdown). */
 export interface Problem {
   kind: "warning" | "error";
-  text: string;
+  issue?: Issue;
+  text?: string;
 }
 
 export type Cell =

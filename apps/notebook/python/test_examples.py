@@ -26,11 +26,15 @@ def test_example_runs_without_errors(path):
 
 
 def test_unknowns_and_holes_give_the_described_answers():
-    text = "\n".join(o["data"] for _, outs in run_notebook(Path(EXAMPLES[0]).parent / "nieznane-i-dziury.electro.json")
-                     for o in outs)
+    outputs = [o for _, outs in run_notebook(Path(EXAMPLES[0]).parent / "nieznane-i-dziury.electro.json") for o in outs]
+    text = "\n".join(o["data"] for o in outputs if isinstance(o["data"], str))
+    issues = [o["issue"] for o in outputs if o["type"] == "issue"]
     for expected in [
-        "R_{2} = 50", "E_1 = 15 V", "E_2 = -4 V", "R_1 = 2 Ω", "brakuje 1 danej", "brakuje 1 danej",
-        "tego nie da się uzyskać", "R_1 = 8 Ω albo R_1 = 2 Ω", "E*R_b/(R_a + R_b)", "R_2 = 200 Ω", "J_1 = 1 A",
-        "X_1 → VoltageSource(14 V).transpose()", "X_1 → przewód", "X_1 → przerwa", ": R = 12 Ω",  # the drawing (subscripts are separate <tspan>s)
+        "E_1 = 15 V", "E_2 = -4 V", "R_1 = 2 Ω", "E*R_b/(R_a + R_b)", "R_2 = 200 Ω", "J_1 = 1 A",
+        "X_1 → E = -14 V", "X_1 → R = 0 Ω", "X_1 → R = ∞", ": R = 12 Ω",  # the drawing (subscripts are separate <tspan>s)
     ]:
         assert expected in text, expected
+    assert r"R_{2} = \frac{U_{R_{2}}}{I_{R_{2}}} = \frac{4}{0.08} = 50\,\mathrm{\Omega}" in json.dumps(outputs[0]["data"]).replace("\\\\", "\\")
+    assert [i["type"] for i in issues] == ["ConflictingData", "MissingData", "MissingData", "ConflictingData", "Ambiguous", "MissingData"]
+    assert [i.get("needed") for i in issues if i["type"] == "MissingData"] == [1, 1, 1]
+    assert issues[4]["options"] == [[r"R_{1} = 8\,\mathrm{\Omega}"], [r"R_{1} = 2\,\mathrm{\Omega}"]]

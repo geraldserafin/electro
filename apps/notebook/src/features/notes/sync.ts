@@ -16,7 +16,7 @@ export type SyncState =
   | { kind: "saved"; at: string }
   | { kind: "offline" } // the server is unreachable: retried
   | { kind: "conflict"; current: number } // changed elsewhere since it was read
-  | { kind: "error"; message: string };
+  | { kind: "error"; tag: string }; // the server's error (its _tag), said by SyncNotice
 
 const DELAY = 1000;
 const RETRY = 10_000;
@@ -77,7 +77,7 @@ export function useNoteSync(notebook: Notebook, revision: number | null, reload:
       } else if (unreachable(error)) {
         setState({ kind: "offline" });
         schedule(RETRY);
-      } else setState({ kind: "error", message: error?.message ?? String(error?._tag) });
+      } else setState({ kind: "error", tag: String(error?._tag) });
     })();
     inflight.current = run;
     try {

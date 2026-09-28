@@ -72,7 +72,7 @@ bez_transpose = (
 try:
     bez_transpose.solve(I_R_1=2, U_R_2=8, U_R_3=5)
 except CircuitError as e:
-    print(e)
+    display(e)
 
 bez_transpose.solve(I_R_1=2, U_R_2=-8, U_R_3=-5, find=["R_1", "R_3", "E_2"])  # te same pomiary „w górę”
 """)
@@ -85,7 +85,7 @@ code("""
 try:
     uklad.solve(I_R_1=2, U_R_2=8, find=["R_1", "R_3", "E_2"])
 except MissingData as e:
-    print(e)
+    display(e)
     print("Udało się wyznaczyć:", e.solution.answers["R_1"], "Ω")
 """)
 
@@ -98,7 +98,7 @@ code("""
 try:
     (supply() + Resistor() + Resistor(4) + ground).solve(U_R_2=4, I_R_2=1, find=["E_1", "R_1"])
 except MissingData as e:
-    print(e)
+    display(e)
 """)
 
 md("## 7. Sprzeczne dane\nSolver wskazuje, które dane się wykluczają.")
@@ -106,7 +106,7 @@ code("""
 try:
     (supply(12) + Resistor(10) + Resistor(20) + ground).solve(I_R_1=1)
 except Contradiction as e:
-    print(e)
+    display(e)
 """)
 
 md("""
@@ -119,7 +119,7 @@ dwa = loop(VoltageSource(12), Resistor(), Resistor(4))
 try:
     dwa.solve(P_R_1=8, find="R_1")
 except Ambiguous as e:
-    print(e)
+    display(e)
 
 dwa.solve(Eq(P("R_1"), 8), Eq(U("R_1"), 2 * U("R_2")), find="R_1")  # R₁ ma dwa razy więcej napięcia niż R₂
 """)
@@ -194,7 +194,7 @@ dwie = loop(VoltageSource(12), Hole(), Hole())
 try:
     dwie.solve(I_E_1=1, find="U_X_1")
 except MissingData as e:
-    print(e)
+    display(e)
 
 sol = dwie.solve(I_E_1=1, U_X_1=5)
 sol["X_1"], sol["X_2"]

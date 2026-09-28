@@ -1,6 +1,7 @@
 """Solver: constraint propagation (step by step, like on paper), then a global solve.
 
-Every step keeps the law it used, so the solution can be explained.
+Every step keeps the law it used (and the law its reason), so the solution can be explained.
+What goes wrong is an ``issues`` type, never a sentence.
 """
 
 from __future__ import annotations
@@ -10,36 +11,16 @@ import warnings
 from dataclasses import dataclass
 
 import sympy as sp
-from sympy.printing.str import StrPrinter
 
-from .circuit import Circuit, wire
-from .components import OPEN, Component, Context, Hole, Law
+from .circuit import Circuit
+from .components import OPEN, Component, Context, Hole, Law, notation
+from .issues import (
+    Ambiguous, BadCondition, CircuitError, ComponentRepeated, ConflictingData, Contradiction, Equals, HoleUndetermined,
+    IsZero, LawBroken, MissingData, NoSolutionFor, NoSystemSolution, NotInCircuit, Underdetermined, Undetermined,
+)
+from .reasons import Given
 from .semantics import KIND_ORDER, Placed, System, compile_circuit
 from .values import fmt, parse
-
-
-class CircuitError(Exception):
-    pass
-
-
-class Contradiction(CircuitError):
-    """The givens are inconsistent with the circuit. ``.details``: the equation that failed."""
-
-    def __init__(self, message: str, details: str = ""):
-        super().__init__(message)
-        self.details = details
-
-
-class Ambiguous(CircuitError):
-    """More than one solution (nonlinear laws)."""
-
-
-class MissingData(CircuitError):
-    """A requested value is not determined by the givens. ``.solution`` holds what was found."""
-
-    def __init__(self, message: str, solution: Solution):
-        super().__init__(message)
-        self.solution = solution
 
 
 # --------------------------------------------------------------------------- references
@@ -73,36 +54,6 @@ class Step:
     formula: sp.Expr | None = None  # for single-target steps: target = formula(knowns)
 
 
-class _Printer(StrPrinter):
-    """Positive terms first: ``V_a - U_R1`` rather than ``-U_R1 + V_a``."""
-
-    def _as_ordered_terms(self, expr, order=None):
-        return sorted(super()._as_ordered_terms(expr, order), key=lambda t: t.could_extract_minus_sign())
-
-
-class _Substituted(_Printer):
-    def __init__(self, values):
-        super().__init__()
-        self.values = values
-
-    def _print_Symbol(self, s):
-        if s not in self.values:
-            return s.name
-        v = self.values[s]
-        if v.is_number and v.is_real:
-            text = f"{float(v):.6g}"
-            return f"({text})" if float(v) < 0 else text
-        return f"({sp.sstr(v)})"
-
-
-def _str(expr) -> str:
-    return _pretty(_Printer().doprint(expr))
-
-
-def _pretty(text: str) -> str:
-    return text.replace("**", "^").replace("*", "·")
-
-
 # --------------------------------------------------------------------------- missing data
 
 @dataclass
@@ -113,15 +64,8 @@ class Diagnosis:
     needed: int | None  # how many more independent givens; None = more than we searched for
     options: list[tuple[sp.Symbol, ...]]  # minimal sets of quantities that would suffice
 
-    def __str__(self):
-        names = ", ".join(s.name for s in self.targets)
-        if self.needed is None:
-            return f"Nie da się wyznaczyć {names} — brakuje kilku danych."
-        head = f"Nie da się wyznaczyć {names} — brakuje {self.needed} {'danej' if self.needed == 1 else 'danych'}."
-        if self.needed == 1:
-            return f"{head} Wystarczy podać jedną z: {', '.join(o[0].name for o in self.options)}."
-        combos = " albo ".join("(" + ", ".join(s.name for s in o) + ")" for o in self.options)
-        return f"{head} Wystarczy podać np.: {combos}."
+    def fields(self) -> dict:
+        return {"targets": self.targets, "needed": self.needed, "options": self.options}
 
 
 def _diagnose(targets, param_map, free, candidates, max_size=3, max_options=6) -> Diagnosis | None:
@@ -173,9 +117,7 @@ class PartResult:
 
     def __repr__(self):
         if isinstance(self.component, Hole):
-            shown = ("przerwa" if self.realized is OPEN else "przewód" if self.realized is wire
-                     else "?" if self.realized is None else repr(self.realized))
-            head = f"{self.label} → {shown}"
+            head = f"{self.label} → {'?' if self.realized is None else notation(self.realized)}"
             return f"{head}   U = {fmt(self.U, 'V')}   I = {fmt(self.I, 'A')}"
         head = f"{self.label} = {fmt(self.value, self.component.unit)}" if self.component.has_value else self.label
         fields = [f"U = {fmt(self.U, 'V')}", f"I = {fmt(self.I, 'A')}"]
@@ -218,8 +160,8 @@ class Solution:
             if len(found) == 1:
                 return found[0]
             if found:
-                raise KeyError(f"Ten element występuje w obwodzie {len(found)} razy — użyj etykiety.")
-        raise KeyError(f"Nie znaleziono {key!r} w obwodzie.")
+                raise ComponentRepeated(len(found))
+        raise NotInCircuit(repr(key))
 
     def __getitem__(self, key) -> PartResult:
         p = self._placed(key)
@@ -244,10 +186,10 @@ class Solution:
             return component
         placed = [p for p in self.system.parts.values() if p.component is component]
         if not placed:
-            raise KeyError(f"{component!r} nie występuje w rozwiązanym obwodzie.")
+            raise NotInCircuit(repr(component))
         result = self.realize(placed[0].label)
         if result is None:
-            raise CircuitError(f"Nie wyznaczono, czym jest {placed[0].label}.")
+            raise HoleUndetermined(sp.Symbol(placed[0].label))
         return result
 
     def _value(self, s: sp.Symbol):
@@ -270,7 +212,7 @@ class Solution:
         result = sp.simplify(expr.xreplace(self.values))
         unknown = result.free_symbols & set(self.missing)
         if unknown:
-            raise CircuitError(f"Nie wyznaczono: {', '.join(sorted(s.name for s in unknown))}.")
+            raise Undetermined(sorted(unknown, key=lambda s: s.name))
         return result
 
     # presentation
@@ -294,43 +236,6 @@ class Solution:
                     *(law.expr.free_symbols for law in step.laws))
                 needed |= deps
         return kept[::-1]
-
-    def explain(self) -> str:
-        lines = []
-        known = self.data
-        if known:
-            lines.append("Dane:")
-            lines += [f"  {s.name} = {fmt(v, self.unit(s))}" for s, v in known.items()]
-        if self.assumed:
-            lines.append("Założenia (najprostszy element, który pasuje do danych):")
-            lines += [f"  {s.name} = {fmt(v, self.unit(s))}" for s, v in self.assumed.items()]
-        lines.append("Rozwiązanie:")
-        values = dict(self.system.known) | self.given | self.assumed
-        for i, step in enumerate(self.shown_steps(), 1):
-            if step.formula is not None:
-                (target, value), = step.targets.items()
-                chain = [target.name]
-                formula = _str(step.formula)
-                substituted = "" if step.formula.is_Symbol else _pretty(_Substituted(values).doprint(step.formula))
-                result = fmt(value, self.unit(target))
-                for part in (formula, substituted):
-                    if part and part not in chain and part != result.split(" ")[0]:
-                        chain.append(part)
-                chain.append(result)
-                lines.append(f"  {i}. {' = '.join(chain)}   — {step.laws[0].reason}")
-            else:
-                lines.append(f"  {i}. układ równań:")
-                for law in step.laws:
-                    lines.append(f"       {_str(law.expr)} = 0   — {law.reason}")
-                for target, value in step.targets.items():
-                    lines.append(f"     ⇒ {target.name} = {fmt(value, self.unit(target))}")
-            values.update(step.targets)
-        if self.find:
-            lines.append("Odpowiedź:")
-            lines += [f"  {s.name} = {fmt(self._value(s), self.unit(s))}" for s in self.find]
-        elif self.missing:
-            lines.append(str(self.diagnose()))
-        return "\n".join(lines)
 
     def __repr__(self):
         if self.find:
@@ -387,9 +292,9 @@ def _given_laws(equations, given, system) -> list[Law]:
         elif isinstance(eq, sp.Equality):
             items.append((eq.lhs, eq.rhs))
         else:
-            raise TypeError(f"Nie rozumiem warunku {eq!r}. Użyj np. {{I('R1'): 0.5}} albo Eq(...).")
+            raise BadCondition(repr(eq))
     items += [(sp.Symbol(name), parse(v)) for name, v in given.items()]
-    return [Law(_resolve(lhs - rhs, system), "dane", "given") for lhs, rhs in items]
+    return [Law(_resolve(lhs - rhs, system), Given(), "given") for lhs, rhs in items]
 
 
 def _admissible(var: sp.Symbol, value: sp.Expr) -> bool:
@@ -408,47 +313,38 @@ def _unit(system: System, s: sp.Symbol) -> str:
     return {"U": "V", "V": "V", "I": "A", "P": "W", "E": "V", "Z": "Ω"}.get(s.name.split("_")[0], "")
 
 
-def _data_items(system: System, laws: list[Law]) -> list[tuple[tuple, str]]:
-    """Every single piece of data, as (key for _solve's ``drop``, how to show it)."""
-    items = [(("param", s.name), f"{s.name} = {fmt(v, _unit(system, s))}")
+def _data_items(system: System, laws: list[Law]) -> list[tuple[tuple, Equals | IsZero]]:
+    """Every single piece of data, as (key for _solve's ``drop``, the datum)."""
+    items = [(("param", s.name), Equals(s, v, _unit(system, s)))
              for s, v in system.known.items() if not s.name.startswith("V_")]
     for i, law in enumerate(laws):
         free = list(law.expr.free_symbols)
         if len(free) == 1 and sp.diff(law.expr, free[0]) == 1:
-            text = f"{free[0].name} = {fmt(free[0] - law.expr, _unit(system, free[0]))}"
+            datum = Equals(free[0], free[0] - law.expr, _unit(system, free[0]))
         else:
-            text = f"{_str(law.expr)} = 0"
-        items.append((("given", i), text))
+            datum = IsZero(law.expr)
+        items.append((("given", i), datum))
     return items
 
 
-def _explain_contradiction(circuit, equations, omega, find, given, err: Contradiction) -> Contradiction:
+def _explain_contradiction(circuit, equations, omega, find, given, err: Contradiction) -> ConflictingData:
     """Which data clash: those whose removal alone makes everything else consistent."""
     ctx = Context(None if omega is None else parse(omega))
     system = compile_circuit(circuit, ctx=ctx)
     conditions, values = [], []  # culprits: given conditions / component values
-    for key, text in _data_items(system, _given_laws(equations, given, system)):
+    for key, datum in _data_items(system, _given_laws(equations, given, system)):
         try:
             _solve(circuit, equations, omega, find, given, {}, drop=frozenset([key]))
         except CircuitError:
             continue
-        (conditions if key[0] == "given" else values).append(text)
-    if conditions and values:
-        message = (f"Sprzeczne dane: {', '.join(conditions)} — tego nie da się uzyskać przy "
-                   f"{', '.join(values)}. Zmień jedną z tych wartości.")
-    elif values:
-        message = f"Sprzeczne dane: elementy {', '.join(values)} wykluczają się. Zmień jedną z tych wartości."
-    elif conditions:
-        message = f"Sprzeczne dane: warunki {', '.join(conditions)} wykluczają się nawzajem."
-    else:
-        message = "Sprzeczne dane: tych warunków nie da się spełnić naraz (żadna pojedyncza zmiana tego nie naprawia)."
-    return Contradiction(message, str(err))
+        (conditions if key[0] == "given" else values).append(datum)
+    return ConflictingData(conditions, values, err)
 
 
 def _check_zero(expr, law: Law, known):
     rest = sp.simplify(expr.xreplace(known))
     if rest != 0:
-        raise Contradiction(f"Sprzeczne dane: {_str(law.expr)} = 0 ({law.reason}), a wychodzi {rest} ≠ 0.")
+        raise LawBroken(law, rest)
 
 
 def solve(circuit: Circuit, *equations, omega=None, find=None, **given) -> Solution:
@@ -490,9 +386,9 @@ def _report(solution: Solution) -> Solution:
     if solution.find:
         lacking = [t for t in solution.find if t in solution.missing]
         if lacking:
-            raise MissingData(str(solution.diagnose(lacking)), solution)
+            raise MissingData(**solution.diagnose(lacking).fields(), solution=solution)
     elif solution.missing:
-        warnings.warn(str(solution.diagnose()), stacklevel=3)
+        warnings.warn(Underdetermined(**solution.diagnose().fields()), stacklevel=3)
     return solution
 
 
@@ -546,7 +442,7 @@ def _solve(circuit: Circuit, equations, omega, find, given, assumed, drop: froze
             (var,) = free
             values = [v for v in sp.solve(law.expr.xreplace(known), var) if _admissible(var, v)]
             if not values:
-                raise Contradiction(f"Brak rozwiązania dla {var.name} z: {_str(law.expr)} = 0 ({law.reason}).")
+                raise NoSolutionFor(var, law)
             if len(set(values)) > 1:
                 continue
             value = sp.simplify(values[0])
@@ -564,16 +460,11 @@ def _solve(circuit: Circuit, equations, omega, find, given, assumed, drop: froze
         variables = sorted(set().union(*(e.free_symbols for e in exprs)) & unknown, key=lambda s: s.name)
         solutions = sp.solve(exprs, variables, dict=True)
         if not solutions:
-            raise Contradiction("Sprzeczne dane: układ równań nie ma rozwiązania.\n" + "\n".join(
-                f"  {_str(law.expr)} = 0   — {law.reason}" for law in pending))
+            raise NoSystemSolution(list(pending))
         if len(solutions) > 1:
             params = {p.model.param for p in system.parts.values()} & unknown
             shown = targets or sorted(params, key=lambda s: s.name) or variables[:3]
-            options = " albo ".join(
-                ", ".join(f"{s.name} = {fmt(sol[s], _unit(system, s))}" for s in shown if s in sol) for sol in solutions
-            )
-            count = f"Są {len(solutions)} rozwiązania" if len(solutions) < 5 else f"Jest {len(solutions)} rozwiązań"
-            raise Ambiguous(f"{count}: {options}. Dodaj jeszcze jedną daną, która wskaże właściwe.")
+            raise Ambiguous([[Equals(s, sol[s], _unit(system, s)) for s in shown if s in sol] for sol in solutions])
         general = {k: sp.simplify(v) for k, v in solutions[0].items()}
         solved = {k: v for k, v in general.items() if k in unknown and not v.free_symbols & unknown}
         free = sorted(unknown - set(general), key=lambda s: s.name)
