@@ -24,9 +24,11 @@ const MITEX = "0.2.5"; // mitex from Typst Universe, for the .typ file (the app 
 
 /**
  * ``drawingOf``: a schematic cell's drawing as SVG, as the page has it (the hidden drawing for the PDF —
- * with the values of the last run, when the settings want them); none when it is empty.
+ * with the values of the last run, when the settings want them); none when it is empty. ``lang``: the
+ * app's language, the document's too (hyphenation, the contents' title, the date).
  */
-export function toTypst(notebook: Notebook, pdf: PdfSettings, drawingOf: (cellId: string) => SVGSVGElement | null): TypstDocument {
+export function toTypst(notebook: Notebook, pdf: PdfSettings, drawingOf: (cellId: string) => SVGSVGElement | null,
+                        lang: string): TypstDocument {
   const formulas: string[] = [];
   const files: Record<string, string> = {};
   const math = (latex: string, block: boolean) => {
@@ -68,8 +70,9 @@ export function toTypst(notebook: Notebook, pdf: PdfSettings, drawingOf: (cellId
     }
   }
 
-  const date = new Date().toLocaleDateString("pl-PL", { day: "numeric", month: "long", year: "numeric" });
+  const date = new Date().toLocaleDateString(lang, { day: "numeric", month: "long", year: "numeric" });
   const config = `#let config = (
+  lang: ${str(lang)},
   theme: ${str(pdf.theme)},
   title: ${pdf.title && notebook.title.trim() ? str(notebook.title.trim()) : "none"},
   author: ${pdf.title && pdf.author.trim() ? str(pdf.author.trim()) : "none"},

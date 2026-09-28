@@ -6,13 +6,14 @@ import { initReactI18next } from "react-i18next";
 import { messages as language, savedLanguage } from "@/features/language";
 import { messages as notebook } from "@/features/notebook";
 import { messages as notes } from "@/features/notes";
+import { messages as pdfExport } from "@/features/pdf-export";
 import { messages as schematic } from "@/features/schematic";
 import { messages as theme } from "@/features/theme";
 import * as pages from "@/pages/messages";
 
 const resources = {
-  pl: { notebook: notebook.pl, notes: notes.pl, schematic: schematic.pl, theme: theme.pl, language: language.pl, pages: pages.pl },
-  en: { notebook: notebook.en, notes: notes.en, schematic: schematic.en, theme: theme.en, language: language.en, pages: pages.en },
+  pl: { notebook: notebook.pl, notes: notes.pl, schematic: schematic.pl, "pdf-export": pdfExport.pl, theme: theme.pl, language: language.pl, pages: pages.pl },
+  en: { notebook: notebook.en, notes: notes.en, schematic: schematic.en, "pdf-export": pdfExport.en, theme: theme.en, language: language.en, pages: pages.en },
 };
 
 declare module "i18next" {

@@ -221,20 +221,20 @@ try {
     const opened = Date.now();
     await page.getByRole("button", { name: "Eksport do PDF" }).click();
     const dialog = page.getByRole("dialog", { name: "Eksport do PDF" });
-    const sheets = dialog.locator(".export-sheets .sheet");
+    const sheets = dialog.locator("[data-sheet]");
     await sheets.first().waitFor({ timeout: 90_000 });
     const firstPages = Date.now() - opened;
     check(`Typst loads in the background: the first export shows its pages at once (${firstPages} ms)`,
       before >= 2 && workers.length === before && firstPages < 3000);
-    await dialog.locator(".export-preview:not(.busy)").waitFor();
+    await dialog.locator("[data-preview]:not([data-busy])").waitFor();
     const firstPage = await sheets.first().getAttribute("src");
     const decoded = await sheets.first().evaluate((img) => img.decode().then(() => img.naturalWidth > 0));
     if (process.env.SHOTS) await dialog.screenshot({ path: `${process.env.SHOTS}/export-classic.png` });
     await dialog.getByRole("radio", { name: /Nowoczesny/ }).click();
     await dialog.getByRole("switch", { name: "Kod komórek" }).uncheck();
     await page.waitForFunction((src) => {
-      const img = document.querySelector(".export-sheets .sheet");
-      return img && img.getAttribute("src") !== src && !document.querySelector(".export-preview.busy");
+      const img = document.querySelector("[data-sheet]");
+      return img && img.getAttribute("src") !== src && !document.querySelector("[data-preview][data-busy]");
     }, firstPage, { timeout: 30_000 });
     if (process.env.SHOTS) await dialog.screenshot({ path: `${process.env.SHOTS}/export-modern.png` });
     const [download] = await Promise.all([page.waitForEvent("download"), dialog.getByRole("button", { name: "Pobierz PDF" }).click()]);
@@ -254,14 +254,14 @@ try {
       && !(await dialog.isVisible()));
     // Ctrl+P (⌘P) opens the export, not the browser's print; more to choose: author, a title page, columns
     await page.keyboard.press("ControlOrMeta+KeyP");
-    await dialog.locator(".export-preview:not(.busy) .sheet").first().waitFor({ timeout: 30_000 });
+    await dialog.locator("[data-preview]:not([data-busy]) [data-sheet]").first().waitFor({ timeout: 30_000 });
     const shownBefore = await sheets.first().getAttribute("src");
     await dialog.getByRole("switch", { name: "Kod komórek" }).check();
     await dialog.getByRole("textbox", { name: "Autor" }).fill("Jan Kowalski");
     await dialog.getByRole("switch", { name: /Strona tytułowa/ }).check();
     await dialog.getByRole("radio", { name: "Dwie" }).click();
-    await page.waitForFunction((src) => !document.querySelector(".export-preview.busy")
-      && document.querySelector(".export-sheets .sheet")?.getAttribute("src") !== src, shownBefore, { timeout: 30_000 });
+    await page.waitForFunction((src) => !document.querySelector("[data-preview][data-busy]")
+      && document.querySelector("[data-sheet]")?.getAttribute("src") !== src, shownBefore, { timeout: 30_000 });
     const titlePages = await sheets.count();
     if (process.env.SHOTS) await dialog.screenshot({ path: `${process.env.SHOTS}/export-title-page.png` });
     await page.keyboard.press("Escape");

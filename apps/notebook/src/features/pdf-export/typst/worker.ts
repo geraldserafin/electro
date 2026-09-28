@@ -113,7 +113,7 @@ self.onmessage = async ({ data }: MessageEvent<Request>) => {
       const more = formulasIn(diagnostics, document.main).filter((i) => !bad.includes(i));
       if (!more.length || attempt > 50) {
         const error = diagnostics.find((d) => d.severity === "error");
-        post({ id, ok: false, error: error ? error.message : "Nie udało się złożyć dokumentu." });
+        post({ id, ok: false, error: error?.message ?? "" });
         return;
       }
       bad.push(...more);

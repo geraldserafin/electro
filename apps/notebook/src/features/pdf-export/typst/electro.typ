@@ -97,7 +97,7 @@
     header: if config.header and config.title != none { running-header() },
     footer: if config.page-numbers { page-number() },
   )
-  set text(font: theme.font, size: config.size, lang: "pl")
+  set text(font: theme.font, size: config.size, lang: config.lang)
   set par(
     justify: if config.justify == auto { theme.justify } else { config.justify },
     leading: config.spacing.leading, spacing: config.spacing.spacing,
@@ -156,7 +156,7 @@
     if config.columns > 1 { place(top, scope: "parent", float: true, clearance: 1.6em, block(width: 100%, below: 0pt, title-block())) } else { title-block() }
   }
   if config.outline {
-    block(below: 2em, outline(title: "Spis treści", indent: auto))
+    block(below: 2em, outline(indent: auto))
   }
   body
 }

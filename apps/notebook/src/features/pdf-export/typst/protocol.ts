@@ -7,4 +7,4 @@ export type Request =
 
 export type Reply =
   | { id: number; ok: true; pdf: Uint8Array; svg: string; bad: number[] } // bad: the formulas shown as written
-  | { id: number; ok: false; error: string };
+  | { id: number; ok: false; error: string }; // error: Typst's message (empty: it gave none)

@@ -67,6 +67,12 @@
   @keyframes rise { from { opacity: 0; transform: translateY(8px); } }
 }
 
+/* in front of everything: a dialog's backdrop */
+@theme {
+  --animate-fade-in: fade-in 0.15s ease both;
+  @keyframes fade-in { from { opacity: 0; } }
+}
+
 /* something is working (Python starting, a cell running): fading in and out */
 @theme {
   --animate-blink: blink 0.9s ease-in-out infinite alternate;
