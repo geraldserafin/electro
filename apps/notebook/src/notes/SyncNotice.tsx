@@ -8,7 +8,7 @@ export function SyncNotice({ state, onKeepMine, onTakeTheirs }: {
 }) {
   if (state.kind === "conflict")
     return (
-      <div className="notice conflict no-print" role="alert">
+      <div className="notice conflict" role="alert">
         <WarningIcon />
         <span>Ta notatka zmieniła się gdzie indziej. Którą wersję zostawić?</span>
         <button onClick={onKeepMine}>Moją</button>
@@ -17,7 +17,7 @@ export function SyncNotice({ state, onKeepMine, onTakeTheirs }: {
     );
   if (state.kind === "offline" || state.kind === "error")
     return (
-      <div className="notice no-print" role="status">
+      <div className="notice" role="status">
         <WarningIcon />
         <span>
           {state.kind === "offline"

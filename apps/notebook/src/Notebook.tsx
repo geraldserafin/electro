@@ -10,7 +10,7 @@ import { Outline } from "./Outline";
 import { TitleBox } from "./TitleBox";
 import { ExportDialog } from "./pdf/ExportDialog";
 import { warmUpWhenIdle } from "./pdf/typst/compile";
-import { PdfContext, pageCss, pdfOf, printClasses, type PdfSettings } from "./pdf/settings";
+import { PdfContext, pdfOf, type PdfSettings } from "./pdf/settings";
 import { kernel } from "./python/kernel";
 import { usePython } from "./python/usePython";
 import symbols from "./schematic/symbols.json";
@@ -53,6 +53,18 @@ export function Notebook({ initial, revision, reload, onSaved }: {
   // the PDF's Typst loads in the background once Python is up (not to slow it down): the first
   // export shows its pages at once
   useEffect(() => (ready ? warmUpWhenIdle() : undefined), [ready]);
+
+  // Ctrl+P (⌘P) exports: the PDF is set by Typst, not printed from the page
+  useEffect(() => {
+    const print = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && !e.altKey && e.key.toLowerCase() === "p") {
+        e.preventDefault();
+        setExporting(true);
+      }
+    };
+    window.addEventListener("keydown", print);
+    return () => window.removeEventListener("keydown", print);
+  }, []);
 
   const setCells = (fn: (cells: Cell[]) => Cell[]) => setNotebook((nb) => ({ ...nb, cells: fn(nb.cells) }));
   const update = (id: string, patch: Partial<Cell>) =>
@@ -129,7 +141,7 @@ export function Notebook({ initial, revision, reload, onSaved }: {
 
 
   return (
-    <div className={`notebook ${printClasses(pdf, notebook.settings.codeInPdf)}`}
+    <div className="notebook"
          // a click outside every cell (and the app's islands) leaves the cell being worked on
          onPointerDownCapture={(e) => {
            // (the export dialog is a portal: its clicks bubble here too, and are not outside)
@@ -137,7 +149,7 @@ export function Notebook({ initial, revision, reload, onSaved }: {
          }}>
       {/* left: the way back and the app (as on the home screen), under it a sidebar — the note's
           title and its sections; right: run, PDF */}
-      <div className="float-group top-left no-print">
+      <div className="float-group top-left">
         <Link className="float icon-button" to="/" title="Wszystkie notatki" aria-label="Wszystkie notatki"><Back /></Link>
         <div className="float">
           <span className="brand"><Bolt /></span>
@@ -148,13 +160,13 @@ export function Notebook({ initial, revision, reload, onSaved }: {
           <OutlineIcon />
         </button>
       </div>
-      <aside className={`note-nav no-print ${outline ? "open" : ""}`} inert={!outline}>
+      <aside className={`note-nav ${outline ? "open" : ""}`} inert={!outline}>
         <div className="note-nav-head">
           <TitleBox title={notebook.title} onChange={setTitle} />
         </div>
         <Outline cells={notebook.cells} />
       </aside>
-      <div className="float-group top-right no-print">
+      <div className="float-group top-right">
         <button className={`float icon-button ${ready ? "" : "waiting"}`} onClick={runAll} disabled={!ready}
                 title={ready ? "Uruchom wszystko" : python.text} aria-label="Uruchom wszystko"><RunAll /></button>
         <button className="float icon-button" onClick={() => setExporting(true)} title="Eksport do PDF" aria-label="Eksport PDF">
@@ -162,7 +174,6 @@ export function Notebook({ initial, revision, reload, onSaved }: {
         </button>
       </div>
       <SyncNotice state={sync.state} onKeepMine={sync.keepMine} onTakeTheirs={sync.takeTheirs} />
-      <style>{pageCss(pdf)}</style>
       {exporting && (
         <ExportDialog notebook={notebook} pdf={pdf} onChange={setPdf}
                       onCode={(codeInPdf) => setNotebook((nb) => ({ ...nb, settings: { ...nb.settings, codeInPdf } }))}
@@ -172,10 +183,8 @@ export function Notebook({ initial, revision, reload, onSaved }: {
       <PdfContext.Provider value={pdf}>
       <main className={`appear ${outline ? "with-nav" : ""}`}>
         {/* the title is the note's first heading too (and the PDF's) */}
-        <input className="doc-title no-print" value={notebook.title} placeholder="Bez tytułu" aria-label="Tytuł"
+        <input className="doc-title" value={notebook.title} placeholder="Bez tytułu" aria-label="Tytuł"
                spellCheck={false} onChange={(e) => setTitle(e.target.value)} />
-        {notebook.title && <h1 className="doc-title print-only">{notebook.title}</h1>}
-        {pdf.date && <p className="doc-date print-only">{new Date().toLocaleDateString("pl-PL", { day: "numeric", month: "long", year: "numeric" })}</p>}
         <AddRow onAdd={(type) => insert(0, type)} />
         {notebook.cells.map((cell, index) => (
           <section
@@ -185,7 +194,7 @@ export function Notebook({ initial, revision, reload, onSaved }: {
             onFocusCapture={() => setFocused(cell.id)}
             onPointerDownCapture={() => setFocused(cell.id)}
           >
-            <div className="cell-tools no-print">
+            <div className="cell-tools">
               <button onClick={() => move(index, -1)} title="W górę" aria-label="W górę"><Up /></button>
               <button onClick={() => move(index, 1)} title="W dół" aria-label="W dół"><Down /></button>
               <button onClick={() => remove(cell.id)} title="Usuń komórkę" aria-label="Usuń komórkę"><Trash /></button>
@@ -245,7 +254,7 @@ function freeName(cells: Cell[]): string {
 
 function AddRow({ onAdd }: { onAdd: (type: CellType) => void }) {
   return (
-    <div className="add-row no-print">
+    <div className="add-row">
       <button onClick={() => onAdd("code")} title="Dodaj komórkę z kodem"><Plus /> Kod</button>
       <button onClick={() => onAdd("markdown")} title="Dodaj komórkę z tekstem"><Plus /> Tekst</button>
       <button onClick={() => onAdd("schematic")} title="Dodaj schemat"><Plus /> Schemat</button>

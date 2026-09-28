@@ -3,6 +3,7 @@
 import type { Notebook, Output } from "../../types";
 import type { PdfSettings } from "../settings";
 import { markdownToTypst, str, text, topHeading } from "./markdown";
+import template from "./electro.typ?raw";
 
 export interface TypstDocument {
   main: string;
@@ -14,10 +15,15 @@ export interface TypstDocument {
 const PAPER = { A4: "a4", Letter: "us-letter" } as const;
 const MARGINS = { narrow: "(x: 14mm, y: 14mm)", normal: "(x: 20mm, y: 22mm)", wide: "(x: 28mm, y: 28mm)" } as const;
 const SIZE = { small: "10pt", normal: "11pt", large: "12pt" } as const;
+const SPACING = { // par's leading (between lines) and spacing (between paragraphs)
+  tight: "(leading: 0.5em, spacing: 1em)", normal: "(leading: 0.65em, spacing: 1.2em)", loose: "(leading: 0.95em, spacing: 1.5em)",
+} as const;
+const ALIGN = { theme: "auto", left: "false", justify: "true" } as const; // justified text (auto: as the theme has it)
 const PX = 0.75; // an SVG's px in pt
+const MITEX = "0.2.5"; // mitex from Typst Universe, for the .typ file (the app has its own copy: public/typst)
 
 /**
- * ``drawingOf``: a schematic cell's drawing as SVG, as the page has it (the hidden print drawing —
+ * ``drawingOf``: a schematic cell's drawing as SVG, as the page has it (the hidden drawing for the PDF —
  * with the values of the last run, when the settings want them); none when it is empty.
  */
 export function toTypst(notebook: Notebook, pdf: PdfSettings, drawingOf: (cellId: string) => SVGSVGElement | null): TypstDocument {
@@ -66,14 +72,23 @@ export function toTypst(notebook: Notebook, pdf: PdfSettings, drawingOf: (cellId
   const config = `#let config = (
   theme: ${str(pdf.theme)},
   title: ${pdf.title && notebook.title.trim() ? str(notebook.title.trim()) : "none"},
+  author: ${pdf.title && pdf.author.trim() ? str(pdf.author.trim()) : "none"},
   date: ${pdf.title && pdf.date ? str(date) : "none"},
+  title-page: ${!!(pdf.title && notebook.title.trim() && pdf.titlePage)},
+  accent: ${pdf.accent && /^#[0-9a-f]{6}$/i.test(pdf.accent) ? `rgb(${str(pdf.accent)})` : "auto"},
   paper: ${str(PAPER[pdf.paper])},
   flipped: ${pdf.orientation === "landscape"},
   margin: ${MARGINS[pdf.margins]},
+  columns: ${pdf.columns === 2 ? 2 : 1},
   size: ${SIZE[pdf.text]},
+  spacing: ${SPACING[pdf.spacing] ?? SPACING.normal},
+  justify: ${ALIGN[pdf.align] ?? "auto"},
+  header: ${pdf.header},
   page-numbers: ${pdf.pageNumbers},
   numbering: ${pdf.numbering},
   outline: ${pdf.outline},
+  section-breaks: ${pdf.sectionBreaks},
+  code-lines: ${pdf.codeLines},
 )
 #let formulas = (${formulas.map((f) => `${str(f)},`).join(" ")})
 #let bad = (__BAD__)
@@ -119,4 +134,24 @@ function forTypst(svg: SVGSVGElement, halo: boolean): { source: string; width: n
   copy.appendChild(extra);
   const width = Number.parseFloat(copy.getAttribute("width") ?? "") || copy.viewBox.baseVal?.width || 400;
   return { source: new XMLSerializer().serializeToString(copy), width };
+}
+
+/**
+ * The document as one .typ file, for Typst itself (the CLI, typst.app): the settings, the drawings
+ * (SVG, inside), the theme and the note. ``bad``: the formulas mitex could not read (shown as written).
+ * mitex comes from Typst Universe; the fonts are the theme's (Inter must be installed for "modern").
+ */
+export function typstFile(document: TypstDocument, bad: number[]): string {
+  const drawings = Object.entries(document.files).map(([path, svg]) => `  ${str(path)}: bytes(${str(svg)}),`);
+  const theme = template
+    .replace(/^#import "mitex\/lib\.typ".*$/m, `#import "@preview/mitex:${MITEX}": mi, mitex`)
+    .replace(/^#import "config\.typ".*\n/m, "")
+    .replace("image(path,", "image(drawings.at(path),");
+  return [
+    "// Exported from electro: typst compile this-file.typ",
+    document.config.replace("__BAD__", bad.map((i) => `${i},`).join(" ")),
+    `#let drawings = (${drawings.length ? `\n${drawings.join("\n")}\n` : ":"})`,
+    theme,
+    document.main.replace(/^#import "electro\.typ".*\n/m, ""),
+  ].join("\n");
 }

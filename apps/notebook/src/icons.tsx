@@ -43,3 +43,4 @@ export const Back = () => <Icon><path d="M14.5 5.5L8 12l6.5 6.5" /></Icon>;
 export const OutlineIcon = () => <Icon><path d="M4 6.5h16M8 12h12M8 17.5h12" /></Icon>;
 export const Flash = () => <Icon size={16}><path d="M13 2L4 14h7l-1 8 9-12h-7z" fill="currentColor" stroke="none" /></Icon>;
 export const Chevron = () => <Icon size={14}><path d="M6 9l6 6 6-6" /></Icon>;
+export const Close = () => <Icon><path d="M6 6l12 12M18 6L6 18" /></Icon>;

@@ -106,7 +106,7 @@ self.onmessage = async ({ data }: MessageEvent<Request>) => {
         renderer.manipulate_data(session, "reset", vector.result);
         const svg = renderer.svg_data(session);
         session.free();
-        post({ id, ok: true, pdf: pdf.result, svg, unreadable: bad.length }, [pdf.result.buffer]);
+        post({ id, ok: true, pdf: pdf.result, svg, bad }, [pdf.result.buffer]);
         return;
       }
       const diagnostics = pdf.diagnostics ?? [];

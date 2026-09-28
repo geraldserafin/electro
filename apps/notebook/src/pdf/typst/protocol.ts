@@ -6,5 +6,5 @@ export type Request =
   | { type: "compile"; id: number; document: TypstDocument };
 
 export type Reply =
-  | { id: number; ok: true; pdf: Uint8Array; svg: string; unreadable: number } // unreadable: formulas shown as written
+  | { id: number; ok: true; pdf: Uint8Array; svg: string; bad: number[] } // bad: the formulas shown as written
   | { id: number; ok: false; error: string };

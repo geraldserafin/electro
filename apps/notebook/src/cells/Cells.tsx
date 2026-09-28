@@ -1,7 +1,7 @@
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { CodeIcon, Eye, Flash, Pencil, Play, SchematicIcon, WarningIcon } from "../icons";
 import { kernel } from "../python/kernel";
-import { PrintDrawing, SchematicEditor, type Camera } from "../schematic/Editor";
+import { PdfDrawing, SchematicEditor, type Camera } from "../schematic/Editor";
 import type { Cell, ElementResult, Problem, SchematicData, SchematicView, SymbolLibrary } from "../types";
 import { CodeEditor } from "./CodeEditor";
 import { usePdf } from "../pdf/settings";
@@ -27,7 +27,7 @@ export function MarkdownCell({ cell, update }: { cell: Extract<Cell, { type: "ma
   const toggle = editing ? "Pokaż tekst (Esc)" : "Edytuj Markdown";
   return (
     <div className="markdown-cell">
-      <div className="gutter no-print">
+      <div className="gutter">
         {/* mouse down would take the focus from the field (and show the text) before the click */}
         <button className="mode" onMouseDown={(e) => e.preventDefault()} onClick={() => setEditing(!editing)}
                 title={toggle} aria-label={toggle} aria-pressed={editing}>
@@ -38,7 +38,7 @@ export function MarkdownCell({ cell, update }: { cell: Extract<Cell, { type: "ma
         {editing ? (
           <textarea
             ref={field}
-            className="markdown-source no-print"
+            className="markdown-source"
             autoFocus
             value={cell.source}
             spellCheck={false}
@@ -58,8 +58,6 @@ export function MarkdownCell({ cell, update }: { cell: Extract<Cell, { type: "ma
             <Markdown source={cell.source || "*Pusty tekst — kliknij, żeby pisać.*"} />
           </div>
         )}
-        {/* the PDF always shows the text, even when the cell is being edited */}
-        {editing && <div className="markdown-view print-only"><Markdown source={cell.source} /></div>}
       </div>
     </div>
   );
@@ -72,7 +70,7 @@ function RunButton({ run, running, label, execution, done, icon = <Play /> }: {
   icon?: ReactNode;
 }) {
   return (
-    <div className="gutter no-print">
+    <div className="gutter">
       <button className={`run ${running ? "running" : ""} ${done ? "done" : ""}`} onClick={run} disabled={running || done}
               title={done ? "Wyniki są aktualne — zmień coś na schemacie, żeby przeliczyć" : label} aria-label={label}>
         {icon}
@@ -258,7 +256,7 @@ export function SchematicCell({ cell, update, library, simulate, running }: {
         </div>
       )}
       {/* the PDF shows the circuit as drawn; results belong to code cells: schematic(układ1, sol) */}
-      <PrintDrawing value={cell.schematic} library={library} results={printed} />
+      <PdfDrawing value={cell.schematic} library={library} results={printed} />
       {cell.results && Object.keys(cell.results).length > 0 && (
         <ResultsTable results={cell.results} stale={!!cell.stale} />
       )}
@@ -304,7 +302,7 @@ function Name({ id }: { id: string }) {
 /** What the run found, element by element. */
 function ResultsTable({ results, stale }: { results: Record<string, ElementResult>; stale: boolean }) {
   return (
-    <table className={`results no-print ${stale ? "stale" : ""}`}>
+    <table className={`results ${stale ? "stale" : ""}`}>
       <thead>
         <tr><th>Element</th><th>Wartość</th><th>Napięcie U</th><th>Prąd I</th><th>Moc P</th></tr>
       </thead>

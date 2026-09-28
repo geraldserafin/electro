@@ -5,7 +5,7 @@ import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from 
 import { Link } from "react-router";
 import { Markdown } from "../cells/Markdown";
 import { More } from "../icons";
-import { PrintDrawing } from "../schematic/Editor";
+import { PdfDrawing } from "../schematic/Editor";
 import type { SchematicData, SymbolLibrary } from "../types";
 
 export const when = (iso: string) => {
@@ -73,7 +73,7 @@ export function PagePreview({ preview, library }: { preview: NotePreview; librar
       {preview.cells.map((cell, i) =>
         cell.type === "markdown" ? <div key={i} className="markdown-view"><Markdown source={cell.source} /></div>
         : cell.type === "code" ? <pre key={i} className="page-code">{cell.source}</pre>
-        : <PrintDrawing key={i} value={cell.schematic as unknown as SchematicData} library={library} />)}
+        : <PdfDrawing key={i} value={cell.schematic as unknown as SchematicData} library={library} />)}
     </div>
   );
 }

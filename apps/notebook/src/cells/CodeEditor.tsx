@@ -1,6 +1,6 @@
 // The code editor of code cells and of a schematic's code view, dressed like Google Colab:
 // a quiet grey block, faint line numbers, Colab's (VS Code's) syntax colours, and completion
-// of electro's names. Colours come from CSS variables, so light / dark / print all follow.
+// of electro's names. Colours come from CSS variables, so light / dark all follow.
 import { autocompletion, completeFromList, type Completion } from "@codemirror/autocomplete";
 import { python, pythonLanguage } from "@codemirror/lang-python";
 import { HighlightStyle, syntaxHighlighting } from "@codemirror/language";

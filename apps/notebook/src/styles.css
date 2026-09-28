@@ -80,9 +80,8 @@
 
 * { box-sizing: border-box; }
 
-/* the whole app a little smaller: 100% here is 80% of the sizes below (not in print: the PDF keeps them) */
+/* the whole app a little smaller: 100% here is 80% of the sizes below */
 :root { zoom: 0.8; }
-@media print { :root { zoom: 1; } }
 
 body {
   margin: 0;
@@ -248,9 +247,9 @@ input:focus, textarea:focus { outline: 2px solid var(--accent-soft); border-colo
 }
 .page .markdown-view { padding: 0; }
 .page .page-code { font: 13px/1.5 var(--mono); background: var(--code-bg); border-radius: 6px; padding: 10px 12px; white-space: pre-wrap; }
-.page .print-drawing { position: static; visibility: visible; width: auto; height: auto; overflow: visible;
+.page .pdf-drawing { position: static; visibility: visible; width: auto; height: auto; overflow: visible;
                        display: flex; justify-content: center; margin: 8px 0 12px; }
-.page .print-drawing svg { max-width: 100%; height: auto; }
+.page .pdf-drawing svg { max-width: 100%; height: auto; }
 
 /* a note's sidebar, under the app's island: the title, the sections under it; the note beside it */
 .note-nav {
@@ -278,7 +277,6 @@ input.doc-title {
 }
 input.doc-title::placeholder { color: var(--faint); }
 input.doc-title:focus { outline: none; background: var(--hover); }
-h1.doc-title { font-size: 26pt; font-weight: 600; margin: 0 0 12pt; }
 .outline-empty { margin: 0 12px; color: var(--muted); font-size: 13px; }
 .outline ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 1px; }
 .outline a {
@@ -357,9 +355,6 @@ main {
 .cell > .add-row { position: absolute; left: 0; right: 0; bottom: -20px; z-index: 4; }
 main > .add-row { justify-content: center; }
 
-/* text */
-.print-only { display: none; }
-
 /* text cells: the rendered text, or its Markdown while editing; a mode button on the side */
 .markdown-cell { display: flex; gap: 8px; align-items: flex-start; }
 .markdown-cell .markdown-view { padding: 4px 8px; cursor: text; min-height: 1.6em; border-radius: 8px; }
@@ -423,7 +418,7 @@ main > .add-row { justify-content: center; }
 /* ---------------------------------------------------------------- schematic board (Excalidraw-like) */
 
 /* the drawing for the PDF: laid out (so it can measure itself) but not seen on screen */
-.print-drawing { position: absolute; visibility: hidden; width: 0; height: 0; overflow: hidden; pointer-events: none; }
+.pdf-drawing { position: absolute; visibility: hidden; width: 0; height: 0; overflow: hidden; pointer-events: none; }
 
 /* a schematic's tools (its islands) fade in while the pointer is over its board — or while something
    in them is being typed into, or the board is full screen; the grid and the drawing always show.
@@ -607,32 +602,6 @@ kbd { font: 11px ui-monospace, monospace; border: 1px solid var(--line); border-
   .gutter { width: 32px; }
 }
 
-/* ---- PDF export: the browser's "print to PDF" of a clean report ---- */
-@media print {
-  @page { margin: 18mm 16mm; }
-  :root { --bg: #fff; --paper: #fff; --board: #fff; --text: #000; --line: #fff; --code-bg: #f5f5f5; color-scheme: light; }
-  body { font-size: 11pt; }
-  .no-print, .cell-tools, .add-row, .island { display: none !important; }
-  main, main.with-nav { max-width: none; padding: 0; } /* not beside the sidebar on paper */
-  .pdf-no-title .doc-title, .pdf-no-title .doc-date { display: none !important; }
-  .pdf-no-outputs .cell-code .outputs { display: none !important; }
-  .doc-date { margin: -8pt 0 14pt; color: #555; }
-  .cell { border: none !important; box-shadow: none !important; padding: 0; margin-bottom: 10pt; break-inside: avoid; }
-  .markdown-view, .schematic-cell { padding-left: 0; }
-  .schematic-cell .board { display: none; } /* the editor; PrintDrawing prints the drawing */
-  /* pictures centred on the page: the drawing, and schematic(...) pictures from code cells */
-  .print-drawing { position: static !important; visibility: visible !important; width: auto !important; height: auto !important;
-                   overflow: visible !important; margin: 4pt 0 8pt; break-inside: avoid; }
-  .print-drawing svg, .output-svg svg { display: block; margin-left: auto; margin-right: auto; max-width: 100%; height: auto; }
-  .output-svg { overflow: visible; }
-  .canvas .label.solved { fill: #000; }
-  .hide-code-in-print .code-editor { display: none; }
-  .code-editor .cm-gutters { display: none; }
-  .print-only { display: block; }
-  .markdown-view.print-only, .markdown-cell .markdown-view { padding: 0; }
-  .cm-line { white-space: pre-wrap; word-break: break-word; } /* long lines wrap instead of being cut off */
-}
-
 /* ---------------------------------------------------------------- results of a run */
 
 .results {
@@ -734,6 +703,7 @@ kbd { font: 11px ui-monospace, monospace; border: 1px solid var(--line); border-
 }
 @keyframes fade-in { from { opacity: 0; } }
 .export-dialog {
+  position: relative;
   display: grid; grid-template-columns: 1fr 320px; width: min(1180px, 94vw); height: min(860px, 90vh);
   border-radius: 14px; overflow: hidden; background: var(--surface); border: 1px solid var(--line);
   animation: appear 0.25s cubic-bezier(0.2, 0.8, 0.2, 1) backwards;
@@ -779,12 +749,24 @@ kbd { font: 11px ui-monospace, monospace; border: 1px solid var(--line); border-
 .export-toggle input:checked::after { transform: translateX(14px); }
 .export-toggle input:focus { outline: none; }
 .export-choice { display: grid; gap: 6px; padding: 6px 8px; font-size: 15px; }
+.export-field { display: grid; gap: 6px; padding: 6px 8px; font-size: 15px; }
+.export-field.disabled { opacity: 0.45; }
+.export-field input { font: inherit; font-size: 14px; padding: 6px 10px; border-radius: 8px; border: 1px solid var(--line); background: var(--surface); color: var(--text); }
+.export-field input:focus { outline: none; border-color: var(--text); }
+.swatches { display: flex; flex-wrap: wrap; gap: 8px; }
+.swatches button { width: 24px; height: 24px; padding: 0; border-radius: 50%; border: 2px solid var(--surface); box-shadow: 0 0 0 1px var(--line); }
+.swatches button.on { box-shadow: 0 0 0 2px var(--text); }
 .segmented { display: flex; gap: 2px; padding: 2px; border-radius: 8px; background: var(--hover); }
-.segmented button { flex: 1; justify-content: center; padding: 5px 8px; border-radius: 6px; font-size: 14px; color: var(--muted); }
+.segmented button { flex: 1; justify-content: center; padding: 5px 8px; white-space: nowrap; border-radius: 6px; font-size: 14px; color: var(--muted); }
 .segmented button.on { background: var(--surface); color: var(--text); box-shadow: 0 0 0 1px var(--line); }
-.export-actions { display: flex; gap: 8px; margin-top: auto; }
+/* the downloads: always in view at the bottom of the options, however far they are scrolled */
+.export-actions { display: flex; gap: 8px; margin: auto -20px -20px; padding: 12px 20px 20px; position: sticky; bottom: -20px;
+                  background: var(--surface); border-top: 1px solid var(--line); }
 .export-actions button { flex: 1; justify-content: center; padding: 9px 12px; border-radius: 10px; border: 1px solid var(--line); font-weight: 500; }
-.export-actions button.primary { border-color: var(--primary); color: var(--on-primary); }
+.export-actions button.primary { background: var(--primary); border-color: var(--primary); color: var(--on-primary); }
 .export-actions button.primary:hover { background: var(--primary-hover); }
 .export-note { margin: 0; font-size: 12px; color: var(--faint); }
+/* closing: an X in the top left corner, over the pages */
+.export-close { position: absolute; top: 12px; left: 12px; z-index: 2; width: 36px; height: 36px; padding: 0; border-radius: 10px;
+                background: var(--surface); box-shadow: var(--island-shadow); }
 @media (max-width: 800px) { .export-dialog { grid-template-columns: 1fr; grid-template-rows: 1fr auto; } }

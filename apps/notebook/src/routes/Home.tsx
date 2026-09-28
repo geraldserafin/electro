@@ -33,11 +33,11 @@ export function Home() {
 
   return (
     <div className="notebook">
-      <div className="float top-left no-print">
+      <div className="float top-left">
         <span className="brand" title="electro — notatnik elektroniki"><Bolt /></span>
         <span className="app-name">electro</span>
       </div>
-      <div className="float-group top-right no-print">
+      <div className="float-group top-right">
         <button className="float icon-button" onClick={() => fileInput.current?.click()}
                 title="Otwórz plik .electro.json jako nową notatkę" aria-label="Otwórz plik"><Upload /></button>
         <input ref={fileInput} type="file" accept=".json" hidden

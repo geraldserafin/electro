@@ -66,7 +66,7 @@ export function NotePage() {
   if (loaded.kind === "loading")
     return (
       <div className="notebook">
-        <div className="float top-left no-print">
+        <div className="float top-left">
           <Link className="icon-button" to="/" title="Wszystkie notatki" aria-label="Wszystkie notatki"><Back /></Link>
         </div>
         <NoteSkeleton />
@@ -74,7 +74,7 @@ export function NotePage() {
     );
   return (
     <div className="notebook">
-      <div className="float top-left no-print">
+      <div className="float top-left">
         <Link className="icon-button" to="/" title="Wszystkie notatki" aria-label="Wszystkie notatki"><Back /></Link>
       </div>
       <div className="page-message">

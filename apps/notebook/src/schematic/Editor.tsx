@@ -466,7 +466,7 @@ export function SchematicEditor({ value, onChange, library, results, topLeft, to
             </pattern>
           </defs>
           {/* the grid covers exactly what the camera sees, so it never ends */}
-          <rect className="grid no-print" x={cam.x} y={cam.y} width={view.w / cam.zoom} height={view.h / cam.zoom}
+          <rect className="grid" x={cam.x} y={cam.y} width={view.w / cam.zoom} height={view.h / cam.zoom}
                 fill={`url(#${CSS.escape(gridId)})`} />
 
           {value.wires.map((w, i) => (
@@ -496,13 +496,13 @@ export function SchematicEditor({ value, onChange, library, results, topLeft, to
                          onPointerDown={(event) => onElementDown(event, e)} />
           ))}
           {openPins(value, library).map(([x, y]) => (
-            <circle key={`o${x},${y}`} className="open-pin no-print" cx={x * G} cy={y * G} r="3.5">
+            <circle key={`o${x},${y}`} className="open-pin" cx={x * G} cy={y * G} r="3.5">
               <title>Niepodłączony zacisk</title>
             </circle>
           ))}
           {value.elements.filter((e) => isComponent(e.kind)).flatMap((e) =>
             pins(e, library).map(([x, y], i) => (
-              <circle key={`p${e.id}${i}`} className="pin-handle no-print" cx={x * G} cy={y * G} r="8"
+              <circle key={`p${e.id}${i}`} className="pin-handle" cx={x * G} cy={y * G} r="8"
                       onPointerDown={(event) => onPinDown(event, [x, y])}>
                 <title>Przeciągnij, żeby poprowadzić przewód</title>
               </circle>
@@ -522,8 +522,8 @@ export function SchematicEditor({ value, onChange, library, results, topLeft, to
         </svg>
       </div>
 
-      <div className="island top-left no-print">{topLeft}</div>
-      <div className="island tools no-print" role="toolbar">
+      <div className="island top-left">{topLeft}</div>
+      <div className="island tools" role="toolbar">
         {tools.map(({ tool: t, label, key, icon }) => (
           <button
             key={label}
@@ -548,7 +548,7 @@ export function SchematicEditor({ value, onChange, library, results, topLeft, to
         </button>
       </div>
       {libraryOpen && (
-        <div className="island library no-print" role="complementary" aria-label="Biblioteka elementów">
+        <div className="island library" role="complementary" aria-label="Biblioteka elementów">
           <div className="library-head">
             <h4>Elementy</h4>
             <button className="icon" onClick={() => setLibraryOpen(false)} title="Zamknij panel (K)" aria-label="Zamknij panel">×</button>
@@ -586,7 +586,7 @@ export function SchematicEditor({ value, onChange, library, results, topLeft, to
           </div>
         </div>
       )}
-      <div className="island top-right no-print">{topRight}</div>
+      <div className="island top-right">{topRight}</div>
       {(selectedElement || selection?.type === "wire" || selection?.type === "group") && (
         <Inspector
           key={selectedElement?.id ?? selection?.type ?? "none"}
@@ -605,11 +605,11 @@ export function SchematicEditor({ value, onChange, library, results, topLeft, to
         />
       )}
       {lost && (
-        <button className="island back-to-drawing no-print" onClick={() => setCam(fitted())}>
+        <button className="island back-to-drawing" onClick={() => setCam(fitted())}>
           <Target /> Wróć do schematu
         </button>
       )}
-      <div className="island bottom-left no-print">
+      <div className="island bottom-left">
         <button className="icon" title="Pomniejsz" aria-label="Pomniejsz" onClick={() => zoomAround(1 / 1.2)}><Minus /></button>
         <button className="zoom" title="Pokaż cały schemat" aria-label="Dopasuj widok" onClick={() => setCam(fitted())}>
           {Math.round(cam.zoom * 100)}%
@@ -619,14 +619,14 @@ export function SchematicEditor({ value, onChange, library, results, topLeft, to
         <button className="icon" title="Cofnij (Ctrl/Cmd+Z)" aria-label="Cofnij" onClick={undo}><Undo /></button>
         <button className="icon" title="Ponów (Ctrl/Cmd+Shift+Z)" aria-label="Ponów" onClick={redo}><Redo /></button>
       </div>
-      {status && <div className="island status no-print">{status}</div>}
-      <div className="island bottom-right no-print">
+      {status && <div className="island status">{status}</div>}
+      <div className="island bottom-right">
         <button className="icon" title={full ? "Zamknij pełny ekran (F)" : "Pełny ekran (F)"} aria-label="Pełny ekran"
                 onClick={() => setFull((f) => !f)}>{full ? <Shrink /> : <Expand />}</button>
         <button className="icon" title="Skróty klawiszowe" aria-label="Pomoc" onClick={() => setHelp((h) => !h)}><Help /></button>
       </div>
       {help && (
-        <div className="island help-panel no-print">
+        <div className="island help-panel">
           <h4>Skróty</h4>
           <dl>
             <dt>V</dt><dd>zaznacz / przesuń</dd>
@@ -652,15 +652,15 @@ export function SchematicEditor({ value, onChange, library, results, topLeft, to
   );
 }
 
-const PRINT_SCALE = 1.1; // drawing px → CSS px on paper: labels come out about as big as the text
-const PRINT_PAD = 6;
+const PDF_SCALE = 1.1; // drawing px → CSS px on paper: labels come out about as big as the text
+const PDF_PAD = 6;
 
 /**
  * The drawing for the PDF: cropped to what is drawn (texts included), no grid, no selection,
  * the same scale whatever the zoom on screen. Hidden on screen but laid out (not display:none),
  * so it can measure itself.
  */
-export function PrintDrawing({ value, library, results }: {
+export function PdfDrawing({ value, library, results }: {
   value: SchematicData; library: SymbolLibrary; results?: Record<string, ElementResult>;
 }) {
   const G = library.grid;
@@ -669,15 +669,15 @@ export function PrintDrawing({ value, library, results }: {
   useLayoutEffect(() => {
     const b = content.current?.getBBox();
     if (!b || !b.width) return;
-    const next: [number, number, number, number] = [b.x - PRINT_PAD, b.y - PRINT_PAD, b.width + 2 * PRINT_PAD, b.height + 2 * PRINT_PAD];
+    const next: [number, number, number, number] = [b.x - PDF_PAD, b.y - PDF_PAD, b.width + 2 * PDF_PAD, b.height + 2 * PDF_PAD];
     if (!box || next.some((v, i) => Math.abs(v - box[i]) > 0.5)) setBox(next);
   });
   if (!value.elements.length && !value.wires.length) return null;
   const pointsOf = (ps: Point[]) => ps.map(([x, y]) => `${x * G},${y * G}`).join(" ");
   const [x, y, w, h] = box ?? [0, 0, 1, 1];
   return (
-    <div className="print-drawing" aria-hidden>
-      <svg className="canvas" viewBox={`${x} ${y} ${w} ${h}`} width={w * PRINT_SCALE} height={h * PRINT_SCALE}>
+    <div className="pdf-drawing" aria-hidden>
+      <svg className="canvas" viewBox={`${x} ${y} ${w} ${h}`} width={w * PDF_SCALE} height={h * PDF_SCALE}>
         <style>{library.style}</style>
         <g ref={content}>
           {value.wires.map((wire, i) => <polyline key={i} className="w wire" points={pointsOf(wire.points)} />)}
@@ -794,7 +794,7 @@ function Inspector({ selection, element, taken, onChange, onRename, onRotate, on
   );
   if (selection?.type === "group" || selection?.type === "wire")
     return (
-      <div className="island inspector no-print">
+      <div className="island inspector">
         <header>
           <div className="title">
             <h4>{selection.type === "group" ? "Zaznaczenie" : "Przewód"}</h4>
@@ -815,7 +815,7 @@ function Inspector({ selection, element, taken, onChange, onRename, onRotate, on
     else setId(element.id);
   };
   return (
-    <div className="island inspector no-print">
+    <div className="island inspector">
       <header>
         <span className="kind-icon">{icon}</span>
         <div className="title">

@@ -25,7 +25,7 @@ function headings(cell: Cell): Entry[] {
 function place(e: Entry): HTMLElement | null {
   const cell = document.getElementById(`cell-${e.cell}`);
   if (!cell || e.schematic) return cell;
-  const found = cell.querySelectorAll<HTMLElement>(".markdown-view:not(.print-only) :is(h1, h2, h3)");
+  const found = cell.querySelectorAll<HTMLElement>(".markdown-view :is(h1, h2, h3)");
   return found[e.nth] ?? cell;
 }
 
@@ -53,7 +53,7 @@ export function Outline({ cells }: { cells: Cell[] }) {
   const top = Math.min(...entries.map((e) => e.level));
   return (
     <>
-    <nav className="outline no-print" aria-label="Spis treści">
+    <nav className="outline" aria-label="Spis treści">
       {entries.length === 0 && <p className="outline-empty">Nagłówki z tekstu (<code># Tytuł</code>) i schematy pojawią się tutaj.</p>}
       <ul>
         {entries.map((e) => (

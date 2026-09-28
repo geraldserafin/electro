@@ -1,13 +1,14 @@
 // Export to PDF: the note set by Typst (typst/) in the chosen theme, next to what can be set —
-// what goes in (code, outputs, title, contents, values on drawings) and how (theme, paper, margins,
-// text, page numbers). The pages shown are the file's own pages; the settings stay with the note.
+// what goes in (title and author, contents, code, outputs, values on drawings) and how (theme and
+// its colour, paper, columns, header, page numbers, text). The pages shown are the file's own
+// pages; the settings stay with the note.
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
-import { Export } from "../icons";
+import { Close, CodeIcon, Export } from "../icons";
 import type { Notebook } from "../types";
 import type { PdfSettings, Theme } from "./settings";
 import { compile, warmUp } from "./typst/compile";
-import { toTypst } from "./typst/document";
+import { toTypst, typstFile } from "./typst/document";
 
 const THEMES: [Theme, string, string][] = [
   ["classic", "Klasyczny", "jak LaTeX"],
@@ -15,9 +16,13 @@ const THEMES: [Theme, string, string][] = [
   ["elegant", "Elegancki", "jak książka"],
 ];
 
+// the accent colours to choose from (besides the theme's own, shown first)
+const ACCENTS = ["#1f4e99", "#0f766e", "#2f7d32", "#b3261e", "#6d28d9", "#c2410c"];
+const THEME_ACCENT: Record<Theme, string> = { classic: "#1f1f1f", modern: "#f5b100", elegant: "#7a1f3d" }; // as in electro.typ
+
 type State =
   | { kind: "loading" }
-  | { kind: "ready"; pdf: Uint8Array; pages: Page[]; unreadable: number }
+  | { kind: "ready"; pdf: Uint8Array; pages: Page[]; unreadable: number; typst: string }
   | { kind: "failed"; error: string };
 
 interface Page { url: string; width: number; height: number }
@@ -56,7 +61,8 @@ export function ExportDialog({ notebook, pdf, onChange, onCode, onClose }: {
       shown.current.forEach((p) => URL.revokeObjectURL(p.url));
       shown.current = pagesOf(out.svg);
       if (!shown.current.length) return setState({ kind: "failed", error: "podgląd stron się nie wczytał" });
-      setState({ kind: "ready", pdf: out.pdf, pages: shown.current, unreadable: out.unreadable });
+      setState({ kind: "ready", pdf: out.pdf, pages: shown.current, unreadable: out.bad.length,
+                typst: typstFile(document, out.bad) });
     }, 150);
     return () => {
       alive = false;
@@ -68,20 +74,25 @@ export function ExportDialog({ notebook, pdf, onChange, onCode, onClose }: {
 
   useEffect(() => () => shown.current.forEach((p) => URL.revokeObjectURL(p.url)), []);
 
-  const download = () => {
+  // the PDF, or the Typst source it was set from (one .typ file)
+  const download = (kind: "pdf" | "typ") => {
     if (state.kind !== "ready") return;
-    const url = URL.createObjectURL(new Blob([state.pdf as BlobPart], { type: "application/pdf" }));
+    const blob = kind === "pdf"
+      ? new Blob([state.pdf as BlobPart], { type: "application/pdf" })
+      : new Blob([state.typst], { type: "text/plain" });
+    const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;
-    link.download = `${fileName(notebook.title)}.pdf`;
+    link.download = `${fileName(notebook.title)}.${kind}`;
     link.click();
     setTimeout(() => URL.revokeObjectURL(url), 1000);
   };
 
   const pages = state.kind === "ready" ? state.pages.length : 0;
   return createPortal(
-    <div className="export-backdrop no-print" onPointerDown={(e) => e.target === e.currentTarget && onClose()}>
+    <div className="export-backdrop" onPointerDown={(e) => e.target === e.currentTarget && onClose()}>
       <div className="export-dialog" role="dialog" aria-label="Eksport do PDF">
+        <button className="export-close icon-button" onClick={onClose} title="Zamknij (Esc)" aria-label="Zamknij"><Close /></button>
         <div className={`export-preview ${busy ? "busy" : ""}`}>
           {state.kind === "loading" && <p className="export-wait">Przygotowuję skład PDF…</p>}
           {state.kind === "failed" && <p className="export-wait error">Nie udało się złożyć PDF: {state.error}</p>}
@@ -108,13 +119,34 @@ export function ExportDialog({ notebook, pdf, onChange, onCode, onClose }: {
                 </button>
               ))}
             </div>
+            <div className="export-choice">
+              <span>Kolor akcentu</span>
+              <div className="swatches" role="radiogroup" aria-label="Kolor akcentu">
+                {[null, ...ACCENTS].map((color) => (
+                  <button key={color ?? "theme"} role="radio" aria-checked={pdf.accent === color} className={pdf.accent === color ? "on" : ""}
+                          title={color ? color : "Jak w motywie"} aria-label={color ?? "Jak w motywie"}
+                          style={{ background: color ?? THEME_ACCENT[pdf.theme] }} onClick={() => onChange({ accent: color })} />
+                ))}
+              </div>
+            </div>
+          </Group>
+          <Group label="Tytuł">
+            <Toggle label="Tytuł" on={pdf.title} set={(title) => onChange({ title })} />
+            <label className={`export-field ${pdf.title ? "" : "disabled"}`}>
+              <span>Autor</span>
+              <input value={pdf.author} placeholder="pod tytułem" disabled={!pdf.title} spellCheck={false}
+                     onChange={(e) => onChange({ author: e.target.value })} />
+            </label>
+            <Toggle label="Data pod tytułem" on={pdf.date} set={(date) => onChange({ date })} disabled={!pdf.title} />
+            <Toggle label="Strona tytułowa" hint="tytuł sam na pierwszej stronie" on={pdf.titlePage}
+                    set={(titlePage) => onChange({ titlePage })} disabled={!pdf.title} />
           </Group>
           <Group label="W dokumencie">
-            <Toggle label="Tytuł" on={pdf.title} set={(title) => onChange({ title })} />
-            <Toggle label="Data pod tytułem" on={pdf.date} set={(date) => onChange({ date })} disabled={!pdf.title} />
             <Toggle label="Spis treści" on={pdf.outline} set={(outline) => onChange({ outline })} />
             <Toggle label="Numerowane nagłówki" hint="1., 1.1., …" on={pdf.numbering} set={(numbering) => onChange({ numbering })} />
+            <Toggle label="Rozdziały od nowej strony" on={pdf.sectionBreaks} set={(sectionBreaks) => onChange({ sectionBreaks })} />
             <Toggle label="Kod komórek" on={codeInPdf} set={onCode} />
+            <Toggle label="Numery wierszy kodu" on={pdf.codeLines} set={(codeLines) => onChange({ codeLines })} disabled={!codeInPdf} />
             <Toggle label="Wyniki kodu" hint="to, co komórki wypisały i narysowały" on={pdf.outputs} set={(outputs) => onChange({ outputs })} />
             <Toggle label="Wartości na schematach" hint="prądy i napięcia z ostatniego uruchomienia" on={pdf.results}
                     set={(results) => onChange({ results })} />
@@ -126,9 +158,19 @@ export function ExportDialog({ notebook, pdf, onChange, onCode, onClose }: {
                     options={[["portrait", "Pionowo"], ["landscape", "Poziomo"]]} />
             <Choice label="Marginesy" value={pdf.margins} set={(margins) => onChange({ margins })}
                     options={[["narrow", "Wąskie"], ["normal", "Zwykłe"], ["wide", "Szerokie"]]} />
-            <Choice label="Tekst" value={pdf.text} set={(text) => onChange({ text })}
-                    options={[["small", "Mały"], ["normal", "Zwykły"], ["large", "Duży"]]} />
+            <Choice label="Kolumny" value={String(pdf.columns) as "1" | "2"} set={(c) => onChange({ columns: c === "2" ? 2 : 1 })}
+                    options={[["1", "Jedna"], ["2", "Dwie"]]} />
+            <Toggle label="Tytuł w nagłówku" hint="na każdej stronie poza pierwszą" on={pdf.header}
+                    set={(header) => onChange({ header })} disabled={!pdf.title} />
             <Toggle label="Numery stron" on={pdf.pageNumbers} set={(pageNumbers) => onChange({ pageNumbers })} />
+          </Group>
+          <Group label="Tekst">
+            <Choice label="Rozmiar" value={pdf.text} set={(text) => onChange({ text })}
+                    options={[["small", "Mały"], ["normal", "Zwykły"], ["large", "Duży"]]} />
+            <Choice label="Odstępy między wierszami" value={pdf.spacing} set={(spacing) => onChange({ spacing })}
+                    options={[["tight", "Ciasne"], ["normal", "Zwykłe"], ["loose", "Luźne"]]} />
+            <Choice label="Wyrównanie" value={pdf.align} set={(align) => onChange({ align })}
+                    options={[["theme", "Jak motyw"], ["left", "Do lewej"], ["justify", "Obustronne"]]} />
           </Group>
           {state.kind === "ready" && state.unreadable > 0 && (
             <p className="export-note">
@@ -136,8 +178,10 @@ export function ExportDialog({ notebook, pdf, onChange, onCode, onClose }: {
             </p>
           )}
           <div className="export-actions">
-            <button onClick={onClose}>Zamknij</button>
-            <button className="primary" onClick={download} disabled={state.kind !== "ready"}><Export /> Pobierz PDF</button>
+            <button className="primary" onClick={() => download("pdf")} disabled={state.kind !== "ready"}><Export /> Pobierz PDF</button>
+            <button onClick={() => download("typ")} disabled={state.kind !== "ready"} title="Źródło w Typst: jeden plik .typ">
+              <CodeIcon /> Pobierz .typ
+            </button>
           </div>
         </aside>
       </div>
@@ -146,8 +190,8 @@ export function ExportDialog({ notebook, pdf, onChange, onCode, onClose }: {
   );
 }
 
-/** A schematic cell's drawing, as the page has it (the hidden print drawing). */
-const drawingOf = (id: string) => document.querySelector<SVGSVGElement>(`#cell-${CSS.escape(id)} .print-drawing svg`);
+/** A schematic cell's drawing, as the page has it (the hidden drawing for the PDF). */
+const drawingOf = (id: string) => document.querySelector<SVGSVGElement>(`#cell-${CSS.escape(id)} .pdf-drawing svg`);
 
 /** Polish plurals: 1 strona, 2–4 (22–24, …) strony, 5+ (and 12–14) stron. */
 const plural = (n: number, one: string, few: string, many: string) =>

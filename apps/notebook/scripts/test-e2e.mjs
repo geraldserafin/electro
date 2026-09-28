@@ -237,27 +237,43 @@ try {
     const [download] = await Promise.all([page.waitForEvent("download"), dialog.getByRole("button", { name: "Pobierz PDF" }).click()]);
     const file = await readFile(await download.path());
     if (process.env.SHOTS) await writeFile(`${process.env.SHOTS}/export.pdf`, file);
-    await page.keyboard.press("Escape");
+    const [typDownload] = await Promise.all([page.waitForEvent("download"), dialog.getByRole("button", { name: "Pobierz .typ" }).click()]);
+    const typ = (await readFile(await typDownload.path())).toString();
+    if (process.env.SHOTS) await writeFile(`${process.env.SHOTS}/export.typ`, typ);
+    await dialog.getByRole("button", { name: "Zamknij" }).click(); // the X in the corner
     await page.waitForTimeout(1500); // saved with the note
     const settings = (await noteOnServer()).document.settings;
-    check("export: Typst's pages in the dialog, a PDF to download; the note keeps the choices",
+    check("export: Typst's pages in the dialog, the PDF and its .typ to download; the note keeps the choices",
       decoded && file.subarray(0, 5).toString() === "%PDF-" && file.length > 10_000
-      && download.suggestedFilename().endsWith(".pdf") && settings.codeInPdf === false && settings.pdf.theme === "modern"
+      && download.suggestedFilename().endsWith(".pdf") && typDownload.suggestedFilename().endsWith(".typ")
+      && typ.includes("#show: note") && typ.includes("@preview/mitex") && typ.includes("bytes(\"<svg")
+      && settings.codeInPdf === false && settings.pdf.theme === "modern"
       && !(await dialog.isVisible()));
-    await page.getByRole("button", { name: "Eksport PDF" }).click();
+    // Ctrl+P (⌘P) opens the export, not the browser's print; more to choose: author, a title page, columns
+    await page.keyboard.press("ControlOrMeta+KeyP");
+    await dialog.locator(".export-preview:not(.busy) .sheet").first().waitFor({ timeout: 30_000 });
+    const shownBefore = await sheets.first().getAttribute("src");
     await dialog.getByRole("switch", { name: "Kod komórek" }).check();
+    await dialog.getByRole("textbox", { name: "Autor" }).fill("Jan Kowalski");
+    await dialog.getByRole("switch", { name: /Strona tytułowa/ }).check();
+    await dialog.getByRole("radio", { name: "Dwie" }).click();
+    await page.waitForFunction((src) => !document.querySelector(".export-preview.busy")
+      && document.querySelector(".export-sheets .sheet")?.getAttribute("src") !== src, shownBefore, { timeout: 30_000 });
+    const titlePages = await sheets.count();
+    if (process.env.SHOTS) await dialog.screenshot({ path: `${process.env.SHOTS}/export-title-page.png` });
     await page.keyboard.press("Escape");
+    await page.waitForTimeout(1500);
+    const more = (await noteOnServer()).document.settings.pdf;
+    check("Ctrl+P opens the export; a title page, an author, columns: kept with the note",
+      titlePages >= 2 && more.author === "Jan Kowalski" && more.titlePage === true && more.columns === 2);
   }
 
-  // the PDF: the drawing cropped to what is drawn, without the editor (and its selection)
+  // the PDF's drawing: cropped to what is drawn, without the editor's selection or the simulation
   await bridge.locator('.board .element[data-id="R_1"]').click();
-  await page.emulateMedia({ media: "print" });
-  const printed = bridge.locator(".print-drawing svg");
-  check("print shows the drawing, not the editor", await printed.isVisible() && !(await bridge.locator(".board").isVisible())
-    && (await printed.locator(".selected").count()) === 0 && (await printed.boundingBox()).height < 500);
-  check("print leaves out the simulation", !(await bridge.locator("table.results").isVisible())
-    && (await printed.locator(".reading, .label.solved").count()) === 0);
-  await page.emulateMedia({ media: "screen" });
+  const drawn = bridge.locator(".pdf-drawing svg");
+  check("the PDF's drawing: cropped, no selection, no values of the run",
+    (await drawn.locator(".selected").count()) === 0 && Number(await drawn.getAttribute("height")) < 500
+    && (await drawn.locator(".reading, .label.solved").count()) === 0);
 
   // editor: place a resistor on the bridge canvas
   const canvas = page.locator(".board .canvas").first();
