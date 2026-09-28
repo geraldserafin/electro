@@ -1,10 +1,11 @@
 /**
  * The notes API: the one description of the endpoints, used by the server (to implement them)
- * and by the notebook (to call them, with typed results and errors). For now there is a single,
- * implicit user; per-user notes will add authentication middleware to the group, not new paths.
+ * and by the notebook (to call them, with typed results and errors). Notes are
+ * private: each user sees only their own, and without a session the notes endpoints answer 401.
  */
 import { HttpApi, HttpApiEndpoint, HttpApiGroup } from "@effect/platform"
 import { Schema } from "effect"
+import { AuthGroup, Authentication } from "./Auth.js"
 import { NoteIdMismatch, NoteNotFound, RevisionConflict } from "./Errors.js"
 import { Note, NoteId, NoteRef, NoteSummary, Saved, SaveNote } from "./Notebook.js"
 
@@ -37,6 +38,7 @@ export class NotesGroup extends HttpApiGroup.make("notes")
       .addSuccess(Schema.Void)
       .addError(NoteNotFound),
   )
+  .middleware(Authentication)
 {}
 
 export class SystemGroup extends HttpApiGroup.make("system")
@@ -45,6 +47,7 @@ export class SystemGroup extends HttpApiGroup.make("system")
 
 export class NotesApi extends HttpApi.make("notes")
   .add(NotesGroup)
+  .add(AuthGroup)
   .add(SystemGroup)
   .prefix("/api")
 {}

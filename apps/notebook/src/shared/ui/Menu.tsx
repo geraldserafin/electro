@@ -60,3 +60,16 @@ export function MenuRadio({ checked, onSelect, icon, children }: {
     </button>
   );
 }
+
+/** One action (not a choice): it runs, the menu closes. */
+export function MenuItem({ onSelect, icon, children }: { onSelect: () => void; icon?: ReactNode; children: ReactNode }) {
+  const close = useContext(Close);
+  return (
+    <button role="menuitem" onClick={() => { close(); onSelect(); }}
+            className={cn("flex items-center gap-2.5 px-4 py-1.75 text-[15px] text-left text-fg hover:bg-hover",
+                          "[&>svg]:flex-none [&>svg]:text-muted")}>
+      {icon}
+      <span className="flex-1">{children}</span>
+    </button>
+  );
+}

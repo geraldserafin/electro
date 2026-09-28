@@ -1,4 +1,4 @@
-export { fromDocument, getNote, NOTES, notesAtom, removeNote, toDocument } from "./atoms";
+export { fromDocument, getNote, NOTES, NotesClient, notesAtom, removeNote, toDocument } from "./atoms";
 export { Card, NewCard } from "./Card";
 export { CardSkeletons } from "./CardSkeletons";
 export { useCreateNote } from "./create";

@@ -1,6 +1,7 @@
 // End-to-end check in a real browser engine: Pyodide starts in the worker, the example
 // notebook runs, outputs appear, and a schematic element can be placed and dragged.
 import { execFileSync, spawn } from "node:child_process";
+import { createHash } from "node:crypto";
 import { writeFileSync } from "node:fs";
 import { readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
@@ -9,14 +10,23 @@ import { webkit } from "playwright";
 
 const port = 4174;
 const shots = process.env.SHOTS ?? tmpdir();  // screenshots, for looking at by hand
-// the notes server with a database of its own, and the built notebook in front of it (/api proxied)
+// the notes server with a schema of its own (in the database at DATABASE_URL: devenv's), and the
+// built notebook in front of it (/api proxied)
 const notesPort = 4175;
 const notesUrl = `http://localhost:${notesPort}`;
-const database = join(tmpdir(), `electro-e2e-${Date.now()}.sqlite`);
+const postgres = process.env.DATABASE_URL ?? "postgres://postgres:postgres@127.0.0.1:5192/electro";
+const schema = `e2e_${Date.now()}`;
+const database = new URL(postgres);
+database.searchParams.set("options", `-c search_path=${schema}`);
+const psql = (url, command) => execFileSync("psql", [url, "-qc", command]);
+psql(postgres, `CREATE SCHEMA ${schema}`);
 const notes = spawn("pnpm", ["exec", "tsx", "src/main.ts"], {
   cwd: new URL("../../server/", import.meta.url), stdio: "ignore", detached: true,
-  env: { ...process.env, PORT: String(notesPort), DATABASE_PATH: database },
+  env: { ...process.env, PORT: String(notesPort), DATABASE_URL: String(database) },
 });
+// signed in: a user and a session made in the database (no provider in a test); the cookie on every call
+const session = "e2e-session";
+const api = (path, init = {}) => fetch(`${notesUrl}${path}`, { ...init, headers: { ...init.headers, cookie: `session=${session}` } });
 const server = spawn("pnpm", ["exec", "vite", "preview", "--port", String(port), "--strictPort"], {
   stdio: "ignore", detached: true, env: { ...process.env, NOTES_SERVER: notesUrl },
 });  // own process groups, see the end
@@ -31,8 +41,12 @@ try {
     if (await fetch(`${notesUrl}/api/health`).then((r) => r.ok, () => false)) break;
     await new Promise((r) => setTimeout(r, 250));
   }
+  psql(postgres, `SET search_path TO ${schema};
+    INSERT INTO users (id, name) VALUES ('00000000-0000-0000-0000-00000000e2e0', 'E2E');
+    INSERT INTO sessions VALUES ('${createHash("sha256").update(session).digest("hex")}', '00000000-0000-0000-0000-00000000e2e0', now() + interval '1 day')`);
   const browser = await webkit.launch();
   const page = await browser.newPage({ viewport: { width: 1440, height: 900 }, locale: "pl-PL" }); // (the app speaks the browser's language)
+  await page.context().addCookies([{ name: "session", value: session, url: `http://localhost:${port}` }]);
   const errors = [];
   page.on("pageerror", (e) => errors.push(String(e)));
   const workers = [];
@@ -41,7 +55,7 @@ try {
   const app = `http://localhost:${port}`;
   // the note on screen: its address (a slug) and, from the server, its id
   const noteRef = () => new URL(page.url()).pathname.match(/^\/notes\/([\w-]+)$/)?.[1];
-  const noteOnServer = async (ref = noteRef()) => (await fetch(`${notesUrl}/api/notes/${ref}`)).json();
+  const noteOnServer = async (ref = noteRef()) => (await api(`/api/notes/${ref}`)).json();
   // the home page: the notes, then the examples (lists, a card in each item: data-id, the note's id)
   const notesList = page.getByRole("list", { name: "Notatki" });
   const examplesList = page.getByRole("list", { name: "Przykłady" });
@@ -503,8 +517,8 @@ try {
     // someone saves the note elsewhere (a direct call, as another tab would), then it is edited here
     await page.goto(`${app}/notes/${slug}`);
     await titleIs(firstTitle, 60_000);
-    const note = await (await fetch(`${notesUrl}/api/notes/${id}`)).json();
-    await fetch(`${notesUrl}/api/notes/${id}`, { method: "PUT", headers: { "content-type": "application/json" },
+    const note = await (await api(`/api/notes/${id}`)).json();
+    await api(`/api/notes/${id}`, { method: "PUT", headers: { "content-type": "application/json" },
       body: JSON.stringify({ document: { ...note.document, title: "Zmienione gdzie indziej" }, baseRevision: note.revision }) });
     await setTitle(`${firstTitle} (tutaj)`);
     await page.getByRole("alert").waitFor({ timeout: 10_000 });
@@ -519,7 +533,7 @@ try {
     page.once("dialog", (d) => d.accept());
     await drugi.getByRole("menuitem", { name: "Usuń notatkę" }).click();
     await drugi.waitFor({ state: "detached", timeout: 10_000 });
-    check("a note is deleted", (await fetch(`${notesUrl}/api/notes/${second}`)).status === 404);
+    check("a note is deleted", (await api(`/api/notes/${second}`)).status === 404);
   }
 
   check("no page errors", errors.length === 0);
@@ -528,5 +542,6 @@ try {
 } finally {
   process.kill(-server.pid);  // pnpm and the vite it started
   process.kill(-notes.pid);
+  psql(postgres, `DROP SCHEMA IF EXISTS ${schema} CASCADE`);
 }
 process.exit(failed ? 1 : 0);

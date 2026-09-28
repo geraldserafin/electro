@@ -1,32 +1,28 @@
 /**
- * Where notes live: SQLite (a file; ":memory:" in tests), schema kept by migrations. The rest
- * of the server only sees @effect/sql's SqlClient, so moving to Postgres is this file.
+ * Where everything lives: Postgres, schema kept by migrations. The rest of the server only sees
+ * @effect/sql's SqlClient.
  */
 import { NodeContext } from "@effect/platform-node"
-import { SqliteClient, SqliteMigrator } from "@effect/sql-sqlite-node"
-import { Config, Effect, Layer } from "effect"
-import { mkdirSync } from "node:fs"
-import { dirname } from "node:path"
-import notes from "./migrations/0001_notes.js"
-import preview from "./migrations/0002_preview.js"
-import slugs from "./migrations/0003_slugs.js"
-import missingSlugs from "./migrations/0004_missing_slugs.js"
+import { PgClient, PgMigrator } from "@effect/sql-pg"
+import { Config, Effect, Layer, Redacted } from "effect"
+import users from "./migrations/0001_users.js"
+import notes from "./migrations/0002_notes.js"
 
-const migrations = SqliteMigrator.fromRecord({ "0001_notes": notes, "0002_preview": preview, "0003_slugs": slugs, "0004_missing_slugs": missingSlugs })
+const migrations = PgMigrator.fromRecord({ "0001_users": users, "0002_notes": notes })
 
-/** SQLite at `filename`, migrated to the current schema. */
-export const layer = (filename: string) => {
-  const client = SqliteClient.layer({ filename })
-  const migrated = SqliteMigrator.layer({ loader: migrations }).pipe(Layer.provide([client, NodeContext.layer]))
+/** Postgres at `url`, migrated to the current schema. */
+export const layer = (url: string) => {
+  const client = PgClient.layer({ url: Redacted.make(url) })
+  const migrated = PgMigrator.layer({ loader: migrations }).pipe(Layer.provide([client, NodeContext.layer]))
   return Layer.merge(client, migrated)
 }
 
-/** The database file from DATABASE_PATH (default .data/notes.sqlite, created if missing). */
+/** The database at DATABASE_URL (by default devenv's: postgres://postgres:postgres@127.0.0.1:5192/electro). */
 export const layerConfig = Layer.unwrapEffect(
   Effect.gen(function* () {
-    const filename = yield* Config.string("DATABASE_PATH").pipe(Config.withDefault(".data/notes.sqlite"))
-    if (filename !== ":memory:") mkdirSync(dirname(filename), { recursive: true })
-    yield* Effect.logInfo(`Baza notatek: ${filename}`)
-    return layer(filename)
+    const url = yield* Config.string("DATABASE_URL").pipe(Config.withDefault("postgres://postgres:postgres@127.0.0.1:5192/electro"))
+    const { host, pathname } = new URL(url)
+    yield* Effect.logInfo(`Baza: ${host}${pathname}`)
+    return layer(url)
   }),
 )
