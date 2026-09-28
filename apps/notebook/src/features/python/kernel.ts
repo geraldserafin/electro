@@ -1,6 +1,7 @@
 // The page's handle on the Python worker: every call is a message and a promise.
 import type { ElementResult, Output, Problem, SchematicData } from "@/shared/model/types";
 import type { Failure } from "@/shared/model/issues";
+import type { LiveCircuit } from "@/features/simulation/engine";
 
 type Reply = { id: number; ok: true; result: unknown } | { id: number; ok: false; error: string };
 
@@ -53,6 +54,11 @@ class Kernel {
   /** A schematic cell's run button: every element's values, and what went wrong. */
   async simulate(schematic: SchematicData): Promise<{ results: Record<string, ElementResult>; problems: Problem[] }> {
     return JSON.parse((await this.call("simulate", { schematic: JSON.stringify(schematic) })) as string);
+  }
+
+  /** A schematic cell's play button: the drawing compiled for the live simulation (or the error in it). */
+  async live(schematic: SchematicData): Promise<LiveCircuit | { error: Failure }> {
+    return JSON.parse((await this.call("live", { schematic: JSON.stringify(schematic) })) as string);
   }
 
   async reset(): Promise<void> {

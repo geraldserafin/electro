@@ -3,7 +3,7 @@
 // to Python; connectivity and solving stay on the Python side.
 import type { ElementData, Point, SchematicData, SymbolLibrary, WireData } from "@/shared/model/types";
 
-export type KindGroup = "passive" | "sources" | "meters" | "connections" | "other";
+export type KindGroup = "passive" | "sources" | "meters" | "connections" | "other" | "controls" | "semiconductors" | "chips";
 
 /** What an element is, apart from its name (that is in messages.ts: kinds.<kind>). */
 export interface KindInfo {
@@ -12,6 +12,7 @@ export interface KindInfo {
   group: KindGroup; // section of the element library
   unit?: string;
   meter?: boolean; // the value is a reading: a measured datum, or left empty to be computed
+  live?: boolean; // only simulated in time (electro.devices): not solved on paper
 }
 
 export const KINDS = [
@@ -26,7 +27,42 @@ export const KINDS = [
   { kind: "label", prefix: "lbl", group: "connections" },
   { kind: "hole", prefix: "X", group: "other" },
   { kind: "opamp", prefix: "OA", group: "other" },
+  { kind: "switch", prefix: "S", group: "controls" },
+  { kind: "button", prefix: "B", group: "controls" },
+  { kind: "potentiometer", prefix: "P", unit: "Ω", group: "controls" },
+  { kind: "diode", prefix: "D", group: "semiconductors", live: true },
+  { kind: "led", prefix: "LED", group: "semiconductors", live: true },
+  { kind: "npn", prefix: "Q", group: "semiconductors", live: true },
+  { kind: "pnp", prefix: "Q", group: "semiconductors", live: true },
+  { kind: "timer555", prefix: "IC", group: "chips", live: true },
+  { kind: "arduino", prefix: "ARD", group: "chips", live: true },
 ] as const satisfies readonly KindInfo[];
+
+/** An LED's colours (electro.devices.LED_COLORS), for its glow while simulating. */
+export const LED_COLORS = {
+  red: "#ff3b30", orange: "#ff9500", yellow: "#ffd60a", green: "#34c759", blue: "#0a84ff", white: "#f5f5f7",
+} as const;
+export const ledColor = (text: string | null) => LED_COLORS[(text ?? "red") as keyof typeof LED_COLORS] ?? LED_COLORS.red;
+
+/** What a new element of a kind starts with in ``text``. */
+export const defaultText = (kind: string): string | null =>
+  kind === "label" ? "A" : kind === "led" ? "red" : kind === "arduino" ? BLINK : null;
+
+export const BLINK = `// Mruga diodą na pinie 13 (wbudowana dioda Arduino Uno też jest na 13).
+void setup() {
+  pinMode(13, OUTPUT);
+  Serial.begin(9600);
+}
+
+void loop() {
+  digitalWrite(13, HIGH);
+  Serial.println("ON");
+  delay(500);
+  digitalWrite(13, LOW);
+  Serial.println("OFF");
+  delay(500);
+}
+`;
 
 export type Kind = (typeof KINDS)[number]["kind"];
 
@@ -202,7 +238,7 @@ export function junctions(sch: SchematicData, lib: SymbolLibrary): Point[] {
 export function openPins(sch: SchematicData, lib: SymbolLibrary): Point[] {
   const count = connections(sch, lib);
   return sch.elements
-    .filter((e) => isComponent(e.kind))
+    .filter((e) => isComponent(e.kind) && e.kind !== "arduino") // a board's unused pins are not a mistake
     .flatMap((e) => pins(e, lib))
     .filter((p) => (count.get(key(p)) ?? 0) <= 1);
 }

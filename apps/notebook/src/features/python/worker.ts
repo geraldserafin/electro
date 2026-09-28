@@ -1,6 +1,7 @@
 /// <reference lib="webworker" />
 // Python (Pyodide) runs here, off the main thread, so the page stays responsive.
 import type { PyodideAPI } from "pyodide";
+import { runProgram } from "@/features/simulation/engine";
 
 const PYODIDE = "https://cdn.jsdelivr.net/pyodide/v314.0.7/full/";
 
@@ -10,6 +11,7 @@ type Request =
   | { id: number; type: "code"; schematic: string; name: string }
   | { id: number; type: "fromCode"; source: string; name: string; old: string }
   | { id: number; type: "simulate"; schematic: string }
+  | { id: number; type: "live"; schematic: string }
   | { id: number; type: "reset" };
 
 interface Kernel {
@@ -17,8 +19,22 @@ interface Kernel {
   code(schematic: string, name: string): string;
   from_code(source: string, name: string, old: string): string;
   simulate(schematic: string): string;
+  live(schematic: string): string;
   reset(): void;
 }
+
+// electro.sim.simulate() runs its steps here, in JavaScript, when there is this (js.electroSim):
+// the same loop as its own, many times faster than in Pyodide
+type PyList = { toJs(): [number, number][]; destroy?(): void };
+(self as unknown as { electroSim: unknown }).electroSim = {
+  run: (json: string, tEnd: number, dtMax: number, schedule: ((t: number) => PyList) | null) =>
+    runProgram(json, tEnd, dtMax, schedule && ((t: number) => {
+      const list = schedule(t);
+      const pairs = list.toJs();
+      list.destroy?.();
+      return pairs;
+    })),
+};
 
 let kernel: Promise<Kernel> | null = null;
 
@@ -53,6 +69,7 @@ self.onmessage = async (event: MessageEvent<Request>) => {
       : request.type === "code" ? k.code(request.schematic, request.name)
       : request.type === "fromCode" ? k.from_code(request.source, request.name, request.old)
       : request.type === "simulate" ? k.simulate(request.schematic)
+      : request.type === "live" ? k.live(request.schematic)
       : (k.reset(), null);
     self.postMessage({ id: request.id, ok: true, result });
   } catch (error) {

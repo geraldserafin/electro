@@ -15,6 +15,7 @@ from dataclasses import asdict, dataclass, field
 
 from electro import circuit as ct
 from electro import components as comp
+from electro import devices as dev
 from electro.values import parse
 
 from .issues import BadRotation, EmptySchematic, NoKindFor, NotOnSchematic, SkewedWire, UnknownKind
@@ -43,6 +44,20 @@ KINDS: dict[str, Kind] = {
     "voltmeter": Kind(TWO_PINS, comp.Voltmeter),
     "hole": Kind(TWO_PINS, comp.Hole),
     "opamp": Kind(((0, 2), (0, 0), (4, 1)), comp.OpAmp),  # plus, minus, out (terminal order)
+    # in time only (electro.devices): the value, where there is one, is in ``value``; the rest
+    # (an LED's colour, a switch's position, a potentiometer's wiper, an Arduino's sketch) in ``text``
+    "diode": Kind(TWO_PINS, dev.Diode),
+    "led": Kind(TWO_PINS, dev.LED),
+    "switch": Kind(TWO_PINS, dev.Switch),
+    "button": Kind(TWO_PINS, dev.Button),
+    "potentiometer": Kind(((0, 0), (4, 0), (2, -2)), dev.Potentiometer),  # a, b, wiper
+    "npn": Kind(((0, 0), (3, -2), (3, 2)), dev.NPN),  # base, collector, emitter
+    "pnp": Kind(((0, 0), (3, -2), (3, 2)), dev.PNP),
+    # gnd, trig, out, reset, ctrl, thr, dis, vcc (DIP order)
+    "timer555": Kind(((2, 6), (0, 2), (6, 3), (4, 0), (4, 6), (0, 3), (0, 4), (2, 0)), dev.Timer555),
+    # D0–D13 on top (D13 on the left, as on the board), A0–A5, 5V and GND below
+    "arduino": Kind(tuple((16 - i if i < 8 else 15 - i, 0) for i in range(14))
+                    + tuple((9 + i, 8) for i in range(6)) + ((3, 8), (5, 8)), dev.Arduino),
     "ground": Kind(((0, 0),)),
     "label": Kind(((0, 0),)),  # net label: same text = same node
     "terminal": Kind(((0, 0),)),  # an open end
@@ -71,7 +86,7 @@ class Element:
     at: Point
     rotation: int = 0  # 0, 90, 180, 270 (clockwise); 180 on a source = reversed polarity
     value: str | None = None  # as typed: "4.7k", "R", None = unknown
-    text: str | None = None  # net label name
+    text: str | None = None  # net label name; or an LED's colour, a switch's position, an Arduino's sketch
 
     def __post_init__(self):
         self.at = tuple(self.at)
@@ -88,6 +103,8 @@ class Element:
         cls = KINDS[self.kind].component
         if cls is None:
             return None
+        if hasattr(cls, "from_schematic"):
+            return cls.from_schematic(self.value, self.text, self.id)
         if issubclass(cls, comp.NoValue):
             return cls(label=self.id)
         return cls(parse(self.value), label=self.id)
@@ -195,8 +212,20 @@ class Schematic:
 
     def to_circuit(self) -> ct.Circuit:
         """The circuit this drawing shows, as a netlist (element ids become labels)."""
+        items, _ = self._netlist_items()
+        if not items:
+            raise EmptySchematic()
+        return ct.net(*items)
+
+    def node_names(self) -> dict[Point, str]:
+        """Every pin's and wire's grid point → the name of its node in ``to_circuit()`` (points of
+        wires that touch no element have none)."""
+        _, named = self._netlist_items()
+        return named
+
+    def _netlist_items(self):
         nodes = self.nodes()
-        names: dict[Point, str] = {}
+        names: dict[object, str] = {}
         for e in self.elements:
             if e.kind == "ground":
                 names[nodes[e.pins()[0]]] = ct.GROUND
@@ -216,9 +245,7 @@ class Schematic:
                     taken.add(names[root])
                 node_names.append(names[root])
             items.append((e.component(), *node_names))
-        if not items:
-            raise EmptySchematic()
-        return ct.net(*items)
+        return items, {p: names[root] for p, root in nodes.items() if root in names}
 
     def to_code(self, name: str = "uklad") -> str:
         """The drawing as plain ``electro`` code (``+``/``|`` when possible, else ``net(...)``)."""

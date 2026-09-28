@@ -7,6 +7,7 @@ import {
 import * as arctic from "arctic"
 import { Config, Effect, Layer, Option, Redacted } from "effect"
 import { Accounts, SESSION_DAYS } from "./Accounts.js"
+import { ArduinoLive } from "./Arduino.js"
 import { NotesRepo } from "./NotesRepo.js"
 import { Providers } from "./Providers.js"
 
@@ -103,7 +104,7 @@ export const SystemLive = HttpApiBuilder.group(NotesApi, "system", (handlers) =>
 
 /** The whole API; needs a database (SqlClient) and the OAuth Providers. */
 export const ApiLive = HttpApiBuilder.api(NotesApi).pipe(
-  Layer.provide([NotesLive, AuthLive, SystemLive]),
+  Layer.provide([NotesLive, AuthLive, SystemLive, ArduinoLive]),
   Layer.provide(AuthenticationLive),
   Layer.provide([NotesRepo.Default, Accounts.Default]),
 )

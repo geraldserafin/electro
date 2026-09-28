@@ -7,7 +7,7 @@ import { cn } from "@/shared/lib/cn";
 import { Rotate, Trash } from "@/shared/ui/icons";
 import { BoardButton, BoardIsland } from "./Board";
 import { useKinds } from "./kinds";
-import { hasValue, isComponent, kindInfo } from "./model";
+import { LED_COLORS, hasValue, isComponent, kindInfo } from "./model";
 
 export type Selection =
   | { type: "element"; id: string }
@@ -90,6 +90,39 @@ export function Inspector({ selection, element, taken, onChange, onRename, onRot
           </span>
           <small className="text-[12px] leading-[1.35] text-faint">{info?.meter ? t("inspector.readingHint") : t("inspector.valueHint")}</small>
         </label>
+      )}
+      {element.kind === "led" && (
+        <div className="grid gap-1">
+          <span className={caption}>{t("inspector.color")}</span>
+          <div className="flex gap-1.5" role="radiogroup" aria-label={t("inspector.color")}>
+            {(Object.entries(LED_COLORS) as [keyof typeof LED_COLORS, string][]).map(([color, css]) => (
+              <button key={color} role="radio" aria-checked={(element.text ?? "red") === color} title={t(`inspector.colors.${color}`)}
+                      aria-label={t(`inspector.colors.${color}`)} onClick={() => onChange({ text: color })}
+                      className={cn("size-6 rounded-full border border-line", (element.text ?? "red") === color && "outline-2 outline-offset-2 outline-accent")}
+                      style={{ background: css }} />
+            ))}
+          </div>
+        </div>
+      )}
+      {element.kind === "switch" && (
+        <label className="flex items-center gap-2 text-[14px]">
+          <input type="checkbox" checked={element.text === "closed"} onChange={(e) => onChange({ text: e.target.checked ? "closed" : null })} />
+          {t("inspector.closed")}
+        </label>
+      )}
+      {(element.kind === "switch" || element.kind === "button") && (
+        <small className="text-[12px] leading-[1.35] text-faint">{t(`inspector.${element.kind}Hint`)}</small>
+      )}
+      {element.kind === "potentiometer" && (
+        <label className="grid gap-1">
+          <span className={caption}>{t("inspector.position", { percent: Math.round(Number(element.text ?? 0.5) * 100) })}</span>
+          <input type="range" min={0} max={1} step={0.01} value={Number(element.text ?? 0.5)}
+                 onChange={(e) => onChange({ text: e.target.value })} />
+        </label>
+      )}
+      {element.kind === "arduino" && <p className="m-0 text-[13px] text-muted">{t("inspector.sketchHint")}</p>}
+      {kindInfo(element.kind)?.live && element.kind !== "arduino" && (
+        <p className="m-0 text-[13px] text-muted">{t("inspector.liveOnly")}</p>
       )}
       {element.kind === "label" && (
         <label className="grid gap-1">

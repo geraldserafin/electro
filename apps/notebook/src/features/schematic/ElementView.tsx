@@ -33,8 +33,10 @@ function Label({ text, x, y, anchor, solved }: {
 
 const ARROW: Record<number, [string, string]> = { 0: ["→", "←"], 90: ["↓", "↑"], 180: ["←", "→"], 270: ["↑", "↓"] };
 
-export function ElementView({ element: e, library, wires, result, selected, onPointerDown }: {
+export function ElementView({ element: e, library, wires, result, selected, closed, lit, onPointerDown }: {
   element: ElementData; library: SymbolLibrary; wires: WireData[]; result?: ElementResult; selected: boolean;
+  closed?: boolean; // a switch or a button: drawn closed
+  lit?: number; // an LED while simulating: how bright (0–1)
   onPointerDown: (event: ReactPointerEvent) => void;
 }) {
   const G = library.grid;
@@ -60,14 +62,16 @@ export function ElementView({ element: e, library, wires, result, selected, onPo
       || (crosses(cx - 20 - labelWidth, cx - 20, cy - 8, cy + 8) && !crosses(cx + 20, cx + 20 + labelWidth, cy - 8, cy + 8))
     : cy - 32 < 0
       || (crosses(cx - labelWidth / 2, cx + labelWidth / 2, cy - 32, cy - 16) && !crosses(cx - labelWidth / 2, cx + labelWidth / 2, cy + 16, cy + 32));
+  const chip = ps.length > 3; // a 555, an Arduino: the label beside the box, top right; no readings (its pins tell)
   const label = result?.solved && result.value
     ? (e.kind === "hole" ? `${e.id}: ${result.value}` : `${e.id} = ${result.value}`)
     : label_(e);
-  const readings = result
+  const readings = result && !chip
     ? [result.I && `I = ${result.I} ${ARROW[e.rotation][result.reversed ? 1 : 0]}`, result.U && `U = ${result.U}`].filter(Boolean) as string[]
     : [];
   return (
-    <g className={`element ${selected ? "selected" : ""}`} data-id={e.id} onPointerDown={onPointerDown}>
+    <g className={`element ${selected ? "selected" : ""} ${closed ? "closed" : ""} ${lit && lit > 0.01 ? "lit" : ""}`}
+       data-id={e.id} data-kind={e.kind} onPointerDown={onPointerDown}>
       <rect
         className="hit"
         x={Math.min(...xs) - 12} y={Math.min(...ys) - 12}
@@ -78,6 +82,8 @@ export function ElementView({ element: e, library, wires, result, selected, onPo
       {symbol.letter && <text className="letter" x={cx} y={cy}>{symbol.letter}</text>}
       {label && (e.kind === "label"
         ? <text x={cx + 4} y={cy - 6} className="node">{label}</text>
+        : chip
+          ? <Label text={label} x={Math.max(...xs) + 8} y={Math.min(...ys) + (e.kind === "arduino" ? 44 : 24)} anchor="start" />
         : vertical
           ? <Label text={label} x={flip ? cx + 20 : cx - 20} y={readings.length ? cy - 2 : cy + 4} anchor={flip ? "start" : "end"} solved={result?.solved} />
           : <Label text={label} x={cx} y={flip ? cy + 30 : cy - 20} anchor="middle" solved={result?.solved} />)}

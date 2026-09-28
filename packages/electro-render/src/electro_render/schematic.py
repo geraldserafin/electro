@@ -194,7 +194,8 @@ def _draw(sch: Schematic, solution) -> Svg:
     for e in sch.elements:
         x, y = e.at[0] * GRID, e.at[1] * GRID
         rotation = 0 if e.kind in UPRIGHT else e.rotation
-        canvas.items.append(f'<g class="w" transform="translate({x:g} {y:g}) rotate({rotation})">{SYMBOLS[e.kind]}</g>')
+        state = " closed" if e.kind in ("switch", "button") and e.text == "closed" else ""
+        canvas.items.append(f'<g class="w{state}" transform="translate({x:g} {y:g}) rotate({rotation})">{SYMBOLS[e.kind]}</g>')
         pins = [(px * GRID, py * GRID) for px, py in e.pins()]
         for px, py in pins:
             canvas.grow(px - 12, py - 12)

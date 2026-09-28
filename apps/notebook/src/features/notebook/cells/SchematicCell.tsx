@@ -3,6 +3,7 @@ import { useTranslation } from "react-i18next";
 import { usePdf } from "@/features/pdf-export";
 import { kernel } from "@/features/python";
 import { board, BoardIsland, PdfDrawing, SchematicEditor, type Camera } from "@/features/schematic";
+import { ArduinoPanel, LiveControls, Scope, useLive } from "@/features/simulation";
 import type { Cell, SchematicData, SchematicView, SymbolLibrary } from "@/shared/model/types";
 import type { Failure } from "@/shared/model/issues";
 import { FailureBox } from "@/features/solution";
@@ -20,7 +21,7 @@ import { cn } from "@/shared/lib/cn";
  * A schematic: the board to draw it on (or its code). The board is always there — its grid, the
  * drawing — and its tools fade in while the pointer is over it.
  */
-export function SchematicCell({ cell, update, library, simulate, running }: {
+export function SchematicCell({ cell, update, library, simulate, running: solving }: {
   cell: Extract<Cell, { type: "schematic" }>;
   update: (patch: Partial<Cell>) => void;
   library: SymbolLibrary;
@@ -37,6 +38,10 @@ export function SchematicCell({ cell, update, library, simulate, running }: {
   const [generated, setGenerated] = useState<string | null>(null);
   const [error, setError] = useState<Failure | null>(null);
   const [busy, setBusy] = useState(false);
+  const live = useLive(cell.schematic);
+  const running = live.status === "running" || live.status === "paused";
+  const pressed = useRef<string[]>([]);
+  const [pressedIds, setPressedIds] = useState<string[]>([]);
 
   // the drawing `source` describes: the code is written anew only after the drawing was edited
   // on the board — never just because it ran, so the way someone wrote it stays
@@ -113,14 +118,23 @@ export function SchematicCell({ cell, update, library, simulate, running }: {
 
   return (
     <div className="flex gap-2 items-start">
-      <RunButton run={run} running={running || busy} done={done || empty} eager icon={<Flash />} label={t("schematic.run")} />
+      <RunButton run={run} running={solving || busy} done={done || empty} eager icon={<Flash />} label={t("schematic.run")} />
       <div className="flex-1 min-w-0">
       {view === "schematic" ? (
         <SchematicEditor
           value={cell.schematic}
           onChange={(schematic) => update({ schematic, ...(cell.results ? { stale: true } : {}) })}
           library={library}
-          results={cell.stale ? undefined : cell.results}
+          results={running ? live.frame?.results : cell.stale ? undefined : cell.results}
+          live={running && live.frame ? {
+            wires: live.frame.wires, scale: live.frame.scale, leds: live.frame.leds, pressed: pressedIds,
+            onPress: (id, down) => {
+              pressed.current = down ? [...pressed.current, id] : pressed.current.filter((x) => x !== id);
+              setPressedIds(pressed.current);
+              live.press(id, down);
+            },
+          } : undefined}
+          below={empty ? undefined : <LiveControls live={live} />}
           topLeft={name}
           topRight={actions}
           status={problems}
@@ -143,6 +157,13 @@ export function SchematicCell({ cell, update, library, simulate, running }: {
           {error && <FailureBox failure={error} className="text-[14px]" />}
         </div>
       )}
+      {live.error && <FailureBox failure={live.error} className="mt-2 text-[14px]" />}
+      {running && <Scope live={live} />}
+      {cell.schematic.elements.filter((e) => e.kind === "arduino").map((e) => (
+        <ArduinoPanel key={e.id} element={e} live={live} onChange={(sketch) => update({
+          schematic: { ...cell.schematic, elements: cell.schematic.elements.map((x) => (x.id === e.id ? { ...x, text: sketch } : x)) },
+        })} />
+      ))}
       {/* the PDF shows the circuit as drawn; results belong to code cells: schematic(układ1, sol) */}
       <PdfDrawing value={cell.schematic} library={library} results={printed} />
       {cell.results && Object.keys(cell.results).length > 0 && (

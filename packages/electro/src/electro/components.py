@@ -14,8 +14,8 @@ import sympy as sp
 
 from .circuit import GROUND, Circuit, Netlist, Seq, Transpose, ground, open_end, wire
 from .reasons import (
-    AmmeterReading, CapacitorImpedance, CapacitorOpenDC, IdealAmmeter, IdealOpAmp, IdealVoltmeter, InductorImpedance,
-    InductorShortDC, OhmsLaw, Reason, SourceCurrent, SourceVoltage, UnknownElement, VoltageAcross, VoltmeterReading,
+    AmmeterReading, CapacitorImpedance, CapacitorOpenDC, CapacitorStep, IdealAmmeter, IdealOpAmp, IdealVoltmeter, InductorImpedance,
+    InductorShortDC, InductorStep, OhmsLaw, Reason, SourceCurrent, SourceVoltage, UnknownElement, VoltageAcross, VoltmeterReading,
 )
 
 OPEN = open_end + open_end.transpose()  # 1 → 1 with nothing between: a break in the circuit
@@ -33,9 +33,15 @@ class Law:
 
 @dataclass(frozen=True)
 class Context:
-    """Analysis settings: DC (``omega=None``) or AC phasors at angular frequency ``omega``."""
+    """Analysis settings: DC (``omega=None``), AC phasors at angular frequency ``omega``, or one
+    step in time (``dt``: its length, a symbol): what ``electro.sim`` solves over and over."""
 
     omega: sp.Expr | None = None
+    dt: sp.Expr | None = None
+
+    @property
+    def transient(self) -> bool:
+        return self.dt is not None
 
 
 @dataclass
@@ -46,6 +52,15 @@ class Model:
     laws: list[Law]
     variables: dict[str, sp.Symbol] = field(default_factory=dict)  # "U", "I", ...
     param: sp.Symbol | None = None
+    # in time only (``ctx.transient``), for electro.sim:
+    # what the element remembers between steps: symbol -> (its value after a step, as an
+    # expression of this step's quantities; its value at t = 0; the most it may change in one
+    # step, else the step is shortened — None: it jumps, like a flip-flop, and nothing is shortened)
+    states: dict[sp.Symbol, tuple[sp.Expr, float, float | None]] = field(default_factory=dict)
+    # set from outside while it runs (a switch's position, an Arduino's pin): symbol -> default
+    inputs: dict[sp.Symbol, float] = field(default_factory=dict)
+    # p-n junctions, for Newton's step limiting: (the junction's voltage variable, n·V_T, I_S)
+    junctions: list[tuple[sp.Symbol, float, float]] = field(default_factory=list)
 
 
 class Component(Circuit):
@@ -76,6 +91,10 @@ class Component(Circuit):
 
     def build(self, label: str, V: dict[str, sp.Expr], param, ctx: Context) -> Model:
         raise NotImplementedError
+
+    def options(self) -> list[str]:
+        """Arguments besides the value and the label, as code (``closed=True``): for ``code()``."""
+        return []
 
     @property
     def dom(self) -> int:
@@ -142,7 +161,18 @@ class Resistor(TwoTerminal):
 class Capacitor(TwoTerminal):
     prefix, unit = "C", "F"
 
+    def build(self, label, V, param, ctx):
+        model = super().build(label, V, param, ctx)
+        if ctx.transient:  # backward Euler; U_prev: the voltage one step earlier
+            prev = sp.Symbol(f"U_{label}_prev")
+            U, I = model.variables["U"], model.variables["I"]
+            model.laws.append(Law(I - param * (U - prev) / ctx.dt, CapacitorStep(sp.Symbol(label))))
+            model.states[prev] = (U, 0.0, 0.05)
+        return model
+
     def law(self, U, I, x, ctx):
+        if ctx.transient:
+            return []  # in build: it needs the state
         if ctx.omega is None:
             return [(I, CapacitorOpenDC)]
         return [(U - I / (sp.I * ctx.omega * x), CapacitorImpedance)]
@@ -151,7 +181,18 @@ class Capacitor(TwoTerminal):
 class Inductor(TwoTerminal):
     prefix, unit = "L", "H"
 
+    def build(self, label, V, param, ctx):
+        model = super().build(label, V, param, ctx)
+        if ctx.transient:  # I_prev: the current one step earlier
+            prev = sp.Symbol(f"I_{label}_prev")
+            U, I = model.variables["U"], model.variables["I"]
+            model.laws.append(Law(U - param * (I - prev) / ctx.dt, InductorStep(sp.Symbol(label))))
+            model.states[prev] = (I, 0.0, 1e-3)
+        return model
+
     def law(self, U, I, x, ctx):
+        if ctx.transient:
+            return []
         if ctx.omega is None:
             return [(U, InductorShortDC)]
         return [(U - sp.I * ctx.omega * x * I, InductorImpedance)]

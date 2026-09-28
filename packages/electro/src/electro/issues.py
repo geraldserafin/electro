@@ -249,3 +249,42 @@ class NotAPort(Issue, TypeError):
 @issue
 class NoThevenin(Issue, ValueError):
     """The terminals are open (R_th = ∞): there is no Thévenin equivalent."""
+
+
+# ------------------------------------------------------------------ simulation in time
+
+@issue
+class NeedsSimulation(Issue, ValueError):
+    """``label`` is not linear (a diode, a transistor, a chip): the circuit is simulated in time
+    (``simulate(...)``), not solved on paper."""
+
+    label: sp.Symbol
+
+
+@issue
+class NotSimulated(Issue, ValueError):
+    """``label`` has no model in time (a hole: the simulation needs every element known)."""
+
+    label: sp.Symbol
+
+
+@issue
+class ValueNeeded(Issue, ValueError):
+    """A simulation needs every value: ``label``'s is unknown."""
+
+    label: sp.Symbol
+
+
+@issue
+class NoConvergence(Issue, ArithmeticError):
+    """The simulation could not find the circuit's state at ``time`` (seconds), even in tiny steps."""
+
+    time: float
+
+
+@issue
+class NoSuchInput(Issue, KeyError):
+    """Nothing in the circuit is set from outside by that name (a switch's ``S_1``, an Arduino's pin)."""
+
+    name: str
+    available: list

@@ -10,7 +10,8 @@ export interface LawData { equation: Tex; reason: Reason }
 
 type Labelled = "OhmsLaw" | "CapacitorOpenDC" | "CapacitorImpedance" | "InductorShortDC" | "InductorImpedance"
   | "SourceVoltage" | "SourceCurrent" | "IdealAmmeter" | "AmmeterReading" | "IdealVoltmeter" | "VoltmeterReading"
-  | "IdealOpAmp" | "UnknownElement" | "VoltageAcross";
+  | "IdealOpAmp" | "UnknownElement" | "VoltageAcross"
+  | "CapacitorStep" | "InductorStep" | "SwitchClosed" | "SwitchOpen" | "PotentiometerDivider" | "DeviceModel";
 
 export type Reason =
   | { type: "Given" }
@@ -55,6 +56,10 @@ export type Issue =
   | { type: "CloseNeedsNToN" | "NotAPort"; shape: string }
   | { type: "WrongNodeCount"; part: string; terminals: number; nodes: string[] }
   | { type: "NotLinear" | "NoThevenin" }
+  // in time (electro.sim)
+  | { type: "NeedsSimulation" | "NotSimulated" | "ValueNeeded"; label: Tex }
+  | { type: "NoConvergence"; time: number }
+  | { type: "NoSuchInput"; name: string; available: string[] }
   // drawings (electro_schematic.issues)
   | { type: "CannotLayOut"; circuit: string }
   | { type: "CannotLayOutElement"; element: string; shape: string }

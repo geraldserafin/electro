@@ -201,6 +201,28 @@ def simulate(schematic_json: str, data: str = "") -> str:
     return json.dumps({"results": results, "problems": problems}, ensure_ascii=False)
 
 
+def live(schematic_json: str) -> str:
+    """The play button of a schematic cell: the drawing compiled for the page's engine
+    (``simulation/engine.ts``), and where on the drawing each node is.
+
+    Returns JSON ``{"program": {...}, "wires": [node per wire], "pins": {id: [node per pin]}}``
+    (``null`` for a wire that touches no element), or ``{"error": {...}}`` (an error output).
+    """
+    from electro.sim import compile_sim
+
+    try:
+        sch = Schematic.from_json(schematic_json)
+        program = compile_sim(sch.to_circuit())
+    except Exception as err:  # noqa: BLE001 — shown on the board
+        return json.dumps({"error": _error(err)}, ensure_ascii=False)
+    names = sch.node_names()
+    return json.dumps({
+        "program": json.loads(program.to_json()),
+        "wires": [names.get(w.points[0]) for w in sch.wires],
+        "pins": {e.id: [names.get(p) for p in e.pins()] for e in sch.components()},
+    }, ensure_ascii=False)
+
+
 def to_json(x):
     """An issue, a reason or a solution's steps as JSON: ``{"type": "OhmsLaw", "label": "R_{1}"}``.
     Quantities and expressions become LaTeX (``R_{1}``, ``\\frac{U}{I}``), the rest stays as it is."""

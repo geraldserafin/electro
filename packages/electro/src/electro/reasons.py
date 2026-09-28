@@ -119,3 +119,45 @@ class KirchhoffCurrent(Reason):
     """Kirchhoff's current law at ``node``."""
 
     node: sp.Symbol
+
+
+@dataclass(frozen=True)
+class CapacitorStep(Reason):
+    """One step in time (backward Euler): I = C·(U − U_prev)/Δt."""
+
+    label: sp.Symbol
+
+
+@dataclass(frozen=True)
+class InductorStep(Reason):
+    """One step in time: U = L·(I − I_prev)/Δt."""
+
+    label: sp.Symbol
+
+
+@dataclass(frozen=True)
+class SwitchClosed(Reason):
+    """A closed switch (or a pressed button): U = 0."""
+
+    label: sp.Symbol
+
+
+@dataclass(frozen=True)
+class SwitchOpen(Reason):
+    """An open switch: I = 0."""
+
+    label: sp.Symbol
+
+
+@dataclass(frozen=True)
+class PotentiometerDivider(Reason):
+    """The two parts of a potentiometer, either side of the wiper, obey Ohm's law."""
+
+    label: sp.Symbol
+
+
+@dataclass(frozen=True)
+class DeviceModel(Reason):
+    """A semiconductor's or a chip's model (a diode's Shockley equation, a 555, an Arduino's pin)."""
+
+    label: sp.Symbol

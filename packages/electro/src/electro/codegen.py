@@ -140,6 +140,7 @@ def _component_code(c: comp.Component, label: str | None) -> str:
     args = []
     if c.has_value and c.value is not UNKNOWN:
         args.append(_literal(c.value))
+    args += c.options()
     if label:
         args.append(f"label={label!r}")
     return f"{type(c).__name__}({', '.join(args)})"

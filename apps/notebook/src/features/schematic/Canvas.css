@@ -30,4 +30,9 @@
   .canvas .label .sub { font-size: 10px; }
   .canvas .label.solved { fill: var(--accent); font-weight: 600; }
   .canvas .reading { font-size: 11px; fill: #2f9e44; }
+  /* running in time: wires coloured by voltage, LEDs glowing, switches and buttons work by clicking */
+  .canvas { --live-pos: #2f9e44; --live-neg: #e03131; --live-zero: var(--text); }
+  .canvas .led-glow { filter: blur(7px); pointer-events: none; }
+  .canvas .element[data-kind="switch"], .canvas .element[data-kind="button"] { cursor: pointer; }
+  .canvas .wire { transition: stroke 60ms linear; }
 }

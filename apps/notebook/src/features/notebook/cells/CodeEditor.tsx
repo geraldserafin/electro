@@ -2,6 +2,7 @@
 // a quiet grey block, faint line numbers, Colab's (VS Code's) syntax colours, and completion
 // of electro's names. Colours come from CSS variables, so light / dark all follow.
 import { autocompletion, completeFromList, type Completion } from "@codemirror/autocomplete";
+import { cpp } from "@codemirror/lang-cpp";
 import { python, pythonLanguage } from "@codemirror/lang-python";
 import { HighlightStyle, syntaxHighlighting } from "@codemirror/language";
 import { EditorView } from "@codemirror/view";
@@ -19,8 +20,10 @@ const doc = (label: string, detail: string, type = "class"): Completion => ({ la
 function electro(t: TFunction<"notebook">): Completion[] {
   const hint = (name: keyof typeof pl.completion) => t(`completion.${name}`);
   return [
-    ...(["Resistor", "Capacitor", "Inductor", "VoltageSource", "CurrentSource", "Ammeter", "Voltmeter", "Hole", "OpAmp"] as const)
+    ...(["Resistor", "Capacitor", "Inductor", "VoltageSource", "CurrentSource", "Ammeter", "Voltmeter", "Hole", "OpAmp",
+      "LED", "Diode", "Switch", "Button", "Potentiometer", "NPN", "PNP", "Timer555", "Arduino"] as const)
       .map((c) => doc(c, hint(c))),
+    doc("simulate", hint("simulate"), "function"),
     ...["loop", "net", "series", "parallel", "shunt", "supply", "node"].map((f) => doc(f, hint("circuit"), "function")),
     ...["solve", "resistance", "equivalent", "blackbox", "code", "schematic", "steps", "schemat", "display"]
       .map((f) => doc(f, "electro", "function")),
@@ -58,20 +61,20 @@ const look = EditorView.theme({
   ".cm-completionDetail": { fontFamily: "var(--sans)", fontStyle: "normal", color: "var(--muted)", marginLeft: "12px" },
 });
 
-export function CodeEditor({ value, onChange, autoFocus, minHeight }: {
+export function CodeEditor({ value, onChange, autoFocus, minHeight, language = "python" }: {
   value: string; onChange: (v: string) => void; autoFocus?: boolean;
   minHeight?: number; // px: the scroller fills it, so its scrollbar sits at the bottom
+  language?: "python" | "cpp"; // cpp: an Arduino sketch
 }) {
   const { t, i18n } = useTranslation("notebook");
   const extensions = useMemo(() => [
-    python(),
-    pythonLanguage.data.of({ autocomplete: completeFromList(electro(t)) }),
+    ...(language === "cpp" ? [cpp()] : [python(), pythonLanguage.data.of({ autocomplete: completeFromList(electro(t)) })]),
     autocompletion({ icons: false }),
     syntaxHighlighting(colab),
     look,
     ...(minHeight ? [EditorView.theme({ ".cm-scroller": { minHeight: `${minHeight}px` } })] : []),
   // eslint-disable-next-line react-hooks/exhaustive-deps -- t changes with the language
-  ], [i18n.language, minHeight]);
+  ], [i18n.language, minHeight, language]);
   return (
     <CodeMirror
       value={value}

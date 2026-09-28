@@ -57,7 +57,12 @@ export function sayer(t: TFunction<"solution">, lang: string) {
       case "Ambiguous":
         return t("issue.Ambiguous", { count: i.options.length, options: or(i.options.map(maths)) });
       case "Undetermined": return t("issue.Undetermined", { symbols: maths(i.symbols) });
-      case "HoleUndetermined": return t("issue.HoleUndetermined", { label: math(i.label) });
+      case "HoleUndetermined":
+      case "NeedsSimulation":
+      case "NotSimulated":
+      case "ValueNeeded": return t(`issue.${i.type}`, { label: math(i.label) });
+      case "NoConvergence": return t("issue.NoConvergence", { time: i.time.toPrecision(4) });
+      case "NoSuchInput": return t("issue.NoSuchInput", { name: code(i.name), available: names(i.available) });
       case "BadCondition": return t("issue.BadCondition", { condition: code(i.condition) });
       case "NotInCircuit": return t("issue.NotInCircuit", { name: code(i.name) });
       case "ComponentRepeated": return t("issue.ComponentRepeated", { count: i.count });

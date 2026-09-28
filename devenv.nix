@@ -3,9 +3,26 @@
 let
   root = config.devenv.root;
   notebook = "${root}/apps/notebook";
+  # Arduino sketches (the live simulation) are compiled by arduino-cli with the arduino:avr core.
+  # The compiler and ctags that core downloads are x86 builds, so on an ARM Mac they come from
+  # nixpkgs instead (apps/server/src/Arduino.ts passes these paths as build properties).
+  avr = pkgs.pkgsCross.avr.buildPackages;
+  avrToolchain = pkgs.symlinkJoin {
+    name = "avr-toolchain";
+    paths = [
+      avr.gcc
+      avr.binutils
+      (pkgs.writeShellScriptBin "avr-gcc-ar" ''PATH=${avr.binutils}/bin:$PATH exec ${avr.gcc.cc}/bin/avr-gcc-ar "$@"'')
+    ];
+  };
 in
 {
-  packages = [ pkgs.uv ];
+  packages = [ pkgs.uv pkgs.arduino-cli ];
+
+  env = pkgs.lib.optionalAttrs (pkgs.stdenv.isDarwin && pkgs.stdenv.isAarch64) {
+    ARDUINO_COMPILER_PATH = "${avrToolchain}/bin/";
+    ARDUINO_CTAGS_PATH = "${pkgs.universal-ctags}/bin";
+  };
 
   languages.python = {
     enable = true;
@@ -47,7 +64,8 @@ in
     python-bundle.exec = "node ${notebook}/scripts/bundle-python.mjs --watch";
     notebook.exec = "cd ${notebook} && pnpm exec vite --port 5190 --strictPort";
     notes-server = {
-      exec = "cd ${root}/apps/server && PORT=5191 pnpm dev";
+      # the first time: the Arduino core for compiling sketches (downloaded once, into ~/.arduino15)
+      exec = "(arduino-cli core list | grep -q arduino:avr || arduino-cli core install arduino:avr); cd ${root}/apps/server && PORT=5191 pnpm dev";
       after = [ "devenv:processes:postgres" ];
     };
   };

@@ -15,8 +15,8 @@ import { HelpPanel } from "./HelpPanel";
 import { Inspector, type Selection } from "./Inspector";
 import { LibraryPanel } from "./LibraryPanel";
 import {
-  KINDS, attach, bounds, elbow, inBox, moveGroup, isComponent, isConnectionPoint, junctions, nextId,
-  moveSegment, openPins, pins, rotatedAbout, same, simplify, updateElement,
+  KINDS, attach, bounds, defaultText, elbow, inBox, moveGroup, isComponent, isConnectionPoint, junctions,
+  ledColor, nextId, moveSegment, openPins, pins, rotatedAbout, same, simplify, updateElement,
 } from "./model";
 import { SymbolIcon } from "./SymbolIcon";
 import { Toolbar, type Tool } from "./Toolbar";
@@ -32,6 +32,20 @@ type Gesture =
   | { type: "group"; ids: string[]; wires: number[]; start: Point; snapshot: SchematicData; moved: boolean }
   | { type: "box"; from: Point; to: Point }; // shift + drag on empty space, in drawing units (not rounded)
 
+/** The circuit running in time (features/simulation), as the board shows it. */
+export interface LiveView {
+  wires: (number | null)[]; // each wire's voltage
+  scale: number; // the largest |V|: full colour
+  leds: Record<string, number>; // LED id → brightness 0–1
+  pressed: string[]; // buttons held down
+  onPress: (id: string, down: boolean) => void;
+}
+
+/** A wire's colour at voltage ``v``: towards green above ground, red below, the ink at 0 V. */
+const wireColor = (v: number | null, scale: number) =>
+  v === null ? undefined
+    : `color-mix(in oklab, ${v >= 0 ? "var(--live-pos)" : "var(--live-neg)"} ${Math.round(Math.min(1, Math.abs(v) / scale) * 100)}%, var(--live-zero))`;
+
 interface Props {
   value: SchematicData;
   onChange: (value: SchematicData) => void;
@@ -42,11 +56,13 @@ interface Props {
   status?: ReactNode; // its own island, next to the full screen button (e.g. warnings)
   camera?: { current: Camera | null }; // where the view was: kept here while the editor is away
   autoFocus?: boolean; // take the keyboard when shown
+  live?: LiveView; // running in time: wires coloured by voltage, LEDs lit, switches and buttons work
+  below?: ReactNode; // an island at the bottom, in the middle (the live simulation's controls)
 }
 
 const PANEL = 260; // screen px the element panel takes on the left (with its margin)
 
-export function SchematicEditor({ value, onChange, library, results, topLeft, topRight, status, camera, autoFocus }: Props) {
+export function SchematicEditor({ value, onChange, library, results, topLeft, topRight, status, camera, autoFocus, live, below }: Props) {
   const { t } = useTranslation("schematic");
   const G = library.grid;
   const gridId = useId();
@@ -150,7 +166,7 @@ export function SchematicEditor({ value, onChange, library, results, topLeft, to
     if (tool.type === "place") {
       const element: ElementData = {
         id: nextId(value, tool.kind), kind: tool.kind, at: p, rotation: 0,
-        value: null, text: tool.kind === "label" ? "A" : null,
+        value: null, text: defaultText(tool.kind),
       };
       commit(attach({ ...value, elements: [...value.elements, element] }, library, element.id));
       setSelection({ type: "element", id: element.id });
@@ -168,6 +184,14 @@ export function SchematicEditor({ value, onChange, library, results, topLeft, to
   const onElementDown = (event: ReactPointerEvent, e: ElementData) => {
     if (tool.type !== "select") return;
     event.stopPropagation();
+    if (live && e.kind === "button") { // held down while running: pressed
+      svgRef.current?.focus({ preventScroll: true });
+      setSelection({ type: "element", id: e.id });
+      live.onPress(e.id, true);
+      const release = () => { live.onPress(e.id, false); window.removeEventListener("pointerup", release); };
+      window.addEventListener("pointerup", release);
+      return;
+    }
     svgRef.current?.focus({ preventScroll: true });
     if (selection?.type === "group" && selection.ids.includes(e.id))
       setGesture({ type: "group", ids: selection.ids, wires: selection.wires, start: toGrid(event), snapshot: value, moved: false });
@@ -236,6 +260,10 @@ export function SchematicEditor({ value, onChange, library, results, topLeft, to
 
   const onUp = () => {
     if (gesture?.type === "move" && gesture.moved) commit(attach(value, library, gesture.id), gesture.snapshot);
+    if (gesture?.type === "move" && !gesture.moved && live) { // a click on a switch while running flips it
+      const e = value.elements.find((x) => x.id === gesture.id);
+      if (e?.kind === "switch") commit(updateElement(value, library, e.id, { text: e.text === "closed" ? null : "closed" }));
+    }
     if (gesture?.type === "segment" && gesture.moved) commit(value, gesture.snapshot);
     if (gesture?.type === "group" && gesture.moved) commit(value, gesture.snapshot);
     if (gesture?.type === "box") {
@@ -371,6 +399,7 @@ export function SchematicEditor({ value, onChange, library, results, topLeft, to
             <g key={i}>
               <polyline className={`w wire ${(selection?.type === "wire" && selection.index === i)
                 || (selection?.type === "group" && selection.wires.includes(i)) ? "selected" : ""}`}
+                        style={live ? { stroke: wireColor(live.wires[i] ?? null, live.scale) } : undefined}
                         points={pointsOf(w.points)} />
               {w.points.slice(1).map((q, j) => (
                 <polyline
@@ -387,8 +416,17 @@ export function SchematicEditor({ value, onChange, library, results, topLeft, to
           {junctions(value, library).map(([x, y]) => (
             <circle key={`j${x},${y}`} className="dot" cx={x * G} cy={y * G} r="3" />
           ))}
+          {live && value.elements.filter((e) => e.kind === "led" && (live.leds[e.id] ?? 0) > 0.01).map((e) => {
+            const [a, b] = pins(e, library);
+            return (
+              <circle key={`glow${e.id}`} className="led-glow" cx={(a[0] + b[0]) / 2 * G} cy={(a[1] + b[1]) / 2 * G} r={22}
+                      style={{ fill: ledColor(e.text), opacity: 0.15 + 0.75 * Math.sqrt(live.leds[e.id]) }} />
+            );
+          })}
           {value.elements.map((e) => (
             <ElementView key={e.id} element={e} library={library} wires={value.wires} result={results?.[e.id]}
+                         closed={e.kind === "switch" ? e.text === "closed" : e.kind === "button" ? !!live?.pressed.includes(e.id) : false}
+                         lit={live && e.kind === "led" ? live.leds[e.id] ?? 0 : undefined}
                          selected={(selection?.type === "element" && selection.id === e.id)
                            || (selection?.type === "group" && selection.ids.includes(e.id))}
                          onPointerDown={(event) => onElementDown(event, e)} />
@@ -453,6 +491,7 @@ export function SchematicEditor({ value, onChange, library, results, topLeft, to
           <Target /> {t("view.back")}
         </button>
       )}
+      {below && <BoardIsland stays className="bottom-3 left-1/2 -translate-x-1/2">{below}</BoardIsland>}
       <ZoomAndHistory zoom={cam.zoom} onZoom={(f) => zoomAround(f)} onFit={() => setCam(fitted())} onUndo={undoStep} onRedo={redo} />
       {status && (
         // what is wrong with the circuit: always shown, next to the full screen button

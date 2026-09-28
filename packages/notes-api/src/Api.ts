@@ -5,6 +5,7 @@
  */
 import { HttpApi, HttpApiEndpoint, HttpApiGroup } from "@effect/platform"
 import { Schema } from "effect"
+import { ArduinoGroup } from "./Arduino.js"
 import { AuthGroup, Authentication } from "./Auth.js"
 import { NoteIdMismatch, NoteNotFound, RevisionConflict } from "./Errors.js"
 import { Note, NoteId, NoteRef, NoteSummary, Saved, SaveNote } from "./Notebook.js"
@@ -49,5 +50,6 @@ export class NotesApi extends HttpApi.make("notes")
   .add(NotesGroup)
   .add(AuthGroup)
   .add(SystemGroup)
+  .add(ArduinoGroup)
   .prefix("/api")
 {}

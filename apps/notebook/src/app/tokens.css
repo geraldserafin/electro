@@ -40,6 +40,11 @@
   --hl-property: #001080;
   --selection: #add6ff;
   --bracket: #d6e9ff;
+  /* chart series, in this order (the scope, simulate()'s plots): blue, orange, aqua, yellow */
+  --series-1: #2a78d6;
+  --series-2: #eb6834;
+  --series-3: #1baf7a;
+  --series-4: #eda100;
   color-scheme: light;
 }
 
@@ -74,5 +79,9 @@
   --hl-property: #9cdcfe;
   --selection: #264f78;
   --bracket: #3a3d41;
+  --series-1: #3987e5;
+  --series-2: #d95926;
+  --series-3: #199e70;
+  --series-4: #c98500;
   color-scheme: dark;
 }
