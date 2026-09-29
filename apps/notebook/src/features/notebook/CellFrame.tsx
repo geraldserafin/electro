@@ -35,9 +35,13 @@ export function CellFrame({ id, type, focused, onFocus, onMoveTo, onRemove, onAd
     <section ref={self} id={`cell-${id}`} data-cell={type} data-focused={focused || undefined}
              onFocusCapture={onFocus} onPointerDownCapture={onFocus}
              className={cn("group/cell relative mb-4 scroll-mt-18 transition-opacity", drag.dragging && "opacity-40")}>
-      <div className={cn("absolute top-0 -right-9 z-5 flex flex-col gap-0.5 opacity-0 pointer-events-none transition-opacity duration-120 [&_svg]:size-4",
-                         "group-hover/cell:opacity-100 group-hover/cell:pointer-events-auto group-data-focused/cell:opacity-100 group-data-focused/cell:pointer-events-auto",
-                         drag.dragging && "opacity-100", "max-[760px]:hidden")}>
+      {/* a safe strip from the block's edge, its full height: the pointer on its way to the handle or
+          the bin never leaves the cell; going, they stay a moment (a slip does not take them away) */}
+      <div className={cn("absolute top-0 bottom-0 left-full z-5 flex flex-col gap-0.5 w-11 pl-2 [&_svg]:size-4",
+                         "invisible opacity-0 transition-[opacity,visibility] duration-150 delay-300",
+                         "group-hover/cell:visible group-hover/cell:opacity-100 group-hover/cell:delay-0",
+                         "group-data-focused/cell:visible group-data-focused/cell:opacity-100 group-data-focused/cell:delay-0",
+                         drag.dragging && "visible opacity-100", "max-[760px]:hidden")}>
         <button {...drag.handle} className={cn(barButton, "cursor-grab active:cursor-grabbing touch-none")}
                 title={t("cell.drag")} aria-label={t("cell.drag")}
                 onKeyDown={(e) => {
