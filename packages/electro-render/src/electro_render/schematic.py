@@ -18,7 +18,7 @@ from electro_schematic import GRID, KINDS, Schematic, layout
 from electro_schematic.layout import label_sides
 from electro_schematic.model import on_segment
 
-from .symbols import LETTERS, STYLE, SYMBOLS, UPRIGHT
+from .symbols import LETTERS, STYLE, UPRIGHT, symbol
 
 Vec = tuple[float, float]
 RIGHT, LEFT, UP, DOWN = (1, 0), (-1, 0), (0, -1), (0, 1)
@@ -195,7 +195,7 @@ def _draw(sch: Schematic, solution) -> Svg:
         x, y = e.at[0] * GRID, e.at[1] * GRID
         rotation = 0 if e.kind in UPRIGHT else e.rotation
         state = " closed" if e.kind in ("switch", "button") and e.text == "closed" else ""
-        canvas.items.append(f'<g class="w{state}" transform="translate({x:g} {y:g}) rotate({rotation})">{SYMBOLS[e.kind]}</g>')
+        canvas.items.append(f'<g class="w{state}" transform="translate({x:g} {y:g}) rotate({rotation})">{symbol(e.kind)}</g>')
         pins = [(px * GRID, py * GRID) for px, py in e.pins()]
         for px, py in pins:
             canvas.grow(px - 12, py - 12)

@@ -1,5 +1,11 @@
 """How elements look: one symbol library for the Python renderer and the web editor.
 
+Two standards, chosen per note: IEC 60617 (PN-EN 60617 — a resistor is a box, a source a circle
+with its arrow; the default) and IEEE Std 315 / ANSI Y32.2 (a resistor is a zigzag, a DC voltage
+source a cell — its long plate the + terminal —, a current source a circle with the current's
+arrow inside). ``SYMBOLS`` are IEC's; ``IEEE`` the symbols IEEE draws otherwise (the rest are the
+same in both). ``use()`` picks the one the renderer draws with.
+
 Each symbol is SVG drawn at rotation 0 with the element's first pin at (0, 0), in
 pixels (``GRID`` px per grid unit). Pins come from ``electro_schematic.KINDS``.
 ``symbol_library()`` exports everything as JSON-friendly data for the web editor.
@@ -10,6 +16,10 @@ from __future__ import annotations
 import json
 
 from electro_schematic import GRID, KINDS
+
+# a zigzag between x = -18 and 18: three full teeth, 7 px high (a resistor, a potentiometer's body)
+ZIGZAG = '<path d="M-18 0L-15 -7L-9 7L-3 -7L3 7L9 -7L15 7L18 0"/>'
+
 
 def _body(inner: str, half: float = 20) -> str:
     """A two-pin symbol: leads from both pins up to the body, ``half`` px either side of the middle."""
@@ -63,6 +73,31 @@ SYMBOLS: dict[str, str] = {
     "terminal": '<circle class="open" r="3.5"/>',
 }
 
+# IEEE Std 315's own (the rest as in IEC)
+IEEE: dict[str, str] = {
+    "resistor": _body(ZIGZAG, 18),
+    # a cell: the long thin plate is + (the right terminal), the short thick one −
+    "voltage_source": _body('<path class="thick" d="M-4 -8V8"/><path d="M4 -15V15"/><path d="M10 -15h6M13 -18v6"/>', 4),
+    # the current's arrow inside the circle, the way it pushes the current (left → right)
+    "current_source": _body('<circle r="13"/><path d="M-7 0H4"/><path class="fill" d="M9 0l-6 -4.5v9z"/>', 13),
+    "potentiometer": _body(ZIGZAG, 18) + '<path d="M40 -40V-15"/><path class="fill" d="M40 -9l-4 -7h8z"/>',
+}
+
+STANDARDS = {"iec": {}, "ieee": IEEE}  # a standard: the symbols it draws unlike IEC's
+_standard = "iec"
+
+
+def use(standard: str) -> None:
+    """Draw with ``standard``'s symbols from now on ("iec" or "ieee"; anything else: IEC)."""
+    global _standard
+    _standard = standard if standard in STANDARDS else "iec"
+
+
+def symbol(kind: str) -> str:
+    """A kind's symbol in the standard in use."""
+    return STANDARDS[_standard].get(kind, SYMBOLS[kind])
+
+
 # Letters stay upright, so they are drawn apart from the (rotating) symbol.
 LETTERS = {"ammeter": "A", "voltmeter": "V", "hole": "?"}
 
@@ -82,7 +117,8 @@ text .sub{font-size:10px}.solved{fill:#2563eb;font-weight:600}.result{fill:#0596
 
 
 def symbol_library() -> dict:
-    """Everything an editor needs to draw elements exactly like the renderer does."""
+    """Everything an editor needs to draw elements exactly like the renderer does: IEC's symbols
+    (``kinds``), and for each other standard the ones it draws otherwise (``standards``)."""
     return {
         "grid": GRID,
         "style": STYLE,
@@ -95,6 +131,7 @@ def symbol_library() -> dict:
             }
             for kind in KINDS
         },
+        "standards": {name: dict(own) for name, own in STANDARDS.items()},
     }
 
 

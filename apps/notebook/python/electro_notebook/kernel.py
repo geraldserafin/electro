@@ -286,8 +286,12 @@ def _warning(message) -> dict:
     return {"type": "warning", "data": str(message)}
 
 
-def run(code: str, schematics_json: str = "{}") -> str:
-    """Run one cell; returns a JSON list of outputs ``{"type": ..., "data": ...}``."""
+def run(code: str, schematics_json: str = "{}", standard: str = "iec") -> str:
+    """Run one cell; returns a JSON list of outputs ``{"type": ..., "data": ...}``. Schematics are
+    drawn with ``standard``'s symbols (the note's: "iec" or "ieee")."""
+    from electro_render.symbols import use
+
+    use(standard)
     outputs: list[dict] = []
     drawings = {name: Schematic.from_json(text) for name, text in json.loads(schematics_json).items()}
 

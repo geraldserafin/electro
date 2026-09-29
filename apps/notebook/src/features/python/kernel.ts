@@ -33,8 +33,9 @@ class Kernel {
     });
   }
 
-  async run(code: string, schematics: Record<string, SchematicData>): Promise<Output[]> {
-    const text = (await this.call("run", { code, schematics: JSON.stringify(
+  /** A code cell; its schematics drawn with `standard`'s symbols (the note's). */
+  async run(code: string, schematics: Record<string, SchematicData>, standard = "iec"): Promise<Output[]> {
+    const text = (await this.call("run", { code, standard, schematics: JSON.stringify(
       Object.fromEntries(Object.entries(schematics).map(([name, s]) => [name, JSON.stringify(s)])),
     ) })) as string;
     return JSON.parse(text);

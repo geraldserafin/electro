@@ -7,7 +7,7 @@ const PYODIDE = "https://cdn.jsdelivr.net/pyodide/v314.0.7/full/";
 
 type Request =
   | { id: number; type: "init"; bundleUrl: string }
-  | { id: number; type: "run"; code: string; schematics: string }
+  | { id: number; type: "run"; code: string; schematics: string; standard: string }
   | { id: number; type: "code"; schematic: string; name: string }
   | { id: number; type: "fromCode"; source: string; name: string; old: string }
   | { id: number; type: "simulate"; schematic: string }
@@ -15,7 +15,7 @@ type Request =
   | { id: number; type: "reset" };
 
 interface Kernel {
-  run(code: string, schematics: string): string;
+  run(code: string, schematics: string, standard: string): string;
   code(schematic: string, name: string): string;
   from_code(source: string, name: string, old: string): string;
   simulate(schematic: string): string;
@@ -65,7 +65,7 @@ self.onmessage = async (event: MessageEvent<Request>) => {
     if (!kernel) throw new Error("The kernel was not started (init first).");
     const k = await kernel;
     const result =
-      request.type === "run" ? k.run(request.code, request.schematics)
+      request.type === "run" ? k.run(request.code, request.schematics, request.standard)
       : request.type === "code" ? k.code(request.schematic, request.name)
       : request.type === "fromCode" ? k.from_code(request.source, request.name, request.old)
       : request.type === "simulate" ? k.simulate(request.schematic)

@@ -425,5 +425,14 @@
    "letter": null,
    "upright": true
   }
+ },
+ "standards": {
+  "iec": {},
+  "ieee": {
+   "resistor": "<path d=\"M0 0H22M58 0H80\"/><g transform=\"translate(40 0)\"><path d=\"M-18 0L-15 -7L-9 7L-3 -7L3 7L9 -7L15 7L18 0\"/></g>",
+   "voltage_source": "<path d=\"M0 0H36M44 0H80\"/><g transform=\"translate(40 0)\"><path class=\"thick\" d=\"M-4 -8V8\"/><path d=\"M4 -15V15\"/><path d=\"M10 -15h6M13 -18v6\"/></g>",
+   "current_source": "<path d=\"M0 0H27M53 0H80\"/><g transform=\"translate(40 0)\"><circle r=\"13\"/><path d=\"M-7 0H4\"/><path class=\"fill\" d=\"M9 0l-6 -4.5v9z\"/></g>",
+   "potentiometer": "<path d=\"M0 0H22M58 0H80\"/><g transform=\"translate(40 0)\"><path d=\"M-18 0L-15 -7L-9 7L-3 -7L3 7L9 -7L15 7L18 0\"/></g><path d=\"M40 -40V-15\"/><path class=\"fill\" d=\"M40 -9l-4 -7h8z\"/>"
+  }
  }
 }

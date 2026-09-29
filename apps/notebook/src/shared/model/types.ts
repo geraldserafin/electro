@@ -26,7 +26,11 @@ export interface SymbolLibrary {
   grid: number;
   style: string;
   kinds: Record<string, { pins: Point[]; svg: string; letter: string | null; upright: boolean }>;
+  standards?: Record<string, Record<string, string>>; // per standard, the symbols it draws unlike the kinds' (IEC's)
 }
+
+/** The symbols' standard a note draws with: IEC 60617 (a box for a resistor) or IEEE 315 (a zigzag). */
+export type SymbolStandard = "iec" | "ieee";
 
 export type Output =
   | { type: "text" | "stream" | "svg" | "markdown"; data: string }
