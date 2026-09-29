@@ -1,13 +1,16 @@
 // The note's cells as a list: moving one, naming a new schematic. Pure, no React.
 import type { Cell } from "@/shared/model/types";
 
-/** ``cells`` with the one at ``index`` swapped with its neighbour ``by`` away (the same at the ends). */
-export function moveCell(cells: Cell[], index: number, by: number): Cell[] {
-  const target = index + by;
-  if (target < 0 || target >= cells.length) return cells;
-  const next = [...cells];
-  [next[index], next[target]] = [next[target], next[index]];
-  return next;
+/**
+ * ``cells`` with ``count`` of them from ``from`` moved to stand before the one now at ``before``
+ * (``cells.length``: at the end). Dropped inside itself: no change.
+ */
+export function moveRange(cells: Cell[], from: number, count: number, before: number): Cell[] {
+  if (before >= from && before <= from + count) return cells;
+  const moved = cells.slice(from, from + count);
+  const rest = [...cells.slice(0, from), ...cells.slice(from + count)];
+  const at = before > from ? before - count : before;
+  return [...rest.slice(0, at), ...moved, ...rest.slice(at)];
 }
 
 /** "Układ 1", "Układ 2", …: the first ``name(n)`` no schematic has yet. */

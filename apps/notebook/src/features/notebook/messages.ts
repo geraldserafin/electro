@@ -3,6 +3,7 @@ export const pl = {
   outline: "Spis treści",
   hideOutline: "Schowaj spis treści",
   outlineEmpty: "Nagłówki z tekstu (<code># Tytuł</code>) i schematy pojawią się tutaj.",
+  outlineDrag: "Przeciągnij, żeby przenieść całą sekcję",
   runAll: "Uruchom wszystko",
   share: "Udostępnij",
   exportPdf: "Eksport do PDF",
@@ -20,6 +21,12 @@ export const pl = {
     up: "W górę",
     down: "W dół",
     remove: "Usuń komórkę",
+    drag: "Przeciągnij, żeby przenieść (albo strzałki ↑ ↓)",
+    tabs: "Komórka",
+  },
+  tab: {
+    close: "Zamknij (karta wraca na pierwszy pasek)",
+    resizeGroups: "Przeciągnij, żeby zmienić podział",
   },
   add: {
     label: "Dodaj komórkę",
@@ -33,6 +40,7 @@ export const pl = {
   markdown: {
     show: "Pokaż tekst (Esc)",
     edit: "Edytuj Markdown",
+    preview: "Podgląd",
     placeholder: "Tekst w Markdown: # nagłówek, **pogrubienie**, - lista, wzory w $…$",
     clickToEdit: "Kliknij, żeby edytować",
     empty: "*Pusty tekst — kliknij, żeby pisać.*",
@@ -52,10 +60,13 @@ export const pl = {
     name: "Nazwa schematu",
     nameTitle: "W kodzie: {{variable}} — kliknij, żeby zmienić nazwę",
     inCode: "w kodzie:",
+    full: "Pełny ekran (Esc: wyjście)",
+    exitFull: "Zamknij pełny ekran (Esc)",
   },
   problems: {
     error: "Błąd — nie da się policzyć",
     warning: "Nie wszystko da się wyznaczyć",
+    dismiss: "Ukryj (wróci przy następnym liczeniu, jeśli dalej coś jest nie tak)",
   },
   results: {
     label: "Wyniki",
@@ -100,6 +111,7 @@ export const en: typeof pl = {
   outline: "Contents",
   hideOutline: "Hide the contents",
   outlineEmpty: "Headings from the text (<code># Title</code>) and schematics will show here.",
+  outlineDrag: "Drag to move the whole section",
   runAll: "Run all",
   share: "Share",
   exportPdf: "Export to PDF",
@@ -117,6 +129,12 @@ export const en: typeof pl = {
     up: "Up",
     down: "Down",
     remove: "Delete cell",
+    drag: "Drag to move (or the arrow keys ↑ ↓)",
+    tabs: "Cell",
+  },
+  tab: {
+    close: "Close (the tab goes back to the first bar)",
+    resizeGroups: "Drag to change the split",
   },
   add: {
     label: "Add a cell",
@@ -130,6 +148,7 @@ export const en: typeof pl = {
   markdown: {
     show: "Show the text (Esc)",
     edit: "Edit the Markdown",
+    preview: "Preview",
     placeholder: "Text in Markdown: # heading, **bold**, - list, formulas in $…$",
     clickToEdit: "Click to edit",
     empty: "*Empty text — click to write.*",
@@ -149,10 +168,13 @@ export const en: typeof pl = {
     name: "Schematic name",
     nameTitle: "In code: {{variable}} — click to rename",
     inCode: "in code:",
+    full: "Full screen (Esc: leave)",
+    exitFull: "Leave full screen (Esc)",
   },
   problems: {
     error: "Error — cannot be solved",
     warning: "Not everything can be found",
+    dismiss: "Hide (it comes back on the next run if something is still wrong)",
   },
   results: {
     label: "Results",

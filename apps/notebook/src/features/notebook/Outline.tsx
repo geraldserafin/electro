@@ -1,7 +1,12 @@
 // The table of contents: the headings of the text cells and the schematics, in order — one tile
 // each, indented by level, under the title in the note's sidebar. A click scrolls there; the
-// section being read is lit.
-import { useEffect, useMemo, useState } from "react";
+// section being read is lit. Dragging a tile by its handle moves its section: the cells from its
+// own to the next heading of its level or above (a heading that starts its cell; one further down
+// a text is only a place to scroll to).
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useDragSort } from "@/shared/hooks/useDragSort";
+import { cn } from "@/shared/lib/cn";
+import { Grip } from "./CellFrame";
 import { Trans, useTranslation } from "react-i18next";
 import { SchematicIcon } from "@/shared/ui/icons";
 import type { Cell } from "@/shared/model/types";
@@ -32,9 +37,24 @@ function place(e: Entry): HTMLElement | null {
 
 const plain = (s: string) => s.replace(/[*_`$]/g, "").replace(/\[(.*?)\]\(.*?\)/g, "$1").replace(/\\,/g, " ");
 
-export function Outline({ cells }: { cells: Cell[] }) {
+/** A section to drag: its first cell and how many. */
+function section(e: Entry, entries: Entry[], cells: Cell[]): { from: number; count: number } {
+  const from = cells.findIndex((c) => c.id === e.cell);
+  const next = cells.findIndex((c, i) => i > from && entries.some((x) => x.cell === c.id && x.level <= e.level));
+  return { from, count: (next < 0 ? cells.length : next) - from };
+}
+
+export function Outline({ cells, onMove }: {
+  cells: Cell[];
+  onMove: (from: number, count: number, before: number) => void; // cells, moved before the one at before
+}) {
   const { t } = useTranslation("notebook");
   const entries = useMemo(() => cells.flatMap(headings), [cells]);
+  const list = useRef<HTMLUListElement>(null);
+  // where a section can land: before a section-starting tile (its cell), or at the very end
+  const starts = entries.filter((e) => e.nth === 0);
+  const places = () => [...(list.current?.querySelectorAll<HTMLElement>("li[data-start]") ?? [])];
+  const cellBefore = (before: number) => (before < starts.length ? cells.findIndex((c) => c.id === starts[before].cell) : cells.length);
   const [active, setActive] = useState<string | null>(null);
 
   // the section being read: the last entry whose cell starts above a line under the app bar
@@ -58,9 +78,10 @@ export function Outline({ cells }: { cells: Cell[] }) {
       {entries.length === 0 && (
         <p className="mx-3 my-0 text-[13px] text-muted"><Trans t={t} i18nKey="outlineEmpty" components={{ code: <code /> }} /></p>
       )}
-      <ul className="m-0 p-0 list-none grid gap-px">
+      <ul ref={list} className="m-0 p-0 list-none grid gap-px">
         {entries.map((e) => (
-          <li key={e.key}>
+          <Row key={e.key} start={e.nth === 0} places={places}
+               onDrop={(before) => { const { from, count } = section(e, entries, cells); onMove(from, count, cellBefore(before)); }}>
             <a href={`#cell-${e.cell}`} aria-current={active === e.key ? "location" : undefined}
                className={`flex items-center gap-2 py-1.75 pr-3 rounded-lg leading-[1.35] no-underline transition-colors duration-100
                            hover:bg-selected hover:text-fg aria-[current]:bg-selected aria-[current]:text-fg aria-[current]:font-medium
@@ -73,9 +94,30 @@ export function Outline({ cells }: { cells: Cell[] }) {
               {e.schematic && <SchematicIcon />}
               {e.text}
             </a>
-          </li>
+          </Row>
         ))}
       </ul>
     </nav>
+  );
+}
+
+/** A tile; one that starts its cell has a handle (on hover) to drag its section by. */
+function Row({ start, places, onDrop, children }: {
+  start: boolean; places: () => HTMLElement[]; onDrop: (before: number) => void; children: ReactNode;
+}) {
+  const { t } = useTranslation("notebook");
+  const drag = useDragSort({ items: places, onDrop });
+  return (
+    <li data-start={start || undefined} className={cn("group/row relative", drag.dragging && "opacity-40")}>
+      {children}
+      {start && (
+        <button {...drag.handle} title={t("outlineDrag")} aria-label={t("outlineDrag")} tabIndex={-1}
+                className="absolute right-1 top-1/2 -translate-y-1/2 inline-flex items-center justify-center size-6 rounded-md text-faint
+                           cursor-grab active:cursor-grabbing touch-none opacity-0 group-hover/row:opacity-100 hover:bg-hover hover:text-fg">
+          <Grip />
+        </button>
+      )}
+      {drag.line && <div className="fixed z-50 h-0.5 rounded-full bg-accent pointer-events-none" style={drag.line} />}
+    </li>
   );
 }

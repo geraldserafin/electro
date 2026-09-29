@@ -21,6 +21,7 @@ export interface LiveFrame {
   t: number;
   voltages: Record<string, number>; // node → V
   wires: (number | null)[]; // each wire's voltage (null: on no node)
+  pins: Record<string, (number | null)[]>; // each element's pins' voltages (null: on no node)
   scale: number; // the largest |V| on the board, for the wires' colours
   leds: Record<string, number>; // LED id → brightness 0–1
   results: Record<string, ElementResult>; // readings next to the elements
@@ -76,6 +77,7 @@ export function useLive(schematic: SchematicData) {
   const [speed, setSpeed] = useState(1);
   const [scope, setScope] = useState<string[]>([]);
   const [traces, setTraces] = useState<ScopeTrace[]>([]);
+  const [probeTraces, setProbeTraces] = useState<ScopeTrace[]>([]); // what the meter shows (an element's, a wire's)
   const [serial, setSerial] = useState("");
   const [sketches, setSketches] = useState<Record<string, SketchState>>({});
   const compile = useAtomSet(compileSketch, { mode: "promiseExit" });
@@ -90,6 +92,9 @@ export function useLive(schematic: SchematicData) {
   speedRef.current = speed;
   const scopeRef = useRef(scope);
   scopeRef.current = scope;
+  const probeRef = useRef<string[]>([]); // the quantities the meter is on
+  /** Everything recorded: the scope's quantities and the meter's. */
+  const recorded = () => [...new Set([...scopeRef.current, ...probeRef.current])];
   const history = useRef(new Map<string, ScopeTrace>());
   const serialText = useRef("");
   const statusRef = useRef(status);
@@ -134,8 +139,11 @@ export function useLive(schematic: SchematicData) {
     setFrame((f) => ({
       t: sim.t, voltages, scale, leds, results, behind: f?.behind ?? false,
       wires: c.wires.map((node) => (node === null ? null : voltages[node] ?? null)),
+      pins: Object.fromEntries(Object.entries(c.pins).map(([id, nodes]) =>
+        [id, nodes.map((node) => (node === null ? null : voltages[node] ?? null))])),
     }));
     setTraces(scopeRef.current.map((name) => history.current.get(name) ?? { name, t: [], v: [] }));
+    setProbeTraces(probeRef.current.map((name) => history.current.get(name) ?? { name, t: [], v: [] }));
   }, []);
 
   /** Samples for the scope: at most SCOPE_POINTS over its window (the last second, at the speed chosen). */
@@ -151,7 +159,7 @@ export function useLive(schematic: SchematicData) {
       g.last = s.sim.t;
     }
     const window = Math.max(1e-4, speedRef.current * 2);
-    for (const name of scopeRef.current) {
+    for (const name of recorded()) {
       let trace = history.current.get(name);
       if (!trace) history.current.set(name, (trace = { name, t: [], v: [] }));
       const last = trace.t[trace.t.length - 1];
@@ -203,7 +211,9 @@ export function useLive(schematic: SchematicData) {
     run(exit.value.hex, "server");
   }, [compile]);
 
-  const start = useCallback(async () => {
+  /** Run the drawing (or `drawing`: one just made from the code view, not on the board yet). */
+  const start = useCallback(async (drawing?: SchematicData) => {
+    if (drawing) latest.current = drawing;
     setStatus("starting");
     setError(null);
     try {
@@ -241,6 +251,8 @@ export function useLive(schematic: SchematicData) {
     setStatus("off");
     setFrame(null);
     setTraces([]);
+    setProbeTraces([]);
+    probeRef.current = [];
   }, []);
 
   // the frames: as much simulated time as passed on the clock (times the speed), within the budget
@@ -315,6 +327,23 @@ export function useLive(schematic: SchematicData) {
       if (session.current) show();
     },
     /** Every quantity the scope can show: node voltages, then elements' voltages and currents. */
+    /** The meter on these quantities (none: off); their samples in probeTraces. */
+    setProbe: (names: string[]) => {
+      probeRef.current = names;
+      if (session.current) show();
+    },
+    probeTraces,
+    /** An element's quantities (U, I, …) as the scope names them. */
+    quantitiesOf: (id: string): string[] => {
+      const c = circuit.current;
+      const parts = c?.program.parts[id];
+      return c && parts ? Object.values(parts).map((i) => c.program.unknowns[i]) : [];
+    },
+    /** The node a wire is on, as the scope names its voltage (V_…); null: on none. */
+    wireVoltage: (index: number): string | null => {
+      const node = circuit.current?.wires[index];
+      return node && node !== "GND" ? `V_${node}` : null;
+    },
     quantities: (): string[] => {
       const c = circuit.current;
       if (!c) return [];
@@ -324,6 +353,8 @@ export function useLive(schematic: SchematicData) {
       return [...nodes, ...parts.filter((n) => !nodes.includes(n))];
     },
     upload,
+    /** The error shown under the board, away (it comes back if it happens again). */
+    dismissError: () => setError(null),
     clearSerial: () => { serialText.current = ""; setSerial(""); },
     /** Text typed into the serial monitor: to every Arduino's Serial.read(). */
     sendSerial: (text: string) => { for (const board of session.current?.boards ?? []) board.uno.send(text); },

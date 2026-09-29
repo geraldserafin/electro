@@ -1,13 +1,14 @@
 // On the right (drawings start top-left, so this side is usually free): what is selected — an
-// element's label, value (or a meter's reading), a node label's name; or a wire, or a group.
+// element's label, value (or a meter's reading), a node label's name; or a wire, or a group. A
+// panel like Excalidraw's: sections under plain labels, tiles for choices and actions.
 import { useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import type { ElementData } from "@/shared/model/types";
 import { cn } from "@/shared/lib/cn";
-import { Rotate, Trash } from "@/shared/ui/icons";
-import { BoardButton, BoardIsland } from "./Board";
+import { CodeIcon, Rotate, Trash } from "@/shared/ui/icons";
 import { useKinds } from "./kinds";
 import { LED_COLORS, hasValue, isComponent, kindInfo } from "./model";
+import { field, Panel, PanelHead, Section, Tile } from "./Panel";
 
 export type Selection =
   | { type: "element"; id: string }
@@ -15,24 +16,10 @@ export type Selection =
   | { type: "group"; ids: string[]; wires: number[] } // from shift + drag
   | null;
 
-const island = "top-16 right-3 w-62 flex-col items-stretch gap-3 p-3 text-[14px]";
-const caption = "text-[12px] font-medium text-muted";
-const input = "w-full px-2.5 py-1.75 rounded-lg border border-transparent bg-hover text-[15px] focus:bg-paper focus:outline-2 focus:outline-accent-soft";
+const place = "top-15 right-3 w-66 max-h-[calc(100%-8rem)] overflow-y-auto text-[14px]";
+const hint = "m-0 text-[12px] leading-[1.4] text-faint";
 
-function Header({ icon, title, subtitle, children }: { icon?: ReactNode; title: string; subtitle?: ReactNode; children: ReactNode }) {
-  return (
-    <header className="flex items-center gap-2.5">
-      {icon && <span className="grid place-items-center flex-none size-10 rounded-[10px] bg-hover text-fg">{icon}</span>}
-      <div className="grid flex-1 min-w-0">
-        <h4 className={cn(caption, "m-0 truncate")}>{title}</h4>
-        {subtitle && <span className="text-[16px] font-semibold">{subtitle}</span>}
-      </div>
-      <div className="flex gap-0.5">{children}</div>
-    </header>
-  );
-}
-
-export function Inspector({ selection, element, taken, onChange, onRename, onRotate, onRemove, icon }: {
+export function Inspector({ selection, element, taken, onChange, onRename, onRotate, onRemove, icon, live, onSketch }: {
   selection: Selection;
   element: ElementData | null;
   taken: string[];
@@ -41,23 +28,23 @@ export function Inspector({ selection, element, taken, onChange, onRename, onRot
   onRotate: () => void;
   onRemove: () => void;
   icon: ReactNode;
+  live?: boolean; // running: only what works as an input (a potentiometer's position)
+  onSketch?: () => void; // an Arduino: open its sketch
 }) {
   const { t } = useTranslation("schematic");
   const { name } = useKinds();
   const [id, setId] = useState(element?.id ?? "");
   const remove = (
-    <BoardButton icon className="text-danger hover:bg-err-bg" onClick={onRemove} title={t("inspector.removeTitle")}
-                 aria-label={t("inspector.remove")}><Trash /></BoardButton>
+    <Tile className="hover:bg-err-bg hover:text-danger" onClick={onRemove} title={t("inspector.removeTitle")} aria-label={t("inspector.remove")}><Trash /></Tile>
   );
   if (selection?.type === "group" || selection?.type === "wire")
     return (
-      <BoardIsland className={island} role="group" aria-label={t("inspector.label")}>
-        <Header title={selection.type === "group" ? t("inspector.selection") : t("inspector.wire")}
-                subtitle={selection.type === "group" && t("inspector.count", { elements: selection.ids.length, wires: selection.wires.length })}>
-          {remove}
-        </Header>
-        {selection.type === "group" && <p className="m-0 text-[13px] text-muted">{t("inspector.dragAll")}</p>}
-      </BoardIsland>
+      <Panel className={place} role="group" aria-label={t("inspector.label")}>
+        <PanelHead caption={selection.type === "group" ? t("inspector.selection") : t("inspector.wire")}
+                   title={selection.type === "group" && t("inspector.count", { elements: selection.ids.length, wires: selection.wires.length })} />
+        {selection.type === "group" && <p className={hint}>{t("inspector.dragAll")}</p>}
+        <Section label={t("inspector.actions")}><div className="flex gap-1.5">{remove}</div></Section>
+      </Panel>
     );
   if (!element) return null;
   const info = kindInfo(element.kind);
@@ -67,69 +54,80 @@ export function Inspector({ selection, element, taken, onChange, onRename, onRot
     else setId(element.id);
   };
   return (
-    <BoardIsland className={island} role="group" aria-label={t("inspector.label")}>
-      <Header icon={icon} title={name(element.kind)} subtitle={isComponent(element.kind) && element.id}>
-        <BoardButton icon onClick={onRotate} title={t("inspector.rotateTitle")} aria-label={t("inspector.rotate")}><Rotate /></BoardButton>
-        {remove}
-      </Header>
-      {isComponent(element.kind) && (
-        <label className="grid gap-1">
-          <span className={caption}>{t("inspector.id")}</span>
-          <input className={input} value={id} spellCheck={false} onChange={(e) => setId(e.target.value)} onBlur={commitId}
-                 onKeyDown={(e) => e.key === "Enter" && commitId()} />
-        </label>
+    <Panel className={place} role="group" aria-label={t("inspector.label")}>
+      <PanelHead icon={icon} caption={name(element.kind)} title={isComponent(element.kind) && element.id} />
+      {!live && isComponent(element.kind) && (
+        <Section label={t("inspector.id")}>
+          <input className={field} value={id} spellCheck={false} aria-label={t("inspector.id")} onChange={(e) => setId(e.target.value)}
+                 onBlur={commitId} onKeyDown={(e) => e.key === "Enter" && commitId()} />
+        </Section>
       )}
-      {hasValue(element.kind) && (
-        <label className="grid gap-1">
-          <span className={caption}>{info?.meter ? t("inspector.reading") : t("inspector.value")}</span>
+      {!live && hasValue(element.kind) && (
+        <Section label={info?.meter ? t("inspector.reading") : t("inspector.value")}>
           <span className="relative block">
-            <input className={cn(input, "pr-8.5")} value={element.value ?? ""} spellCheck={false}
+            <input className={cn(field, "pr-8.5")} value={element.value ?? ""} spellCheck={false}
+                   aria-label={info?.meter ? t("inspector.reading") : t("inspector.value")}
                    placeholder={info?.meter ? t("inspector.noReading") : "?"}
                    onChange={(e) => onChange({ value: e.target.value.trim() === "" ? null : e.target.value })} />
             {info?.unit && <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted pointer-events-none">{info.unit}</span>}
           </span>
-          <small className="text-[12px] leading-[1.35] text-faint">{info?.meter ? t("inspector.readingHint") : t("inspector.valueHint")}</small>
-        </label>
+          <p className={hint}>{info?.meter ? t("inspector.readingHint") : t("inspector.valueHint")}</p>
+        </Section>
       )}
-      {element.kind === "led" && (
-        <div className="grid gap-1">
-          <span className={caption}>{t("inspector.color")}</span>
+      {!live && element.kind === "led" && (
+        <Section label={t("inspector.color")}>
           <div className="flex gap-1.5" role="radiogroup" aria-label={t("inspector.color")}>
             {(Object.entries(LED_COLORS) as [keyof typeof LED_COLORS, string][]).map(([color, css]) => (
               <button key={color} role="radio" aria-checked={(element.text ?? "red") === color} title={t(`inspector.colors.${color}`)}
                       aria-label={t(`inspector.colors.${color}`)} onClick={() => onChange({ text: color })}
-                      className={cn("size-6 rounded-full border border-line", (element.text ?? "red") === color && "outline-2 outline-offset-2 outline-accent")}
+                      className={cn("size-7 rounded-md border border-black/10",
+                                    (element.text ?? "red") === color && "outline-2 outline-offset-2 outline-accent")}
                       style={{ background: css }} />
             ))}
           </div>
-        </div>
+        </Section>
       )}
-      {element.kind === "switch" && (
-        <label className="flex items-center gap-2 text-[14px]">
-          <input type="checkbox" checked={element.text === "closed"} onChange={(e) => onChange({ text: e.target.checked ? "closed" : null })} />
-          {t("inspector.closed")}
-        </label>
+      {!live && element.kind === "switch" && (
+        <Section label={t("inspector.state")}>
+          <div className="flex gap-1.5" role="radiogroup" aria-label={t("inspector.state")}>
+            {([null, "closed"] as const).map((state) => (
+              <Tile key={state ?? "open"} role="radio" aria-checked={element.text === state} on={element.text === state}
+                    className="w-auto px-3 text-[13px]" onClick={() => onChange({ text: state })}>
+                {state ? t("inspector.closed") : t("inspector.opened")}
+              </Tile>
+            ))}
+          </div>
+          <p className={hint}>{t("inspector.switchHint")}</p>
+        </Section>
       )}
-      {(element.kind === "switch" || element.kind === "button") && (
-        <small className="text-[12px] leading-[1.35] text-faint">{t(`inspector.${element.kind}Hint`)}</small>
-      )}
+      {!live && element.kind === "button" && <p className={hint}>{t("inspector.buttonHint")}</p>}
       {element.kind === "potentiometer" && (
-        <label className="grid gap-1">
-          <span className={caption}>{t("inspector.position", { percent: Math.round(Number(element.text ?? 0.5) * 100) })}</span>
-          <input type="range" min={0} max={1} step={0.01} value={Number(element.text ?? 0.5)}
+        <Section label={t("inspector.position", { percent: Math.round(Number(element.text ?? 0.5) * 100) })}>
+          <input type="range" min={0} max={1} step={0.01} value={Number(element.text ?? 0.5)} className="w-full accent-[var(--accent)]"
+                 aria-label={t("inspector.position", { percent: Math.round(Number(element.text ?? 0.5) * 100) })}
                  onChange={(e) => onChange({ text: e.target.value })} />
-        </label>
+        </Section>
       )}
-      {element.kind === "arduino" && <p className="m-0 text-[13px] text-muted">{t("inspector.sketchHint")}</p>}
-      {kindInfo(element.kind)?.live && element.kind !== "arduino" && (
-        <p className="m-0 text-[13px] text-muted">{t("inspector.liveOnly")}</p>
+      {element.kind === "arduino" && onSketch && (
+        <Tile className="w-full h-9 gap-2 px-3 grid-flow-col text-[14px] font-medium" onClick={onSketch} title={t("inspector.sketchTitle")}>
+          <CodeIcon /> {t("inspector.sketch")}
+        </Tile>
       )}
-      {element.kind === "label" && (
-        <label className="grid gap-1">
-          <span className={caption}>{t("inspector.node")}</span>
-          <input className={input} value={element.text ?? ""} spellCheck={false} onChange={(e) => onChange({ text: e.target.value })} />
-        </label>
+      {!live && kindInfo(element.kind)?.live && element.kind !== "arduino" && <p className={hint}>{t("inspector.liveOnly")}</p>}
+      {!live && element.kind === "label" && (
+        <Section label={t("inspector.node")}>
+          <input className={field} value={element.text ?? ""} spellCheck={false} aria-label={t("inspector.node")}
+                 onChange={(e) => onChange({ text: e.target.value })} />
+        </Section>
       )}
-    </BoardIsland>
+      {!live && (
+        <Section label={t("inspector.actions")}>
+          <div className="flex gap-1.5">
+            <Tile onClick={onRotate} title={t("inspector.rotateTitle")} aria-label={t("inspector.rotate")}><Rotate /></Tile>
+            {remove}
+          </div>
+        </Section>
+      )}
+    </Panel>
   );
 }

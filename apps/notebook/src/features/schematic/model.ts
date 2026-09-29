@@ -68,6 +68,8 @@ export type Kind = (typeof KINDS)[number]["kind"];
 
 export const kindInfo = (kind: string): KindInfo | undefined => KINDS.find((k) => k.kind === kind);
 export const hasValue = (kind: string) => kindInfo(kind)?.unit !== undefined;
+/** A drawing with a non-linear element (a diode, a transistor, a 555, an Arduino): it can only run in time. */
+export const inTimeOnly = (sch: SchematicData) => sch.elements.some((e) => kindInfo(e.kind)?.live);
 export const isComponent = (kind: string) => !["ground", "label", "terminal"].includes(kind);
 
 export const key = ([x, y]: Point) => `${x},${y}`;

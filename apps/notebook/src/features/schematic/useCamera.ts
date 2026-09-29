@@ -1,6 +1,6 @@
 // The board shows the drawing (an endless plane) through a camera: a viewBox that pans and zooms,
 // like Excalidraw. Nothing moves under the cursor unless you pan.
-import { useEffect, useState, type RefObject } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, type RefObject } from "react";
 import type { SchematicData, SymbolLibrary } from "@/shared/model/types";
 import { bounds } from "./model";
 
@@ -15,12 +15,13 @@ function startCamera(sch: SchematicData, lib: SymbolLibrary): Camera {
   return { x: x0 * lib.grid - 80, y: y0 * lib.grid - 110, zoom: 1 };
 }
 
-export function useCamera({ value, library, viewRef, kept, inUse }: {
+export function useCamera({ value, library, viewRef, kept, inUse, inset = 0 }: {
   value: SchematicData;
   library: SymbolLibrary;
   viewRef: RefObject<HTMLDivElement | null>; // the board's view: its size, its wheel
   kept?: { current: Camera | null }; // where the view was: kept there while the editor is away
   inUse: boolean; // the board was clicked (or is full screen): the wheel pans it, not the page
+  inset?: number; // px of the board's top under a bar laid over it: "fit" centres in what is left
 }) {
   const G = library.grid;
   const [cam, setCam] = useState<Camera>(() => kept?.current ?? startCamera(value, library));
@@ -34,23 +35,42 @@ export function useCamera({ value, library, viewRef, kept, inUse }: {
 
   // the size of the board on screen: the camera shows view.w × view.h screen px
   const [view, setView] = useState({ w: 800, h: 480 });
-  useEffect(() => {
+  const shown = useRef(view);
+  // measured before the first paint: a note opens with each drawing centred, as "fit" shows it
+  // (unless the view was kept from before); later the board keeps its middle where it was
+  // when it changes size (full screen, the window, a panel beside it)
+  useLayoutEffect(() => {
     const el = viewRef.current;
     if (!el) return;
-    const observer = new ResizeObserver(() => setView({ w: el.clientWidth, h: el.clientHeight }));
+    const measure = () => {
+      const size = { w: el.clientWidth, h: el.clientHeight };
+      const before = shown.current;
+      if (!size.w || (size.w === before.w && size.h === before.h)) return;
+      shown.current = size;
+      setView(size);
+      setCam((c) => ({ ...c, x: c.x + (before.w - size.w) / 2 / c.zoom, y: c.y + (before.h - size.h) / 2 / c.zoom }));
+    };
+    const first = { w: el.clientWidth, h: el.clientHeight };
+    if (first.w) {
+      shown.current = first;
+      setView(first);
+      if (!kept?.current) setCam(fitted(first));
+    }
+    const observer = new ResizeObserver(measure);
     observer.observe(el);
     return () => observer.disconnect();
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- once, with the drawing as it opened
   }, [viewRef]);
 
-  /** A camera that shows the whole drawing. */
-  const fitted = (): Camera => {
+  /** A camera that shows the whole drawing (on a board of ``size``). */
+  function fitted(size = view): Camera {
     if (!value.elements.length && !value.wires.length) return startCamera(value, library);
     const [x0, y0, x1, y1] = bounds(value, library);
     const w = (x1 - x0) * G + 160;
     const h = (y1 - y0) * G + 140;
-    const zoom = clampZoom(Math.min(1.5, view.w / w, (view.h - 120) / h));
-    return { x: ((x0 + x1) / 2) * G - view.w / 2 / zoom, y: ((y0 + y1) / 2) * G - (view.h + 40) / 2 / zoom, zoom };
-  };
+    const zoom = clampZoom(Math.min(1.5, size.w / w, (size.h - 120 - inset) / h));
+    return { x: ((x0 + x1) / 2) * G - size.w / 2 / zoom, y: ((y0 + y1) / 2) * G - (size.h + 40 + inset) / 2 / zoom, zoom };
+  }
 
   // the drawing is somewhere, but not in view (panned or zoomed away): offer the way back
   const lost = (() => {

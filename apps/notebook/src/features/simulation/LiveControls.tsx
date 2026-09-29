@@ -1,42 +1,64 @@
-// Under the board while it may run in time: start it, pause it, stop it, and how fast it goes.
+// Running in time: start it (a button on the board), and while it runs — in the simulation
+// panel's bar — the time with a light for running / paused, the speed, pause and stop.
 import { useTranslation } from "react-i18next";
 import { BoardButton } from "@/features/schematic";
-import { Close, Play } from "@/shared/ui/icons";
-import { si } from "./format";
+import { cn } from "@/shared/lib/cn";
+import { Play, WarningIcon } from "@/shared/ui/icons";
 import { SPEEDS, type Live } from "./useLive";
 
 const Pause = () => (
-  <svg viewBox="0 0 24 24" width={18} height={18} aria-hidden="true"><path d="M7 5h3.5v14H7zM13.5 5H17v14h-3.5z" fill="currentColor" /></svg>
+  <svg viewBox="0 0 24 24" width={16} height={16} aria-hidden="true"><path d="M7 5h3.5v14H7zM13.5 5H17v14h-3.5z" fill="currentColor" /></svg>
 );
+const Stop = () => (
+  <svg viewBox="0 0 24 24" width={14} height={14} aria-hidden="true"><rect x="5" y="5" width="14" height="14" rx="2.5" fill="currentColor" /></svg>
+);
+
+/**
+ * The time, steady: always in seconds, as many decimals as the speed makes worth seeing (1×: 0.01 s,
+ * 0.001×: 0.00001 s), padded so the digits never move as it counts (unlike si()'s changing prefixes).
+ */
+const clock = (t: number, speed: number) => {
+  const decimals = 2 + Math.max(0, Math.round(-Math.log10(speed)));
+  return `${t.toFixed(decimals).padStart(decimals + 4, " ")} s`;
+};
+
+const icon = "inline-flex items-center justify-center size-7 rounded-md text-muted hover:bg-selected hover:text-fg";
 
 export function LiveControls({ live }: { live: Live }) {
   const { t } = useTranslation("simulation");
   if (live.status === "off" || live.status === "starting")
     return (
-      <BoardButton onClick={live.start} disabled={live.status === "starting"} title={t("controls.startTitle")}
-                   className="px-2.5 font-medium">
+      <BoardButton onClick={() => live.start()} disabled={live.status === "starting"} title={t("controls.startTitle")}
+                   className="h-9 px-3 font-medium">
         <Play /> {live.status === "starting" ? t("controls.starting") : t("controls.start")}
       </BoardButton>
     );
   const running = live.status === "running";
   return (
-    <div className="flex items-center gap-1" role="group" aria-label={t("controls.label")}>
-      <BoardButton icon onClick={running ? live.pause : live.resume} title={running ? t("controls.pause") : t("controls.resume")}
-                   aria-label={running ? t("controls.pause") : t("controls.resume")}>
-        {running ? <Pause /> : <Play />}
-      </BoardButton>
-      <BoardButton icon onClick={live.stop} title={t("controls.stop")} aria-label={t("controls.stop")}><Close /></BoardButton>
-      <span className="min-w-24 px-1.5 font-mono text-[13px] tabular-nums" aria-live="off">
-        {t("controls.time", { time: si(live.frame?.t ?? 0, "s") })}
+    <div className="flex items-center gap-0.5" role="group" aria-label={t("controls.label")}>
+      {/* its place is kept whether shown or not: it comes and goes from frame to frame, the bar stays still */}
+      <span className={cn("inline-flex items-center px-1 text-warn [&_svg]:size-4", !live.frame?.behind && "invisible")}
+            title={t("controls.behind")} aria-label={live.frame?.behind ? t("controls.behind") : undefined}>
+        <WarningIcon />
       </span>
-      <label className="flex items-center gap-1 text-[13px] text-muted" title={t("controls.speedTitle")}>
-        {t("controls.speed")}
-        <select className="rounded-md bg-hover px-1 py-0.5 text-fg" value={live.speed}
-                onChange={(e) => live.setSpeed(Number(e.target.value))}>
-          {SPEEDS.map((s) => <option key={s} value={s}>{s}×</option>)}
-        </select>
-      </label>
-      {live.frame?.behind && <span className="px-1 text-[12px] text-warn">{t("controls.behind")}</span>}
+      <span className="inline-flex items-center gap-1.5 h-7 px-2 font-mono text-[12px] tabular-nums text-fg whitespace-pre" aria-live="off"
+            title={running ? t("controls.running") : t("controls.paused")}>
+        <span className={cn("size-1.5 rounded-full", running ? "bg-ok animate-pulse" : "bg-warn")} />
+        {clock(live.frame?.t ?? 0, live.speed)}
+      </span>
+      <select className="h-7 rounded-md bg-transparent px-1.5 font-mono text-[12px] text-muted hover:bg-selected hover:text-fg cursor-pointer"
+              value={live.speed} title={t("controls.speedTitle")} aria-label={t("controls.speed")}
+              onChange={(e) => live.setSpeed(Number(e.target.value))}>
+        {SPEEDS.map((s) => <option key={s} value={s}>{s}×</option>)}
+      </select>
+      <span className="w-px h-4 mx-1 bg-line" />
+      <button className={icon} onClick={running ? live.pause : live.resume}
+              title={running ? t("controls.pause") : t("controls.resume")} aria-label={running ? t("controls.pause") : t("controls.resume")}>
+        {running ? <Pause /> : <Play />}
+      </button>
+      <button className={cn(icon, "hover:text-danger")} onClick={live.stop} title={t("controls.stop")} aria-label={t("controls.stop")}>
+        <Stop />
+      </button>
     </div>
   );
 }

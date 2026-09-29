@@ -34,5 +34,13 @@
   .canvas { --live-pos: #2f9e44; --live-neg: #e03131; --live-zero: var(--text); }
   .canvas .led-glow { filter: blur(7px); pointer-events: none; }
   .canvas .element[data-kind="switch"], .canvas .element[data-kind="button"] { cursor: pointer; }
+  /* running: nothing is dragged or wired; the switches, buttons and potentiometers answer */
+  .canvas.running .pin-handle, .canvas.running .segment-h, .canvas.running .segment-v { pointer-events: none; }
+  .canvas.running .element { cursor: inherit; }
+  .canvas.running .element:is([data-kind="switch"], [data-kind="button"], [data-kind="potentiometer"]) { cursor: pointer; }
+  /* the meter: every element and wire answers it */
+  .canvas.running.probing .element { cursor: crosshair; }
+  .canvas.running.probing :is(.segment-h, .segment-v) { pointer-events: stroke; cursor: crosshair; }
   .canvas .wire { transition: stroke 60ms linear; }
+  .canvas .lead { fill: none; stroke-width: 1.6; stroke-linecap: round; pointer-events: none; }
 }

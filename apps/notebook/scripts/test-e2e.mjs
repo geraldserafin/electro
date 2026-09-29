@@ -129,16 +129,18 @@ try {
     && (await bridge.locator("[data-board] .canvas .label.solved").allTextContents()).join(" ").includes("200")
     && await runBridge.isDisabled());
 
-  // left alone, a schematic keeps its board (grid, drawing, values); its tools come with the pointer
+  // left alone, a schematic keeps its board (grid, drawing, values); its tools come once the cell is taken up
   {
+    await page.locator('[data-cell="code"] .cm-content').first().click(); // another cell worked on
     await page.mouse.move(4, 600); // over no cell
     await page.waitForTimeout(300);
     const tools = bridge.locator("[data-board]").getByRole("toolbar");
     const hidden = (await bridge.locator("[data-board] .canvas .label.solved").count()) > 0
       && await tools.evaluate((el) => getComputedStyle(el).opacity === "0");
-    await bridge.locator("[data-board]").hover();
+    const box = await bridge.locator("[data-board] .canvas").boundingBox();
+    await page.mouse.click(box.x + 20, box.y + box.height - 20); // empty space on the board
     await page.waitForTimeout(300);
-    check("a schematic: board always there, its tools on hover", hidden
+    check("a schematic: board always there, its tools once it is worked on", hidden
       && await tools.evaluate((el) => getComputedStyle(el).opacity === "1"));
   }
 
@@ -241,7 +243,8 @@ try {
     const before = workers.length;
     await page.waitForTimeout(8000); // (the compiler and the fonts: long done on a local server)
     const opened = Date.now();
-    await page.getByRole("button", { name: "Eksport do PDF" }).click();
+    await page.getByRole("button", { name: "Ustawienia" }).click(); // the export is in the ⋯ menu
+    await page.getByRole("menuitem", { name: "Eksport do PDF" }).click();
     const dialog = page.getByRole("dialog", { name: "Eksport do PDF" });
     const sheets = dialog.locator("[data-sheet]");
     await sheets.first().waitFor({ timeout: 90_000 });
@@ -324,15 +327,15 @@ try {
   }, [gx * 20, gy * 20]);
   const click = async (gx, gy) => { const [x, y] = await at(gx, gy); await page.mouse.click(x, y); };
   const code = () => codeOf(cell);
-  await pick(cell, "Źródło napięcia"); await click(4, 6);
-  await pick(cell, "Rezystor"); await click(12, 3);
+  await pick(cell, "Źródło napięcia"); await click(6, 6);  // a new element is placed by its middle: pins at (4, 6) and (8, 6)
+  await pick(cell, "Rezystor"); await click(14, 3);
   check("new elements show open pins", (await grid.locator(".open-pin").count()) === 4);
 
   // the element panel: search, Enter, place; the panel stays open (like Excalidraw's)
   await cell.getByRole("button", { name: "Elementy" }).click();
   await page.keyboard.type("kond");
   await page.keyboard.press("Enter");
-  await click(24, 3);
+  await click(22, 3);  // its middle; clear of R_1 and of the inspector on the right
   check("library search places an element", (await grid.locator(".element").count()) === 3
     && await cell.getByRole("complementary", { name: "Biblioteka elementów" }).isVisible());
   await page.keyboard.press("Delete");  // keep the circuit a simple loop for what follows
@@ -434,12 +437,14 @@ try {
     check("text cells: click edits the Markdown, leaving renders it",
       source.includes("**▶ Uruchom wszystko**") && !rendered.includes("**")
       && (await view.locator("strong").last().innerText()) === "pogrubieniem" && (await view.locator(".katex").count()) > 0);
-    // the button on the side: pencil ↔ eye
-    await cell.getByRole("button", { name: "Edytuj Markdown" }).click();
+    // taken up again, it is a block with two tabs: its Markdown and the preview
+    await cell.getByTitle("Kliknij, żeby edytować").click();
     const editing = await field.isVisible();
-    await cell.getByRole("button", { name: /Pokaż tekst/ }).click();
-    check("text cells: the side button switches edit / view", editing && !(await field.isVisible())
-      && await cell.getByTitle("Kliknij, żeby edytować").isVisible());
+    await cell.getByRole("tab", { name: /Pokaż tekst/ }).click();
+    const previewed = !(await field.isVisible()) && await cell.getByTitle("Kliknij, żeby edytować").isVisible();
+    await cell.getByRole("tab", { name: "Edytuj Markdown" }).click();
+    check("text cells: tabs switch the Markdown and its preview", editing && previewed && await field.isVisible());
+    await page.keyboard.press("Escape");
   }
 
   // "+ Kod / + Tekst / + Schemat" only on the edge between cells

@@ -5,16 +5,17 @@ import { useTranslation } from "react-i18next";
 import { ReadOnlyNotice, SyncNotice, useCreateNote, useNoteSync } from "@/features/notes";
 import { ExportDialog, PdfContext, pdfOf, warmUpWhenIdle, type PdfSettings } from "@/features/pdf-export";
 import { kernel, usePython } from "@/features/python";
-import { library } from "@/features/schematic";
-import { SettingsMenu } from "@/features/settings";
+import { libraryFor } from "@/features/schematic";
+import { SettingsMenu, SymbolsChoice } from "@/features/settings";
+import { MenuItem } from "@/shared/ui/Menu";
 import { newCell } from "@/shared/model/cells";
 import { copyOf } from "@/shared/model/format";
-import type { Cell, CellType, Notebook as NotebookData } from "@/shared/model/types";
+import type { Cell, CellType, Notebook as NotebookData, SymbolStandard } from "@/shared/model/types";
 import { Back, Export, OutlineIcon, RunAll, ShareIcon } from "@/shared/ui/icons";
 import { IslandButton, IslandLink, Islands } from "@/shared/ui/Island";
 import { AddRow } from "./AddRow";
 import { CellFrame } from "./CellFrame";
-import { freeName, moveCell } from "./cellList";
+import { freeName, moveRange } from "./cellList";
 import { CodeCell } from "./cells/CodeCell";
 import { MarkdownCell } from "./cells/MarkdownCell";
 import { SchematicCell } from "./cells/SchematicCell";
@@ -54,6 +55,9 @@ export function Notebook({ initial, revision, reload, onTitle, readOnly = false,
   const [outline, setOutline] = useOutlineOpen();
   const [exporting, setExporting] = useState(false);
   const pdf = pdfOf(notebook.settings);
+  // the symbols' standard the note draws with (IEC unless it says IEEE)
+  const symbols: SymbolStandard = notebook.settings.symbols === "ieee" ? "ieee" : "iec";
+  const library = libraryFor(symbols);
   const setPdf = (patch: Partial<PdfSettings>) =>
     setNotebook((nb) => ({ ...nb, settings: { ...nb.settings, pdf: { ...pdfOf(nb.settings), ...patch } } }));
   const setTitle = (title: string) => setNotebook({ ...latest.current, title });
@@ -96,13 +100,18 @@ export function Notebook({ initial, revision, reload, onTitle, readOnly = false,
           <OutlineIcon />
         </IslandButton>
       </Islands>
-      <Sidebar open={outline} title={notebook.title} onTitle={setTitle} cells={notebook.cells} />
+      <Sidebar open={outline} title={notebook.title} onTitle={setTitle} cells={notebook.cells}
+               onMove={(from, count, before) => setCells((cells) => moveRange(cells, from, count, before))} />
       <Islands side="right">
-        {onShare && <IslandButton onClick={() => onShare(latest.current)} title={t("share")} aria-label={t("share")}><ShareIcon /></IslandButton>}
         <IslandButton waiting={!ready} onClick={runAll} disabled={!ready}
                       title={ready ? t("runAll") : python.kind === "error" ? t("python.failed", { error: python.error }) : t("python.loading")} aria-label={t("runAll")}><RunAll /></IslandButton>
-        <IslandButton onClick={() => setExporting(true)} title={t("exportPdf")} aria-label={t("exportPdf")}><Export /></IslandButton>
-        <SettingsMenu />
+        <SettingsMenu
+          // the note's own: share it, export it (Ctrl/⌘ P); its symbols among the preferences
+          actions={<>
+            {onShare && <MenuItem icon={<ShareIcon />} onSelect={() => onShare(latest.current)}>{t("share")}</MenuItem>}
+            <MenuItem icon={<Export />} shortcut={/Mac|iPhone|iPad/.test(navigator.platform) ? "⌘P" : "Ctrl+P"} onSelect={() => setExporting(true)}>{t("exportPdf")}</MenuItem>
+          </>}
+          preferences={<SymbolsChoice value={symbols} onChange={(next) => setNotebook((nb) => ({ ...nb, settings: { ...nb.settings, symbols: next } }))} />} />
       </Islands>
       {readOnly
         ? <ReadOnlyNotice onCopy={() => void copy()} />
@@ -116,14 +125,14 @@ export function Notebook({ initial, revision, reload, onTitle, readOnly = false,
       <PdfContext.Provider value={pdf}>
       <main className={cn("appear", column(outline))}>
         {/* the title is the note's first heading too (and the PDF's); in line with the cells' text */}
-        <input className="block w-full mt-0 mb-1 py-1 pr-2 pl-16.25 rounded-lg border-none bg-transparent text-[34px] font-semibold leading-tight
+        <input className="block w-full mt-0 mb-4 py-1 pr-2 pl-3 rounded-lg border-none bg-transparent text-[34px] font-semibold leading-tight
                           placeholder:text-faint focus:outline-none focus:bg-hover"
                value={notebook.title} placeholder={t("untitled")} aria-label={t("title")}
                spellCheck={false} onChange={(e) => setTitle(e.target.value)} />
         <AddRow onAdd={(type) => insert(0, type)} shown={notebook.cells.length === 0} />
         {notebook.cells.map((cell, index) => (
           <CellFrame key={cell.id} id={cell.id} type={cell.type} focused={focused === cell.id} onFocus={() => setFocused(cell.id)}
-                     onMove={(by) => setCells((cells) => moveCell(cells, index, by))}
+                     onMoveTo={(before) => setCells((cells) => moveRange(cells, index, 1, before))}
                      onRemove={() => setCells((cells) => cells.filter((c) => c.id !== cell.id))}
                      onAdd={(type) => insert(index + 1, type)}>
             {cell.type === "markdown" && <MarkdownCell cell={cell} update={(p) => update(cell.id, p)} />}

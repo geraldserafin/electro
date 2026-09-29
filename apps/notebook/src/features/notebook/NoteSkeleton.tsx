@@ -13,10 +13,10 @@ export function NoteSkeleton() {
         {[62, 80, 54, 70, 45].map((w, i) => <Bone key={i} w={`${w}%`} h={12} style={{ margin: "9px 12px" }} />)}
       </aside>
       <main className={cn(column(true), "pt-22")}>
-        <Bone w="55%" h={34} style={{ marginLeft: 65, marginBottom: 32 }} />
-        {[96, 88, 72].map((w, i) => <Bone key={i} w={`calc(${w}% - 65px)`} style={{ marginLeft: 65, marginBottom: 12 }} />)}
-        <Bone w="calc(100% - 56px)" h={140} style={{ marginLeft: 56, margin: "28px 0 28px 56px", borderRadius: 10 }} />
-        {[92, 60].map((w, i) => <Bone key={i} w={`calc(${w}% - 65px)`} style={{ marginLeft: 65, marginBottom: 12 }} />)}
+        <Bone w="55%" h={34} style={{ marginLeft: 12, marginBottom: 32 }} />
+        {[96, 88, 72].map((w, i) => <Bone key={i} w={`calc(${w}% - 12px)`} style={{ marginLeft: 12, marginBottom: 12 }} />)}
+        <Bone w="100%" h={140} style={{ margin: "28px 0", borderRadius: 12 }} />
+        {[92, 60].map((w, i) => <Bone key={i} w={`calc(${w}% - 12px)`} style={{ marginLeft: 12, marginBottom: 12 }} />)}
       </main>
     </div>
   );

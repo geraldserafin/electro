@@ -25,6 +25,8 @@
   --board: #ffffff;
   --island: var(--surface);
   --island-shadow: 0 0 0 1px var(--line);
+  /* the drawing board's islands and panels float, as Excalidraw's: a hairline and a soft drop */
+  --panel-shadow: 0 0 0.9px rgb(0 0 0 / 0.17), 0 0 3.1px rgb(0 0 0 / 0.08), 0 7px 14px rgb(0 0 0 / 0.05);
   --tool-active: var(--selected);
   --tool-active-text: var(--text);
   /* type and code, as in Colab (its colours are VS Code's "Light+" / "Dark+") */
@@ -69,6 +71,7 @@
   --primary-hover: #ffc21a;
   --surface: #262626;
   --selected: #34353a;
+  --panel-shadow: 0 0 0 1px rgb(255 255 255 / 0.07), 0 7px 16px rgb(0 0 0 / 0.4);
   --hl-keyword: #569cd6;
   --hl-control: #c586c0;
   --hl-string: #ce9178;

@@ -9,7 +9,7 @@ const box = "m-0 px-2.5 py-1.5 rounded-md text-[16px]";
 export function Outputs({ outputs }: { outputs: Output[] }) {
   if (!outputs.length) return null;
   return (
-    <div data-outputs className="mt-2 grid gap-2">
+    <div data-outputs className="grid gap-2">
       {outputs.map((o, i) => {
         switch (o.type) {
           case "svg":

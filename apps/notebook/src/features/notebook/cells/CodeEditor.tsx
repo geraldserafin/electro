@@ -61,10 +61,11 @@ const look = EditorView.theme({
   ".cm-completionDetail": { fontFamily: "var(--sans)", fontStyle: "normal", color: "var(--muted)", marginLeft: "12px" },
 });
 
-export function CodeEditor({ value, onChange, autoFocus, minHeight, language = "python" }: {
+export function CodeEditor({ value, onChange, autoFocus, minHeight, fill, language = "python" }: {
   value: string; onChange: (v: string) => void; autoFocus?: boolean;
   minHeight?: number; // px: the scroller fills it, so its scrollbar sits at the bottom
   language?: "python" | "cpp"; // cpp: an Arduino sketch
+  fill?: boolean; // as tall as its parent, scrolling inside (a side pane)
 }) {
   const { t, i18n } = useTranslation("notebook");
   const extensions = useMemo(() => [
@@ -73,13 +74,17 @@ export function CodeEditor({ value, onChange, autoFocus, minHeight, language = "
     syntaxHighlighting(colab),
     look,
     ...(minHeight ? [EditorView.theme({ ".cm-scroller": { minHeight: `${minHeight}px` } })] : []),
+    // a pane of its own: edge to edge, on the pane's background, like an IDE's editor
+    ...(fill ? [EditorView.theme({ "&": { height: "100%", borderRadius: "0", background: "transparent" }, ".cm-scroller": { overflow: "auto" } })] : []),
   // eslint-disable-next-line react-hooks/exhaustive-deps -- t changes with the language
-  ], [i18n.language, minHeight, language]);
+  ], [i18n.language, minHeight, language, fill]);
   return (
     <CodeMirror
       value={value}
       theme="none"
       extensions={extensions}
+      height={fill ? "100%" : undefined}
+      className={fill ? "h-full" : undefined}
       autoFocus={autoFocus}
       basicSetup={{
         foldGutter: false,

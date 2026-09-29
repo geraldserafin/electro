@@ -1,8 +1,8 @@
 // One element on the drawing: its symbol, its label ("R_1 = 100 Ω", beside it where no wire runs),
 // and after a run what was found (the solved value, I and U).
-import type { PointerEvent as ReactPointerEvent } from "react";
+import { useId, type PointerEvent as ReactPointerEvent } from "react";
 import type { ElementData, ElementResult, Point, SymbolLibrary, WireData } from "@/shared/model/types";
-import { hasValue, isComponent, kindInfo, pins } from "./model";
+import { hasValue, isComponent, kindInfo, pins, rotate } from "./model";
 
 /** The text next to an element: "R_1 = 100 Ω", "A_1", or a net label's name. */
 function label_(e: ElementData): string {
@@ -33,15 +33,47 @@ function Label({ text, x, y, anchor, solved }: {
 
 const ARROW: Record<number, [string, string]> = { 0: ["→", "←"], 90: ["↓", "↑"], 180: ["←", "→"], 270: ["↑", "↓"] };
 
-export function ElementView({ element: e, library, wires, result, selected, closed, lit, onPointerDown }: {
+/** A voltage's colour while running: towards green above ground, red below, the ink at 0 V. */
+export const liveColor = (v: number | null, scale: number) =>
+  v === null ? undefined
+    : `color-mix(in oklab, ${v >= 0 ? "var(--live-pos)" : "var(--live-neg)"} ${Math.round(Math.min(1, Math.abs(v) / scale) * 100)}%, var(--live-zero))`;
+
+/**
+ * The leads of an element with more than two pins (symbol px, before rotation): from each pin
+ * along its lead into the body, so each takes its own node's colour. A chip's pins sit on its
+ * box's edges, 20 px of lead each; the others are listed.
+ */
+function leads(kind: string, symbolPins: number[][]): number[][] {
+  if (kind === "npn" || kind === "pnp") return [[30, 0], [0, 18], [0, -18]];
+  if (kind === "opamp") return [[20, 0], [20, 0], [-20, 0]];
+  if (kind === "potentiometer") return [[0, 0], [0, 0], [0, 27]]; // its ends: the body's gradient
+  const xs = symbolPins.map((p) => p[0]), ys = symbolPins.map((p) => p[1]);
+  return symbolPins.map(([x, y]) =>
+    y === Math.min(...ys) ? [0, 20] : y === Math.max(...ys) ? [0, -20] : x === Math.min(...xs) ? [20, 0] : [-20, 0]);
+}
+
+export function ElementView({ element: e, library, wires, result, selected, closed, lit, live, onPointerDown }: {
   element: ElementData; library: SymbolLibrary; wires: WireData[]; result?: ElementResult; selected: boolean;
   closed?: boolean; // a switch or a button: drawn closed
   lit?: number; // an LED while simulating: how bright (0–1)
+  live?: { pins: (number | null)[]; scale: number }; // running: its pins' voltages, the element coloured by them
   onPointerDown: (event: ReactPointerEvent) => void;
 }) {
   const G = library.grid;
   const symbol = library.kinds[e.kind];
   const ps = pins(e, library).map(([x, y]) => [x * G, y * G] as Point);
+  const gradient = useId(); // unique on the page: other boards have their R_1 too
+  // running: a two-pin element (and a potentiometer's body) shades from one pin's colour to the
+  // other's, so it reads as the wires on both sides do; longer leads get a colour each
+  const colours = live?.pins.map((v) => liveColor(v, live.scale));
+  const shaded = colours && (ps.length === 2 || e.kind === "potentiometer") && colours[0] && colours[1];
+  const tinted = shaded ? { stroke: `url(#${CSS.escape(gradient)})`, color: `color-mix(in oklab, ${colours[0]}, ${colours[1]})` } : undefined;
+  const ownLeads = colours && (ps.length > 3 || e.kind === "potentiometer" || e.kind === "npn" || e.kind === "pnp" || e.kind === "opamp")
+    ? leads(e.kind, symbol.pins).map(([dx, dy], i) => {
+      const [rx, ry] = rotate([dx, dy], symbol.upright ? 0 : e.rotation);
+      return { from: ps[i], to: [ps[i][0] + rx, ps[i][1] + ry] as Point, colour: colours[i] };
+    }).filter((l) => l.colour && (l.to[0] !== l.from[0] || l.to[1] !== l.from[1]))
+    : [];
   const cx = ps.reduce((s, p) => s + p[0], 0) / ps.length;
   const cy = ps.reduce((s, p) => s + p[1], 0) / ps.length;
   const xs = ps.map((p) => p[0]);
@@ -77,8 +109,17 @@ export function ElementView({ element: e, library, wires, result, selected, clos
         x={Math.min(...xs) - 12} y={Math.min(...ys) - 12}
         width={Math.max(...xs) - Math.min(...xs) + 24} height={Math.max(...ys) - Math.min(...ys) + 24}
       />
+      {shaded && (
+        <linearGradient id={gradient} gradientUnits="userSpaceOnUse" x1={ps[0][0]} y1={ps[0][1]} x2={ps[1][0]} y2={ps[1][1]}>
+          <stop offset="0.2" style={{ stopColor: colours[0] }} />
+          <stop offset="0.8" style={{ stopColor: colours[1] }} />
+        </linearGradient>
+      )}
       <g className="w" transform={`translate(${e.at[0] * G} ${e.at[1] * G}) rotate(${symbol.upright ? 0 : e.rotation})`}
-         dangerouslySetInnerHTML={{ __html: symbol.svg }} />
+         style={tinted} dangerouslySetInnerHTML={{ __html: symbol.svg }} />
+      {ownLeads.map((l, i) => (
+        <path key={i} className="lead" d={`M${l.from[0]} ${l.from[1]}L${l.to[0]} ${l.to[1]}`} style={{ stroke: l.colour }} />
+      ))}
       {symbol.letter && <text className="letter" x={cx} y={cy}>{symbol.letter}</text>}
       {label && (e.kind === "label"
         ? <text x={cx + 4} y={cy - 6} className="node">{label}</text>
