@@ -46,7 +46,7 @@ export const pl = {
   drawing: {
     moveSegment: "Przeciągnij, żeby przesunąć ten odcinek",
     openPin: "Niepodłączony zacisk",
-    drawWire: "Przeciągnij, żeby poprowadzić przewód",
+    drawWire: "Kliknij albo przeciągnij, żeby poprowadzić przewód",
   },
   view: {
     back: "Wróć do schematu",
@@ -166,7 +166,7 @@ export const en: typeof pl = {
   drawing: {
     moveSegment: "Drag to move this segment",
     openPin: "Unconnected pin",
-    drawWire: "Drag to draw a wire",
+    drawWire: "Click or drag to draw a wire",
   },
   view: {
     back: "Back to the schematic",

@@ -85,7 +85,9 @@ export function SchematicEditor({
   const [tool, setTool] = useState<Tool>({ type: "select" });
   const [selection, setSelection] = useState<Selection>(null);
   const [cursor, setCursor] = useState<Point | null>(null);
-  const [draft, setDraft] = useState<Point[] | null>(null);
+  // the wire being drawn: what is laid down is in the drawing already (``wire``: its index, from the
+  // second click on), only the stretch to the pointer is dashed
+  const [draft, setDraft] = useState<{ points: Point[]; wire: number | null } | null>(null);
   const [gesture, setGesture] = useState<Gesture | null>(null);
   const [help, setHelp] = useState(false);
   const [libraryOpen, setLibraryOpen] = useState(false);
@@ -177,23 +179,27 @@ export function SchematicEditor({
     return [Math.round(point.x / G), Math.round(point.y / G)];
   };
 
-  /** Wire tool: every click adds a corner; clicking something to connect to ends the wire. */
+  /**
+   * Wire tool: every click lays the wire down as far as it (a step of its own to undo) and goes on
+   * from there; clicking the same point again, or something to connect to, ends it. It need not end
+   * on anything — Esc takes away only the dashed stretch still following the pointer.
+   */
   const addDraftPoint = (p: Point) => {
     if (!draft) {
-      setDraft([p]);
+      setDraft({ points: [p], wire: null });
       return;
     }
-    const last = draft[draft.length - 1];
+    const last = draft.points[draft.points.length - 1];
     if (same(last, p)) {
-      addWire(draft);
       setDraft(null);
       return;
     }
-    const path = [...draft, ...elbow(last, p).slice(1)];
-    if (isConnectionPoint(value, library, p)) {
-      addWire(path);
-      setDraft(null);
-    } else setDraft(path);
+    // still the wire it was? (the drawing may have changed under it) — if not, a new one from here
+    const own = draft.wire !== null && value.wires[draft.wire]?.points.at(-1)?.join() === last.join() ? draft.wire : null;
+    const points = simplify(own === null ? elbow(last, p) : [...draft.points, ...elbow(last, p).slice(1)]);
+    const wire = own ?? value.wires.length;
+    commit({ ...value, wires: own === null ? [...value.wires, { points }] : value.wires.map((w, i) => (i === own ? { points } : w)) });
+    setDraft(isConnectionPoint(value, library, p) ? null : { points, wire });
   };
 
   const addWire = (points: Point[]) => {
@@ -352,6 +358,11 @@ export function SchematicEditor({
     }
     const end = toGrid(event);
     if (g.type === "wire" && !same(end, g.from)) addWire(elbow(g.from, end));
+    // a pin clicked, not dragged from: the wire goes on click by click, as with the wire tool
+    if (g.type === "wire" && same(end, g.from)) {
+      setTool({ type: "wire" });
+      setDraft({ points: [g.from], wire: null });
+    }
   };
 
   // ------------------------------------------------------------------ keyboard
@@ -371,8 +382,8 @@ export function SchematicEditor({
       event.preventDefault();
       return;
     }
-    if (mod && event.key.toLowerCase() === "z") (event.shiftKey ? redo : undoStep)();
-    else if (mod && event.key.toLowerCase() === "y") redo();
+    if (mod && event.key.toLowerCase() === "z") { setDraft(null); (event.shiftKey ? redo : undoStep)(); }
+    else if (mod && event.key.toLowerCase() === "y") { setDraft(null); redo(); }
     else if (event.key === "Escape") {
       // one step back at a time: the wire being drawn, the tool / selection, the panel, full screen
       if (draft) setDraft(null);
@@ -381,10 +392,8 @@ export function SchematicEditor({
         setSelection(null);
       } else if (libraryOpen) setLibraryOpen(false);
       else if (full) onFull(false);
-    } else if (event.key === "Enter" && draft) {
-      addWire(draft);
-      setDraft(null);
-    } else if (plain("r")) rotateSelected();
+    } else if (event.key === "Enter" && draft) setDraft(null);
+    else if (plain("r")) rotateSelected();
     else if (plain("v")) { setTool({ type: "select" }); setDraft(null); }
     else if (plain("h")) { setTool({ type: "hand" }); setDraft(null); }
     else if (plain("w")) setTool({ type: "wire" });
@@ -419,7 +428,7 @@ export function SchematicEditor({
 
   const wiring = draft !== null || gesture?.type === "wire";
   const preview: Point[] | null =
-    cursor && draft ? [...draft, ...elbow(draft[draft.length - 1], cursor).slice(1)]
+    cursor && draft ? elbow(draft.points[draft.points.length - 1], cursor)
     : cursor && gesture?.type === "wire" ? elbow(gesture.from, cursor)
     : null;
   const snap = wiring && cursor && isConnectionPoint(value, library, cursor) ? cursor : null;
@@ -483,7 +492,7 @@ export function SchematicEditor({
             onUp(event);
           }}
           onPointerLeave={() => { pointer.current = null; setCursor(null); }}
-          onDoubleClick={() => { if (draft) { addWire(draft); setDraft(null); } }}
+          onDoubleClick={() => setDraft(null)}
           onKeyDown={(event) => {
             if (event.key === " ") { setSpaceHeld(true); event.preventDefault(); return; }
             onKey(event);
