@@ -70,6 +70,12 @@ export const kindInfo = (kind: string): KindInfo | undefined => KINDS.find((k) =
 export const hasValue = (kind: string) => kindInfo(kind)?.unit !== undefined;
 /** A drawing with a non-linear element (a diode, a transistor, a 555, an Arduino): it can only run in time. */
 export const inTimeOnly = (sch: SchematicData) => sch.elements.some((e) => kindInfo(e.kind)?.live);
+/**
+ * Can it run in time? (as electro.sim.compile_sim asks) No hole in it, and every value known — a
+ * meter's reading apart, the simulation measures that.
+ */
+export const canRunInTime = (sch: SchematicData) =>
+  sch.elements.every((e) => e.kind !== "hole" && (!hasValue(e.kind) || kindInfo(e.kind)?.meter || (e.value ?? "").trim() !== ""));
 export const isComponent = (kind: string) => !["ground", "label", "terminal"].includes(kind);
 
 export const key = ([x, y]: Point) => `${x},${y}`;

@@ -3,7 +3,7 @@ import { useTranslation } from "react-i18next";
 import { useLocation, useNavigate, useSearchParams } from "react-router";
 import { usePdf } from "@/features/pdf-export";
 import { kernel } from "@/features/python";
-import { inTimeOnly, PdfDrawing, SchematicEditor, type Camera } from "@/features/schematic";
+import { canRunInTime, inTimeOnly, PdfDrawing, SchematicEditor, type Camera } from "@/features/schematic";
 import { LiveControls, ProbePanel, SimPanel, SketchEditor, UploadButton, useLive } from "@/features/simulation";
 import type { Cell, SchematicData, SymbolLibrary } from "@/shared/model/types";
 import type { Failure } from "@/shared/model/issues";
@@ -360,7 +360,8 @@ export function SchematicCell({ cell, update, library, simulate, running: solvin
       } : undefined}
       // the bolt runs a circuit that only works in time; one that can also be solved has its own
       // way to run in time, here
-      below={empty || running || timed ? undefined : <LiveControls live={live} />}
+      // (not offered when it cannot run: a hole in it, a value not given)
+      below={empty || running || timed || !canRunInTime(cell.schematic) ? undefined : <LiveControls live={live} />}
       camera={camera}
       autoFocus={focusBoard.current}
       // the meter, while it runs: what an element or a wire is doing
