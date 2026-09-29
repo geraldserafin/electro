@@ -4,7 +4,7 @@ import { Result, useAtomSet, useAtomValue } from "@effect-atom/atom-react";
 import { useTranslation } from "react-i18next";
 import { Avatar } from "@/shared/ui/Avatar";
 import { SignOut } from "@/shared/ui/icons";
-import { MenuGroup, MenuItem } from "@/shared/ui/Menu";
+import { MenuItem, MenuSeparator } from "@/shared/ui/Menu";
 import { logout, meAtom } from "./atoms";
 
 export function Account() {
@@ -14,8 +14,9 @@ export function Account() {
   if (!Result.isSuccess(me)) return null;
   const user = me.value;
   return (
-    <MenuGroup label={t("account")}>
-      <div className="flex items-center gap-2.5 px-4 py-1.5">
+    <div role="group" aria-label={t("account")} className="grid">
+      <MenuSeparator />
+      <div className="flex items-center gap-2.5 px-2.5 py-1.5">
         <Avatar name={user.name} url={user.avatarUrl} />
         <span className="grid min-w-0">
           <span className="truncate text-[14px]">{user.name}</span>
@@ -23,6 +24,6 @@ export function Account() {
         </span>
       </div>
       <MenuItem icon={<SignOut />} onSelect={async () => { await signOut({}); location.assign("/"); }}>{t("signOut")}</MenuItem>
-    </MenuGroup>
+    </div>
   );
 }
