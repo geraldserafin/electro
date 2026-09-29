@@ -102,6 +102,10 @@ export class Simulation {
   private F: Float64Array;
   private J: Float64Array;
   private after: Float64Array;
+  // Newton's iterates: two buffers taking turns, so a step allocates nothing (thousands of steps a frame)
+  private xa: Float64Array;
+  private xb: Float64Array;
+  private where = new Map<string, number | null>(); // quantity → index in x (null: 0 V), see at()
   readonly program: ProgramData;
 
   constructor(program: ProgramData) {
@@ -114,6 +118,8 @@ export class Simulation {
     this.F = new Float64Array(this.n);
     this.J = new Float64Array(this.n * this.n);
     this.after = new Float64Array(program.states.length);
+    this.xa = new Float64Array(this.n);
+    this.xb = new Float64Array(this.n);
   }
 
   setInput(name: string, value: number) {
@@ -132,16 +138,27 @@ export class Simulation {
     return i === null || i === undefined ? 0 : this.x[i];
   }
 
+  /** A quantity as the scope names it: an unknown ("I_LED_1") or a node's potential ("V_n3"), looked up once. */
+  at(name: string): number {
+    let i = this.where.get(name);
+    if (i === undefined) {
+      const k = this.program.unknowns.indexOf(name);
+      i = k >= 0 ? k : name.startsWith("V_") ? this.program.nodes[name.slice(2)] ?? null : null;
+      this.where.set(name, i);
+    }
+    return i === null ? 0 : this.x[i];
+  }
+
   private newton(dt: number): Float64Array | null {
     const { n, p, F, J } = this;
     p[0] = dt;
-    let x = Float64Array.from(this.x);
+    let x = this.xa, next = this.xb;
+    x.set(this.x);
     for (let iteration = 1; iteration <= MAX_NEWTON; iteration++) {
       J.fill(0);
       this.kernel(x, p, F, J);
       for (let i = 0; i < n; i++) F[i] = -F[i];
       if (!solveLinear(J, F, n)) return null;
-      const next = new Float64Array(n);
       for (let i = 0; i < n; i++) {
         if (Number.isNaN(F[i])) return null;
         next[i] = x[i] + F[i];
@@ -150,7 +167,9 @@ export class Simulation {
       let done = true;
       for (let i = 0; i < n && done; i++)
         if (Math.abs(next[i] - x[i]) > RELTOL * Math.max(Math.abs(next[i]), Math.abs(x[i])) + VNTOL) done = false;
+      const was = x;
       x = next;
+      next = was;
       if (done && iteration > 1) return x;
     }
     return null;
@@ -168,7 +187,7 @@ export class Simulation {
       if (most !== null) change = Math.max(change, Math.abs(this.after[k] - this.p[i]) / most);
     }
     if (change > 1) return [false, change];
-    this.x = x;
+    this.x.set(x);
     this.t += dt;
     this.switched = false;
     for (let k = 0; k < states.length; k++) {

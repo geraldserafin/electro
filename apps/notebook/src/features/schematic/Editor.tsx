@@ -4,7 +4,7 @@
 // The drawing lives on an endless plane; the board shows it through a camera (useCamera), like
 // Excalidraw. Here: the state of the drawing being edited, the pointer and the keyboard; the
 // islands around it are components of their own.
-import { useEffect, useId, useRef, useState, type KeyboardEvent, type PointerEvent as ReactPointerEvent, type ReactNode } from "react";
+import { useCallback, useEffect, useId, useMemo, useRef, useState, type KeyboardEvent, type PointerEvent as ReactPointerEvent, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import type { ElementData, ElementResult, Point, SchematicData, SymbolLibrary } from "@/shared/model/types";
 import { cn } from "@/shared/lib/cn";
@@ -271,6 +271,10 @@ export function SchematicEditor({
     svgRef.current?.setPointerCapture(event.pointerId);
   };
 
+  // the elements get one handler for the whole life of the board (it calls the latest onElementDown),
+  // so an element whose look did not change is not drawn again (ElementView is memo)
+  const elementDown = useRef<(event: ReactPointerEvent, e: ElementData) => void>(() => {});
+  const onElementDownStable = useCallback((event: ReactPointerEvent, e: ElementData) => elementDown.current(event, e), []);
   const onElementDown = (event: ReactPointerEvent, e: ElementData) => {
     if (tool.type !== "select") return;
     if (live) {
@@ -485,6 +489,10 @@ export function SchematicEditor({
 
   // ------------------------------------------------------------------ what to draw
 
+  elementDown.current = onElementDown;
+  // (the same drawing: the same dots; while it runs, the board is drawn 30 times a second)
+  const junctionPoints = useMemo(() => junctions(value, library), [value, library]);
+  const openPinPoints = useMemo(() => openPins(value, library), [value, library]);
   const wiring = draft !== null || gesture?.type === "wire";
   const preview: Point[] | null =
     cursor && draft ? elbow(draft.points[draft.points.length - 1], cursor)
@@ -597,7 +605,7 @@ export function SchematicEditor({
             <rect className="group-frame" x={groupFrame[0] * G - 20} y={groupFrame[1] * G - 20}
                   width={(groupFrame[2] - groupFrame[0]) * G + 40} height={(groupFrame[3] - groupFrame[1]) * G + 40} rx="6" />
           )}
-          {junctions(value, library).map(([x, y]) => (
+          {junctionPoints.map(([x, y]) => (
             <circle key={`j${x},${y}`} className="dot" cx={x * G} cy={y * G} r="3"
                     style={live ? { fill: liveColor(dotVoltage([x, y]), live.scale) } : undefined} />
           ))}
@@ -614,9 +622,9 @@ export function SchematicEditor({
                          lit={live && e.kind === "led" ? live.leds[e.id] ?? 0 : undefined}
                          live={live && { pins: live.pins[e.id] ?? [], scale: live.scale }}
                          selected={picked(selection).ids.includes(e.id) || (probed?.type === "element" && probed.id === e.id)}
-                         onPointerDown={(event) => onElementDown(event, e)} />
+                         onPointerDown={onElementDownStable} />
           ))}
-          {openPins(value, library).map(([x, y]) => (
+          {openPinPoints.map(([x, y]) => (
             <circle key={`o${x},${y}`} className="open-pin" cx={x * G} cy={y * G} r="3.5">
               <title>{t("drawing.openPin")}</title>
             </circle>

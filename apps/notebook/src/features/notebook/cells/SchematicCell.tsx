@@ -164,6 +164,15 @@ export function SchematicCell({ cell, update, library, simulate, running: solvin
 
   const [panelHeight, setPanelHeight] = useKeptSize("electro.panelHeight");
   const frame = useRef<HTMLDivElement>(null);
+  // running out of view: the circuit goes on, the board is not drawn
+  const { setOnScreen } = live;
+  useEffect(() => {
+    const el = frame.current;
+    if (!el) return;
+    const observer = new IntersectionObserver(([entry]) => setOnScreen(entry.isIntersecting), { rootMargin: "200px" });
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [setOnScreen]);
   const groupEls = useRef<(HTMLElement | null)[]>([]);
   // the notebook: the editor as tall as the drawing needs (fixed after opening, so it never jumps)
   const [height] = useState(() => {

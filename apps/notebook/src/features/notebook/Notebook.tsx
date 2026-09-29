@@ -1,6 +1,6 @@
 // One note, edited: its cells, running them, and saving it to the notes server as it changes.
 // The page (pages/NotePage.tsx) reads the note by its address and hands it over.
-import { useCallback, useEffect, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ReadOnlyNotice, SyncNotice, useCreateNote, useNoteSync } from "@/features/notes";
 import { ExportDialog, PdfContext, pdfOf, warmUpWhenIdle, type PdfSettings } from "@/features/pdf-export";
@@ -26,6 +26,15 @@ import { usePrintKey } from "./usePrintKey";
 import { useRemoved } from "./useRemoved";
 import { useRunner } from "./useRunner";
 import { cn } from "@/shared/lib/cn";
+
+// A cell is drawn again when its own data changes, not whenever the note does (a key typed in
+// another cell, the title, a save): its callbacks are made anew each render of the note, but
+// they only act on the cell by its id and on the note as it is then, so an older one does the same.
+const sameButCallbacks = <P extends object>(a: P, b: P) =>
+  (Object.keys(a) as (keyof P)[]).every((k) => a[k] === b[k] || (typeof a[k] === "function" && typeof b[k] === "function"));
+const Markdown = memo(MarkdownCell, sameButCallbacks);
+const Code = memo(CodeCell, sameButCallbacks);
+const Schematic = memo(SchematicCell, sameButCallbacks);
 
 /**
  * ``initial``/``revision``: the note as read from the server; ``reload``: read it again (after a
@@ -146,12 +155,12 @@ export function Notebook({ initial, revision, reload, onTitle, readOnly = false,
                      onMoveTo={(before) => setCells((cells) => moveRange(cells, index, 1, before))}
                      onRemove={() => removed.remove(cell.id)}
                      onAdd={(type) => insert(index + 1, type)}>
-            {cell.type === "markdown" && <MarkdownCell cell={cell} update={(p) => update(cell.id, p)} />}
+            {cell.type === "markdown" && <Markdown cell={cell} update={(p) => update(cell.id, p)} />}
             {cell.type === "code" && (
-              <CodeCell cell={cell} update={(p) => update(cell.id, p)} run={() => run(cell.id)} running={running.has(cell.id)} />
+              <Code cell={cell} update={(p) => update(cell.id, p)} run={() => run(cell.id)} running={running.has(cell.id)} />
             )}
             {cell.type === "schematic" && (
-              <SchematicCell cell={cell} update={(p) => update(cell.id, p)} library={library}
+              <Schematic cell={cell} update={(p) => update(cell.id, p)} library={library}
                              simulate={(s) => simulate(cell.id, s)} running={running.has(cell.id)} />
             )}
           </CellFrame>

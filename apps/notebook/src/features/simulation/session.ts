@@ -35,7 +35,7 @@ export class Session {
     return board;
   }
 
-  private offset = new Map<Board, number>(); // the circuit's time when each chip was reset
+  private offset = new WeakMap<Board, number>(); // the circuit's time when each chip was reset (a board replaced by a new sketch goes with it)
 
   private drive(board: Board, pin: string, state: keyof typeof PIN_MODES) {
     const [g, e] = PIN_MODES[state];

@@ -43,7 +43,8 @@ export type SketchState =
   | { kind: "tooBig"; size: number; flash: number }
   | { kind: "unavailable" | "signedOut" | "unreachable" };
 
-const FRAME_BUDGET = 12; // ms of computing per frame at most (else the simulation falls behind)
+const FRAME_BUDGET = 12; // ms of computing per frame at most, for all of them (else the simulation falls behind)
+let runningNow = 0; // circuits running on the page: they share the frame's budget
 const SCOPE_POINTS = 600;
 export const SPEEDS = [1, 0.1, 0.01, 0.001];
 
@@ -93,8 +94,16 @@ export function useLive(schematic: SchematicData) {
   const scopeRef = useRef(scope);
   scopeRef.current = scope;
   const probeRef = useRef<string[]>([]); // the quantities the meter is on
-  /** Everything recorded: the scope's quantities and the meter's. */
-  const recorded = () => [...new Set([...scopeRef.current, ...probeRef.current])];
+  // everything recorded: the scope's quantities and the meter's (worked out again only when either changes:
+  // record() runs after every step)
+  const recording = useRef({ scope: [] as string[], probe: [] as string[], names: [] as string[] });
+  const recorded = () => {
+    const r = recording.current;
+    if (r.scope !== scopeRef.current || r.probe !== probeRef.current)
+      recording.current = { scope: scopeRef.current, probe: probeRef.current, names: [...new Set([...scopeRef.current, ...probeRef.current])] };
+    return recording.current.names;
+  };
+  const ledCurrents = useRef<[string, number][]>([]); // each LED's id and its current's index in x
   const history = useRef(new Map<string, ScopeTrace>());
   const serialText = useRef("");
   const statusRef = useRef(status);
@@ -108,7 +117,8 @@ export function useLive(schematic: SchematicData) {
     for (const e of latest.current.elements) for (const [name, value] of inputsOf(e, pressed.current)) s.sim.setInput(name, value);
   }, []);
 
-  const show = useCallback(() => {
+  /** The board as the circuit is now; `behind`: whether the last frame kept up (else as it was). */
+  const show = useCallback((behind?: boolean) => {
     const s = session.current, c = circuit.current;
     if (!s || !c) return;
     const { sim } = s;
@@ -137,7 +147,7 @@ export function useLive(schematic: SchematicData) {
     }
     glow.current = { since: sim.t, last: sim.t, charge: new Map() };
     setFrame((f) => ({
-      t: sim.t, voltages, scale, leds, results, behind: f?.behind ?? false,
+      t: sim.t, voltages, scale, leds, results, behind: behind ?? f?.behind ?? false,
       wires: c.wires.map((node) => (node === null ? null : voltages[node] ?? null)),
       pins: Object.fromEntries(Object.entries(c.pins).map(([id, nodes]) =>
         [id, nodes.map((node) => (node === null ? null : voltages[node] ?? null))])),
@@ -152,10 +162,7 @@ export function useLive(schematic: SchematicData) {
     if (!s || !c) return;
     const g = glow.current, dt = s.sim.t - g.last;
     if (dt > 0) {
-      for (const [id, kind] of Object.entries(c.program.kinds)) {
-        const i = c.program.parts[id]?.I;
-        if (kind === "LED" && i !== undefined) g.charge.set(id, (g.charge.get(id) ?? 0) + Math.max(0, s.sim.x[i]) * dt);
-      }
+      for (const [id, i] of ledCurrents.current) g.charge.set(id, (g.charge.get(id) ?? 0) + Math.max(0, s.sim.x[i]) * dt);
       g.last = s.sim.t;
     }
     const window = Math.max(1e-4, speedRef.current * 2);
@@ -165,10 +172,12 @@ export function useLive(schematic: SchematicData) {
       const last = trace.t[trace.t.length - 1];
       if (last !== undefined && s.sim.t - last < window / SCOPE_POINTS) continue;
       trace.t.push(s.sim.t);
-      trace.v.push(name.startsWith("V_") && !s.sim.program.unknowns.includes(name) ? s.sim.node(name.slice(2)) : s.sim.value(name));
-      while (trace.t.length && trace.t[0] < s.sim.t - window) {
-        trace.t.shift();
-        trace.v.shift();
+      trace.v.push(s.sim.at(name));
+      let old = 0;
+      while (old < trace.t.length && trace.t[old] < s.sim.t - window) old++;
+      if (old) {
+        trace.t.splice(0, old);
+        trace.v.splice(0, old);
       }
     }
   }, []);
@@ -226,6 +235,9 @@ export function useLive(schematic: SchematicData) {
       }
       circuit.current = compiled;
       session.current = new Session(compiled);
+      const { kinds, parts } = compiled.program;
+      ledCurrents.current = Object.keys(kinds).flatMap((id) =>
+        kinds[id] === "LED" && parts[id]?.I !== undefined ? [[id, parts[id].I] as [string, number]] : []);
       glow.current = { since: 0, last: 0, charge: new Map() };
       built.current = structure(latest.current);
       history.current.clear();
@@ -259,6 +271,7 @@ export function useLive(schematic: SchematicData) {
   useEffect(() => {
     if (status !== "running") return;
     let raf = 0, last = performance.now(), shown = 0;
+    runningNow++;
     const tick = (now: number) => {
       const s = session.current;
       if (!s) return;
@@ -266,12 +279,12 @@ export function useLive(schematic: SchematicData) {
       last = now;
       const target = s.sim.t + elapsed * speedRef.current;
       const dtMax = Math.max(1e-7, speedRef.current * 1e-3);
-      const began = performance.now();
+      const began = performance.now(), budget = FRAME_BUDGET / Math.max(1, runningNow);
       let behind = false;
       try {
         while (s.sim.t < target - 1e-15) {
           s.advanceTo(Math.min(target, s.sim.t + dtMax * 4), dtMax, record);
-          if (performance.now() - began > FRAME_BUDGET) {
+          if (performance.now() - began > budget) {
             behind = s.sim.t < target - 1e-12;
             break;
           }
@@ -283,16 +296,20 @@ export function useLive(schematic: SchematicData) {
         setStatus("paused");
         return;
       }
-      if (now - shown > 33) { // the board: 30 times a second is plenty
+      // the board: 30 times a second is plenty, and not at all while it is off screen (it keeps
+      // running and recording; it is drawn as it is the moment it comes back)
+      if (now - shown > 33 && onScreen.current) {
         shown = now;
-        show();
-        setFrame((f) => (f ? { ...f, behind } : f));
-        if (serialText.current !== serial) setSerial(serialText.current);
+        show(behind);
+        setSerial(serialText.current); // (the same text: no render)
       }
       raf = requestAnimationFrame(tick);
     };
     raf = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(raf);
+    return () => {
+      cancelAnimationFrame(raf);
+      runningNow--;
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [status, show, record]);
 
@@ -308,6 +325,17 @@ export function useLive(schematic: SchematicData) {
   }, [schematic, start, applyInputs, show]);
 
   useEffect(() => () => { session.current = null; }, []);
+
+  const onScreen = useRef(true);
+  /** Whether the board can be seen (scrolled out of view: nothing is drawn). */
+  const setOnScreen = useCallback((seen: boolean) => {
+    const back = seen && !onScreen.current;
+    onScreen.current = seen;
+    if (back && session.current) {
+      show();
+      setSerial(serialText.current);
+    }
+  }, [show]);
 
   return {
     status, error, frame, speed, setSpeed, traces, scope, serial, sketches,
@@ -353,6 +381,7 @@ export function useLive(schematic: SchematicData) {
       return [...nodes, ...parts.filter((n) => !nodes.includes(n))];
     },
     upload,
+    setOnScreen,
     /** The error shown under the board, away (it comes back if it happens again). */
     dismissError: () => setError(null),
     clearSerial: () => { serialText.current = ""; setSerial(""); },

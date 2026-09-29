@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import json
 import math
+from array import array
 from dataclasses import dataclass, field
 
 import sympy as sp
@@ -340,11 +341,14 @@ class Trace:
 
     names: list[str]
     t: list[float]
-    rows: list[list[float]]
+    # every step's values one after another (len(names) a step), 8 bytes a number: a long run
+    # of a big circuit would take several times more as lists of floats (and Pyodide's memory
+    # never shrinks back)
+    data: array
     program: Program
 
     def __getitem__(self, name: str) -> list[float]:
-        return [row[self._column(name)] for row in self.rows]
+        return self.data[self._column(name)::len(self.names)].tolist()
 
     def _column(self, name: str) -> int:
         if name in self.names:
@@ -360,7 +364,8 @@ class Trace:
     def at(self, t: float) -> dict[str, float]:
         """Every quantity at time ``t`` (the last step not after it)."""
         k = max((i for i, s in enumerate(self.t) if s <= t + 1e-15), default=0)
-        return dict(zip(self.names, self.rows[k]))
+        n = len(self.names)
+        return dict(zip(self.names, self.data[k * n:(k + 1) * n]))
 
     def V(self, node: str) -> list[float]:
         return self[f"V_{node}"]
@@ -418,13 +423,13 @@ def _schedule(program: Program, inputs: dict | None):
     return lambda now: [pair for to_values, value in parts for pair in to_values(value(now) if callable(value) else value)]
 
 
-def _run_python(program: Program, t_end: float, dt_max: float, schedule) -> tuple[list[float], list[list[float]]]:
+def _run_python(program: Program, t_end: float, dt_max: float, schedule) -> tuple[list[float], array]:
     sim = Simulation(program)
-    times, rows = [], []
+    times, rows = [], array("d")
 
     def record():
         times.append(sim.t)
-        rows.append(list(sim.x))
+        rows.extend(sim.x)
 
     sim.run(t_end, dt_max, schedule, record)
     return times, rows
@@ -445,11 +450,10 @@ def _run_javascript(engine, program: Program, t_end: float, dt_max: float, sched
     finally:
         if callback is not None:
             callback.destroy()
-    n = len(program.unknowns)
-    times = result.t.to_py().tolist() if hasattr(result.t.to_py(), "tolist") else list(result.t.to_py())
-    flat = result.rows.to_py()
-    flat = flat.tolist() if hasattr(flat, "tolist") else list(flat)
-    return times, [flat[k * n:(k + 1) * n] for k in range(len(times))]
+    times, rows = array("d"), array("d")
+    times.frombytes(result.t.to_bytes())
+    rows.frombytes(result.rows.to_bytes())  # straight from the engine's Float64Array, no float by float
+    return times.tolist(), rows
 
 
 def _engine():

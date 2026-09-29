@@ -1,6 +1,6 @@
 // One element on the drawing: its symbol, its label ("R_1 = 100 Ω", beside it where no wire runs),
 // and after a run what was found (the solved value, I and U).
-import { useId, useLayoutEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
+import { memo, useId, useLayoutEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
 import type { ElementData, ElementResult, Point, SymbolLibrary, WireData } from "@/shared/model/types";
 import { hasValue, isComponent, kindInfo, pins, rotate } from "./model";
 
@@ -52,13 +52,29 @@ function leads(kind: string, symbolPins: number[][]): number[][] {
     y === Math.min(...ys) ? [0, 20] : y === Math.max(...ys) ? [0, -20] : x === Math.min(...xs) ? [20, 0] : [-20, 0]);
 }
 
-export function ElementView({ element: e, library, wires, result, selected, closed, lit, live, onPointerDown }: {
+type Props = {
   element: ElementData; library: SymbolLibrary; wires: WireData[]; result?: ElementResult; selected: boolean;
   closed?: boolean; // a switch or a button: drawn closed
   lit?: number; // an LED while simulating: how bright (0–1)
   live?: { pins: (number | null)[]; scale: number }; // running: its pins' voltages, the element coloured by them
-  onPointerDown: (event: ReactPointerEvent) => void;
-}) {
+  onPointerDown: (event: ReactPointerEvent, element: ElementData) => void;
+};
+
+const sameResult = (a?: ElementResult, b?: ElementResult) => a === b || (!!a && !!b
+  && a.value === b.value && a.solved === b.solved && a.U === b.U && a.I === b.I && a.P === b.P && a.reversed === b.reversed);
+const sameColours = (a: Props["live"], b: Props["live"]) => a === b || (!!a && !!b && a.pins.length === b.pins.length
+  && a.pins.every((v, i) => liveColor(v, a.scale) === liveColor(b.pins[i], b.scale)));
+
+/**
+ * Drawn again only when what it shows changed: while the circuit runs, the board gets new numbers
+ * 30 times a second, and most elements look just as they did (the same colours, the same readings).
+ */
+export const ElementView = memo(ElementView_, (a, b) =>
+  a.element === b.element && a.library === b.library && a.wires === b.wires && a.selected === b.selected
+  && a.closed === b.closed && (a.lit ?? 0) > 0.01 === (b.lit ?? 0) > 0.01 && a.onPointerDown === b.onPointerDown
+  && sameResult(a.result, b.result) && sameColours(a.live, b.live));
+
+function ElementView_({ element: e, library, wires, result, selected, closed, lit, live, onPointerDown }: Props) {
   const G = library.grid;
   const symbol = library.kinds[e.kind];
   const ps = pins(e, library).map(([x, y]) => [x * G, y * G] as Point);
@@ -109,7 +125,7 @@ export function ElementView({ element: e, library, wires, result, selected, clos
     : [];
   return (
     <g className={`element ${selected ? "selected" : ""} ${closed ? "closed" : ""} ${lit && lit > 0.01 ? "lit" : ""}`}
-       data-id={e.id} data-kind={e.kind} onPointerDown={onPointerDown}>
+       data-id={e.id} data-kind={e.kind} onPointerDown={(event) => onPointerDown(event, e)}>
       <rect
         className="hit"
         x={Math.min(...xs) - 12} y={Math.min(...ys) - 12}

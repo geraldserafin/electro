@@ -9,7 +9,7 @@ import { EditorView } from "@codemirror/view";
 import { tags as t } from "@lezer/highlight";
 import CodeMirror from "@uiw/react-codemirror";
 import type { TFunction } from "i18next";
-import { useMemo } from "react";
+import { useCallback, useMemo, useRef } from "react";
 import { useTranslation } from "react-i18next";
 import type { pl } from "../messages";
 
@@ -61,6 +61,16 @@ const look = EditorView.theme({
   ".cm-completionDetail": { fontFamily: "var(--sans)", fontStyle: "normal", color: "var(--muted)", marginLeft: "12px" },
 });
 
+// the same object every time: @uiw/react-codemirror reconfigures the whole editor when its
+// basicSetup or onChange changes, and a new object (a new arrow) every render would do it each time
+const setup = {
+  foldGutter: false,
+  highlightActiveLine: false,
+  highlightActiveLineGutter: false,
+  syntaxHighlighting: false, // ours (colab) instead of the default colours
+  autocompletion: false, // configured above
+};
+
 export function CodeEditor({ value, onChange, autoFocus, minHeight, fill, language = "python" }: {
   value: string; onChange: (v: string) => void; autoFocus?: boolean;
   minHeight?: number; // px: the scroller fills it, so its scrollbar sits at the bottom
@@ -68,6 +78,9 @@ export function CodeEditor({ value, onChange, autoFocus, minHeight, fill, langua
   fill?: boolean; // as tall as its parent, scrolling inside (a side pane)
 }) {
   const { t, i18n } = useTranslation("notebook");
+  const changed = useRef(onChange);
+  changed.current = onChange;
+  const change = useCallback((v: string) => changed.current(v), []);
   const extensions = useMemo(() => [
     ...(language === "cpp" ? [cpp()] : [python(), pythonLanguage.data.of({ autocomplete: completeFromList(electro(t)) })]),
     autocompletion({ icons: false }),
@@ -86,14 +99,8 @@ export function CodeEditor({ value, onChange, autoFocus, minHeight, fill, langua
       height={fill ? "100%" : undefined}
       className={fill ? "h-full" : undefined}
       autoFocus={autoFocus}
-      basicSetup={{
-        foldGutter: false,
-        highlightActiveLine: false,
-        highlightActiveLineGutter: false,
-        syntaxHighlighting: false, // ours (colab) instead of the default colours
-        autocompletion: false, // configured above
-      }}
-      onChange={onChange}
+      basicSetup={setup}
+      onChange={change}
     />
   );
 }

@@ -12,6 +12,8 @@ const PDF_PAD = 6;
  * the same scale whatever the zoom on screen. Hidden on screen but laid out (not display:none),
  * so it can measure itself.
  */
+const nothing = () => {};
+
 export function PdfDrawing({ value, library, results }: {
   value: SchematicData; library: SymbolLibrary; results?: Record<string, ElementResult>;
 }) {
@@ -36,7 +38,7 @@ export function PdfDrawing({ value, library, results }: {
           {junctions(value, library).map(([jx, jy]) => <circle key={`j${jx},${jy}`} className="dot" cx={jx * G} cy={jy * G} r="3" />)}
           {value.elements.map((e) => (
             <ElementView key={e.id} element={e} library={library} wires={value.wires} result={results?.[e.id]}
-                         selected={false} onPointerDown={() => {}} />
+                         selected={false} onPointerDown={nothing} />
           ))}
         </g>
       </svg>
