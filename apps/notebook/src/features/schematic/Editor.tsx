@@ -13,6 +13,7 @@ import { board, BoardIsland, boardIsland } from "./Board";
 import { ElementView, liveColor } from "./ElementView";
 import { HelpPanel } from "./HelpPanel";
 import { Inspector, type Selection } from "./Inspector";
+import { LcdScreen, type LcdScreenData } from "./LcdScreen";
 import { LibraryPanel } from "./LibraryPanel";
 import {
   KINDS, attach, bounds, defaultText, defaultValue, isAdjustable, elbow, inBox, moveGroup, isComponent, isConnectionPoint, junctions,
@@ -42,6 +43,7 @@ export interface LiveView {
   scale: number; // the largest |V|: full colour
   leds: Record<string, number>; // LED id → brightness 0–1
   looks: Record<string, Record<string, number>>; // what else each element shows (useLive's LiveFrame.looks)
+  screens: Record<string, LcdScreenData>; // what each LCD shows
   pressed: string[]; // buttons held down
   onPress: (id: string, down: boolean) => void;
 }
@@ -637,6 +639,9 @@ export function SchematicEditor({
                          live={live && { pins: live.pins[e.id] ?? [], scale: live.scale }}
                          selected={picked(selection).ids.includes(e.id) || (probed?.type === "element" && probed.id === e.id)}
                          onPointerDown={onElementDownStable} />
+          ))}
+          {live && value.elements.filter((e) => e.kind === "lcd1602" && live.screens[e.id]).map((e) => (
+            <LcdScreen key={`lcd${e.id}`} screen={live.screens[e.id]} at={[e.at[0] * G, e.at[1] * G]} rotation={e.rotation} />
           ))}
           {openPinPoints.map(([x, y]) => (
             <circle key={`o${x},${y}`} className="open-pin" cx={x * G} cy={y * G} r="3.5">

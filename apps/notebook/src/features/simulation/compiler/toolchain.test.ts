@@ -6,6 +6,7 @@ import { PinState } from "avr8js";
 import { beforeAll, describe, expect, it } from "vitest";
 import type { Application } from "@yowasp/runtime";
 import { CLOCK, Uno } from "../arduino";
+import { lcd, screen, watch } from "../lcd";
 import { compile, toolchain } from "./toolchain";
 
 const dir = new URL("../../../../public/arduino/", import.meta.url);
@@ -52,6 +53,29 @@ void later() { s.write(90); }
     const d9 = uno.events.filter((e) => e.pin === "D9").map((e) => [e.cycle / CLOCK, e.state] as const);
     const i = d9.findIndex(([, s], k) => k > 2 && s === PinState.High);
     expect((d9[i + 1][0] - d9[i][0]) * 1000).toBeCloseTo(1.47, 1); // 90°: a 1.47 ms pulse
+  }, 120_000);
+
+  it("LiquidCrystal: the display says what the sketch printed", async () => {
+    const result = await compile(app, readFileSync(new URL("../fixtures/lcd.ino", import.meta.url), "utf8"));
+    if (!("hex" in result)) throw new Error(JSON.stringify(result));
+    const uno = new Uno(result.hex);
+    uno.runUntil(0.3);
+    const wiring: Record<string, number> = { D12: 2, D11: 4, D5: 9, D4: 10, D3: 11, D2: 12 }; // as lcd.test.ts
+    const d = lcd("LCD_1", { power: 0, contrast: 1, backlight: undefined, rs: 2, rw: 3, e: 4, data: [5, 6, 7, 8, 9, 10, 11, 12] });
+    const x = new Float64Array(13);
+    x[0] = 5;
+    watch(d, x);
+    for (const e of uno.events) {
+      if (wiring[e.pin] === undefined) continue;
+      x[wiring[e.pin]] = e.state === PinState.High ? 5 : 0;
+      watch(d, x);
+    }
+    expect(screen(d, x).text[0].join("")).toBe("Hello, world!   ");
+  }, 120_000);
+
+  it("a header included in quotes, looked for next to the sketch first", async () => {
+    const result = await compile(app, '#include "Print.h"\nvoid setup() {}\nvoid loop() {}\n');
+    if (!("hex" in result)) throw new Error(JSON.stringify(result));
   }, 120_000);
 
   it("says what is wrong, on the sketch's own line", async () => {

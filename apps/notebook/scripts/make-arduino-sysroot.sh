@@ -4,14 +4,14 @@
 #
 #   include/          avr-libc's headers (only the ATmega328P's registers)
 #   core/             the Arduino core's headers and the Uno's pins_arduino.h
-#   libraries/<Name>/ headers of the bundled libraries (SPI, Wire, EEPROM, SoftwareSerial, Servo)
+#   libraries/<Name>/ headers of the bundled libraries (SPI, Wire, EEPROM, SoftwareSerial, Servo, LiquidCrystal)
 #   lib/              crt, libc, libm, libgcc (without debug info: lld does not read gcc's), core.a,
 #                     lib<Name>.a — the core and libraries compiled by clang
 #   avr5.x            the GNU linker script for the avr5 family, in the syntax lld reads
 #
 # The same compiler flags as the browser uses are in ../src/features/arduino/toolchain.ts (FLAGS).
 # Needs nix (it fetches clang, avr-libc and avr-gcc's libgcc) and arduino-cli with the arduino:avr
-# core and the Servo library (devenv's notes-server installs both).
+# core and the Servo and LiquidCrystal libraries (devenv's notes-server installs them).
 set -euo pipefail
 here=$(cd "$(dirname "$0")" && pwd)
 out="$here/../public/arduino"
@@ -30,12 +30,13 @@ data=$(arduino-cli config get directories.data)
 user=$(arduino-cli config get directories.user)
 avr=$(ls -d "$data"/packages/arduino/hardware/avr/* | sort -V | tail -1)
 servo="$user/libraries/Servo/src"
+lcd="$user/libraries/LiquidCrystal/src"
 
 root="$work/sysroot"
 mkdir -p "$root/include" "$root/core" "$root/lib" "$root/libraries"
 
 # avr-libc: headers (registers of the ATmega328P only — io.h picks the chip's file by -mmcu), libraries
-cp -r "$tools/avr-libc/include/." "$root/include/"
+cp -RL "$tools/avr-libc/include/." "$root/include/"  # -L: the files, not links into the nix store (BSD cp keeps links)
 chmod -R u+w "$root"
 find "$root/include/avr" -name 'io*.h' ! -name 'io.h' ! -name 'iom328p.h' -delete
 for f in crtatmega328p.o libc.a libm.a libatmega328p.a; do "$bin/llvm-objcopy" --strip-debug "$tools/avr-libc/lib/avr5/$f" "$root/lib/$f"; done
@@ -80,6 +81,7 @@ library() { # name, source dir
 }
 for name in SPI Wire EEPROM SoftwareSerial; do library "$name" "$avr/libraries/$name/src"; done
 library Servo "$servo"
+library LiquidCrystal "$lcd"
 
 mkdir -p "$out"
 (cd "$root" && tar --format=ustar -cf "$out/sysroot.tar" .)

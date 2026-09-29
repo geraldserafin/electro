@@ -124,7 +124,8 @@ function ElementView_({ element: e, library, wires, result, selected, closed, li
       || (crosses(cx - 20 - labelWidth, cx - 20, cy - 8, cy + 8) && !crosses(cx + 20, cx + 20 + labelWidth, cy - 8, cy + 8))
     : cy - 32 < 0
       || (crosses(cx - labelWidth / 2, cx + labelWidth / 2, cy - 32, cy - 16) && !crosses(cx - labelWidth / 2, cx + labelWidth / 2, cy + 16, cy + 32));
-  const chip = kindInfo(e.kind)?.group === "chips"; // a 555, an Arduino: the label beside the box, top right; no readings (its pins tell)
+  // a 555, an Arduino, a display: the label beside the box, top right; no readings (its pins tell)
+  const chip = kindInfo(e.kind)?.group === "chips" || ps.length > 4;
   const vars = look && Object.fromEntries(Object.entries(look).map(([k, v]) => [`--${k}`, Math.round(v * 100) / 100])) as CSSProperties;
   const label = result?.solved && result.value
     ? (e.kind === "hole" ? `${e.id}: ${result.value}` : `${e.id} = ${result.value}`)

@@ -7,7 +7,7 @@ import { Application, Exit, type Tree } from "@yowasp/runtime";
 import { prepareSketch } from "@electro/notes-api";
 import { parseTar } from "nanotar";
 
-const LIBRARIES = ["SPI", "Wire", "EEPROM", "SoftwareSerial", "Servo"];
+const LIBRARIES = ["SPI", "Wire", "EEPROM", "SoftwareSerial", "Servo", "LiquidCrystal"];
 const FLASH = 32256; // bytes of an Uno's flash the bootloader leaves
 
 /** The same flags make-arduino-sysroot.sh built the core and the libraries with. */
@@ -62,18 +62,28 @@ export async function toolchain(parts: Parts): Promise<Application> {
   return app;
 }
 
-/** Run one of the tools: the files after it, what it said (stdout and stderr together, as text)
- *  and its stdout alone. */
-async function run(app: Application, args: string[], files: Tree) {
+/** Run one of the tools: the files after it, what it said (stderr, and stdout unless ``binary``, as
+ *  text), its stdout as text, and — ``binary`` — as bytes (an object file). */
+async function run(app: Application, args: string[], files: Tree, binary = false) {
   let output = "", stdout = "";
+  const chunks: Uint8Array[] = [];
   const decoder = new TextDecoder(), out = new TextDecoder();
   const both = (bytes: Uint8Array | null) => { if (bytes) output += decoder.decode(bytes, { stream: true }); };
-  const only = (bytes: Uint8Array | null) => { if (bytes) { stdout += out.decode(bytes, { stream: true }); both(bytes); } };
+  const only = (bytes: Uint8Array | null) => {
+    if (!bytes) return;
+    if (binary) chunks.push(bytes.slice());
+    else { stdout += out.decode(bytes, { stream: true }); both(bytes); }
+  };
+  const bytes = () => {
+    const all = new Uint8Array(chunks.reduce((n, c) => n + c.length, 0));
+    chunks.reduce((at, c) => (all.set(c, at), at + c.length), 0);
+    return all;
+  };
   try {
     const after = (await app.run(args, files, { stdout: only, stderr: both, decodeASCII: false })) as Tree;
-    return { files: after, output, stdout, ok: true };
+    return { files: after, output, stdout, bytes: bytes(), ok: true };
   } catch (e) {
-    if (e instanceof Exit) return { files: e.files, output, stdout, ok: false };
+    if (e instanceof Exit) return { files: e.files, output, stdout, bytes: bytes(), ok: false };
     throw e;
   }
 }
@@ -85,14 +95,15 @@ async function clang(app: Application, args: string[], files: Tree) {
   if (!plan.ok) return plan;
   const jobs = plan.output.split("\n").filter((l) => l.startsWith(' "'))
     .map((l) => Array.from(l.matchAll(/ (?:([^ "]+)|"((?:[^"\\]|\\.)*)")/g), (m) => m[1] ?? m[2].replace(/\\(.)/g, "$1")));
-  let current = files;
+  let current = files, bytes = new Uint8Array();
   // each job: the program's path (empty here), then the tool in the multi-call program ("clang", "-cc1", …)
   for (const [, ...rest] of jobs) {
-    const step = await run(app, rest, current);
+    const step = await run(app, rest, current, true);
     if (!step.ok) return step;
     current = step.files;
+    bytes = step.bytes;
   }
-  return { files: current, stdout: "", output: plan.output.split("\n").filter((l) => !l.startsWith(' "') && !/^(clang|Target|Thread|InstalledDir|Build config)/.test(l)).join("\n"), ok: true };
+  return { files: current, stdout: "", bytes, output: plan.output.split("\n").filter((l) => !l.startsWith(' "') && !/^(clang|Target|Thread|InstalledDir|Build config)/.test(l)).join("\n"), ok: true };
 }
 
 /** Bytes of program in an Intel HEX file. */
@@ -100,9 +111,11 @@ const hexSize = (hex: string) =>
   hex.split(/\r?\n/).filter((l) => l.startsWith(":") && l.slice(7, 9) === "00").reduce((n, l) => n + parseInt(l.slice(1, 3), 16), 0);
 
 export async function compile(app: Application, sketch: string): Promise<Compiled> {
-  const compiled = await clang(app, [...FLAGS, "-c", "sketch.cpp", "-o", "sketch.o"], { "sketch.cpp": prepareSketch(sketch) });
+  // the object to stdout: once a header was looked for where it is not (#include "Print.h" from a library,
+  // tried next to it first), clang writes a file through a temporary one, which the runtime cannot
+  const compiled = await clang(app, [...FLAGS, "-c", "sketch.cpp", "-o", "-"], { "sketch.cpp": prepareSketch(sketch) });
   if (!compiled.ok) return { failed: compiled.output.trim() };
-  const linked = await run(app, ["ld.lld", "-o", "sketch.elf", ...LINK], compiled.files);
+  const linked = await run(app, ["ld.lld", "-o", "sketch.elf", ...LINK], { ...compiled.files, "sketch.o": compiled.bytes });
   if (!linked.ok) return { failed: linked.output.replaceAll("/arduino/lib/", "").trim() };
   // to stdout: writing a file, objcopy renames a temporary one, which the runtime cannot do
   const hexed = await run(app, ["llvm-objcopy", "-O", "ihex", "-R", ".eeprom", "sketch.elf", "-"], linked.files);

@@ -140,6 +140,18 @@ export function Inspector({ element, taken, onChange, onRename, onRotate, onRemo
                  onChange={(e) => onChange({ text: e.target.value })} />
         </Section>
       )}
+      {element.kind === "ultrasonic" && (() => {
+        const cm = Number(element.text ?? 100) || 100;
+        const label = cm > 400 ? t("inspector.farAway") : t("inspector.distance", { cm });
+        return (
+          <Section label={label}>
+            <input type="range" min={2} max={450} step={1} value={cm} className="w-full accent-[var(--accent)]" aria-label={label}
+                   onChange={(e) => onChange({ text: e.target.value })} />
+            <p className={hint}>{t("inspector.distanceHint")}</p>
+          </Section>
+        );
+      })()}
+      {!live && element.kind === "lcd1602" && <p className={hint}>{t("inspector.lcdHint")}</p>}
       {!live && element.kind === "servo" && <p className={hint}>{t("inspector.servoHint")}</p>}
       {!live && (element.kind === "buzzer" || element.kind === "passive_buzzer") && <p className={hint}>{t(`inspector.${element.kind === "buzzer" ? "buzzerHint" : "passiveBuzzerHint"}`)}</p>}
       {element.kind === "arduino" && onSketch && (

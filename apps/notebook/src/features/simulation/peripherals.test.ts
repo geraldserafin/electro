@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { PinState } from "avr8js";
 import { describe, expect, test } from "vitest";
 import { CLOCK, Uno } from "./arduino";
-import { buzzing, heard, listen, servoing, turn, watch } from "./peripherals";
+import { ECHO_DELAY, buzzing, heard, listen, ping, servoing, sonar, turn, watch } from "./peripherals";
 
 /** A pin's square wave as the circuit gives it: a step lands on every edge, then steps of ``dt``. */
 function pinWave(period: number, high: number, until: number, dt = 20e-6): [number, number][] {
@@ -82,5 +82,29 @@ describe("driven by a real sketch (fixtures/peripherals.ino: Servo.write(45) on 
     heard(b, 0.1);
     for (const [t, v] of wave.filter(([t]) => t > 0.1 && t <= 0.3)) { listen(b, v, t - last); last = t; }
     expect(heard(b, 0.2).frequency).toBeCloseTo(440, -1);
+  });
+});
+
+describe("HC-SR04", () => {
+  const trigger = (s: ReturnType<typeof sonar>, at: number, width: number, distance: number) =>
+    [ping(s, 0, at, distance), ping(s, 5, at + 1e-7, distance), ping(s, 5, at + width, distance), ping(s, 0, at + width + 1e-7, distance)]
+      .find((e) => e !== null) ?? null;
+
+  test("a 10 µs trigger: the echo 58 µs a centimetre, after the burst", () => {
+    const echo = trigger(sonar("US_1", 0), 0.01, 10e-6, 100);
+    expect(echo?.[0]).toBeCloseTo(0.01 + 10e-6 + ECHO_DELAY, 9);
+    expect(echo?.[1]).toBeCloseTo(5.83e-3, 5);
+  });
+
+  test("out of range: the echo times out at 38 ms", () => {
+    expect(trigger(sonar("US_1", 0), 0, 10e-6, 500)?.[1]).toBe(38e-3);
+  });
+
+  test("too short a trigger, or one while it is still listening: nothing", () => {
+    expect(trigger(sonar("US_1", 0), 0, 2e-6, 100)).toBeNull();
+    const s = sonar("US_1", 0);
+    trigger(s, 0, 10e-6, 100);
+    expect(trigger(s, 3e-3, 10e-6, 100)).toBeNull();
+    expect(trigger(s, 20e-3, 10e-6, 100)).not.toBeNull();
   });
 });

@@ -44,7 +44,9 @@
   .canvas.running .pin-handle, .canvas.running .segment-h, .canvas.running .segment-v { pointer-events: none; }
   .canvas.running .element { cursor: inherit; }
   .canvas.running .element:is([data-kind="switch"], [data-kind="button"], [data-kind="potentiometer"], [data-kind="photoresistor"],
-                              [data-kind="thermistor"]) { cursor: pointer; }
+                              [data-kind="thermistor"], [data-kind="ultrasonic"]) { cursor: pointer; }
+  .canvas .lcd-screen text { font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; font-size: 25px; pointer-events: none; }
+  .canvas .lcd-screen rect { pointer-events: none; }
   /* a servo's arm follows its angle smoothly between drawings */
   .canvas .element[data-kind="servo"] .horn { transition: transform 33ms linear; }
   /* the meter: every element and wire answers it */

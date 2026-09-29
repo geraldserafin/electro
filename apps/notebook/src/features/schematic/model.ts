@@ -39,6 +39,7 @@ export const KINDS = [
   { kind: "potentiometer", prefix: "P", unit: "Ω", group: "controls" },
   { kind: "photoresistor", prefix: "LDR", unit: "Ω", group: "sensors" },
   { kind: "thermistor", prefix: "RT", unit: "Ω", group: "sensors" },
+  { kind: "ultrasonic", prefix: "US", group: "sensors" },
   { kind: "diode", prefix: "D", group: "semiconductors", live: true },
   { kind: "led", prefix: "LED", group: "semiconductors", live: true },
   { kind: "rgb_led", prefix: "LED", group: "semiconductors", live: true },
@@ -53,6 +54,7 @@ export const KINDS = [
   { kind: "buzzer", prefix: "BZ", group: "peripherals" },
   { kind: "passive_buzzer", prefix: "BZ", group: "peripherals" },
   { kind: "servo", prefix: "M", group: "peripherals" },
+  { kind: "lcd1602", prefix: "LCD", group: "peripherals", live: true },
 ] as const satisfies readonly KindInfo[];
 
 /** An LED's colours (electro.devices.LED_COLORS), for its glow while simulating. */
@@ -65,11 +67,12 @@ export const ledColor = (text: string | null) => LED_COLORS[(text ?? "red") as k
 export const defaultText = (kind: string): string | null =>
   kind === "label" ? "A" : kind === "led" ? "red" : kind === "arduino" ? BLINK
     : kind === "sine_source" ? "50" : kind === "square_source" ? "1k"
-    : kind === "photoresistor" ? "100" : kind === "thermistor" ? "25" : null;
+    : kind === "photoresistor" ? "100" : kind === "thermistor" ? "25" : kind === "ultrasonic" ? "100" : null;
 /** What a new element of a kind starts with in ``value``: a part that comes in one usual value. */
 export const defaultValue = (kind: string): string | null => (kind === "photoresistor" || kind === "thermistor" ? "10k" : null);
-/** Set while it runs, from its panel: a potentiometer's wiper, the light on a photoresistor, a thermistor's temperature. */
-export const isAdjustable = (kind: string) => kind === "potentiometer" || kind === "photoresistor" || kind === "thermistor";
+/** Set while it runs, from its panel: a potentiometer's wiper, the light on a photoresistor, a thermistor's temperature,
+ *  how far an HC-SR04 is from what it sees. */
+export const isAdjustable = (kind: string) => ["potentiometer", "photoresistor", "thermistor", "ultrasonic"].includes(kind);
 
 /** A source in time's ``text`` (electro.devices.SquareSource.from_schematic): its frequency as typed, the duty in %. */
 export function wave(text: string | null): { frequency: string; duty: number } {

@@ -13,7 +13,8 @@ import { compileSketch } from "./atoms";
 import { compiler } from "./compiler";
 import { NoConvergence, type LiveCircuit } from "./engine";
 import { si } from "./format";
-import { buzzing, heard, listen, servoing, turn, watch, type Buzzing, type Servoing } from "./peripherals";
+import { lcd, screen, watch as read, type Lcd, type Screen } from "./lcd";
+import { buzzing, heard, listen, ping, servoing, sonar, turn, watch, type Buzzing, type Servoing, type Sonar } from "./peripherals";
 import { Session } from "./session";
 import { Sound, wake } from "./sound";
 
@@ -30,6 +31,7 @@ export interface LiveFrame {
   // what else an element shows, as CSS variables of its symbol: an RGB LED's and a display's glow per
   // channel (r, a, dp, …: 0–1), a servo's angle (degrees), a buzzer sounding (sound: 0 or 1)
   looks: Record<string, Record<string, number>>;
+  screens: Record<string, Screen>; // each LCD: what it shows
   results: Record<string, ElementResult>; // readings next to the elements
   behind: boolean; // the page cannot keep up: time runs slower than asked
 }
@@ -58,12 +60,13 @@ export const SPEEDS = [1, 0.1, 0.01, 0.001];
 const LIGHTS: Record<string, string[]> = {
   LED: [""], RGBLED: ["r", "g", "b"], SevenSegment: ["a", "b", "c", "d", "e", "f", "g", "dp"],
 };
+const LCD_DATA = ["d0", "d1", "d2", "d3", "d4", "d5", "d6", "d7"];
 const LED_RATED = 0.02; // A: full brightness
 
 /** The drawing without what may change while it runs (switches, positions, sketches): if that
  *  is the same, the circuit is too. */
 function structure(sch: SchematicData): string {
-  const inputs = new Set(["switch", "button", "potentiometer", "photoresistor", "thermistor", "arduino"]);
+  const inputs = new Set(["switch", "button", "potentiometer", "photoresistor", "thermistor", "ultrasonic", "arduino"]);
   return JSON.stringify({ ...sch, elements: sch.elements.map((e) => (inputs.has(e.kind) ? { ...e, text: null } : e)) });
 }
 
@@ -120,6 +123,8 @@ export function useLive(schematic: SchematicData) {
   const lights = useRef<[string, string, number][]>([]); // each LED's id, channel ("" for a plain one), its current's index in x
   const buzzers = useRef<Buzzing[]>([]);
   const servos = useRef<Servoing[]>([]);
+  const lcds = useRef<Lcd[]>([]);
+  const sonars = useRef<Sonar[]>([]);
   const sound = useRef(new Sound());
   const [muted, setMuted] = useState(false);
   const mutedRef = useRef(muted);
@@ -165,6 +170,9 @@ export function useLive(schematic: SchematicData) {
       if (audible) sound.current.set(b.id, frequency === null ? null : frequency * speedRef.current, volume);
     }
     for (const m of servos.current) (looks[m.id] ??= {}).angle = turn(m, sim.t);
+    for (const u of sonars.current) (looks[u.id] ??= {}).ping = sim.t < u.until ? 1 : 0;
+    const screens: Record<string, Screen> = {};
+    for (const d of lcds.current) screens[d.id] = screen(d, sim.x);
     const results: Record<string, ElementResult> = {};
     for (const [id, quantities] of Object.entries(c.program.parts)) {
       const current = quantities.I ?? quantities.I_C ?? quantities.I_D ?? quantities.I_5V;
@@ -180,7 +188,7 @@ export function useLive(schematic: SchematicData) {
     }
     glow.current = { since: sim.t, last: sim.t, charge: new Map() };
     setFrame((f) => ({
-      t: sim.t, voltages, scale, leds, looks, results, behind: behind ?? f?.behind ?? false,
+      t: sim.t, voltages, scale, leds, looks, screens, results, behind: behind ?? f?.behind ?? false,
       wires: c.wires.map((node) => (node === null ? null : voltages[node] ?? null)),
       pins: Object.fromEntries(Object.entries(c.pins).map(([id, nodes]) =>
         [id, nodes.map((node) => (node === null ? null : voltages[node] ?? null))])),
@@ -203,6 +211,16 @@ export function useLive(schematic: SchematicData) {
       g.last = s.sim.t;
     }
     for (const m of servos.current) watch(m, s.sim.x[m.u], s.sim.t);
+    for (const d of lcds.current) read(d, s.sim.x);
+    for (const u of sonars.current) {
+      // (the distance is looked up only while the trigger is high: a ping is sent as it falls)
+      const distance = u.high ? Number(latest.current.elements.find((e) => e.id === u.id)?.text ?? 100) || 100 : 0;
+      const echo = ping(u, s.sim.x[u.trig], s.sim.t, distance);
+      if (!echo) continue;
+      const [at, length] = echo, input = `${u.id}_echo`;
+      s.schedule(at, () => s.sim.setInput(input, 1));
+      s.schedule(at + length, () => s.sim.setInput(input, 0));
+    }
     const window = Math.max(1e-4, speedRef.current * 2);
     for (const name of recorded()) {
       let trace = history.current.get(name);
@@ -286,6 +304,14 @@ export function useLive(schematic: SchematicData) {
       servos.current = Object.entries(kinds).flatMap(([id, kind]) =>
         kind === "Servo" && parts[id]?.U_sig !== undefined
           ? [servoing(id, parts[id].U_sig)] : []);
+      lcds.current = Object.entries(kinds).flatMap(([id, kind]) => {
+        const q = parts[id];
+        return kind === "LCD1602" && q ? [lcd(id, {
+          power: q.U, contrast: q.U_v0, backlight: q.I_a, rs: q.U_rs, rw: q.U_rw, e: q.U_e, data: LCD_DATA.map((d) => q[`U_${d}`]),
+        })] : [];
+      });
+      sonars.current = Object.entries(kinds).flatMap(([id, kind]) =>
+        kind === "Ultrasonic" && parts[id]?.U_trig !== undefined ? [sonar(id, parts[id].U_trig)] : []);
       setHasSound(buzzers.current.length > 0);
       glow.current = { since: 0, last: 0, charge: new Map() };
       built.current = structure(latest.current);

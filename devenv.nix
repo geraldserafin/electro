@@ -64,8 +64,8 @@ in
     python-bundle.exec = "node ${notebook}/scripts/bundle-python.mjs --watch";
     notebook.exec = "cd ${notebook} && pnpm exec vite --port 5190 --strictPort";
     notes-server = {
-      # the first time: the Arduino core for compiling sketches, and the Servo library (downloaded once)
-      exec = "(arduino-cli core list | grep -q arduino:avr || arduino-cli core install arduino:avr); (arduino-cli lib list | grep -q '^Servo ' || arduino-cli lib install Servo); cd ${root}/apps/server && PORT=5191 pnpm dev";
+      # the first time: the Arduino core for compiling sketches, and the Servo and LiquidCrystal libraries (downloaded once)
+      exec = "(arduino-cli core list | grep -q arduino:avr || arduino-cli core install arduino:avr); (arduino-cli lib list | grep -q '^Servo ' || arduino-cli lib install Servo); (arduino-cli lib list | grep -q '^LiquidCrystal ' || arduino-cli lib install LiquidCrystal); cd ${root}/apps/server && PORT=5191 pnpm dev";
       after = [ "devenv:processes:postgres" ];
     };
   };

@@ -21,7 +21,7 @@ from .components import (
 )
 from .devices import (
     LED, NMOS, NPN, PMOS, PNP, RGBLED, Arduino, Button, Buzzer, Diode, PassiveBuzzer, Photoresistor, Potentiometer,
-    Servo, SevenSegment, SineSource, SquareSource, Switch, Thermistor, Timer555, Zener,
+    LCD1602, Servo, SevenSegment, SineSource, SquareSource, Switch, Thermistor, Timer555, Ultrasonic, Zener,
 )
 from .issues import Issue
 from .sim import Trace, simulate
@@ -38,5 +38,5 @@ __all__ = [
     "fmt", "parse", "Eq", "Symbol", "symbols",
     "LED", "NMOS", "NPN", "PMOS", "PNP", "RGBLED", "Arduino", "Button", "Buzzer", "Diode", "PassiveBuzzer",
     "Photoresistor", "Potentiometer", "Servo", "SevenSegment", "SineSource", "SquareSource", "Switch", "Thermistor",
-    "Timer555", "Trace", "Zener", "simulate",
+    "Timer555", "Trace", "Zener", "LCD1602", "Ultrasonic", "simulate",
 ]

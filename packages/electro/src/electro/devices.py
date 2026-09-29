@@ -1,6 +1,6 @@
 """Elements that live in time: sine and square sources, diodes, LEDs (single, RGB, seven-segment)
-and Zener diodes, sensors (light, temperature), buzzers and a servo, switches, a potentiometer,
-bipolar transistors and MOSFETs, the 555 timer and an Arduino board.
+and Zener diodes, sensors (light, temperature, distance), buzzers, a servo and a character LCD,
+switches, a potentiometer, bipolar transistors and MOSFETs, the 555 timer and an Arduino board.
 
 Semiconductors and chips are not linear, so they have laws only in time
 (``ctx.transient``), for ``electro.sim``: the solver on paper says ``NeedsSimulation``.
@@ -376,7 +376,7 @@ class Buzzer(NoValue, TwoTerminal):
     ``ON``; electrically a resistor (a 5 V one draws about 30 mA)."""
 
     prefix = "BZ"
-    R, ON, TONE = 160.0, 2.5, 2300.0  # Ω, V, Hz
+    R, ON, TONE = 160, 2.5, 2300.0  # Ω (whole: exact on paper), V, Hz
 
     def law(self, U, I, x, ctx):
         return [(U - self.R * I, OhmsLaw)]
@@ -386,7 +386,7 @@ class PassiveBuzzer(Buzzer):
     """A passive (magnetic) buzzer: it sounds at the frequency it is driven with (``tone()``);
     electrically its coil, 16 Ω."""
 
-    R = 16.0
+    R = 16
 
 
 class Servo(NoValue):
@@ -397,7 +397,7 @@ class Servo(NoValue):
 
     prefix = "M"
     left, right = ("sig",), ("vcc", "gnd")
-    R_IN, R_LOAD = 100e3, 500.0  # Ω
+    R_IN, R_LOAD = 100_000, 500  # Ω (whole: exact on paper)
 
     def build(self, label, V, param, ctx):
         Us, U, I = sp.Symbol(f"U_{label}_sig"), sp.Symbol(f"U_{label}"), sp.Symbol(f"I_{label}")
@@ -409,6 +409,87 @@ class Servo(NoValue):
         ]
         inflow = {"sig": Us / self.R_IN, "vcc": I, "gnd": -(I + Us / self.R_IN)}
         return Model(inflow, laws, {"U_sig": Us, "U": U, "I": I})
+
+
+class Ultrasonic(NoValue):
+    """An HC-SR04 distance sensor: ``vcc``, ``trig``, ``echo``, ``gnd`` (its pins' order). A pulse of
+    10 µs on ``trig`` sends a ping; ``echo`` then goes high for as long as sound takes there and back,
+    58 µs a centimetre. The page does the timing (``distance`` in cm is set while it runs) through
+    the input ``<label>_echo`` (0 or 1): ``echo`` is a source of ``vcc`` or 0 V behind ``R_OUT``."""
+
+    prefix = "US"
+    left, right = ("vcc", "trig", "echo", "gnd"), ()
+    # (whole numbers: on paper the solver's arithmetic is exact)
+    R_SUPPLY, R_IN, R_OUT = 333, 100_000, 100  # Ω: 15 mA from 5 V; the trigger's input; the echo's output
+    DISTANCE = 100.0  # cm
+
+    def __init__(self, distance: float = DISTANCE, label: str | None = None):
+        super().__init__(label=label)
+        self.distance = float(distance)
+
+    def build(self, label, V, param, ctx):
+        U, I, Ut = sp.Symbol(f"U_{label}"), sp.Symbol(f"I_{label}"), sp.Symbol(f"U_{label}_trig")
+        name = DeviceModel(sp.Symbol(label))
+        high: sp.Expr = sp.Integer(0)
+        model = Model({}, [], {"U": U, "I": I, "U_trig": Ut})
+        if ctx.transient:
+            high = sp.Symbol(f"{label}_echo")
+            model.inputs[high] = 0.0
+        echo = (V["echo"] - V["gnd"] - high * U) / self.R_OUT
+        model.laws += [
+            Law(U - (V["vcc"] - V["gnd"]), name, "kvl"),
+            Law(Ut - (V["trig"] - V["gnd"]), name, "kvl"),
+            Law(U - self.R_SUPPLY * I, name),
+        ]
+        model.inflow |= {"vcc": I, "trig": Ut / self.R_IN, "echo": echo, "gnd": -(I + Ut / self.R_IN + echo)}
+        return model
+
+    def options(self):
+        return [] if self.distance == self.DISTANCE else [f"distance={self.distance:g}"]
+
+    @classmethod
+    def from_schematic(cls, value, text, label):
+        try:
+            return cls(float(text.replace(",", ".")) if text else cls.DISTANCE, label=label)
+        except ValueError:
+            raise BadValue(text) from None
+
+    def __repr__(self):
+        args = self.options() + ([f"label={self.label!r}"] if self.label else [])
+        return f"Ultrasonic({', '.join(args)})"
+
+
+LCD_INPUTS = ("rs", "rw", "e", "d0", "d1", "d2", "d3", "d4", "d5", "d6", "d7")
+
+
+class LCD1602(NoValue):
+    """A 16×2 character LCD (an HD44780 controller), its 16 pins in order: ``vss``, ``vdd``, ``v0``
+    (contrast: the lower, the darker), ``rs``, ``rw``, ``e``, ``d0``–``d7``, and the backlight's
+    ``a``, ``k``. The page runs the controller (it latches on ``e`` falling, 8- or 4-bit, as
+    Arduino's LiquidCrystal drives it) from ``U_<pin>`` (each input against ``vss``); electrically
+    the inputs are high resistances, the logic a load across the supply, the backlight an LED."""
+
+    prefix = "LCD"
+    left, right = ("vss", "vdd", "v0", *LCD_INPUTS, "a", "k"), ()
+    R_LOGIC, R_IN = 5000.0, 1e6  # Ω: 1 mA from 5 V; an input
+    BACKLIGHT = 3.0  # V at 20 mA
+
+    def build(self, label, V, param, ctx):
+        _paper_only(label, ctx)
+        name = DeviceModel(sp.Symbol(label))
+        U, I = sp.Symbol(f"U_{label}"), sp.Symbol(f"I_{label}")
+        model = _leds(label, V, {"a": self.BACKLIGHT}, "k")
+        model.laws += [Law(U - (V["vdd"] - V["vss"]), name, "kvl"), Law(U - self.R_LOGIC * I, name)]
+        model.variables |= {"U": U, "I": I}
+        taken = I
+        for pin in ("v0", *LCD_INPUTS):
+            u = sp.Symbol(f"U_{label}_{pin}")
+            model.laws.append(Law(u - (V[pin] - V["vss"]), name, "kvl"))
+            model.variables[f"U_{pin}"] = u
+            model.inflow[pin] = u / self.R_IN
+            taken += u / self.R_IN
+        model.inflow |= {"vdd": I, "vss": -taken}
+        return model
 
 
 # ------------------------------------------------------------------ switches

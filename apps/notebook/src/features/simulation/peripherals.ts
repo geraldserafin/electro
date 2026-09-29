@@ -72,3 +72,38 @@ export function turn(m: Servoing, t: number): number {
   m.shown = t;
   return m.angle;
 }
+
+/** An HC-SR04: a trigger pulse of 10 µs, then an echo as long as the sound's way there and back. */
+export interface Sonar {
+  id: string;
+  trig: number; // its trigger's voltage's index in x
+  high: boolean; rose: number; last: number; // the trigger now, when it went high, the last sample's time
+  until: number; // the echo it is sending lasts till then (a trigger meanwhile is not heard)
+}
+
+const SOUND = 343; // m/s
+const RANGE = [2, 400]; // cm it measures; beyond, the echo times out
+const TIMEOUT = 38e-3; // s: the echo when nothing came back
+// s: from the trigger falling to the echo rising (the sensor's burst takes about this). More than
+// a slice: a chip runs up to a slice ahead of the circuit (session.ts), and must not be past it.
+export const ECHO_DELAY = 1.2e-3;
+
+export const sonar = (id: string, trig: number): Sonar => ({ id, trig, high: false, rose: 0, last: 0, until: -1 });
+
+/**
+ * The trigger ``u`` at time ``t``; ``distance`` in cm. A ping (the trigger high for 10 µs, then low):
+ * the echo to send, [when it rises, how long it lasts]; else null.
+ */
+export function ping(s: Sonar, u: number, t: number, distance: number): [number, number] | null {
+  const high = u > LOGIC;
+  let echo: [number, number] | null = null;
+  if (high && !s.high) s.rose = s.last;
+  else if (!high && s.high && s.last - s.rose >= 9e-6 && s.last >= s.until) {
+    const length = distance >= RANGE[0] && distance <= RANGE[1] ? 2 * distance / 100 / SOUND : TIMEOUT;
+    echo = [s.last + ECHO_DELAY, length];
+    s.until = s.last + ECHO_DELAY + length;
+  }
+  s.high = high;
+  s.last = t;
+  return echo;
+}

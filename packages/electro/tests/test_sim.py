@@ -6,7 +6,7 @@ import pytest
 
 from electro import (
     LED, NPN, Arduino, Button, Capacitor, Inductor, Potentiometer, Resistor, SineSource, SquareSource, Switch, Timer555,
-    Zener, NMOS, PMOS, RGBLED, Buzzer, PassiveBuzzer, Photoresistor, Servo, SevenSegment, Thermistor,
+    Zener, NMOS, PMOS, RGBLED, Buzzer, PassiveBuzzer, Photoresistor, Servo, SevenSegment, Thermistor, LCD1602, Ultrasonic,
     VoltageSource,
     code, ground, net, node, simulate, supply,
 )
@@ -245,3 +245,26 @@ def test_buzzers_and_servo_are_their_loads():
     assert (supply(5) + PassiveBuzzer() + ground).solve()["BZ_1"].I == pytest.approx(5 / 16)
     servo = net((VoltageSource(5), "GND", "vcc"), (VoltageSource(3), "GND", "s"), (Servo(), "s", "vcc", "GND")).solve()
     assert servo["M_1"].I == pytest.approx(0.01) and servo["M_1"].U == 5
+
+
+def test_ultrasonic_echo_is_a_source_set_from_outside():
+    sensor = net((VoltageSource(5), "GND", "vcc"), (VoltageSource(5), "GND", "trig"), (Resistor(10000), "echo", "GND"),
+                 (Ultrasonic(distance=50), "vcc", "trig", "echo", "GND"))
+    quiet = sensor.solve()
+    assert quiet["US_1"].I == pytest.approx(5 / 333) and quiet["US_1"].U == 5
+    trace = simulate(sensor, t=1e-3, inputs={"US_1_echo": lambda t: 1 if t > 5e-4 else 0})
+    assert trace.at(4e-4)["V_echo"] == pytest.approx(0, abs=1e-6)
+    assert trace.at(1e-3)["V_echo"] == pytest.approx(5 * 10000 / 10100, rel=1e-3)
+    assert "Ultrasonic(distance=50)" in code(sensor)
+
+
+def test_lcd_senses_its_inputs_and_lights_its_backlight():
+    pins = {p: "GND" for p in ("rs", "rw", "e", "d0", "d1", "d2", "d3", "d4", "d5", "d6", "d7")}
+    pins |= {"e": "vcc", "d7": "vcc"}
+    lcd = net((VoltageSource(5), "GND", "vcc"), (Resistor(100), "vcc", "a"),
+              (LCD1602(), "GND", "vcc", "GND", *pins.values(), "a", "GND"))
+    end = simulate(lcd, t=1e-4).at(1e-4)
+    assert end["U_LCD_1_e"] == end["U_LCD_1_d7"] == pytest.approx(5)
+    assert end["U_LCD_1_rs"] == pytest.approx(0)
+    assert end["I_LCD_1_a"] == pytest.approx(0.02, abs=3e-3)  # 3 V backlight behind 100 Ω
+    assert end["I_LCD_1"] == pytest.approx(1e-3)

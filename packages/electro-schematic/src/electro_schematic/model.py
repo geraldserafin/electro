@@ -64,6 +64,8 @@ KINDS: dict[str, Kind] = {
     "buzzer": Kind(TWO_PINS, dev.Buzzer),
     "passive_buzzer": Kind(TWO_PINS, dev.PassiveBuzzer),
     "servo": Kind(((0, 0), (0, 1), (0, 2)), dev.Servo),  # signal, +, − (its cable's order)
+    "ultrasonic": Kind(((0, 4), (1, 4), (2, 4), (3, 4)), dev.Ultrasonic),  # VCC, Trig, Echo, GND below; the distance (cm) in ``text``
+    "lcd1602": Kind(tuple((i, 0) for i in range(16)), dev.LCD1602),  # its 16 pins in a row on top, VSS first
     "switch": Kind(TWO_PINS, dev.Switch),
     "button": Kind(TWO_PINS, dev.Button),
     "potentiometer": Kind(((0, 0), (4, 0), (2, -2)), dev.Potentiometer),  # a, b, wiper
