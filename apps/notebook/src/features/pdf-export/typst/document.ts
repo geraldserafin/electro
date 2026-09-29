@@ -129,11 +129,14 @@ function forTypst(svg: SVGSVGElement, halo: boolean): { source: string; width: n
   const copy = svg.cloneNode(true) as SVGSVGElement;
   copy.setAttribute("xmlns", "http://www.w3.org/2000/svg");
   copy.setAttribute("color", "#000");
-  copy.removeAttribute("class");
+  // the board's classes (canvas, tool-…) mean nothing without the page's styles; a plot's own
+  // class scopes the <style> inside it (its lines' colours, fill: none) and has to stay
+  if (halo) copy.removeAttribute("class");
   // what the board needs and its page styles hide (areas to click): Typst would fill them black
   copy.querySelectorAll(".hit, .pin-handle, .open-pin, .snap, .ghost, .draft, .rubber-band").forEach((el) => el.remove());
   copy.querySelectorAll("style").forEach((style) => {
     style.textContent = (style.textContent ?? "")
+      .replace(/:root\[data-theme="dark"\][^{}]*\{[^}]*\}/g, "") // paper is light; Typst's SVG reader has no :root
       .replace(/var\(--[\w-]+\s*,\s*([^)]+)\)/g, "$1")
       .replace(/var\(--[\w-]+\)/g, "#000")
       .replace(/font:\s*([\d.]+px)[^;}]*/g, "font-size:$1;font-family:sans-serif");
