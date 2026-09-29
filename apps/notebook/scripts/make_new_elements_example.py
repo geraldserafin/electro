@@ -3,6 +3,7 @@ sources in time, the Zener diode, MOSFETs, controlled sources, sensors, and what
 a servo, buzzers, an RGB LED, a seven-segment display, a character LCD, an HC-SR04, and I²C modules
 (run from the repo root with PYTHONPATH set, e.g. in devenv shell). Each drawing is checked: a
 circuit, runnable in time, and wired where it says."""
+import heapq
 import json
 import secrets
 from datetime import datetime, timezone
@@ -23,6 +24,7 @@ class Drawing:
         self.elements: list[Element] = []
         self.wires: list[list] = []
         self.labels = 0
+        self.nets: dict[str, list] = {}
 
     def add(self, *args) -> Element:
         e = Element(*args)
@@ -61,6 +63,11 @@ class Drawing:
         for i, (pin, text) in enumerate(zip(pins, texts)):
             self.stub(pin, (-1, 0), 2 + 2 * i, text)
 
+    def connect(self, nets: dict[str, list]):
+        """Wires for the nets (name → [(element id, pin index), …]), routed (Router); checked in cell()."""
+        self.nets |= nets
+        Router(self).route(nets)
+
     def cell(self, name, joined=(), live=True):
         # where the drawing starts: every point a few squares from the top left (the canvas starts at 0, 0;
         # a symbol may reach 5 squares above its pins, as an HC-SR04's)
@@ -77,19 +84,156 @@ class Drawing:
         for group in joined:  # (element id, pin index), all on one node
             nodes = {names.get(pins[i][k]) for i, k in group}
             assert len(nodes) == 1 and None not in nodes, (name, group, nodes)
+        # each net on a node of its own: no wire crossing another has joined it
+        found = {net: {names.get(pins[i][k]) for i, k in group} for net, group in self.nets.items()}
+        for net, nodes in found.items():
+            assert len(nodes) == 1 and None not in nodes, (name, net, nodes)
+        assert len({next(iter(n)) for n in found.values()}) == len(found), (name, found)
         cells.append({"id": secrets.token_hex(4), "type": "schematic", "name": name, "schematic": json.loads(sch.to_json())})
+
+
+# ------------------------------------------------------------------ wires routed between pins
+
+# where a module's body is (rotation 0, grid squares from its first pin, both ends in): no wire goes there
+BODIES = {
+    "arduino": (1, 17, 1, 7), "servo": (1, 5, -1, 3), "seven_segment": (0, 4, 1, 5), "rgb_led": (1, 3, -1, 5),
+    "lcd1602": (0, 15, 1, 6), "ultrasonic": (-2, 5, -2, 3), "lcd1602_i2c": (1, 18, -2, 4), "ssd1306": (-4, 7, 1, 8),
+    "ds1307": (1, 6, -2, 4), "potentiometer": (1, 3, -1, 0), "passive_buzzer": (1, 3, -1, 0),
+}
+BEND = 4  # a bend costs as much as this many squares of wire
+
+
+class Router:
+    """Wires for nets on a drawing, along the grid: around the bodies and the other nets' pins, a net's
+    wire never along another's and across one only at right angles (never at its bend or end); a net
+    of several pins a tree — a branch ends on the wire it joins, which is split there (wires join
+    only at their ends)."""
+
+    def __init__(self, d: "Drawing"):
+        self.d = d
+        self.blocked: set = set()
+        for e in d.elements:
+            if e.kind in BODIES:
+                assert e.rotation == 0, e.id
+                x0, x1, y0, y1 = BODIES[e.kind]
+                ax, ay = e.at
+                self.blocked |= {(ax + x, ay + y) for x in range(x0, x1 + 1) for y in range(y0, y1 + 1)}
+            pins = e.pins()
+            if len(pins) == 2:  # a two-pin element: its body lies between its pins
+                (x0, y0), (x1, y1) = pins
+                self.blocked |= {(x0 + (x1 - x0) * k // 4, y0 + (y1 - y0) * k // 4) for k in (1, 2, 3)}
+            if e.kind == "ground":
+                self.blocked |= {(e.at[0] + dx, e.at[1] + 1) for dx in (-1, 0, 1)}
+        self.pins = {p for e in d.elements for p in e.pins()}
+        self.edges: set = set()  # grid edges taken
+        self.through: dict = {}  # a point a wire goes straight through → "h" / "v"
+        self.corners: set = set()  # wires' bends and ends
+        self.crossed: set = set()  # where one net's wire crosses another's
+        xs = [p[0] for p in self.blocked | self.pins]
+        ys = [p[1] for p in self.blocked | self.pins]
+        self.box = (min(xs) - 6, max(xs) + 6, min(ys) - 6, max(ys) + 6)
+
+    def route(self, nets: dict[str, list]) -> dict:
+        """nets: name → [(element id, pin index), …]; the wires are added to the drawing. Returns name → points."""
+        at = {e.id: e.pins() for e in self.d.elements}
+        points = {name: [at[i][k] for i, k in pins] for name, pins in nets.items()}
+        mine = {p: name for name, ps in points.items() for p in ps}
+        # the short ones first: they have the fewest ways round
+        for name in sorted(points, key=lambda n: sum(abs(p[0] - q[0]) + abs(p[1] - q[1]) for p in points[n] for q in points[n])):
+            ps = points[name]
+            reached = {ps[0]}
+            wires: list[list] = []  # each a list of every grid point it passes
+            for p in sorted(ps[1:], key=lambda p: min(abs(p[0] - q[0]) + abs(p[1] - q[1]) for q in reached)):
+                if p in reached:  # on the net already (a pin on another's pin)
+                    continue
+                avoid = {q for q in self.pins if mine.get(q) != name or (q not in reached and q != p)}
+                path = self.search(p, reached - self.crossed, avoid)
+                assert path, f"no way for {name} to {p}"
+                end = path[-1]
+                for w in wires:  # the branch ends inside one of this net's wires: split it there
+                    if end in w[1:-1]:
+                        k = w.index(end)
+                        wires.remove(w)
+                        wires += [w[:k + 1], w[k:]]
+                        self.corners.add(end)
+                        self.through.pop(end, None)
+                        break
+                wires.append(path)
+                reached |= set(path)
+                self.take(self.corners_of(path))
+            for w in wires:
+                self.d.wire(*self.corners_of(w))
+        return points
+
+    @staticmethod
+    def cells(wire):
+        out = [wire[0]]
+        for (x0, y0), (x1, y1) in zip(wire, wire[1:]):
+            n = abs(x1 - x0) + abs(y1 - y0)
+            out += [(x0 + (x1 - x0) * k // n, y0 + (y1 - y0) * k // n) for k in range(1, n + 1)]
+        return out
+
+    @staticmethod
+    def corners_of(path):
+        path = Router.cells(path) if len(path) > 1 else path
+        keep = [path[0]]
+        for a, b, c in zip(path, path[1:], path[2:]):
+            if (b[0] - a[0], b[1] - a[1]) != (c[0] - b[0], c[1] - b[1]):
+                keep.append(b)
+        return keep + [path[-1]]
+
+    def take(self, wire):
+        cells = self.cells(wire)
+        for a, b in zip(cells, cells[1:]):
+            self.edges.add(frozenset((a, b)))
+        corners = set(wire)
+        self.corners |= corners
+        for a, b, c in zip(cells, cells[1:], cells[2:]):
+            if b not in corners:
+                if b in self.through:
+                    self.crossed.add(b)
+                self.through[b] = "h" if a[1] == b[1] else "v"
+
+    def search(self, start, targets, avoid):
+        x0, x1, y0, y1 = self.box
+        h = lambda p: min(abs(p[0] - t[0]) + abs(p[1] - t[1]) for t in targets)
+        queue = [(h(start), 0, start, None, (start,))]
+        best = {}
+        while queue:
+            _, cost, p, heading, path = heapq.heappop(queue)
+            if p in targets and p != start:
+                return list(path)
+            if best.get((p, heading), 1e9) <= cost:
+                continue
+            best[(p, heading)] = cost
+            crossing = p in self.through and p != start  # across another wire: straight on only
+            for step in ((1, 0), (-1, 0), (0, 1), (0, -1)):
+                if crossing and step != heading:
+                    continue
+                q = (p[0] + step[0], p[1] + step[1])
+                if not (x0 <= q[0] <= x1 and y0 <= q[1] <= y1) or q in self.blocked or frozenset((p, q)) in self.edges:
+                    continue
+                if q in targets:
+                    pass
+                elif q in avoid or q in self.corners or q in path:
+                    continue
+                elif q in self.through and self.through[q] == ("h" if step[1] == 0 else "v"):
+                    continue
+                turn = heading is not None and step != heading
+                heapq.heappush(queue, (cost + 1 + BEND * turn + h(q), cost + 1 + BEND * turn, q, step, path + (q,)))
+        return None
 
 
 # an Uno's pins (electro_schematic: KINDS["arduino"]), by name → index
 PIN = {f"D{i}": i for i in range(14)} | {f"A{i}": 14 + i for i in range(6)} | {"5V": 20, "GND": 21}
 
 
-def uno(d: Drawing, sketch: str, labels: dict[str, str]) -> Element:
-    """An Arduino at (0, 0) with its sketch, and net labels on the pins named: {"D9": "SERVO", …}."""
-    board = d.add("ARD_1", "arduino", (0, 0), 0, None, sketch)
-    for pin, text in labels.items():
-        d.label(text, board.pins()[PIN[pin]])
-    return board
+def uno(d: Drawing, sketch: str) -> Element:
+    """An Arduino at (0, 0) with its sketch."""
+    return d.add("ARD_1", "arduino", (0, 0), 0, None, sketch)
+
+
+A = lambda pin: ("ARD_1", PIN[pin])  # an Arduino's pin in a net
 
 
 md("""
@@ -266,7 +410,6 @@ md("""
 ## 6. Arduino: serwo i buzzer
 Potencjometr na A0 ustawia kąt serwa (biblioteka `Servo`: impulsy 0,54–2,4 ms na D9), a buzzer pasywny
 na D6 gra `tone()` tym wyższy, im dalej suwak. Buzzer słychać — na pasku symulacji jest przycisk wyciszenia.
-Połączenia oznaczone etykietami (5V, GND, SERWO, BUZZER) są połączone, choć nie ma między nimi przewodu.
 """)
 SERVO = """#include <Servo.h>
 
@@ -284,25 +427,24 @@ void loop() {
 }
 """
 d = Drawing()
-board = uno(d, SERVO, {"D9": "SERWO", "D6": "BUZZER", "5V": "5V", "GND": "GND"})
-servo = d.add("M_1", "servo", (26, -6), 0)
-d.column(servo.pins(), ["SERWO", "5V", "GND"])
-d.add("BZ_1", "passive_buzzer", (24, 4), 0)
-d.stub((24, 4), (-1, 0), 4, "BUZZER")
-d.ground((28, 4))
-d.add("P_1", "potentiometer", (8, 12), 0, "10k", "0.5")
-d.wire(board.pins()[PIN["A0"]], (9, 9), (10, 9), (10, 10))
-d.label("5V", (8, 12))
-d.label("GND", (12, 12))
-d.cell("serwo", joined=[[("ARD_1", PIN["D9"]), ("M_1", 0)], [("ARD_1", PIN["A0"]), ("P_1", 2)],
-                        [("ARD_1", PIN["D6"]), ("BZ_1", 0)]])
+uno(d, SERVO)
+d.add("M_1", "servo", (24, -6), 0)
+d.add("BZ_1", "passive_buzzer", (22, 4), 0)
+d.add("P_1", "potentiometer", (8, 13), 0, "10k", "0.5")
+d.connect({
+    "servo": [A("D9"), ("M_1", 0)], "buzzer": [A("D6"), ("BZ_1", 0)], "wiper": [A("A0"), ("P_1", 2)],
+    "5V": [A("5V"), ("M_1", 1), ("P_1", 0)], "GND": [A("GND"), ("M_1", 2), ("BZ_1", 1), ("P_1", 1)],
+})
+d.cell("serwo")
 
 # ------------------------------------------------------------------ 7. seven segments, RGB
 
 md("""
 ## 7. Wyświetlacz 7-segmentowy i dioda RGB
-Licznik 0–9 na wyświetlaczu ze wspólną katodą (segmenty a–g na D2–D8, jeden rezystor na katodzie —
-dlatego cyfry z większą liczbą segmentów świecą ciemniej), a dioda RGB płynnie zmienia kolor (PWM na D9–D11).
+Licznik 0–9 na wyświetlaczu ze wspólną katodą (segmenty a–g na D2–D8, każdy przez swój rezystor 220 Ω:
+ok. 12 mA na segment, więc każda cyfra świeci tak samo jasno — z jednym wspólnym rezystorem na katodzie prąd
+dzieliłby się między zapalone segmenty i „8” byłaby ciemniejsza niż „1”), a dioda RGB płynnie zmienia kolor
+(PWM na D9–D11).
 """)
 SEGMENTS = """// segmenty a–g na pinach 2–8; bit 0 = a … bit 6 = g
 const byte SEG[] = {2, 3, 4, 5, 6, 7, 8};
@@ -327,21 +469,20 @@ void loop() {
 }
 """
 d = Drawing()
-segs = "abcdefg"
-uno(d, SEGMENTS, {f"D{2 + i}": s for i, s in enumerate(segs)} | {"D9": "R", "D10": "G", "D11": "B", "GND": "GND"})
-ds = d.add("DS_1", "seven_segment", (22, -4), 0)
-for i, s in enumerate(segs):
-    d.label(s, ds.pins()[i])
-d.add("R_1", "resistor", ds.pins()[8], 270, "220")  # from the common cathode, one resistor to ground
-d.wire((24, -8), (28, -8))
-d.ground((28, -8))
-for k, (c, y) in enumerate(zip("RGB", (6, 8, 10))):
-    d.add(f"R_{k + 2}", "resistor", (22, y), 0, "220")
-    d.label(c, (22, y))
-d.add("LED_1", "rgb_led", (26, 6), 0)
-d.ground((30, 8))
-d.cell("licznik", joined=[[("ARD_1", PIN["D2"]), ("DS_1", 0)], [("ARD_1", PIN["D8"]), ("DS_1", 6)],
-                          [("ARD_1", PIN["D10"]), ("R_3", 0)], [("R_3", 1), ("LED_1", 1)]])
+uno(d, SEGMENTS)
+d.add("DS_1", "seven_segment", (27, -22), 0)
+for i in range(7):  # a resistor for each segment, a → g, standing between the board and the display
+    d.add(f"R_{i + 1}", "resistor", (20 + 2 * i, -4), 270, "220")
+for k, y in enumerate((4, 6, 8)):
+    d.add(f"R_{k + 8}", "resistor", (22, y), 0, "220")
+d.add("LED_1", "rgb_led", (27, 4), 0)
+d.connect({f"to_{s}": [A(f"D{2 + i}"), (f"R_{i + 1}", 0)] for i, s in enumerate("abcdefg")}
+          | {f"seg_{s}": [(f"R_{i + 1}", 1), ("DS_1", i)] for i, s in enumerate("abcdefg")} | {
+    "red": [A("D9"), ("R_8", 0)], "green": [A("D10"), ("R_9", 0)], "blue": [A("D11"), ("R_10", 0)],
+    "r": [("R_8", 1), ("LED_1", 0)], "g": [("R_9", 1), ("LED_1", 1)], "b": [("R_10", 1), ("LED_1", 2)],
+    "GND": [A("GND"), ("DS_1", 8), ("LED_1", 3)],
+})
+d.cell("licznik")
 
 # ------------------------------------------------------------------ 8. LCD + HC-SR04
 
@@ -349,7 +490,9 @@ md("""
 ## 8. Czujnik odległości HC-SR04 i wyświetlacz LCD 16×2
 Szkic co chwilę wysyła impuls na TRIG (10 µs), mierzy `pulseIn()` długość echa (58 µs na centymetr) i pisze
 odległość na LCD (biblioteka `LiquidCrystal`, tryb 4-bitowy: RS, E, D4–D7). Przesuń przeszkodę suwakiem
-czujnika. V0 przy masie daje najciemniejsze znaki; podświetlenie to dioda między A i K.
+czujnika. Kontrast ustawia potencjometr na V0, jak w prawdziwym układzie — pokręć nim w czasie symulacji
+(kliknij go albo zakładka **Regulacja**): za mało i znaki znikają, za dużo i wychodzą ciemne kratki.
+RW jest przy masie (tylko zapis); podświetlenie to dioda między A i K, przez rezystor.
 """)
 DISTANCE = """#include <LiquidCrystal.h>
 
@@ -378,32 +521,25 @@ void loop() {
 }
 """
 d = Drawing()
-uno(d, DISTANCE, {"D12": "RS", "D11": "E", "D5": "D4", "D4": "D5", "D3": "D6", "D2": "D7", "D9": "TRIG", "D7": "ECHO",
-                  "5V": "5V", "GND": "GND"})
-lcd = d.add("LCD_1", "lcd1602", (22, -2), 0)
-pins = lcd.pins()
-for i in (0, 2, 4):  # VSS, V0 (at ground: the darkest), RW (writing only): one rail to ground
-    d.wire(pins[i], (pins[i][0], -4))
-d.wire((21, -4), (22, -4))
-d.wire((22, -4), (24, -4))
-d.wire((24, -4), (26, -4))
-d.ground((21, -4))
-for i, text in {1: "5V", 3: "RS", 5: "E", 10: "D4", 11: "D5", 12: "D6", 13: "D7"}.items():
-    d.label(text, pins[i])
-d.add("R_1", "resistor", pins[14], 270, "220")  # the backlight's resistor, from A up to 5 V
-d.label("5V", (36, -6))
-d.wire(pins[15], (37, -4), (38, -4))
-d.ground((38, -4))
-us = d.add("US_1", "ultrasonic", (4, -14), 0, None, "80")
-d.row(us.pins(), (0, 1), ["5V", "TRIG", "ECHO", None])
-d.cell("odleglosc", joined=[[("ARD_1", PIN["D12"]), ("LCD_1", 3)], [("ARD_1", PIN["D7"]), ("US_1", 2)],
-                            [("ARD_1", PIN["5V"]), ("LCD_1", 1), ("US_1", 0)]])
+uno(d, DISTANCE)
+d.add("LCD_1", "lcd1602", (22, -18), 0)
+d.add("R_1", "resistor", (36, -18), 270, "220")  # the backlight's resistor, from A up
+d.add("US_1", "ultrasonic", (-12, -8), 0, None, "80")
+d.add("P_1", "potentiometer", (14, -24), 0, "10k", "0.87")  # contrast: its wiper to V0 (about 0.65 V)
+L = lambda i: ("LCD_1", i)
+d.connect({
+    "rs": [A("D12"), L(3)], "e": [A("D11"), L(5)], "d4": [A("D5"), L(10)], "d5": [A("D4"), L(11)], "d6": [A("D3"), L(12)],
+    "d7": [A("D2"), L(13)], "trig": [A("D9"), ("US_1", 1)], "echo": [A("D7"), ("US_1", 2)],
+    "5V": [A("5V"), L(1), ("R_1", 1), ("US_1", 0), ("P_1", 0)], "GND": [A("GND"), L(0), L(4), L(15), ("US_1", 3), ("P_1", 1)],
+    "v0": [("P_1", 2), L(2)],
+})
+d.cell("odleglosc")
 
 # ------------------------------------------------------------------ 9. I²C
 
 md("""
 ## 9. I²C: zegar, OLED i LCD z konwerterem
-Trzy moduły na jednej magistrali: SDA do A4, SCL do A5 (etykiety). Zegar **DS1307** startuje od czasu na
+Trzy moduły na jednej magistrali: SDA do A4, SCL do A5. Zegar **DS1307** startuje od czasu na
 Twoim komputerze; **OLED** 128×64 (`Adafruit_SSD1306`, adres 0x3C) pokazuje godzinę dużymi cyframi,
 a **LCD z konwerterem PCF8574** (`LiquidCrystal_I2C`, 0x27) datę. Adres modułu zmienisz w jego panelu —
 wtedy szkic go nie znajdzie, jak w prawdziwym układzie.
@@ -455,16 +591,15 @@ void loop() {
 }
 """
 d = Drawing()
-board = uno(d, CLOCK, {"5V": "5V", "GND": "GND"})
-d.row([board.pins()[PIN["A4"]], board.pins()[PIN["A5"]]], (0, 1), ["SDA", "SCL"])
-rtc = d.add("RTC_1", "ds1307", (28, 12), 0, None, "0x68")
-oled = d.add("OLED_1", "ssd1306", (28, -14), 0, None, "0x3C")
-lcd = d.add("LCD_1", "lcd1602_i2c", (28, 22), 0, None, "0x27")
-for module in (rtc, lcd):
-    d.column(module.pins(), ["GND", "5V", "SDA", "SCL"])
-d.row(oled.pins(), (0, -1), ["GND", "5V", "SCL", "SDA"])
-d.cell("zegar", joined=[[("ARD_1", PIN["A4"]), ("RTC_1", 2), ("OLED_1", 3), ("LCD_1", 2)],
-                        [("ARD_1", PIN["A5"]), ("RTC_1", 3), ("OLED_1", 2), ("LCD_1", 3)]])
+uno(d, CLOCK)
+d.add("RTC_1", "ds1307", (26, 10), 0, None, "0x68")
+d.add("OLED_1", "ssd1306", (28, -14), 0, None, "0x3C")
+d.add("LCD_1", "lcd1602_i2c", (26, 18), 0, None, "0x27")
+d.connect({
+    "SDA": [A("A4"), ("RTC_1", 2), ("OLED_1", 3), ("LCD_1", 2)], "SCL": [A("A5"), ("RTC_1", 3), ("OLED_1", 2), ("LCD_1", 3)],
+    "5V": [A("5V"), ("RTC_1", 1), ("OLED_1", 1), ("LCD_1", 1)], "GND": [A("GND"), ("RTC_1", 0), ("OLED_1", 0), ("LCD_1", 0)],
+})
+d.cell("zegar")
 
 md("""
 ## W kodzie

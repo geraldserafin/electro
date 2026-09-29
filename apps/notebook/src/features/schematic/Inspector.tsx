@@ -7,6 +7,8 @@ import { useTranslation } from "react-i18next";
 import type { ElementData } from "@/shared/model/types";
 import { cn } from "@/shared/lib/cn";
 import { CodeIcon, Rotate, Trash } from "@/shared/ui/icons";
+import { i2cParts, i2cText } from "@/shared/model/i2c";
+import { Adjusters, isAdjustable } from "./Adjusters";
 import { useKinds } from "./kinds";
 import { I2C_ADDRESSES, LED_COLORS, hasValue, isComponent, isControlled, isWaveSource, kindInfo, wave, waveText } from "./model";
 import { field, Panel, PanelHead, Section, Tile } from "./Panel";
@@ -114,51 +116,19 @@ export function Inspector({ element, taken, onChange, onRename, onRotate, onRemo
       )}
       {!live && element.kind === "button" && <p className={hint}>{t("inspector.buttonHint")}</p>}
       {!live && isControlled(element.kind) && <p className={hint}>{t("inspector.controlledHint")}</p>}
-      {element.kind === "potentiometer" && (
-        <Section label={t("inspector.position", { percent: Math.round(Number(element.text ?? 0.5) * 100) })}>
-          <input type="range" min={0} max={1} step={0.01} value={Number(element.text ?? 0.5)} className="w-full accent-[var(--accent)]"
-                 aria-label={t("inspector.position", { percent: Math.round(Number(element.text ?? 0.5) * 100) })}
-                 onChange={(e) => onChange({ text: e.target.value })} />
+      {isAdjustable(element.kind) && (
+        <Section label={t("inspector.adjust")}>
+          <Adjusters element={element} onChange={onChange} />
         </Section>
       )}
-      {element.kind === "photoresistor" && (() => {
-        const lux = Math.max(1, Number(element.text ?? 100) || 100);
-        const shown = lux < 10 ? lux.toFixed(1) : String(Math.round(lux));
-        return (
-          <Section label={t("inspector.lux", { lux: shown })}>
-            <input type="range" min={0} max={5} step={0.01} value={Math.log10(lux)} className="w-full accent-[var(--accent)]"
-                   aria-label={t("inspector.lux", { lux: shown })}
-                   onChange={(e) => { const v = 10 ** Number(e.target.value); onChange({ text: v < 10 ? v.toFixed(1) : String(Math.round(v)) }); }} />
-            <p className={hint}>{t("inspector.luxHint")}</p>
-          </Section>
-        );
-      })()}
-      {element.kind === "thermistor" && (
-        <Section label={t("inspector.temperature", { t: Number(element.text ?? 25) })}>
-          <input type="range" min={-20} max={120} step={1} value={Number(element.text ?? 25)} className="w-full accent-[var(--accent)]"
-                 aria-label={t("inspector.temperature", { t: Number(element.text ?? 25) })}
-                 onChange={(e) => onChange({ text: e.target.value })} />
-        </Section>
-      )}
-      {element.kind === "ultrasonic" && (() => {
-        const cm = Number(element.text ?? 100) || 100;
-        const label = cm > 400 ? t("inspector.farAway") : t("inspector.distance", { cm });
-        return (
-          <Section label={label}>
-            <input type="range" min={2} max={450} step={1} value={cm} className="w-full accent-[var(--accent)]" aria-label={label}
-                   onChange={(e) => onChange({ text: e.target.value })} />
-            <p className={hint}>{t("inspector.distanceHint")}</p>
-          </Section>
-        );
-      })()}
       {!live && element.kind === "lcd1602" && <p className={hint}>{t("inspector.lcdHint")}</p>}
       {!live && I2C_ADDRESSES[element.kind] && (
         <Section label={t("inspector.address")}>
           <div className="flex gap-1.5" role="radiogroup" aria-label={t("inspector.address")}>
             {I2C_ADDRESSES[element.kind].map((a) => (
-              <Tile key={a} role="radio" aria-checked={(element.text ?? I2C_ADDRESSES[element.kind][0]) === a}
-                    on={(element.text ?? I2C_ADDRESSES[element.kind][0]) === a} className="w-auto px-3 font-mono text-[13px]"
-                    onClick={() => onChange({ text: a })}>{a}</Tile>
+              <Tile key={a} role="radio" aria-checked={(i2cParts(element.text).address || I2C_ADDRESSES[element.kind][0]) === a}
+                    on={(i2cParts(element.text).address || I2C_ADDRESSES[element.kind][0]) === a} className="w-auto px-3 font-mono text-[13px]"
+                    onClick={() => onChange({ text: element.kind === "lcd1602_i2c" ? i2cText(a, i2cParts(element.text).trimmer) : a })}>{a}</Tile>
             ))}
           </div>
         </Section>

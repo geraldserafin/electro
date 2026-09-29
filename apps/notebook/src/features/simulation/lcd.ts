@@ -112,12 +112,18 @@ export interface Screen {
   underline: boolean;
   blink: boolean;
   contrast: number; // 0 (unreadable) – 1
+  over: number; // 0 – 1: too much contrast, and the dots that are off darken too (the boxes)
   backlight: number; // 0–1
 }
 
+// the liquid crystal is driven by VDD − V0: about 4.2 V shows it best; below 3 V hardly anything, from
+// 4.4 V up the dots that are off start to show (V0 at ground: faint boxes behind the characters)
+const clamp = (v: number) => Math.max(0, Math.min(1, v));
+
 export function screen(d: Lcd, x: ArrayLike<number>): Screen {
-  const volts = x[d.pins.power];
-  const contrast = d.powered && d.on ? Math.max(0, Math.min(1, (volts - x[d.pins.contrast] - 2.5) / 1.5)) : 0;
+  const volts = x[d.pins.power], drive = volts - x[d.pins.contrast];
+  const shown = d.powered && d.on;
+  const contrast = shown ? clamp((drive - 2.8) / 1.4) : 0, over = shown ? 0.35 * clamp((drive - 4.4) / 0.6) : 0;
   const lines = [0, 1].map((line) => Array.from({ length: 16 }, (_, col) => d.ddram[line * LINE + (col + d.shift) % LINE]));
   let cursor: [number, number] | null = null;
   if ((d.cursor || d.blink) && !d.glyphs) {
@@ -126,7 +132,7 @@ export function screen(d: Lcd, x: ArrayLike<number>): Screen {
   }
   const lit = d.pins.backlight === undefined ? 0 : Math.max(0, Math.min(1, x[d.pins.backlight] / 0.02));
   return { lines, text: lines.map((line) => line.map(glyph)), cgram: [...d.cgram], cursor, underline: d.cursor, blink: d.blink,
-    contrast, backlight: lit };
+    contrast, over, backlight: lit };
 }
 
 /** A character of the A00 ROM (the usual one) as text: ASCII mostly, ¥ and arrows, katakana, a few Greek letters. */

@@ -4,6 +4,7 @@
 // character LCD, an SSD1306 OLED, a DS1307 clock.
 import type { AVRTWI, TWIEventHandler } from "avr8js";
 import { lcd, screen, watch, type Lcd, type Screen } from "./lcd";
+import { TRIMMER, i2cParts } from "@/shared/model/i2c";
 import type { Board, Session } from "./session";
 
 /** A chip on the bus: it answers to ``address`` while ``powered()``. */
@@ -58,6 +59,8 @@ export class Bus implements TWIEventHandler {
  */
 export class Backpack implements Device {
   readonly lcd: Lcd;
+  /** The contrast trimmer on its back, 0–1: it sets V0 (0.7: VDD − V0 ≈ 4.25 V, as it best shows). */
+  trimmer = TRIMMER;
   private pins = 0xff; // quasi-bidirectional: high after reset
   private x = new Float64Array(14); // lcd.ts's view: the supply, the contrast, RS, RW, E, D0–D7, the backlight's current
 
@@ -82,6 +85,7 @@ export class Backpack implements Device {
   sample() {
     const x = this.x, p = this.pins, on = this.powered();
     x[0] = on ? 5 : 0;
+    x[1] = 2.5 * (1 - this.trimmer); // V0: VDD − V0 from 2.5 V (nothing shown) to 5 V (boxes)
     x[2] = p & 0x01 ? 5 : 0;
     x[3] = p & 0x02 ? 5 : 0;
     x[4] = p & 0x04 ? 5 : 0;
@@ -197,6 +201,21 @@ export class Oled implements Device {
   }
 }
 
+/** Rows of pixels (1: lit) → the path: each run of lit pixels in a row one rectangle. */
+export function pixelPath(rows: ArrayLike<number>[]): string {
+  let d = "";
+  for (let y = 0; y < rows.length; y++) {
+    const row = rows[y];
+    for (let x = 0; x < row.length; x++) {
+      if (!row[x]) continue;
+      const from = x;
+      while (x + 1 < row.length && row[x + 1]) x++;
+      d += `M${from} ${y}h${x - from + 1}v1h${from - x - 1}z`;
+    }
+  }
+  return d;
+}
+
 // ------------------------------------------------------------------ DS1307
 
 const bcd = (n: number) => ((n / 10) | 0) << 4 | n % 10;
@@ -267,6 +286,7 @@ export class Clock implements Device {
 
 // ------------------------------------------------------------------ on a board
 
+
 const MODULES: Record<string, number> = { LCD1602I2C: 0x27, SSD1306: 0x3c, DS1307: 0x68 }; // electro's kinds, the address they come set to
 const SDA = 18, SCL = 19; // A4, A5 among a board's pins (arduino.ts: Uno.pins)
 
@@ -287,7 +307,7 @@ export function modulesOn(s: Session, board: Board, addresses: Record<string, st
     const [dsa, dcl] = kind === "SSD1306" ? [b, a] : [a, b]; // an OLED's pins: SCL before SDA
     if (dsa !== sda || dcl !== scl) continue;
     const powered = () => s.sim.node(vcc ?? "") - s.sim.node(gnd ?? "") > 3;
-    const address = Number(addresses[id]) || MODULES[kind];
+    const address = Number(i2cParts(addresses[id]).address) || MODULES[kind];
     let m = kept.get(id);
     if (!m || m.address !== address) {
       m = kind === "LCD1602I2C" ? new Backpack(id, address, powered)

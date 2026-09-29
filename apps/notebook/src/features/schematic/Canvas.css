@@ -44,7 +44,7 @@
   .canvas.running .pin-handle, .canvas.running .segment-h, .canvas.running .segment-v { pointer-events: none; }
   .canvas.running .element { cursor: inherit; }
   .canvas.running .element:is([data-kind="switch"], [data-kind="button"], [data-kind="potentiometer"], [data-kind="photoresistor"],
-                              [data-kind="thermistor"], [data-kind="ultrasonic"]) { cursor: pointer; }
+                              [data-kind="thermistor"], [data-kind="ultrasonic"], [data-kind="lcd1602_i2c"]) { cursor: pointer; }
   .canvas .lcd-screen text { font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; font-size: 25px; pointer-events: none; }
   .canvas .lcd-screen rect, .canvas .oled-screen { pointer-events: none; }
   /* a servo's arm follows its angle smoothly between drawings */

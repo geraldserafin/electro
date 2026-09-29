@@ -1,10 +1,12 @@
 // While the circuit runs: one panel under the board, like an IDE's — its controls (pause, stop,
-// time, speed) and two tabs: the chart (the scope) and the console (what the Arduinos write to
-// their serial ports, and how their sketches compiled). Dressed like the board's islands.
+// time, speed) and its tabs: the chart (the scope), the controls (what can be turned, flipped or held,
+// and what the meters read) and the console (what the Arduinos write to their serial ports, and how
+// their sketches compiled). Dressed like the board's islands.
 import { useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import type { ElementData } from "@/shared/model/types";
 import { cn } from "@/shared/lib/cn";
+import { Controls, controlled } from "./Controls";
 import { si } from "./format";
 import { LiveControls } from "./LiveControls";
 import { Scope, ScopeChoice } from "./Scope";
@@ -17,22 +19,29 @@ const Icon = ({ d }: { d: string }) => (
 );
 const ChartIcon = () => <Icon d="M4 19h16M4 15l4.5-5 4 3L20 6" />;
 const ConsoleIcon = () => <Icon d="M4 5h16v14H4zM7.5 9.5l2.5 2.5-2.5 2.5M12.5 15h4" />;
+const SlidersIcon = () => <Icon d="M5 6h9M18 6h1M5 12h3M12 12h7M5 18h11M20 18h-1M16 4v4M10 10v4M18 16v4" />;
 
-type Tab = "chart" | "console";
+type Tab = "chart" | "controls" | "console";
 
-export function SimPanel({ live, arduinos, full, height }: {
+export function SimPanel({ live, arduinos, elements, pressed, onElement, onPress, full, height }: {
   live: Live;
   arduinos: ElementData[]; // the console is theirs
+  elements: ElementData[]; // the board's: the controls tab's
+  pressed: string[]; // buttons held down
+  onElement: (id: string, patch: Partial<ElementData>) => void; // a control turned: the drawing changes
+  onPress: (id: string, down: boolean) => void;
   full?: boolean; // a pane of the cell's editor (under its groups, as tall as dragged), the chart filling it
   height?: number; // that pane's height, px
 }) {
   const { t } = useTranslation("simulation");
   const [tab, setTab] = useState<Tab>("chart");
-  const shown: Tab = arduinos.length ? tab : "chart";
+  const hasControls = elements.some(controlled);
   const tabs: { id: Tab; label: string; icon: ReactNode }[] = [
     { id: "chart", label: t("panel.chart"), icon: <ChartIcon /> },
+    ...(hasControls ? [{ id: "controls" as const, label: t("panel.controls"), icon: <SlidersIcon /> }] : []),
     ...(arduinos.length ? [{ id: "console" as const, label: t("panel.console"), icon: <ConsoleIcon /> }] : []),
   ];
+  const shown: Tab = tabs.some((x) => x.id === tab) ? tab : "chart";
   return (
     <section aria-label={t("panel.label")} style={full && height ? { height } : undefined}
              className={cn("flex flex-col bg-code-bg overflow-hidden",
@@ -61,6 +70,8 @@ export function SimPanel({ live, arduinos, full, height }: {
           </div>
           <div className={cn(full && "flex-1 min-h-0")}><Scope live={live} fill={full} /></div>
         </div>
+      ) : shown === "controls" ? (
+        <Controls live={live} elements={elements} pressed={pressed} onElement={onElement} onPress={onPress} full={full} />
       ) : (
         <Console live={live} arduinos={arduinos} full={full} />
       )}

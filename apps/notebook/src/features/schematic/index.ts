@@ -1,9 +1,10 @@
+export { Adjusters, isAdjustable } from "./Adjusters";
 export { board, BoardButton, BoardIsland, islandButton } from "./Board";
 export { SchematicEditor } from "./Editor";
 export { library, libraryFor } from "./library";
-export { canRunInTime, inTimeOnly } from "./model";
+export { useKinds } from "./kinds";
+export { canRunInTime, inTimeOnly, updateElement } from "./model";
 export * as messages from "./messages";
-export { pixelPath, type OledScreenData } from "./OledScreen";
 export { Panel, PanelHead, Section, Tile } from "./Panel";
 export { PdfDrawing } from "./PdfDrawing";
 export type { ProbeTarget } from "./Editor";

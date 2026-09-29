@@ -15,6 +15,12 @@ export const pl = {
     behind: "wolniej niż zadane — to dużo liczenia",
     mute: "Wycisz buzzery",
     unmute: "Włącz dźwięk buzzerów",
+    inputs: "Elementy do regulacji",
+    meters: "Mierniki",
+    closed: "Zamknięty",
+    open: "Otwarty",
+    hold: "Przytrzymaj",
+    nothing: "Na schemacie nie ma nic do regulowania ani mierników.",
   },
   error: {
     dismiss: "Zamknij",
@@ -28,6 +34,7 @@ export const pl = {
   panel: {
     label: "Symulacja",
     chart: "Wykres",
+    controls: "Regulacja",
     console: "Konsola",
     resize: "Przeciągnij, żeby zmienić wysokość panelu",
   },
@@ -85,6 +92,12 @@ export const en: typeof pl = {
     behind: "slower than asked — a lot to compute",
     mute: "Mute the buzzers",
     unmute: "Sound the buzzers",
+    inputs: "What can be adjusted",
+    meters: "Meters",
+    closed: "Closed",
+    open: "Open",
+    hold: "Hold",
+    nothing: "Nothing on the board to adjust, and no meters.",
   },
   error: {
     dismiss: "Dismiss",
@@ -98,6 +111,7 @@ export const en: typeof pl = {
   panel: {
     label: "Simulation",
     chart: "Chart",
+    controls: "Controls",
     console: "Console",
     resize: "Drag to change the panel's height",
   },

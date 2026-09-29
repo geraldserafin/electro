@@ -76,9 +76,6 @@ export const defaultText = (kind: string): string | null =>
 export const I2C_ADDRESSES: Record<string, string[]> = { lcd1602_i2c: ["0x27", "0x3F"], ssd1306: ["0x3C", "0x3D"] };
 /** What a new element of a kind starts with in ``value``: a part that comes in one usual value. */
 export const defaultValue = (kind: string): string | null => (kind === "photoresistor" || kind === "thermistor" ? "10k" : null);
-/** Set while it runs, from its panel: a potentiometer's wiper, the light on a photoresistor, a thermistor's temperature,
- *  how far an HC-SR04 is from what it sees. */
-export const isAdjustable = (kind: string) => ["potentiometer", "photoresistor", "thermistor", "ultrasonic"].includes(kind);
 
 /** A source in time's ``text`` (electro.devices.SquareSource.from_schematic): its frequency as typed, the duty in %. */
 export function wave(text: string | null): { frequency: string; duty: number } {

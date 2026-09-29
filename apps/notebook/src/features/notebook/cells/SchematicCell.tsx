@@ -3,7 +3,7 @@ import { useTranslation } from "react-i18next";
 import { useLocation, useNavigate, useSearchParams } from "react-router";
 import { usePdf } from "@/features/pdf-export";
 import { kernel } from "@/features/python";
-import { canRunInTime, inTimeOnly, PdfDrawing, SchematicEditor, type Camera } from "@/features/schematic";
+import { canRunInTime, inTimeOnly, PdfDrawing, SchematicEditor, updateElement, type Camera } from "@/features/schematic";
 import { LiveControls, ProbePanel, SimPanel, SketchEditor, UploadButton, useLive } from "@/features/simulation";
 import type { Cell, SchematicData, SymbolLibrary } from "@/shared/model/types";
 import type { Failure } from "@/shared/model/issues";
@@ -352,6 +352,13 @@ export function SchematicCell({ cell, update, library, simulate, running: solvin
                label={timed ? (running ? ts("controls.stop") : ts("controls.startTitle")) : t("schematic.run")} />
   );
 
+  // a button held down (on the board or in the panel): drawn pressed, and closed in the circuit
+  const press = (id: string, down: boolean) => {
+    pressed.current = down ? [...pressed.current.filter((x) => x !== id), id] : pressed.current.filter((x) => x !== id);
+    setPressedIds(pressed.current);
+    live.press(id, down);
+  };
+
   const board = (
     <SchematicEditor
       bare
@@ -361,11 +368,7 @@ export function SchematicCell({ cell, update, library, simulate, running: solvin
       results={running ? live.frame?.results : cell.stale ? undefined : cell.results}
       live={running && live.frame ? {
         wires: live.frame.wires, pins: live.frame.pins, scale: live.frame.scale, leds: live.frame.leds, looks: live.frame.looks, screens: live.frame.screens, oleds: live.frame.oleds, pressed: pressedIds,
-        onPress: (id, down) => {
-          pressed.current = down ? [...pressed.current, id] : pressed.current.filter((x) => x !== id);
-          setPressedIds(pressed.current);
-          live.press(id, down);
-        },
+        onPress: press,
       } : undefined}
       // the bolt runs a circuit that only works in time; one that can also be solved has its own
       // way to run in time, here
@@ -403,7 +406,11 @@ export function SchematicCell({ cell, update, library, simulate, running: solvin
     )
     : <SketchEditor key={id} element={sketchOf(id)!} live={live} fill onChange={(text) => setSketchText(id, text)} />;
 
-  const panel = running && <SimPanel live={live} arduinos={arduinos} full height={full ? panelHeight ?? 260 : 260} />;
+  const panel = running && (
+    <SimPanel live={live} arduinos={arduinos} elements={cell.schematic.elements} pressed={pressedIds} onPress={press}
+              onElement={(id, patch) => update({ schematic: updateElement(cell.schematic, library, id, patch) })}
+              full height={full ? panelHeight ?? 260 : 260} />
+  );
   const last = view.groups.length - 1;
 
   return (

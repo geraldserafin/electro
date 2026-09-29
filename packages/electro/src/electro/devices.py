@@ -520,7 +520,7 @@ class I2CModule(NoValue):
     @classmethod
     def from_schematic(cls, value, text, label):
         try:
-            return cls(int(text, 0) if text else None, label=label)
+            return cls(int(text.split()[0], 0) if text and text.strip() else None, label=label)  # "0x27 70%": the address first
         except ValueError:
             raise BadValue(text) from None
 

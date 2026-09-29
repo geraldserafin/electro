@@ -1,26 +1,26 @@
 {
  "format": "electro-notebook",
  "version": 2,
- "id": "09ba0b06d80069ba",
+ "id": "be2db6cf7a6090a0",
  "title": "Nowe elementy",
- "created": "2026-09-29T20:50:42+00:00",
- "modified": "2026-09-29T20:50:42+00:00",
+ "created": "2026-09-29T21:34:02+00:00",
+ "modified": "2026-09-29T21:34:02+00:00",
  "settings": {
   "codeInPdf": true
  },
  "cells": [
   {
-   "id": "dbc74ce3",
+   "id": "02e429d4",
    "type": "markdown",
    "source": "Przegląd elementów dodanych ostatnio. Schematy uruchamiasz przyciskiem **▶ Symuluj w czasie** pod każdym\nz nich: przewody zmieniają kolor z napięciem, a oscyloskop pod schematem pokazuje przebiegi. Czujniki\n(fotorezystor, termistor, czujnik odległości) mają w czasie symulacji suwak — kliknij element.\nSzkice Arduino kompilują się w przeglądarce; biblioteki `Servo`, `LiquidCrystal`, `LiquidCrystal_I2C`,\n`Adafruit_SSD1306` i `RTClib` są dostępne od razu."
   },
   {
-   "id": "68cad0dd",
+   "id": "7b1cac1c",
    "type": "markdown",
    "source": "## 1. Źródła zmienne w czasie\n**Źródło sinusoidalne** (amplituda i częstotliwość) na filtrze RC: przy częstotliwości granicznej\n$f_g = \\frac{1}{2\\pi RC} \\approx 48$ Hz na kondensatorze zostaje $\\frac{1}{\\sqrt 2}$ amplitudy, opóźnione.\nPorównaj na oscyloskopie `V_we` i `V_wy`."
   },
   {
-   "id": "a2a94308",
+   "id": "4c69d9bd",
    "type": "schematic",
    "name": "filtr",
    "schematic": {
@@ -142,12 +142,12 @@
    }
   },
   {
-   "id": "64f83531",
+   "id": "875a09f3",
    "type": "markdown",
    "source": "**Generator prostokąta** (poziom, częstotliwość, wypełnienie): 2 Hz z wypełnieniem 25 % — dioda błyska\nkrótko dwa razy na sekundę. Zmień wypełnienie suwakiem w panelu źródła."
   },
   {
-   "id": "cffd278d",
+   "id": "5ad282f6",
    "type": "schematic",
    "name": "migacz_prostokat",
    "schematic": {
@@ -247,23 +247,23 @@
    }
   },
   {
-   "id": "578679d8",
+   "id": "7b8bc7ab",
    "type": "markdown",
    "source": "W kodzie: `SineSource(amplituda, frequency=…)`, `SquareSource(poziom, frequency=…, duty=…)`."
   },
   {
-   "id": "a69655a1",
+   "id": "350e0d63",
    "type": "code",
    "source": "przebieg = simulate(filtr, t=0.1)\nprzebieg.plot(\"V_we\", \"V_wy\")",
    "outputs": []
   },
   {
-   "id": "b5fddaf9",
+   "id": "a23517c9",
    "type": "markdown",
    "source": "## 2. Dioda Zenera — stabilizator napięcia\nZener 5,1 V w kierunku zaporowym trzyma napięcie na obciążeniu, choć zasilanie jest wyższe; nadmiar\nodkłada się na $R_1$. W symulacji woltomierz pokazuje ok. 5,1 V — zmień napięcie $E_1$ albo obciążenie $R_2$."
   },
   {
-   "id": "a230e0ce",
+   "id": "dbd1a2fd",
    "type": "schematic",
    "name": "stabilizator",
    "schematic": {
@@ -453,23 +453,23 @@
    }
   },
   {
-   "id": "dfdf75e5",
+   "id": "2ff686da",
    "type": "markdown",
    "source": "Ogranicznik: sinus 10 V obcięty z góry do 5,1 V (przebicie), z dołu do ok. −0,7 V (przewodzenie)."
   },
   {
-   "id": "10673459",
+   "id": "d178d8ec",
    "type": "code",
    "source": "ogranicznik = net(\n    (SineSource(10, frequency=50), \"GND\", \"we\"),\n    (Resistor(1000), \"we\", \"wy\"),\n    (Zener(5.1), \"GND\", \"wy\"),\n)\nsimulate(ogranicznik, t=0.04).plot(\"V_we\", \"V_wy\")",
    "outputs": []
   },
   {
-   "id": "11bbf603",
+   "id": "78bfc955",
    "type": "markdown",
    "source": "## 3. MOSFET jako klucz\nProstokąt 1 Hz na bramce tranzystora N-MOSFET: powyżej napięcia progowego (2 V) kanał przewodzi\n(ok. 0,7 Ω) i dioda świeci. Bramka pobiera prąd tylko przy przeładowaniu swojej pojemności — zobacz `I_Q_1_G`\nna mierniku. W kodzie: `NMOS()`, `PMOS()` — bramka, dren, źródło."
   },
   {
-   "id": "c5dea970",
+   "id": "3ec740b2",
    "type": "schematic",
    "name": "klucz",
    "schematic": {
@@ -626,12 +626,12 @@
    }
   },
   {
-   "id": "88ba0043",
+   "id": "289aa961",
    "type": "markdown",
    "source": "## 4. Źródła sterowane — na papierze, krok po kroku\nWzmacniacz napięciowy jako **źródło napięcia sterowane napięciem** ($\\mu = 10$): lewa para zacisków\nmierzy napięcie, prawa jest źródłem. Uruchom komórkę przyciskiem ▶ — to obwód liniowy, więc solver\nrozwiązuje go na papierze."
   },
   {
-   "id": "ecb28e1e",
+   "id": "6eb6e00f",
    "type": "schematic",
    "name": "wzmacniacz",
    "schematic": {
@@ -747,23 +747,23 @@
    }
   },
   {
-   "id": "121c951f",
+   "id": "c10b09ee",
    "type": "markdown",
    "source": "Źródło prądu sterowane prądem jako model tranzystora: prąd bazy płynie przez gałąź pomiarową (ze strzałką),\nkolektor to źródło $\\beta \\cdot I_b$. Z pomiaru napięcia na $R_2$ solver wyznacza $\\beta$."
   },
   {
-   "id": "5720ae8c",
+   "id": "0b942f6c",
    "type": "code",
    "source": "stopien = net(\n    (VoltageSource(\"10m\"), \"GND\", \"we\"),\n    (Resistor(1000), \"we\", \"b\"),       # r_be\n    (CCCS(), \"b\", \"GND\", \"GND\", \"c\"),  # β · I_b\n    (Resistor(2000), \"c\", \"GND\"),\n)\nsol = stopien.solve(U_R_2=2, find=\"CCCS_1\")\nsteps(sol)",
    "outputs": []
   },
   {
-   "id": "30178c16",
+   "id": "6b79c61b",
    "type": "markdown",
    "source": "## 5. Czujniki: światło i temperatura\nDzielniki z **fotorezystorem** (10 kΩ przy 10 lx) i **termistorem NTC** (10 kΩ przy 25 °C). Na papierze\nliczą się przy świetle i temperaturze ustawionych w panelu; w symulacji zmieniasz je suwakiem, a woltomierze\nnadążają. Ciemniej — większy opór fotorezystora; cieplej — mniejszy termistora."
   },
   {
-   "id": "fbe64644",
+   "id": "100fe2dc",
    "type": "schematic",
    "name": "czujniki",
    "schematic": {
@@ -963,12 +963,12 @@
    }
   },
   {
-   "id": "843dd244",
+   "id": "cd394f2d",
    "type": "markdown",
-   "source": "## 6. Arduino: serwo i buzzer\nPotencjometr na A0 ustawia kąt serwa (biblioteka `Servo`: impulsy 0,54–2,4 ms na D9), a buzzer pasywny\nna D6 gra `tone()` tym wyższy, im dalej suwak. Buzzer słychać — na pasku symulacji jest przycisk wyciszenia.\nPołączenia oznaczone etykietami (5V, GND, SERWO, BUZZER) są połączone, choć nie ma między nimi przewodu."
+   "source": "## 6. Arduino: serwo i buzzer\nPotencjometr na A0 ustawia kąt serwa (biblioteka `Servo`: impulsy 0,54–2,4 ms na D9), a buzzer pasywny\nna D6 gra `tone()` tym wyższy, im dalej suwak. Buzzer słychać — na pasku symulacji jest przycisk wyciszenia."
   },
   {
-   "id": "fcb40ce1",
+   "id": "2416f81b",
    "type": "schematic",
    "name": "serwo",
    "schematic": {
@@ -986,120 +986,21 @@
       "text": "#include <Servo.h>\n\nServo serwo;\n\nvoid setup() {\n  serwo.attach(9);\n}\n\nvoid loop() {\n  int v = analogRead(A0);        // 0–1023 z potencjometru\n  serwo.write(map(v, 0, 1023, 0, 180));\n  tone(6, 200 + v, 60);          // krótki ton, wyższy im dalej suwak\n  delay(250);\n}\n"
      },
      {
-      "id": "lbl1",
-      "kind": "label",
-      "at": [
-       8,
-       13
-      ],
-      "rotation": 0,
-      "value": null,
-      "text": "SERWO"
-     },
-     {
-      "id": "lbl2",
-      "kind": "label",
-      "at": [
-       12,
-       13
-      ],
-      "rotation": 0,
-      "value": null,
-      "text": "BUZZER"
-     },
-     {
-      "id": "lbl3",
-      "kind": "label",
-      "at": [
-       5,
-       21
-      ],
-      "rotation": 0,
-      "value": null,
-      "text": "5V"
-     },
-     {
-      "id": "lbl4",
-      "kind": "label",
-      "at": [
-       7,
-       21
-      ],
-      "rotation": 0,
-      "value": null,
-      "text": "GND"
-     },
-     {
       "id": "M_1",
       "kind": "servo",
-      "at": [
-       28,
-       7
-      ],
-      "rotation": 0,
-      "value": null,
-      "text": null
-     },
-     {
-      "id": "lbl5",
-      "kind": "label",
       "at": [
        26,
        7
       ],
       "rotation": 0,
       "value": null,
-      "text": "SERWO"
-     },
-     {
-      "id": "lbl6",
-      "kind": "label",
-      "at": [
-       24,
-       8
-      ],
-      "rotation": 0,
-      "value": null,
-      "text": "5V"
-     },
-     {
-      "id": "lbl7",
-      "kind": "label",
-      "at": [
-       22,
-       9
-      ],
-      "rotation": 0,
-      "value": null,
-      "text": "GND"
+      "text": null
      },
      {
       "id": "BZ_1",
       "kind": "passive_buzzer",
       "at": [
-       26,
-       17
-      ],
-      "rotation": 0,
-      "value": null,
-      "text": null
-     },
-     {
-      "id": "lbl8",
-      "kind": "label",
-      "at": [
-       22,
-       17
-      ],
-      "rotation": 0,
-      "value": null,
-      "text": "BUZZER"
-     },
-     {
-      "id": "gnd9",
-      "kind": "ground",
-      "at": [
-       30,
+       24,
        17
       ],
       "rotation": 0,
@@ -1111,101 +1012,175 @@
       "kind": "potentiometer",
       "at": [
        10,
-       25
+       26
       ],
       "rotation": 0,
       "value": "10k",
       "text": "0.5"
-     },
-     {
-      "id": "lbl10",
-      "kind": "label",
-      "at": [
-       10,
-       25
-      ],
-      "rotation": 0,
-      "value": null,
-      "text": "5V"
-     },
-     {
-      "id": "lbl11",
-      "kind": "label",
-      "at": [
-       14,
-       25
-      ],
-      "rotation": 0,
-      "value": null,
-      "text": "GND"
      }
     ],
     "wires": [
      {
       "points": [
        [
-        28,
-        7
+        12,
+        24
        ],
        [
-        26,
-        7
-       ]
-      ]
-     },
-     {
-      "points": [
-       [
-        28,
-        8
+        11,
+        24
        ],
-       [
-        24,
-        8
-       ]
-      ]
-     },
-     {
-      "points": [
-       [
-        28,
-        9
-       ],
-       [
-        22,
-        9
-       ]
-      ]
-     },
-     {
-      "points": [
-       [
-        26,
-        17
-       ],
-       [
-        22,
-        17
-       ]
-      ]
-     },
-     {
-      "points": [
        [
         11,
         21
+       ]
+      ]
+     },
+     {
+      "points": [
+       [
+        24,
+        17
        ],
        [
-        11,
-        22
+        24,
+        12
        ],
        [
         12,
-        22
+        12
        ],
        [
         12,
+        13
+       ]
+      ]
+     },
+     {
+      "points": [
+       [
+        26,
+        7
+       ],
+       [
+        8,
+        7
+       ],
+       [
+        8,
+        13
+       ]
+      ]
+     },
+     {
+      "points": [
+       [
+        10,
+        26
+       ],
+       [
+        5,
+        26
+       ],
+       [
+        5,
+        22
+       ]
+      ]
+     },
+     {
+      "points": [
+       [
+        5,
+        22
+       ],
+       [
+        5,
+        21
+       ]
+      ]
+     },
+     {
+      "points": [
+       [
+        26,
+        8
+       ],
+       [
+        20,
+        8
+       ],
+       [
+        20,
+        22
+       ],
+       [
+        5,
+        22
+       ]
+      ]
+     },
+     {
+      "points": [
+       [
+        14,
+        26
+       ],
+       [
+        14,
         23
+       ]
+      ]
+     },
+     {
+      "points": [
+       [
+        14,
+        23
+       ],
+       [
+        7,
+        23
+       ],
+       [
+        7,
+        21
+       ]
+      ]
+     },
+     {
+      "points": [
+       [
+        28,
+        17
+       ],
+       [
+        28,
+        23
+       ],
+       [
+        14,
+        23
+       ]
+      ]
+     },
+     {
+      "points": [
+       [
+        26,
+        9
+       ],
+       [
+        26,
+        15
+       ],
+       [
+        28,
+        15
+       ],
+       [
+        28,
+        17
        ]
       ]
      }
@@ -1213,12 +1188,12 @@
    }
   },
   {
-   "id": "4a660e21",
+   "id": "62d21d4b",
    "type": "markdown",
-   "source": "## 7. Wyświetlacz 7-segmentowy i dioda RGB\nLicznik 0–9 na wyświetlaczu ze wspólną katodą (segmenty a–g na D2–D8, jeden rezystor na katodzie —\ndlatego cyfry z większą liczbą segmentów świecą ciemniej), a dioda RGB płynnie zmienia kolor (PWM na D9–D11)."
+   "source": "## 7. Wyświetlacz 7-segmentowy i dioda RGB\nLicznik 0–9 na wyświetlaczu ze wspólną katodą (segmenty a–g na D2–D8, każdy przez swój rezystor 220 Ω:\nok. 12 mA na segment, więc każda cyfra świeci tak samo jasno — z jednym wspólnym rezystorem na katodzie prąd\ndzieliłby się między zapalone segmenty i „8” byłaby ciemniejsza niż „1”), a dioda RGB płynnie zmienia kolor\n(PWM na D9–D11)."
   },
   {
-   "id": "e4ab6643",
+   "id": "4b46784b",
    "type": "schematic",
    "name": "licznik",
    "schematic": {
@@ -1228,139 +1203,18 @@
       "id": "ARD_1",
       "kind": "arduino",
       "at": [
-       2,
-       15
+       4,
+       33
       ],
       "rotation": 0,
       "value": null,
       "text": "// segmenty a–g na pinach 2–8; bit 0 = a … bit 6 = g\nconst byte SEG[] = {2, 3, 4, 5, 6, 7, 8};\nconst byte CYFRY[10] = {0b0111111, 0b0000110, 0b1011011, 0b1001111, 0b1100110,\n                        0b1101101, 0b1111101, 0b0000111, 0b1111111, 0b1101111};\n\nvoid setup() {\n  for (byte s : SEG) pinMode(s, OUTPUT);\n}\n\nvoid loop() {\n  for (int n = 0; n < 10; n++) {\n    for (int i = 0; i < 7; i++) digitalWrite(SEG[i], (CYFRY[n] >> i) & 1);\n    for (int k = 0; k < 50; k++) {        // przez sekundę kolor diody RGB krąży po tęczy\n      float h = (n * 50 + k) / 500.0 * 6.283;\n      analogWrite(9, 127 + 127 * sin(h));\n      analogWrite(10, 127 + 127 * sin(h + 2.094));\n      analogWrite(11, 127 + 127 * sin(h + 4.189));\n      delay(20);\n    }\n  }\n}\n"
      },
      {
-      "id": "lbl1",
-      "kind": "label",
-      "at": [
-       16,
-       15
-      ],
-      "rotation": 0,
-      "value": null,
-      "text": "a"
-     },
-     {
-      "id": "lbl2",
-      "kind": "label",
-      "at": [
-       15,
-       15
-      ],
-      "rotation": 0,
-      "value": null,
-      "text": "b"
-     },
-     {
-      "id": "lbl3",
-      "kind": "label",
-      "at": [
-       14,
-       15
-      ],
-      "rotation": 0,
-      "value": null,
-      "text": "c"
-     },
-     {
-      "id": "lbl4",
-      "kind": "label",
-      "at": [
-       13,
-       15
-      ],
-      "rotation": 0,
-      "value": null,
-      "text": "d"
-     },
-     {
-      "id": "lbl5",
-      "kind": "label",
-      "at": [
-       12,
-       15
-      ],
-      "rotation": 0,
-      "value": null,
-      "text": "e"
-     },
-     {
-      "id": "lbl6",
-      "kind": "label",
-      "at": [
-       11,
-       15
-      ],
-      "rotation": 0,
-      "value": null,
-      "text": "f"
-     },
-     {
-      "id": "lbl7",
-      "kind": "label",
-      "at": [
-       9,
-       15
-      ],
-      "rotation": 0,
-      "value": null,
-      "text": "g"
-     },
-     {
-      "id": "lbl8",
-      "kind": "label",
-      "at": [
-       8,
-       15
-      ],
-      "rotation": 0,
-      "value": null,
-      "text": "R"
-     },
-     {
-      "id": "lbl9",
-      "kind": "label",
-      "at": [
-       7,
-       15
-      ],
-      "rotation": 0,
-      "value": null,
-      "text": "G"
-     },
-     {
-      "id": "lbl10",
-      "kind": "label",
-      "at": [
-       6,
-       15
-      ],
-      "rotation": 0,
-      "value": null,
-      "text": "B"
-     },
-     {
-      "id": "lbl11",
-      "kind": "label",
-      "at": [
-       7,
-       23
-      ],
-      "rotation": 0,
-      "value": null,
-      "text": "GND"
-     },
-     {
       "id": "DS_1",
       "kind": "seven_segment",
       "at": [
-       24,
+       31,
        11
       ],
       "rotation": 0,
@@ -1368,187 +1222,121 @@
       "text": null
      },
      {
-      "id": "lbl12",
-      "kind": "label",
-      "at": [
-       27,
-       11
-      ],
-      "rotation": 0,
-      "value": null,
-      "text": "a"
-     },
-     {
-      "id": "lbl13",
-      "kind": "label",
-      "at": [
-       28,
-       11
-      ],
-      "rotation": 0,
-      "value": null,
-      "text": "b"
-     },
-     {
-      "id": "lbl14",
-      "kind": "label",
-      "at": [
-       27,
-       17
-      ],
-      "rotation": 0,
-      "value": null,
-      "text": "c"
-     },
-     {
-      "id": "lbl15",
-      "kind": "label",
-      "at": [
-       25,
-       17
-      ],
-      "rotation": 0,
-      "value": null,
-      "text": "d"
-     },
-     {
-      "id": "lbl16",
-      "kind": "label",
-      "at": [
-       24,
-       17
-      ],
-      "rotation": 0,
-      "value": null,
-      "text": "e"
-     },
-     {
-      "id": "lbl17",
-      "kind": "label",
-      "at": [
-       25,
-       11
-      ],
-      "rotation": 0,
-      "value": null,
-      "text": "f"
-     },
-     {
-      "id": "lbl18",
-      "kind": "label",
-      "at": [
-       24,
-       11
-      ],
-      "rotation": 0,
-      "value": null,
-      "text": "g"
-     },
-     {
       "id": "R_1",
       "kind": "resistor",
       "at": [
-       26,
-       11
+       24,
+       29
       ],
       "rotation": 270,
       "value": "220",
       "text": null
      },
      {
-      "id": "gnd19",
-      "kind": "ground",
-      "at": [
-       30,
-       7
-      ],
-      "rotation": 0,
-      "value": null,
-      "text": null
-     },
-     {
       "id": "R_2",
       "kind": "resistor",
       "at": [
-       24,
-       21
+       26,
+       29
       ],
-      "rotation": 0,
+      "rotation": 270,
       "value": "220",
       "text": null
-     },
-     {
-      "id": "lbl20",
-      "kind": "label",
-      "at": [
-       24,
-       21
-      ],
-      "rotation": 0,
-      "value": null,
-      "text": "R"
      },
      {
       "id": "R_3",
       "kind": "resistor",
       "at": [
-       24,
-       23
+       28,
+       29
       ],
-      "rotation": 0,
+      "rotation": 270,
       "value": "220",
       "text": null
-     },
-     {
-      "id": "lbl21",
-      "kind": "label",
-      "at": [
-       24,
-       23
-      ],
-      "rotation": 0,
-      "value": null,
-      "text": "G"
      },
      {
       "id": "R_4",
       "kind": "resistor",
       "at": [
-       24,
-       25
+       30,
+       29
+      ],
+      "rotation": 270,
+      "value": "220",
+      "text": null
+     },
+     {
+      "id": "R_5",
+      "kind": "resistor",
+      "at": [
+       32,
+       29
+      ],
+      "rotation": 270,
+      "value": "220",
+      "text": null
+     },
+     {
+      "id": "R_6",
+      "kind": "resistor",
+      "at": [
+       34,
+       29
+      ],
+      "rotation": 270,
+      "value": "220",
+      "text": null
+     },
+     {
+      "id": "R_7",
+      "kind": "resistor",
+      "at": [
+       36,
+       29
+      ],
+      "rotation": 270,
+      "value": "220",
+      "text": null
+     },
+     {
+      "id": "R_8",
+      "kind": "resistor",
+      "at": [
+       26,
+       37
       ],
       "rotation": 0,
       "value": "220",
       "text": null
      },
      {
-      "id": "lbl22",
-      "kind": "label",
+      "id": "R_9",
+      "kind": "resistor",
       "at": [
-       24,
-       25
+       26,
+       39
       ],
       "rotation": 0,
-      "value": null,
-      "text": "B"
+      "value": "220",
+      "text": null
+     },
+     {
+      "id": "R_10",
+      "kind": "resistor",
+      "at": [
+       26,
+       41
+      ],
+      "rotation": 0,
+      "value": "220",
+      "text": null
      },
      {
       "id": "LED_1",
       "kind": "rgb_led",
       "at": [
-       28,
-       21
-      ],
-      "rotation": 0,
-      "value": null,
-      "text": null
-     },
-     {
-      "id": "gnd23",
-      "kind": "ground",
-      "at": [
-       32,
-       23
+       31,
+       37
       ],
       "rotation": 0,
       "value": null,
@@ -1559,12 +1347,456 @@
      {
       "points": [
        [
-        26,
-        7
+        31,
+        37
        ],
        [
         30,
+        37
+       ]
+      ]
+     },
+     {
+      "points": [
+       [
+        31,
+        39
+       ],
+       [
+        30,
+        39
+       ]
+      ]
+     },
+     {
+      "points": [
+       [
+        31,
+        41
+       ],
+       [
+        30,
+        41
+       ]
+      ]
+     },
+     {
+      "points": [
+       [
+        31,
+        17
+       ],
+       [
+        31,
+        25
+       ],
+       [
+        32,
+        25
+       ]
+      ]
+     },
+     {
+      "points": [
+       [
+        24,
+        29
+       ],
+       [
+        18,
+        29
+       ],
+       [
+        18,
+        33
+       ]
+      ]
+     },
+     {
+      "points": [
+       [
+        32,
+        17
+       ],
+       [
+        32,
+        18
+       ],
+       [
+        30,
+        18
+       ],
+       [
+        30,
+        25
+       ]
+      ]
+     },
+     {
+      "points": [
+       [
+        26,
+        29
+       ],
+       [
+        26,
+        30
+       ],
+       [
+        17,
+        30
+       ],
+       [
+        17,
+        33
+       ]
+      ]
+     },
+     {
+      "points": [
+       [
+        34,
+        17
+       ],
+       [
+        34,
+        19
+       ],
+       [
+        28,
+        19
+       ],
+       [
+        28,
+        25
+       ]
+      ]
+     },
+     {
+      "points": [
+       [
+        28,
+        29
+       ],
+       [
+        28,
+        31
+       ],
+       [
+        16,
+        31
+       ],
+       [
+        16,
+        33
+       ]
+      ]
+     },
+     {
+      "points": [
+       [
+        32,
+        11
+       ],
+       [
+        32,
+        10
+       ],
+       [
+        36,
+        10
+       ],
+       [
+        36,
+        20
+       ],
+       [
+        34,
+        20
+       ],
+       [
+        34,
+        25
+       ]
+      ]
+     },
+     {
+      "points": [
+       [
+        30,
+        29
+       ],
+       [
+        30,
+        32
+       ],
+       [
+        15,
+        32
+       ],
+       [
+        15,
+        33
+       ]
+      ]
+     },
+     {
+      "points": [
+       [
+        31,
+        11
+       ],
+       [
+        29,
+        11
+       ],
+       [
+        29,
+        24
+       ],
+       [
+        36,
+        24
+       ],
+       [
+        36,
+        25
+       ]
+      ]
+     },
+     {
+      "points": [
+       [
+        26,
+        37
+       ],
+       [
+        22,
+        37
+       ],
+       [
+        22,
+        28
+       ],
+       [
+        10,
+        28
+       ],
+       [
+        10,
+        33
+       ]
+      ]
+     },
+     {
+      "points": [
+       [
+        32,
+        29
+       ],
+       [
+        33,
+        29
+       ],
+       [
+        33,
+        23
+       ],
+       [
+        14,
+        23
+       ],
+       [
+        14,
+        33
+       ]
+      ]
+     },
+     {
+      "points": [
+       [
+        35,
+        11
+       ],
+       [
+        35,
+        9
+       ],
+       [
+        26,
+        9
+       ],
+       [
+        26,
+        25
+       ]
+      ]
+     },
+     {
+      "points": [
+       [
+        26,
+        39
+       ],
+       [
+        23,
+        39
+       ],
+       [
+        23,
+        27
+       ],
+       [
+        9,
+        27
+       ],
+       [
+        9,
+        33
+       ]
+      ]
+     },
+     {
+      "points": [
+       [
+        34,
+        11
+       ],
+       [
+        34,
+        8
+       ],
+       [
+        24,
+        8
+       ],
+       [
+        24,
+        25
+       ]
+      ]
+     },
+     {
+      "points": [
+       [
+        34,
+        29
+       ],
+       [
+        34,
+        30
+       ],
+       [
+        27,
+        30
+       ],
+       [
+        27,
+        24
+       ],
+       [
+        13,
+        24
+       ],
+       [
+        13,
+        33
+       ]
+      ]
+     },
+     {
+      "points": [
+       [
+        26,
+        41
+       ],
+       [
+        26,
+        42
+       ],
+       [
+        4,
+        42
+       ],
+       [
+        4,
+        32
+       ],
+       [
+        8,
+        32
+       ],
+       [
+        8,
+        33
+       ]
+      ]
+     },
+     {
+      "points": [
+       [
+        36,
+        29
+       ],
+       [
+        35,
+        29
+       ],
+       [
+        35,
+        22
+       ],
+       [
+        11,
+        22
+       ],
+       [
+        11,
+        33
+       ]
+      ]
+     },
+     {
+      "points": [
+       [
+        35,
+        39
+       ],
+       [
+        35,
+        43
+       ],
+       [
+        9,
+        43
+       ],
+       [
+        9,
+        41
+       ]
+      ]
+     },
+     {
+      "points": [
+       [
+        33,
+        11
+       ],
+       [
+        33,
         7
+       ],
+       [
+        37,
+        7
+       ],
+       [
+        37,
+        39
+       ],
+       [
+        35,
+        39
        ]
       ]
      }
@@ -1572,12 +1804,12 @@
    }
   },
   {
-   "id": "83f756b4",
+   "id": "0bd08e75",
    "type": "markdown",
-   "source": "## 8. Czujnik odległości HC-SR04 i wyświetlacz LCD 16×2\nSzkic co chwilę wysyła impuls na TRIG (10 µs), mierzy `pulseIn()` długość echa (58 µs na centymetr) i pisze\nodległość na LCD (biblioteka `LiquidCrystal`, tryb 4-bitowy: RS, E, D4–D7). Przesuń przeszkodę suwakiem\nczujnika. V0 przy masie daje najciemniejsze znaki; podświetlenie to dioda między A i K."
+   "source": "## 8. Czujnik odległości HC-SR04 i wyświetlacz LCD 16×2\nSzkic co chwilę wysyła impuls na TRIG (10 µs), mierzy `pulseIn()` długość echa (58 µs na centymetr) i pisze\nodległość na LCD (biblioteka `LiquidCrystal`, tryb 4-bitowy: RS, E, D4–D7). Przesuń przeszkodę suwakiem\nczujnika. Kontrast ustawia potencjometr na V0, jak w prawdziwym układzie — pokręć nim w czasie symulacji\n(kliknij go albo zakładka **Regulacja**): za mało i znaki znikają, za dużo i wychodzą ciemne kratki.\nRW jest przy masie (tylko zapis); podświetlenie to dioda między A i K, przez rezystor."
   },
   {
-   "id": "b06a5f1a",
+   "id": "4fc0ae55",
    "type": "schematic",
    "name": "odleglosc",
    "schematic": {
@@ -1587,420 +1819,287 @@
       "id": "ARD_1",
       "kind": "arduino",
       "at": [
-       2,
-       17
+       16,
+       35
       ],
       "rotation": 0,
       "value": null,
       "text": "#include <LiquidCrystal.h>\n\nLiquidCrystal lcd(12, 11, 5, 4, 3, 2);   // RS, E, D4, D5, D6, D7\nconst int TRIG = 9, ECHO = 7;\n\nvoid setup() {\n  lcd.begin(16, 2);\n  lcd.print(\"Odleglosc:\");\n  pinMode(TRIG, OUTPUT);\n  pinMode(ECHO, INPUT);\n}\n\nvoid loop() {\n  digitalWrite(TRIG, HIGH);\n  delayMicroseconds(10);\n  digitalWrite(TRIG, LOW);\n  long us = pulseIn(ECHO, HIGH, 30000UL);\n  lcd.setCursor(0, 1);\n  if (us == 0) lcd.print(\"poza zasiegiem  \");\n  else {\n    lcd.print(us / 58);\n    lcd.print(\" cm            \");\n  }\n  delay(200);\n}\n"
      },
      {
-      "id": "lbl1",
-      "kind": "label",
-      "at": [
-       5,
-       17
-      ],
-      "rotation": 0,
-      "value": null,
-      "text": "RS"
-     },
-     {
-      "id": "lbl2",
-      "kind": "label",
-      "at": [
-       6,
-       17
-      ],
-      "rotation": 0,
-      "value": null,
-      "text": "E"
-     },
-     {
-      "id": "lbl3",
-      "kind": "label",
-      "at": [
-       13,
-       17
-      ],
-      "rotation": 0,
-      "value": null,
-      "text": "D4"
-     },
-     {
-      "id": "lbl4",
-      "kind": "label",
-      "at": [
-       14,
-       17
-      ],
-      "rotation": 0,
-      "value": null,
-      "text": "D5"
-     },
-     {
-      "id": "lbl5",
-      "kind": "label",
-      "at": [
-       15,
-       17
-      ],
-      "rotation": 0,
-      "value": null,
-      "text": "D6"
-     },
-     {
-      "id": "lbl6",
-      "kind": "label",
-      "at": [
-       16,
-       17
-      ],
-      "rotation": 0,
-      "value": null,
-      "text": "D7"
-     },
-     {
-      "id": "lbl7",
-      "kind": "label",
-      "at": [
-       8,
-       17
-      ],
-      "rotation": 0,
-      "value": null,
-      "text": "TRIG"
-     },
-     {
-      "id": "lbl8",
-      "kind": "label",
-      "at": [
-       11,
-       17
-      ],
-      "rotation": 0,
-      "value": null,
-      "text": "ECHO"
-     },
-     {
-      "id": "lbl9",
-      "kind": "label",
-      "at": [
-       5,
-       25
-      ],
-      "rotation": 0,
-      "value": null,
-      "text": "5V"
-     },
-     {
-      "id": "lbl10",
-      "kind": "label",
-      "at": [
-       7,
-       25
-      ],
-      "rotation": 0,
-      "value": null,
-      "text": "GND"
-     },
-     {
       "id": "LCD_1",
       "kind": "lcd1602",
       "at": [
-       24,
-       15
+       38,
+       17
       ],
       "rotation": 0,
       "value": null,
       "text": null
-     },
-     {
-      "id": "gnd11",
-      "kind": "ground",
-      "at": [
-       23,
-       13
-      ],
-      "rotation": 0,
-      "value": null,
-      "text": null
-     },
-     {
-      "id": "lbl12",
-      "kind": "label",
-      "at": [
-       25,
-       15
-      ],
-      "rotation": 0,
-      "value": null,
-      "text": "5V"
-     },
-     {
-      "id": "lbl13",
-      "kind": "label",
-      "at": [
-       27,
-       15
-      ],
-      "rotation": 0,
-      "value": null,
-      "text": "RS"
-     },
-     {
-      "id": "lbl14",
-      "kind": "label",
-      "at": [
-       29,
-       15
-      ],
-      "rotation": 0,
-      "value": null,
-      "text": "E"
-     },
-     {
-      "id": "lbl15",
-      "kind": "label",
-      "at": [
-       34,
-       15
-      ],
-      "rotation": 0,
-      "value": null,
-      "text": "D4"
-     },
-     {
-      "id": "lbl16",
-      "kind": "label",
-      "at": [
-       35,
-       15
-      ],
-      "rotation": 0,
-      "value": null,
-      "text": "D5"
-     },
-     {
-      "id": "lbl17",
-      "kind": "label",
-      "at": [
-       36,
-       15
-      ],
-      "rotation": 0,
-      "value": null,
-      "text": "D6"
-     },
-     {
-      "id": "lbl18",
-      "kind": "label",
-      "at": [
-       37,
-       15
-      ],
-      "rotation": 0,
-      "value": null,
-      "text": "D7"
      },
      {
       "id": "R_1",
       "kind": "resistor",
       "at": [
-       38,
-       15
+       52,
+       17
       ],
       "rotation": 270,
       "value": "220",
       "text": null
      },
      {
-      "id": "lbl19",
-      "kind": "label",
-      "at": [
-       38,
-       11
-      ],
-      "rotation": 0,
-      "value": null,
-      "text": "5V"
-     },
-     {
-      "id": "gnd20",
-      "kind": "ground",
-      "at": [
-       40,
-       13
-      ],
-      "rotation": 0,
-      "value": null,
-      "text": null
-     },
-     {
       "id": "US_1",
       "kind": "ultrasonic",
       "at": [
-       6,
-       3
+       4,
+       27
       ],
       "rotation": 0,
       "value": null,
       "text": "80"
      },
      {
-      "id": "lbl21",
-      "kind": "label",
+      "id": "P_1",
+      "kind": "potentiometer",
       "at": [
-       6,
-       12
-      ],
-      "rotation": 0,
-      "value": null,
-      "text": "5V"
-     },
-     {
-      "id": "lbl22",
-      "kind": "label",
-      "at": [
-       7,
+       30,
        11
       ],
       "rotation": 0,
-      "value": null,
-      "text": "TRIG"
-     },
-     {
-      "id": "lbl23",
-      "kind": "label",
-      "at": [
-       8,
-       10
-      ],
-      "rotation": 0,
-      "value": null,
-      "text": "ECHO"
-     },
-     {
-      "id": "gnd24",
-      "kind": "ground",
-      "at": [
-       9,
-       9
-      ],
-      "rotation": 0,
-      "value": null,
-      "text": null
+      "value": "10k",
+      "text": "0.87"
      }
     ],
     "wires": [
      {
       "points": [
        [
-        24,
-        15
-       ],
-       [
-        24,
-        13
-       ]
-      ]
-     },
-     {
-      "points": [
-       [
-        26,
-        15
-       ],
-       [
-        26,
-        13
-       ]
-      ]
-     },
-     {
-      "points": [
-       [
-        28,
-        15
-       ],
-       [
-        28,
-        13
-       ]
-      ]
-     },
-     {
-      "points": [
-       [
-        23,
-        13
-       ],
-       [
-        24,
-        13
-       ]
-      ]
-     },
-     {
-      "points": [
-       [
-        24,
-        13
-       ],
-       [
-        26,
-        13
-       ]
-      ]
-     },
-     {
-      "points": [
-       [
-        26,
-        13
-       ],
-       [
-        28,
-        13
-       ]
-      ]
-     },
-     {
-      "points": [
-       [
-        39,
-        15
-       ],
-       [
-        39,
-        13
+        40,
+        17
        ],
        [
         40,
+        9
+       ],
+       [
+        32,
+        9
+       ]
+      ]
+     },
+     {
+      "points": [
+       [
+        5,
+        31
+       ],
+       [
+        5,
+        34
+       ],
+       [
+        22,
+        34
+       ],
+       [
+        22,
+        35
+       ]
+      ]
+     },
+     {
+      "points": [
+       [
+        6,
+        31
+       ],
+       [
+        6,
+        33
+       ],
+       [
+        25,
+        33
+       ],
+       [
+        25,
+        35
+       ]
+      ]
+     },
+     {
+      "points": [
+       [
+        48,
+        17
+       ],
+       [
+        48,
+        16
+       ],
+       [
+        27,
+        16
+       ],
+       [
+        27,
+        35
+       ]
+      ]
+     },
+     {
+      "points": [
+       [
+        49,
+        17
+       ],
+       [
+        49,
+        15
+       ],
+       [
+        28,
+        15
+       ],
+       [
+        28,
+        35
+       ]
+      ]
+     },
+     {
+      "points": [
+       [
+        50,
+        17
+       ],
+       [
+        50,
+        14
+       ],
+       [
+        29,
+        14
+       ],
+       [
+        29,
+        35
+       ]
+      ]
+     },
+     {
+      "points": [
+       [
+        51,
+        17
+       ],
+       [
+        51,
         13
+       ],
+       [
+        30,
+        13
+       ],
+       [
+        30,
+        35
        ]
       ]
      },
      {
       "points": [
        [
-        6,
-        7
+        41,
+        17
        ],
        [
-        6,
+        41,
         12
+       ],
+       [
+        19,
+        12
+       ],
+       [
+        19,
+        35
        ]
       ]
      },
      {
       "points": [
        [
-        7,
-        7
+        43,
+        17
        ],
        [
-        7,
+        43,
+        8
+       ],
+       [
+        20,
+        8
+       ],
+       [
+        20,
+        35
+       ]
+      ]
+     },
+     {
+      "points": [
+       [
+        4,
+        31
+       ],
+       [
+        4,
+        43
+       ],
+       [
+        16,
+        43
+       ]
+      ]
+     },
+     {
+      "points": [
+       [
+        16,
+        43
+       ],
+       [
+        19,
+        43
+       ]
+      ]
+     },
+     {
+      "points": [
+       [
+        30,
+        11
+       ],
+       [
+        16,
+        11
+       ],
+       [
+        16,
+        43
+       ]
+      ]
+     },
+     {
+      "points": [
+       [
+        39,
+        17
+       ],
+       [
+        39,
         11
        ]
       ]
@@ -2008,24 +2107,152 @@
      {
       "points": [
        [
-        8,
+        39,
+        11
+       ],
+       [
+        39,
         7
        ],
        [
-        8,
-        10
+        30,
+        7
+       ],
+       [
+        30,
+        11
        ]
       ]
      },
      {
       "points": [
        [
-        9,
-        7
+        52,
+        13
        ],
        [
-        9,
-        9
+        52,
+        11
+       ],
+       [
+        39,
+        11
+       ]
+      ]
+     },
+     {
+      "points": [
+       [
+        7,
+        31
+       ],
+       [
+        7,
+        44
+       ],
+       [
+        21,
+        44
+       ]
+      ]
+     },
+     {
+      "points": [
+       [
+        21,
+        44
+       ],
+       [
+        21,
+        43
+       ]
+      ]
+     },
+     {
+      "points": [
+       [
+        38,
+        17
+       ],
+       [
+        34,
+        17
+       ]
+      ]
+     },
+     {
+      "points": [
+       [
+        34,
+        17
+       ],
+       [
+        34,
+        44
+       ],
+       [
+        21,
+        44
+       ]
+      ]
+     },
+     {
+      "points": [
+       [
+        34,
+        11
+       ],
+       [
+        34,
+        17
+       ]
+      ]
+     },
+     {
+      "points": [
+       [
+        42,
+        17
+       ],
+       [
+        42,
+        12
+       ]
+      ]
+     },
+     {
+      "points": [
+       [
+        42,
+        12
+       ],
+       [
+        42,
+        10
+       ],
+       [
+        34,
+        10
+       ],
+       [
+        34,
+        11
+       ]
+      ]
+     },
+     {
+      "points": [
+       [
+        53,
+        17
+       ],
+       [
+        53,
+        12
+       ],
+       [
+        42,
+        12
        ]
       ]
      }
@@ -2033,12 +2260,12 @@
    }
   },
   {
-   "id": "36143640",
+   "id": "4a45b7af",
    "type": "markdown",
-   "source": "## 9. I²C: zegar, OLED i LCD z konwerterem\nTrzy moduły na jednej magistrali: SDA do A4, SCL do A5 (etykiety). Zegar **DS1307** startuje od czasu na\nTwoim komputerze; **OLED** 128×64 (`Adafruit_SSD1306`, adres 0x3C) pokazuje godzinę dużymi cyframi,\na **LCD z konwerterem PCF8574** (`LiquidCrystal_I2C`, 0x27) datę. Adres modułu zmienisz w jego panelu —\nwtedy szkic go nie znajdzie, jak w prawdziwym układzie."
+   "source": "## 9. I²C: zegar, OLED i LCD z konwerterem\nTrzy moduły na jednej magistrali: SDA do A4, SCL do A5. Zegar **DS1307** startuje od czasu na\nTwoim komputerze; **OLED** 128×64 (`Adafruit_SSD1306`, adres 0x3C) pokazuje godzinę dużymi cyframi,\na **LCD z konwerterem PCF8574** (`LiquidCrystal_I2C`, 0x27) datę. Adres modułu zmienisz w jego panelu —\nwtedy szkic go nie znajdzie, jak w prawdziwym układzie."
   },
   {
-   "id": "cfe96f99",
+   "id": "07769cbe",
    "type": "schematic",
    "name": "zegar",
    "schematic": {
@@ -2049,62 +2276,18 @@
       "kind": "arduino",
       "at": [
        2,
-       26
+       24
       ],
       "rotation": 0,
       "value": null,
       "text": "#include <Wire.h>\n#include <RTClib.h>\n#include <Adafruit_GFX.h>\n#include <Adafruit_SSD1306.h>\n#include <LiquidCrystal_I2C.h>\n\nRTC_DS1307 zegar;\nAdafruit_SSD1306 oled(128, 64, &Wire, -1);\nLiquidCrystal_I2C lcd(0x27, 16, 2);\n\nvoid dwie(Print &p, int n) {   // zawsze dwie cyfry: 09, 10, …\n  if (n < 10) p.print('0');\n  p.print(n);\n}\n\nvoid setup() {\n  zegar.begin();\n  oled.begin(SSD1306_SWITCHCAPVCC, 0x3C);\n  oled.setTextColor(SSD1306_WHITE);\n  lcd.init();\n  lcd.backlight();\n}\n\nvoid loop() {\n  DateTime t = zegar.now();\n  oled.clearDisplay();\n  oled.setTextSize(3);\n  oled.setCursor(20, 20);\n  dwie(oled, t.hour());\n  oled.print(':');\n  dwie(oled, t.minute());\n  oled.setTextSize(1);\n  oled.setCursor(56, 52);\n  dwie(oled, t.second());\n  oled.display();\n  lcd.setCursor(0, 0);\n  lcd.print(\"Data:\");\n  lcd.setCursor(0, 1);\n  dwie(lcd, t.day());\n  lcd.print('.');\n  dwie(lcd, t.month());\n  lcd.print('.');\n  lcd.print(t.year());\n  delay(200);\n}\n"
      },
      {
-      "id": "lbl1",
-      "kind": "label",
-      "at": [
-       5,
-       34
-      ],
-      "rotation": 0,
-      "value": null,
-      "text": "5V"
-     },
-     {
-      "id": "lbl2",
-      "kind": "label",
-      "at": [
-       7,
-       34
-      ],
-      "rotation": 0,
-      "value": null,
-      "text": "GND"
-     },
-     {
-      "id": "lbl3",
-      "kind": "label",
-      "at": [
-       15,
-       37
-      ],
-      "rotation": 0,
-      "value": null,
-      "text": "SDA"
-     },
-     {
-      "id": "lbl4",
-      "kind": "label",
-      "at": [
-       16,
-       36
-      ],
-      "rotation": 0,
-      "value": null,
-      "text": "SCL"
-     },
-     {
       "id": "RTC_1",
       "kind": "ds1307",
       "at": [
-       30,
-       38
+       28,
+       34
       ],
       "rotation": 0,
       "value": null,
@@ -2115,7 +2298,7 @@
       "kind": "ssd1306",
       "at": [
        30,
-       12
+       10
       ],
       "rotation": 0,
       "value": null,
@@ -2125,155 +2308,23 @@
       "id": "LCD_1",
       "kind": "lcd1602_i2c",
       "at": [
-       30,
-       48
+       28,
+       42
       ],
       "rotation": 0,
       "value": null,
       "text": "0x27"
-     },
-     {
-      "id": "lbl5",
-      "kind": "label",
-      "at": [
-       28,
-       38
-      ],
-      "rotation": 0,
-      "value": null,
-      "text": "GND"
-     },
-     {
-      "id": "lbl6",
-      "kind": "label",
-      "at": [
-       26,
-       39
-      ],
-      "rotation": 0,
-      "value": null,
-      "text": "5V"
-     },
-     {
-      "id": "lbl7",
-      "kind": "label",
-      "at": [
-       24,
-       40
-      ],
-      "rotation": 0,
-      "value": null,
-      "text": "SDA"
-     },
-     {
-      "id": "lbl8",
-      "kind": "label",
-      "at": [
-       22,
-       41
-      ],
-      "rotation": 0,
-      "value": null,
-      "text": "SCL"
-     },
-     {
-      "id": "lbl9",
-      "kind": "label",
-      "at": [
-       28,
-       48
-      ],
-      "rotation": 0,
-      "value": null,
-      "text": "GND"
-     },
-     {
-      "id": "lbl10",
-      "kind": "label",
-      "at": [
-       26,
-       49
-      ],
-      "rotation": 0,
-      "value": null,
-      "text": "5V"
-     },
-     {
-      "id": "lbl11",
-      "kind": "label",
-      "at": [
-       24,
-       50
-      ],
-      "rotation": 0,
-      "value": null,
-      "text": "SDA"
-     },
-     {
-      "id": "lbl12",
-      "kind": "label",
-      "at": [
-       22,
-       51
-      ],
-      "rotation": 0,
-      "value": null,
-      "text": "SCL"
-     },
-     {
-      "id": "lbl13",
-      "kind": "label",
-      "at": [
-       30,
-       7
-      ],
-      "rotation": 0,
-      "value": null,
-      "text": "GND"
-     },
-     {
-      "id": "lbl14",
-      "kind": "label",
-      "at": [
-       31,
-       8
-      ],
-      "rotation": 0,
-      "value": null,
-      "text": "5V"
-     },
-     {
-      "id": "lbl15",
-      "kind": "label",
-      "at": [
-       32,
-       9
-      ],
-      "rotation": 0,
-      "value": null,
-      "text": "SCL"
-     },
-     {
-      "id": "lbl16",
-      "kind": "label",
-      "at": [
-       33,
-       10
-      ],
-      "rotation": 0,
-      "value": null,
-      "text": "SDA"
      }
     ],
     "wires": [
      {
       "points": [
        [
-        15,
-        34
+        28,
+        37
        ],
        [
-        15,
+        27,
         37
        ]
       ]
@@ -2281,11 +2332,75 @@
      {
       "points": [
        [
-        16,
-        34
+        28,
+        45
+       ],
+       [
+        27,
+        45
+       ],
+       [
+        27,
+        37
+       ]
+      ]
+     },
+     {
+      "points": [
+       [
+        27,
+        37
+       ],
+       [
+        25,
+        37
+       ]
+      ]
+     },
+     {
+      "points": [
+       [
+        25,
+        37
        ],
        [
         16,
+        37
+       ],
+       [
+        16,
+        32
+       ]
+      ]
+     },
+     {
+      "points": [
+       [
+        32,
+        10
+       ],
+       [
+        32,
+        9
+       ],
+       [
+        25,
+        9
+       ],
+       [
+        25,
+        37
+       ]
+      ]
+     },
+     {
+      "points": [
+       [
+        28,
+        36
+       ],
+       [
+        26,
         36
        ]
       ]
@@ -2293,144 +2408,188 @@
      {
       "points": [
        [
-        30,
-        38
-       ],
-       [
         28,
-        38
-       ]
-      ]
-     },
-     {
-      "points": [
-       [
-        30,
-        39
+        44
        ],
        [
         26,
-        39
-       ]
-      ]
-     },
-     {
-      "points": [
-       [
-        30,
-        40
-       ],
-       [
-        24,
-        40
-       ]
-      ]
-     },
-     {
-      "points": [
-       [
-        30,
-        41
-       ],
-       [
-        22,
-        41
-       ]
-      ]
-     },
-     {
-      "points": [
-       [
-        30,
-        48
-       ],
-       [
-        28,
-        48
-       ]
-      ]
-     },
-     {
-      "points": [
-       [
-        30,
-        49
+        44
        ],
        [
         26,
-        49
+        36
        ]
       ]
      },
      {
       "points": [
        [
-        30,
-        50
+        26,
+        36
        ],
        [
         24,
-        50
+        36
        ]
       ]
      },
      {
       "points": [
        [
-        30,
-        51
+        24,
+        36
        ],
        [
-        22,
-        51
+        15,
+        36
+       ],
+       [
+        15,
+        32
        ]
       ]
      },
      {
       "points": [
-       [
-        30,
-        12
-       ],
-       [
-        30,
-        7
-       ]
-      ]
-     },
-     {
-      "points": [
-       [
-        31,
-        12
-       ],
-       [
-        31,
-        8
-       ]
-      ]
-     },
-     {
-      "points": [
-       [
-        32,
-        12
-       ],
-       [
-        32,
-        9
-       ]
-      ]
-     },
-     {
-      "points": [
-       [
-        33,
-        12
-       ],
        [
         33,
         10
+       ],
+       [
+        33,
+        8
+       ],
+       [
+        24,
+        8
+       ],
+       [
+        24,
+        36
+       ]
+      ]
+     },
+     {
+      "points": [
+       [
+        28,
+        34
+       ],
+       [
+        23,
+        34
+       ]
+      ]
+     },
+     {
+      "points": [
+       [
+        23,
+        34
+       ],
+       [
+        7,
+        34
+       ],
+       [
+        7,
+        32
+       ]
+      ]
+     },
+     {
+      "points": [
+       [
+        28,
+        42
+       ],
+       [
+        23,
+        42
+       ],
+       [
+        23,
+        34
+       ]
+      ]
+     },
+     {
+      "points": [
+       [
+        30,
+        10
+       ],
+       [
+        23,
+        10
+       ],
+       [
+        23,
+        34
+       ]
+      ]
+     },
+     {
+      "points": [
+       [
+        28,
+        35
+       ],
+       [
+        22,
+        35
+       ]
+      ]
+     },
+     {
+      "points": [
+       [
+        22,
+        35
+       ],
+       [
+        5,
+        35
+       ],
+       [
+        5,
+        32
+       ]
+      ]
+     },
+     {
+      "points": [
+       [
+        28,
+        43
+       ],
+       [
+        22,
+        43
+       ],
+       [
+        22,
+        35
+       ]
+      ]
+     },
+     {
+      "points": [
+       [
+        31,
+        10
+       ],
+       [
+        31,
+        7
+       ],
+       [
+        22,
+        7
+       ],
+       [
+        22,
+        35
        ]
       ]
      }
@@ -2438,12 +2597,12 @@
    }
   },
   {
-   "id": "d13f5bac",
+   "id": "e507a72b",
    "type": "markdown",
    "source": "## W kodzie\nKażdy z tych elementów jest też w Pythonie — `code()` zapisze schemat jako kod:\n`Photoresistor(10000, lux=100)`, `Thermistor(10000, temperature=25)`, `Zener(5.1)`, `NMOS()`, `VCVS(10)`,\n`Servo()`, `Buzzer()`, `PassiveBuzzer()`, `RGBLED()`, `SevenSegment()`, `LCD1602()`, `Ultrasonic(distance=80)`,\n`LCD1602I2C()`, `SSD1306()`, `DS1307()`."
   },
   {
-   "id": "04e3a1b3",
+   "id": "6bfc6bcd",
    "type": "code",
    "source": "code(czujniki)",
    "outputs": []

@@ -19,18 +19,3 @@ export function OledScreen({ screen, at, rotation }: { screen: OledScreenData; a
     </g>
   );
 }
-
-/** Rows of pixels (1: lit) → the path: each run of lit pixels in a row one rectangle. */
-export function pixelPath(rows: ArrayLike<number>[]): string {
-  let d = "";
-  for (let y = 0; y < rows.length; y++) {
-    const row = rows[y];
-    for (let x = 0; x < row.length; x++) {
-      if (!row[x]) continue;
-      const from = x;
-      while (x + 1 < row.length && row[x + 1]) x++;
-      d += `M${from} ${y}h${x - from + 1}v1h${from - x - 1}z`;
-    }
-  }
-  return d;
-}

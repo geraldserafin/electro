@@ -1,7 +1,8 @@
 // The circuit in time, in the page: the same loop as electro.sim.Simulation, on a program the
 // Python side compiled (sympy wrote its residuals and Jacobian as JavaScript). Kept step for step
-// like the Python one, so both give the same numbers; here it is JIT-compiled and fast enough to
-// run live, next to an emulated Arduino.
+// like the Python one, so both give the same numbers (within Newton's tolerance: when the inputs
+// change, this one starts from the circuit as it last was with them); here it is JIT-compiled and
+// fast enough to run live, next to an emulated Arduino.
 
 /** electro.sim.Program.to_json() */
 export interface ProgramData {
@@ -29,6 +30,7 @@ const EXP_LIMIT = 80;
 const limexp = (x: number) => (x <= EXP_LIMIT ? Math.exp(x) : Math.exp(EXP_LIMIT) * (1 + x - EXP_LIMIT));
 const dlimexp = (x: number) => Math.exp(Math.min(x, EXP_LIMIT));
 const RELTOL = 1e-6, VNTOL = 1e-6, MAX_NEWTON = 60;
+const GUESSES = 64; // input combinations remembered (the most recent)
 
 type Kernel = (x: Float64Array, p: Float64Array, F: Float64Array, J: Float64Array) => void;
 type Update = (x: Float64Array, p: Float64Array, out: Float64Array) => void;
@@ -106,6 +108,12 @@ export class Simulation {
   private xa: Float64Array;
   private xb: Float64Array;
   private where = new Map<string, number | null>(); // quantity → index in x (null: 0 V), see at()
+  // Newton's first guess when the inputs change: the circuit as it last was with those inputs. A PWM pin,
+  // a multiplexed display go back and forth between a few of them, and from its own last state a step
+  // converges in two iterations instead of fifteen (a LED turning on, walked up its exponential)
+  private guesses = new Map<string, Float64Array>(); // the inputs' values → x
+  private changed = false; // the inputs changed since the last step
+  private inputIndices: number[];
   readonly program: ProgramData;
 
   constructor(program: ProgramData) {
@@ -118,13 +126,27 @@ export class Simulation {
     this.F = new Float64Array(this.n);
     this.J = new Float64Array(this.n * this.n);
     this.after = new Float64Array(program.states.length);
+    this.inputIndices = Object.values(program.inputs).sort((i, j) => i - j);
     this.xa = new Float64Array(this.n);
     this.xb = new Float64Array(this.n);
   }
 
   setInput(name: string, value: number) {
     const i = this.program.inputs[name];
-    if (i !== undefined) this.p[i] = value;
+    if (i === undefined || this.p[i] === value) return;
+    if (!this.changed) { // the inputs as they were: remember the circuit with them
+      this.guesses.delete(this.inputsKey()); // (re-inserted: the map keeps the most recent last)
+      this.guesses.set(this.inputsKey(), Float64Array.from(this.x));
+      if (this.guesses.size > GUESSES) this.guesses.delete(this.guesses.keys().next().value!);
+      this.changed = true;
+    }
+    this.p[i] = value;
+  }
+
+  private inputsKey(): string {
+    let key = "";
+    for (const i of this.inputIndices) key += `${this.p[i]},`;
+    return key;
   }
 
   /** The value of a quantity ("V_A", "I_LED_1"); a node's potential by its name too. */
@@ -154,7 +176,8 @@ export class Simulation {
     p[0] = dt;
     p[1] = this.t + dt;
     let x = this.xa, next = this.xb;
-    x.set(this.x);
+    x.set((this.changed && this.guesses.get(this.inputsKey())) || this.x);
+    this.changed = false;
     for (let iteration = 1; iteration <= MAX_NEWTON; iteration++) {
       J.fill(0);
       this.kernel(x, p, F, J);

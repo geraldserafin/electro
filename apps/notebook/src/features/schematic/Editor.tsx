@@ -12,12 +12,13 @@ import { Target } from "@/shared/ui/icons";
 import { board, BoardIsland, boardIsland } from "./Board";
 import { ElementView, liveColor } from "./ElementView";
 import { HelpPanel } from "./HelpPanel";
+import { isAdjustable } from "./Adjusters";
 import { Inspector, type Selection } from "./Inspector";
 import { LcdScreen, type LcdScreenData } from "./LcdScreen";
 import { LibraryPanel } from "./LibraryPanel";
 import { OledScreen, type OledScreenData } from "./OledScreen";
 import {
-  KINDS, attach, bounds, defaultText, defaultValue, isAdjustable, elbow, inBox, moveGroup, isComponent, isConnectionPoint, junctions,
+  KINDS, attach, bounds, defaultText, defaultValue, elbow, inBox, moveGroup, isComponent, isConnectionPoint, junctions,
   ledColor, nextId, moveSegment, openPins, pins, rotatedAbout, same, simplify, updateElement,
 } from "./model";
 import { SymbolIcon } from "./SymbolIcon";
@@ -630,7 +631,7 @@ export function SchematicEditor({
             const rgb = [r, g, b].map((c) => Math.round(255 * c / most)).join(" ");
             return (
               <circle key={`glow${e.id}`} className="led-glow" cx={(green[0] + k[0]) / 2 * G} cy={(green[1] + k[1]) / 2 * G} r={30}
-                      style={{ fill: `rgb(${rgb})`, opacity: 0.15 + 0.75 * Math.sqrt(most) }} />
+                      style={{ fill: `rgb(${rgb})`, opacity: 0.15 + 0.75 * most }} /> /* (its channels: as the eye sees them already) */
             );
           })}
           {value.elements.map((e) => (

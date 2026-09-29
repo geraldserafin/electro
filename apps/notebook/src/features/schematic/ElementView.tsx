@@ -4,6 +4,17 @@ import { memo, useId, useLayoutEffect, useRef, useState, type CSSProperties, typ
 import type { ElementData, ElementResult, Point, SymbolLibrary, WireData } from "@/shared/model/types";
 import { hasValue, isComponent, isWaveSource, kindInfo, pins, rotate, waveLabel } from "./model";
 
+/**
+ * Where an element is grabbed: all of it as drawn (its body is not just its strokes — a module's
+ * insides, an LCD's glass), and its pins; at least 24 px across, so a thin one (a resistor) is too.
+ */
+function hitArea(box: DOMRect | null, xs: number[], ys: number[]) {
+  const x0 = Math.min(box?.x ?? Infinity, ...xs), x1 = Math.max(box ? box.x + box.width : -Infinity, ...xs);
+  const y0 = Math.min(box?.y ?? Infinity, ...ys), y1 = Math.max(box ? box.y + box.height : -Infinity, ...ys);
+  const padX = Math.max(4, (24 - (x1 - x0)) / 2), padY = Math.max(4, (24 - (y1 - y0)) / 2);
+  return { x: x0 - padX, y: y0 - padY, width: x1 - x0 + 2 * padX, height: y1 - y0 + 2 * padY };
+}
+
 /** The text next to an element: "R_1 = 100 Ω", "A_1", or a net label's name. */
 function label_(e: ElementData): string {
   const unit = kindInfo(e.kind)?.unit ?? "";
@@ -87,12 +98,14 @@ function ElementView_({ element: e, library, wires, result, selected, closed, li
   const symbol = library.kinds[e.kind];
   const ps = pins(e, library).map(([x, y]) => [x * G, y * G] as Point);
   const gradient = useId(); // unique on the page: other boards have their R_1 too
-  // selected: a frame around the symbol as drawn (measured — symbols differ, and rotate)
+  // the symbol as drawn, measured (symbols differ, and rotate): what grabs it, and its frame when selected
   const body = useRef<SVGGElement>(null);
-  const [frame, setFrame] = useState<DOMRect | null>(null);
+  const [box, setBox] = useState<DOMRect | null>(null);
   useLayoutEffect(() => {
-    setFrame(selected && body.current ? body.current.getBBox() : null);
-  }, [selected, e.at[0], e.at[1], e.rotation, e.kind, symbol.svg]);
+    const measured = body.current?.getBBox?.();
+    setBox(measured && (measured.width || measured.height) ? measured : null); // (a net label draws nothing: 0 × 0 at the origin)
+  }, [e.at[0], e.at[1], e.rotation, e.kind, symbol.svg]);
+  const frame = selected ? box : null;
   // running: a two-pin element (and a potentiometer's body) shades from one pin's colour to the
   // other's, so it reads as the wires on both sides do; longer leads get a colour each
   const colours = live?.pins.map((v) => liveColor(v, live.scale));
@@ -136,11 +149,7 @@ function ElementView_({ element: e, library, wires, result, selected, closed, li
   return (
     <g className={`element ${selected ? "selected" : ""} ${closed ? "closed" : ""} ${lit && lit > 0.01 ? "lit" : ""}`}
        data-id={e.id} data-kind={e.kind} style={vars} onPointerDown={(event) => onPointerDown(event, e)}>
-      <rect
-        className="hit"
-        x={Math.min(...xs) - 12} y={Math.min(...ys) - 12}
-        width={Math.max(...xs) - Math.min(...xs) + 24} height={Math.max(...ys) - Math.min(...ys) + 24}
-      />
+      <rect className="hit" {...hitArea(box, xs, ys)} />
       {shaded && (
         <linearGradient id={gradient} gradientUnits="userSpaceOnUse" x1={ps[0][0]} y1={ps[0][1]} x2={ps[1][0]} y2={ps[1][1]}>
           <stop offset="0.2" style={{ stopColor: colours[0] }} />

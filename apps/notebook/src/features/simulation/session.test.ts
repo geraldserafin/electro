@@ -2,9 +2,10 @@
 // fixtures/sonar.ino (pulseIn() on its echo). The circuit is fixtures/sonar.live.json
 // (scripts/make_sim_fixtures.py); the sensor's timing is peripherals.ts's, scheduled as useLive does.
 import { readFileSync } from "node:fs";
-import { expect, test } from "vitest";
+import { describe, expect, test } from "vitest";
 import { Backpack, modulesOn } from "./i2c";
 import { ping, sonar } from "./peripherals";
+import { Runner } from "./runner";
 import { Session } from "./session";
 
 const fixture = (name: string) => readFileSync(new URL(`./fixtures/${name}`, import.meta.url), "utf8");
@@ -43,4 +44,32 @@ test("I²C: the modules on A4/A5 are on the bus, powered by the circuit; one els
   board.uno.i2c.devices = devices;
   session.advanceTo(1.5, 1e-3);
   expect((devices[0] as Backpack).screen().text[0].join("")).toBe("I2C works       ");
+});
+
+// runner.ts, as the worker runs it: the same circuits, the devices wired up by it
+describe("Runner", () => {
+  test("an HC-SR04 through the whole chain: its echo timed, the sketch's serial in the frames", () => {
+    const runner = new Runner(JSON.parse(fixture("sonar.live.json")), [{ id: "US_1", kind: "ultrasonic", text: "100" }]);
+    runner.attach("ARD_1", fixture("sonar.hex"));
+    let serial = "";
+    for (let t = 0.02; t <= 0.1; t += 0.02) {
+      runner.advanceTo(t, 1e-3);
+      serial += runner.frame().serial;
+    }
+    const lengths = serial.trim().split(/\s+/).map(Number).slice(1);
+    expect(lengths.length).toBeGreaterThan(2);
+    for (const us of lengths) expect(Math.abs(us - (5831 - 6.2 * 5))).toBeLessThan(10);
+  });
+
+  test("an I²C LCD shows its text, as dark as its trimmer is turned", () => {
+    const parts = [{ id: "LCD_1", kind: "lcd1602_i2c", text: "0x27 70%" }];
+    const runner = new Runner(JSON.parse(fixture("i2c.live.json")), parts);
+    runner.attach("ARD_1", fixture("i2c_lcd.hex"));
+    runner.advanceTo(1.5, 1e-3);
+    const lit = runner.frame().screens.LCD_1;
+    expect(lit.text[0].join("")).toBe("I2C works       ");
+    expect([lit.contrast, lit.over]).toEqual([1, 0]);
+    runner.setParts([{ id: "LCD_1", kind: "lcd1602_i2c", text: "0x27 20%" }]);
+    expect(runner.frame().screens.LCD_1.contrast).toBeLessThan(0.3);
+  });
 });
