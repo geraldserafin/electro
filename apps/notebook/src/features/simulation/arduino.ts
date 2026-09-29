@@ -6,6 +6,7 @@ import {
   AVRADC, AVRIOPort, AVRTimer, AVRTWI, AVRUSART, CPU, PinState, adcConfig, avrInstruction, portBConfig, portCConfig,
   portDConfig, timer0Config, timer1Config, timer2Config, twiConfig, usart0Config,
 } from "avr8js";
+import type { Chip, Mode, PinChange } from "./chip";
 import { Bus } from "./i2c";
 
 export const CLOCK = 16e6; // Hz
@@ -49,7 +50,16 @@ export function loadHex(source: string): Uint16Array {
   return new Uint16Array(flash.buffer);
 }
 
-export class Uno {
+const MODE: Record<PinState, Mode> = {
+  [PinState.Input]: "input", [PinState.InputPullUp]: "pullup", [PinState.Low]: "low", [PinState.High]: "high",
+};
+
+export class Uno implements Chip {
+  readonly pins = PINS.map((p) => p.name);
+  readonly modes: Record<Mode, [number, number]> = { ...Object.fromEntries(Object.entries(MODE).map(([s, m]) => [m, PIN_MODES[Number(s) as PinState]])),
+    pulldown: PIN_MODES[PinState.Input] } as Record<Mode, [number, number]>; // (an AVR has no pull-downs)
+  readonly sda = "A4";
+  readonly scl = "A5";
   readonly cpu: CPU;
   private ports: Record<"B" | "C" | "D", AVRIOPort>;
   private adc: AVRADC;
@@ -81,6 +91,16 @@ export class Uno {
     };
     for (const port of Object.values(this.ports)) port.addListener(() => this.scan());
     for (const { name } of PINS) this.last.set(name, PinState.Input);
+  }
+
+  initial(): [string, Mode][] {
+    return this.states().map(([pin, state]) => [pin, MODE[state]]);
+  }
+
+  take(): PinChange[] {
+    const changes = this.events.map((e) => ({ time: e.cycle / CLOCK, pin: e.pin, mode: MODE[e.state] }));
+    this.events = [];
+    return changes;
   }
 
   /** Every pin as it is now (all inputs before the sketch starts). */

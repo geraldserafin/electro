@@ -98,7 +98,7 @@ class Drawing:
 BODIES = {
     "arduino": (1, 17, 1, 7), "servo": (1, 5, -1, 3), "seven_segment": (0, 4, 1, 5), "rgb_led": (1, 3, -1, 5),
     "lcd1602": (0, 15, 1, 6), "ultrasonic": (-2, 5, -2, 3), "lcd1602_i2c": (1, 18, -2, 4), "ssd1306": (-4, 7, 1, 8),
-    "ds1307": (1, 6, -2, 4), "potentiometer": (1, 3, -1, 0), "passive_buzzer": (1, 3, -1, 0),
+    "ds1307": (1, 6, -2, 4), "potentiometer": (1, 3, -1, 0), "passive_buzzer": (1, 3, -1, 0), "pico": (1, 7, -2, 16),
 }
 BEND = 4  # a bend costs as much as this many squares of wire
 
@@ -234,6 +234,9 @@ def uno(d: Drawing, sketch: str) -> Element:
 
 
 A = lambda pin: ("ARD_1", PIN[pin])  # an Arduino's pin in a net
+# a Pico's pins (electro_schematic: KINDS["pico"]): GP0–GP22, GP26–GP28, VBUS, 3V3, GND
+PICO = {f"GP{i}": i for i in range(23)} | {"GP26": 23, "GP27": 24, "GP28": 25, "VBUS": 26, "3V3": 27, "GND": 28}
+PI = lambda pin: ("PICO_1", PICO[pin])
 
 
 md("""
@@ -601,12 +604,41 @@ d.connect({
 })
 d.cell("zegar")
 
+# ------------------------------------------------------------------ 10. Pico: a game
+
+md("""
+## 10. Raspberry Pi Pico: strzelanka w stylu Dooma
+Druga płytka: **Raspberry Pi Pico** (RP2040, logika 3,3 V). Szkic kompiluje serwer (rdzeń arduino-pico), więc
+trzeba być zalogowanym; emulowany jest jeden rdzeń. Na nim gra: korytarze liczone metodą rzucania promieni
+(jak w Wolfensteinie 3D), ściany cieniowane ditheringiem, demony jako sprite'y — na OLED-zie 128×64 przez I²C
+(GP4 SDA, GP5 SCL), z buzzerem na GP15.
+
+Sterowanie: przyciski mają przypisane klawisze — **kliknij schemat** (żeby miał fokus) i graj **strzałkami**,
+**spacja** strzela i zaczyna grę. Można też trzymać przyciski myszką albo w zakładce **Regulacja**.
+To nie jest prawdziwy Doom: ten potrzebowałby dwóch rdzeni po 270 MHz i obrazu VGA z PIO.
+""")
+GAME = (Path(__file__).parent.parent / "src/features/simulation/fixtures/hell.pico.ino").read_text()
+d = Drawing()
+d.add("PICO_1", "pico", (0, 0), 0, None, GAME)
+d.add("OLED_1", "ssd1306", (-14, -8), 0, None, "0x3C")
+d.add("BZ_1", "passive_buzzer", (-6, 9), 0)
+keys = {"GP10": "ArrowUp", "GP11": "ArrowDown", "GP12": "ArrowLeft", "GP13": "ArrowRight", "GP14": "Space"}
+for k, (pin, key) in enumerate(keys.items()):
+    d.add(f"B_{k + 1}", "button", (-4 - 3 * k, 19), 90, None, key)
+d.connect({
+    "sda": [PI("GP4"), ("OLED_1", 3)], "scl": [PI("GP5"), ("OLED_1", 2)], "buzz": [PI("GP15"), ("BZ_1", 0)],
+    **{f"key_{pin}": [PI(pin), (f"B_{k + 1}", 0)] for k, pin in enumerate(keys)},
+    "3V3": [PI("3V3"), ("OLED_1", 1)],
+    "GND": [PI("GND"), ("OLED_1", 0), ("BZ_1", 1), *[(f"B_{k + 1}", 1) for k in range(len(keys))]],
+})
+d.cell("pico_gra")
+
 md("""
 ## W kodzie
 Każdy z tych elementów jest też w Pythonie — `code()` zapisze schemat jako kod:
 `Photoresistor(10000, lux=100)`, `Thermistor(10000, temperature=25)`, `Zener(5.1)`, `NMOS()`, `VCVS(10)`,
 `Servo()`, `Buzzer()`, `PassiveBuzzer()`, `RGBLED()`, `SevenSegment()`, `LCD1602()`, `Ultrasonic(distance=80)`,
-`LCD1602I2C()`, `SSD1306()`, `DS1307()`.
+`LCD1602I2C()`, `SSD1306()`, `DS1307()`, `Pico()`.
 """)
 code("""
 code(czujniki)

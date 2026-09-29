@@ -10,7 +10,7 @@ import { CodeIcon, Rotate, Trash } from "@/shared/ui/icons";
 import { i2cParts, i2cText } from "@/shared/model/i2c";
 import { Adjusters, isAdjustable } from "./Adjusters";
 import { useKinds } from "./kinds";
-import { I2C_ADDRESSES, LED_COLORS, hasValue, isComponent, isControlled, isWaveSource, kindInfo, wave, waveText } from "./model";
+import { I2C_ADDRESSES, LED_COLORS, hasValue, isBoard, keyLabel, keyName, isComponent, isControlled, isWaveSource, kindInfo, wave, waveText } from "./model";
 import { field, Panel, PanelHead, Section, Tile } from "./Panel";
 
 export type Selection =
@@ -31,7 +31,7 @@ export function Inspector({ element, taken, onChange, onRename, onRotate, onRemo
   onRemove: () => void;
   icon: ReactNode;
   live?: boolean; // running: only what works as an input (a potentiometer's position, a sensor's reading)
-  onSketch?: () => void; // an Arduino: open its sketch
+  onSketch?: () => void; // a board: open its sketch
 }) {
   const { t } = useTranslation("schematic");
   const { name } = useKinds();
@@ -114,7 +114,19 @@ export function Inspector({ element, taken, onChange, onRename, onRotate, onRemo
           <p className={hint}>{t("inspector.switchHint")}</p>
         </Section>
       )}
-      {!live && element.kind === "button" && <p className={hint}>{t("inspector.buttonHint")}</p>}
+      {!live && element.kind === "button" && (
+        <Section label={t("inspector.key")}>
+          {/* press the key to give it; Backspace takes it away */}
+          <input className={field} readOnly value={element.text ? keyLabel(element.text) : ""} placeholder={t("inspector.noKey")}
+                 aria-label={t("inspector.key")}
+                 onKeyDown={(e) => {
+                   if (e.key === "Tab") return;
+                   e.preventDefault();
+                   onChange({ text: e.key === "Backspace" || e.key === "Delete" ? null : keyName(e.key) });
+                 }} />
+          <p className={hint}>{t("inspector.buttonHint")}</p>
+        </Section>
+      )}
       {!live && isControlled(element.kind) && <p className={hint}>{t("inspector.controlledHint")}</p>}
       {isAdjustable(element.kind) && (
         <Section label={t("inspector.adjust")}>
@@ -137,12 +149,13 @@ export function Inspector({ element, taken, onChange, onRename, onRotate, onRemo
       {!live && element.kind === "ds1307" && <p className={hint}>{t("inspector.clockHint")}</p>}
       {!live && element.kind === "servo" && <p className={hint}>{t("inspector.servoHint")}</p>}
       {!live && (element.kind === "buzzer" || element.kind === "passive_buzzer") && <p className={hint}>{t(`inspector.${element.kind === "buzzer" ? "buzzerHint" : "passiveBuzzerHint"}`)}</p>}
-      {element.kind === "arduino" && onSketch && (
+      {isBoard(element.kind) && onSketch && (
         <Tile className="w-full h-9 gap-2 px-3 grid-flow-col text-[14px] font-medium" onClick={onSketch} title={t("inspector.sketchTitle")}>
           <CodeIcon /> {t("inspector.sketch")}
         </Tile>
       )}
-      {!live && kindInfo(element.kind)?.live && element.kind !== "arduino" &&
+      {!live && element.kind === "pico" && <p className={hint}>{t("inspector.picoHint")}</p>}
+      {!live && kindInfo(element.kind)?.live && !isBoard(element.kind) &&
         <p className={hint}>{t(isWaveSource(element.kind) ? "inspector.waveOnly" : "inspector.liveOnly")}</p>}
       {!live && element.kind === "label" && (
         <Section label={t("inspector.node")}>

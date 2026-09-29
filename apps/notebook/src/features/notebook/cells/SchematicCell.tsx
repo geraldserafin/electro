@@ -3,7 +3,7 @@ import { useTranslation } from "react-i18next";
 import { useLocation, useNavigate, useSearchParams } from "react-router";
 import { usePdf } from "@/features/pdf-export";
 import { kernel } from "@/features/python";
-import { canRunInTime, inTimeOnly, PdfDrawing, SchematicEditor, updateElement, type Camera } from "@/features/schematic";
+import { canRunInTime, inTimeOnly, isBoard, PdfDrawing, SchematicEditor, updateElement, type Camera } from "@/features/schematic";
 import { LiveControls, ProbePanel, SimPanel, SketchEditor, UploadButton, useLive } from "@/features/simulation";
 import type { Cell, SchematicData, SymbolLibrary } from "@/shared/model/types";
 import type { Failure } from "@/shared/model/issues";
@@ -112,7 +112,7 @@ export function SchematicCell({ cell, update, library, simulate, running: solvin
   const live = useLive(cell.schematic);
   const running = live.status === "running" || live.status === "paused";
   const timed = inTimeOnly(cell.schematic); // only in time: the bolt runs it
-  const arduinos = cell.schematic.elements.filter((e) => e.kind === "arduino");
+  const arduinos = cell.schematic.elements.filter((e) => isBoard(e.kind)); // (an Arduino, a Pico: each its sketch)
   const pressed = useRef<string[]>([]);
   const [pressedIds, setPressedIds] = useState<string[]>([]);
   const [dismissed, setDismissed] = useState<unknown>(null); // the problems hidden (that very list)

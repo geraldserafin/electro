@@ -13,7 +13,7 @@ import type { Failure } from "@/shared/model/issues";
 import { compileSketch } from "./atoms";
 import { compiler } from "./compiler";
 import type { LiveCircuit } from "./engine";
-import type { Frame, OledData, Part, ScopeTrace } from "./runner";
+import type { Firmware, Frame, OledData, Part, ScopeTrace } from "./runner";
 import type { Reply, Request } from "./sim.worker";
 import { Sound, wake } from "./sound";
 import type { Screen } from "./lcd";
@@ -46,10 +46,14 @@ export type SketchState =
 
 export const SPEEDS = [1, 0.1, 0.01, 0.001];
 
+/** A Pico's flash image as the server sends it (base64) → bytes. (Here, not in pico.ts: the emulator
+ *  itself — rp2040js, the boot ROM — is the worker's alone.) */
+const flashImage = (base64: string) => Uint8Array.from(atob(base64), (c) => c.charCodeAt(0));
+
 /** The drawing without what may change while it runs (switches, positions, readings, sketches): if
  *  that is the same, the circuit is too. */
 function structure(sch: SchematicData): string {
-  const inputs = new Set(["switch", "button", "potentiometer", "photoresistor", "thermistor", "ultrasonic", "lcd1602_i2c", "arduino"]);
+  const inputs = new Set(["switch", "button", "potentiometer", "photoresistor", "thermistor", "ultrasonic", "lcd1602_i2c", "arduino", "pico"]);
   return JSON.stringify({ ...sch, elements: sch.elements.map((e) => (inputs.has(e.kind) ? { ...e, text: null } : e)) });
 }
 
@@ -125,22 +129,24 @@ export function useLive(schematic: SchematicData) {
     const element = latest.current.elements.find((e) => e.id === id);
     if (!w || !element) return;
     const sketch = element.text ?? "";
+    const board = element.kind === "pico" ? "pico" : "uno";
     setSketches((all) => ({ ...all, [id]: { kind: "compiling" } }));
-    const run = (hex: string, where: "page" | "server") => {
-      w.postMessage({ type: "attach", id, hex } satisfies Request);
+    const run = (firmware: Firmware, where: "page" | "server") => {
+      w.postMessage({ type: "attach", id, firmware } satisfies Request);
       setSketches((all) => ({ ...all, [id]: { kind: "running", sketch, where } }));
     };
-    // in the page first; the server only if the page's compiler could not be loaded
-    const local = await compiler.compile(sketch).catch(() => null);
+    // an Uno's in the page first, the server only if the page's compiler could not be loaded; a Pico's
+    // on the server (the page's compiler is AVR's)
+    const local = board === "uno" ? await compiler.compile(sketch).catch(() => null) : null;
     if (worker.current !== w) return; // stopped meanwhile
     if (local) {
-      if ("hex" in local) run(local.hex, "page");
+      if ("hex" in local) run({ board: "uno", hex: local.hex }, "page");
       else setSketches((all) => ({
         ...all, [id]: "failed" in local ? { kind: "failed", output: local.failed } : { kind: "tooBig", size: local.tooBig, flash: local.flash },
       }));
       return;
     }
-    const exit = await compile({ payload: { sketch } });
+    const exit = await compile({ payload: { sketch, board } });
     if (worker.current !== w) return;
     if (exit._tag === "Failure") {
       const e = failure(exit.cause);
@@ -151,7 +157,8 @@ export function useLive(schematic: SchematicData) {
       setSketches((all) => ({ ...all, [id]: state }));
       return;
     }
-    run(exit.value.hex, "server");
+    const compiled = exit.value;
+    run("image" in compiled ? { board: "pico", image: flashImage(compiled.image) } : { board: "uno", hex: compiled.hex }, "server");
   }, [compile]);
 
   const halt = () => {
@@ -203,7 +210,7 @@ export function useLive(schematic: SchematicData) {
         speed: speedRef.current, scope: first, probe: probeRef.current,
       } satisfies Request);
       setStatus("running");
-      for (const e of latest.current.elements) if (e.kind === "arduino") void upload(e.id);
+      for (const e of latest.current.elements) if (e.kind === "arduino" || e.kind === "pico") void upload(e.id);
     } catch (e) {
       setError({ data: String(e) });
       setStatus("off");

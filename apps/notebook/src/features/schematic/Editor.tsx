@@ -18,7 +18,7 @@ import { LcdScreen, type LcdScreenData } from "./LcdScreen";
 import { LibraryPanel } from "./LibraryPanel";
 import { OledScreen, type OledScreenData } from "./OledScreen";
 import {
-  KINDS, attach, bounds, defaultText, defaultValue, elbow, inBox, moveGroup, isComponent, isConnectionPoint, junctions,
+  KINDS, attach, bounds, defaultText, defaultValue, elbow, keyName, inBox, moveGroup, isComponent, isConnectionPoint, junctions,
   ledColor, nextId, moveSegment, openPins, pins, rotatedAbout, same, simplify, updateElement,
 } from "./model";
 import { SymbolIcon } from "./SymbolIcon";
@@ -433,6 +433,22 @@ export function SchematicEditor({
 
   // ------------------------------------------------------------------ keyboard
 
+  // running: a button with a key (its text) is held while the key is — several at once, as a game wants
+  const heldKeys = useRef(new Set<string>());
+  const pressKey = (event: KeyboardEvent, down: boolean): boolean => {
+    const name = keyName(event.key);
+    const bound = value.elements.filter((e) => e.kind === "button" && e.text === name);
+    if (!bound.length || !live) return false;
+    event.preventDefault();
+    if (event.repeat) return true;
+    for (const e of bound) {
+      if (down) heldKeys.current.add(e.id);
+      else heldKeys.current.delete(e.id);
+      live.onPress(e.id, down);
+    }
+    return true;
+  };
+
   const onKey = (event: KeyboardEvent) => {
     const mod = event.metaKey || event.ctrlKey;
     const plain = (k: string) => !mod && event.key.toLowerCase() === k;
@@ -571,10 +587,15 @@ export function SchematicEditor({
           onPointerLeave={() => { pointer.current = null; setCursor(null); }}
           onDoubleClick={() => setDraft(null)}
           onKeyDown={(event) => {
+            if (live && pressKey(event, true)) return;
             if (event.key === " ") { setSpaceHeld(true); event.preventDefault(); return; }
             onKey(event);
           }}
-          onKeyUp={(event) => { if (event.key === " ") setSpaceHeld(false); }}
+          onKeyUp={(event) => {
+            if (live && pressKey(event, false)) return;
+            if (event.key === " ") setSpaceHeld(false);
+          }}
+          onBlur={() => { if (live) for (const id of heldKeys.current) live.onPress(id, false); heldKeys.current.clear(); }}
         >
           <style>{library.style}</style>
           <defs>

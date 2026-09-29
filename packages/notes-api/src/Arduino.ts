@@ -1,13 +1,24 @@
-/** Compiling an Arduino sketch for the notebook's live simulation: C++ in, the machine code (Intel
- *  HEX, for an ATmega328P) out; the page runs it in an emulated chip. Signed-in users only: the
- *  compiler runs on the server. */
+/** Compiling a sketch for the notebook's live simulation: C++ in, the machine code out — for an
+ *  Arduino Uno Intel HEX (its ATmega328P's flash), for a Raspberry Pi Pico its flash image (base64,
+ *  arduino-pico's) — which the page runs in an emulated chip. Signed-in users only: the compiler runs
+ *  on the server. */
 import { HttpApiEndpoint, HttpApiGroup, HttpApiSchema } from "@effect/platform"
 import { Schema } from "effect"
 import { Authentication } from "./Auth.js"
 
-export const Sketch = Schema.Struct({ sketch: Schema.String.pipe(Schema.maxLength(65536)) })
+/** The boards a sketch can be compiled for. */
+export const Board = Schema.Literal("uno", "pico")
+export type Board = typeof Board.Type
 
-export const Compiled = Schema.Struct({ hex: Schema.String })
+export const Sketch = Schema.Struct({
+  sketch: Schema.String.pipe(Schema.maxLength(262144)), // (a game's maps and sprites are in it too)
+  board: Schema.optionalWith(Board, { default: () => "uno" as const }),
+})
+
+export const Compiled = Schema.Union(
+  Schema.Struct({ hex: Schema.String }), // an Uno's
+  Schema.Struct({ image: Schema.String }), // a Pico's flash image, base64
+)
 
 /** The compiler said no: its output (errors with line numbers) as it wrote it. */
 export class CompileFailed extends Schema.TaggedError<CompileFailed>()(
@@ -20,7 +31,7 @@ export class CompileFailed extends Schema.TaggedError<CompileFailed>()(
   }
 }
 
-/** The server has no Arduino compiler (arduino-cli with the arduino:avr core). */
+/** The server has no compiler for the board (arduino-cli with the arduino:avr core, the rp2040:rp2040 one). */
 export class CompilerUnavailable extends Schema.TaggedError<CompilerUnavailable>()(
   "CompilerUnavailable",
   {},

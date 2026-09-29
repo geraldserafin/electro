@@ -49,8 +49,9 @@ export function SketchEditor({ element, live, onChange, fill }: {
   onChange: (sketch: string) => void;
   fill?: boolean; // as tall as its parent (the side pane, full screen), edge to edge
 }) {
-  // an Arduino on the board: the compiler starts loading now, so the first upload does not wait for it
-  useEffect(() => { compiler.load().catch(() => {}); }, []);
+  // an Arduino on the board: the page's compiler starts loading now, so the first upload does not wait for it
+  // (a Pico's sketch is compiled on the server)
+  useEffect(() => { if (element.kind === "arduino") compiler.load().catch(() => {}); }, [element.kind]);
   const state = live.sketches[element.id];
   return (
     <section className={cn("flex flex-col", fill && "h-full min-h-0")}>

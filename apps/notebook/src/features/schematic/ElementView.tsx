@@ -2,7 +2,7 @@
 // and after a run what was found (the solved value, I and U).
 import { memo, useId, useLayoutEffect, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent } from "react";
 import type { ElementData, ElementResult, Point, SymbolLibrary, WireData } from "@/shared/model/types";
-import { hasValue, isComponent, isWaveSource, kindInfo, pins, rotate, waveLabel } from "./model";
+import { hasValue, isComponent, isWaveSource, keyLabel, kindInfo, pins, rotate, waveLabel } from "./model";
 
 /**
  * Where an element is grabbed: all of it as drawn (its body is not just its strokes — a module's
@@ -20,6 +20,7 @@ function label_(e: ElementData): string {
   const unit = kindInfo(e.kind)?.unit ?? "";
   if (e.kind === "label") return e.text ?? "";
   if (!isComponent(e.kind)) return "";
+  if (e.kind === "button" && e.text) return `${e.id} [${keyLabel(e.text)}]`; // held with that key while it runs
   if (!hasValue(e.kind)) return e.id;
   if (kindInfo(e.kind)?.meter && !e.value) return e.id; // no reading: the simulation fills it in
   const wave = isWaveSource(e.kind) ? `, ${waveLabel(e.text)}` : "";

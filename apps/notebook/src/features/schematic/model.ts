@@ -50,6 +50,7 @@ export const KINDS = [
   { kind: "pmos", prefix: "Q", group: "semiconductors", live: true },
   { kind: "timer555", prefix: "IC", group: "chips", live: true },
   { kind: "arduino", prefix: "ARD", group: "chips", live: true },
+  { kind: "pico", prefix: "PICO", group: "chips", live: true },
   { kind: "seven_segment", prefix: "DS", group: "peripherals", live: true },
   { kind: "buzzer", prefix: "BZ", group: "peripherals" },
   { kind: "passive_buzzer", prefix: "BZ", group: "peripherals" },
@@ -68,7 +69,7 @@ export const ledColor = (text: string | null) => LED_COLORS[(text ?? "red") as k
 
 /** What a new element of a kind starts with in ``text``. */
 export const defaultText = (kind: string): string | null =>
-  kind === "label" ? "A" : kind === "led" ? "red" : kind === "arduino" ? BLINK
+  kind === "label" ? "A" : kind === "led" ? "red" : kind === "arduino" ? BLINK : kind === "pico" ? PICO_BLINK
     : kind === "sine_source" ? "50" : kind === "square_source" ? "1k"
     : kind === "photoresistor" ? "100" : kind === "thermistor" ? "25" : kind === "ultrasonic" ? "100"
     : kind === "lcd1602_i2c" ? "0x27" : kind === "ssd1306" ? "0x3C" : kind === "ds1307" ? "0x68" : null;
@@ -92,6 +93,31 @@ export function waveLabel(text: string | null): string {
 }
 export const isControlled = (kind: string) => ["vcvs", "vccs", "ccvs", "cccs"].includes(kind);
 export const isWaveSource = (kind: string) => kind === "sine_source" || kind === "square_source";
+
+/** A key as a button keeps it (its text): "ArrowUp", "Space", "a". */
+export const keyName = (key: string) => (key === " " ? "Space" : key.length === 1 ? key.toLowerCase() : key);
+const ARROWS: Record<string, string> = { ArrowUp: "↑", ArrowDown: "↓", ArrowLeft: "←", ArrowRight: "→" };
+/** …and as it is shown. */
+export const keyLabel = (name: string) => ARROWS[name] ?? (name.length === 1 ? name.toUpperCase() : name);
+
+/** A board that runs a sketch (its text): an Arduino Uno, a Raspberry Pi Pico. */
+export const isBoard = (kind: string) => kind === "arduino" || kind === "pico";
+
+export const PICO_BLINK = `// Mruga diodą na płytce Pico (GP25, LED_BUILTIN) i pisze na port szeregowy (USB).
+void setup() {
+  pinMode(LED_BUILTIN, OUTPUT);
+  Serial.begin(115200);
+}
+
+void loop() {
+  digitalWrite(LED_BUILTIN, HIGH);
+  Serial.println("ON");
+  delay(500);
+  digitalWrite(LED_BUILTIN, LOW);
+  Serial.println("OFF");
+  delay(500);
+}
+`;
 
 export const BLINK = `// Mruga diodą na pinie 13 (wbudowana dioda Arduino Uno też jest na 13).
 void setup() {
@@ -291,7 +317,7 @@ export function junctions(sch: SchematicData, lib: SymbolLibrary): Point[] {
 export function openPins(sch: SchematicData, lib: SymbolLibrary): Point[] {
   const count = connections(sch, lib);
   return sch.elements
-    .filter((e) => isComponent(e.kind) && e.kind !== "arduino") // a board's unused pins are not a mistake
+    .filter((e) => isComponent(e.kind) && !isBoard(e.kind)) // a board's unused pins are not a mistake
     .flatMap((e) => pins(e, lib))
     .filter((p) => (count.get(key(p)) ?? 0) <= 1);
 }

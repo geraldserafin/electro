@@ -2,7 +2,7 @@
 // whole transactions — a start, an address, bytes, a stop — not the lines' levels, so the bus is
 // here, in the page, and the devices on it are emulated as the chips they are: a PCF8574 behind a
 // character LCD, an SSD1306 OLED, a DS1307 clock.
-import type { AVRTWI, TWIEventHandler } from "avr8js";
+import type { TWIEventHandler } from "avr8js";
 import { lcd, screen, watch, type Lcd, type Screen } from "./lcd";
 import { TRIMMER, i2cParts } from "@/shared/model/i2c";
 import type { Board, Session } from "./session";
@@ -17,11 +17,20 @@ export interface Device {
   end(): void; // the stop
 }
 
+/** The chip's side of a transaction: avr8js's TWI and rp2040js's I²C both answer so. */
+export interface Controller {
+  completeStart(): void;
+  completeStop(): void;
+  completeConnect(ack: boolean): void;
+  completeWrite(ack: boolean): void;
+  completeRead(value: number): void;
+}
+
 export class Bus implements TWIEventHandler {
   devices: Device[] = [];
   private current: Device | null = null;
 
-  constructor(private twi: AVRTWI) {}
+  constructor(private twi: Controller) {}
 
   start() {
     this.current?.end();
@@ -288,17 +297,17 @@ export class Clock implements Device {
 
 
 const MODULES: Record<string, number> = { LCD1602I2C: 0x27, SSD1306: 0x3c, DS1307: 0x68 }; // electro's kinds, the address they come set to
-const SDA = 18, SCL = 19; // A4, A5 among a board's pins (arduino.ts: Uno.pins)
 
 /**
- * The I²C modules on ``board``'s bus: those whose SDA and SCL are wired to its A4 and A5; each
+ * The I²C modules on ``board``'s bus: those whose SDA and SCL are wired to its chip's (an Uno's A4 and A5,
+ * a Pico's GP4 and GP5); each
  * answers while it has power. ``addresses``: each element's address as set (its text); ``kept``:
  * the modules made so far, by id — reused, so a display keeps what it showed across a new sketch.
  */
 export function modulesOn(s: Session, board: Board, addresses: Record<string, string | null>, kept: Map<string, Device>): Device[] {
   const { pins, program } = s.circuit;
   const at = (id: string, i: number) => pins[id]?.[i] ?? null;
-  const sda = at(board.label, SDA), scl = at(board.label, SCL);
+  const sda = board.pins[board.chip.sda], scl = board.pins[board.chip.scl];
   if (!sda || !scl) return [];
   const devices: Device[] = [];
   for (const [id, kind] of Object.entries(program.kinds)) {

@@ -82,6 +82,10 @@ KINDS: dict[str, Kind] = {
     # D0–D13 on top (D13 on the left, as on the board), A0–A5, 5V and GND below
     "arduino": Kind(tuple((16 - i if i < 8 else 15 - i, 0) for i in range(14))
                     + tuple((9 + i, 8) for i in range(6)) + ((3, 8), (5, 8)), dev.Arduino),
+    # GP0–GP15 down its left; GP16–GP22, GP26–GP28 up its right, then VBUS, 3V3, GND at its top (the USB end)
+    "pico": Kind(tuple((0, i) for i in range(16))
+                 + ((8, 15), (8, 14), (8, 12), (8, 11), (8, 10), (8, 9), (8, 8), (8, 6), (8, 5), (8, 4))
+                 + ((8, 0), (8, 1), (8, 2)), dev.Pico),
     "ground": Kind(((0, 0),)),
     "label": Kind(((0, 0),)),  # net label: same text = same node
     "terminal": Kind(((0, 0),)),  # an open end

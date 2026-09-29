@@ -279,3 +279,17 @@ def test_i2c_modules_pull_their_lines_up_and_load_the_supply():
     three = 4700 / 3  # three modules' pull-ups in parallel, against the 10 kΩ to ground
     assert float(sol["R_1"].U) == pytest.approx(5 * 10000 / (10000 + three))
     assert "SSD1306(address=0x3D)" in code(bus)
+
+
+def test_pico_drives_its_pins_at_3v3_and_supplies_both_rails():
+    from electro import Pico
+    board = ["GND" if p == "GP1" else ("led" if p == "GP15" else f"free_{p}") for p in Pico.PINS]
+    blink = net((Pico(), *board, "vbus", "v33", "GND"), (Resistor(100), "led", "a"), (LED(), "a", "GND"),
+                (Resistor(1000), "v33", "GND"))
+    lit = simulate(blink, t=1e-4, inputs={"PICO_1.GP15": "high"}).at(1e-4)
+    assert lit["I_LED_1"] == pytest.approx((3.3 - 2.0) / 140, rel=0.15)  # 100 Ω + the pin's 40 Ω, a red LED's 2 V
+    assert lit["V_v33"] == pytest.approx(3.3) and lit["V_vbus"] == pytest.approx(5)
+    dark = simulate(blink, t=1e-4, inputs={"PICO_1.GP15": "pulldown"}).at(1e-4)
+    assert dark["I_LED_1"] == pytest.approx(0, abs=1e-6)
+    rail = net((Pico(), *board, "vbus", "v33", "GND"), (Resistor(1000), "v33", "GND"))
+    assert rail.solve()["R_1"].I == pytest.approx(3.3e-3)  # on paper: the 3V3 rail

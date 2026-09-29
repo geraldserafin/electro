@@ -1,6 +1,7 @@
 """Elements that live in time: sine and square sources, diodes, LEDs (single, RGB, seven-segment)
 and Zener diodes, sensors (light, temperature, distance), buzzers, a servo and a character LCD,
-switches, a potentiometer, bipolar transistors and MOSFETs, the 555 timer and an Arduino board.
+switches, a potentiometer, bipolar transistors and MOSFETs, the 555 timer, and boards: an Arduino
+Uno and a Raspberry Pi Pico.
 
 Semiconductors and chips are not linear, so they have laws only in time
 (``ctx.transient``), for ``electro.sim``: the solver on paper says ``NeedsSimulation``.
@@ -790,30 +791,67 @@ PIN_MODES = {  # what the microcontroller makes of a pin: (conductance to the pi
 }
 
 
-class Arduino(NoValue):
-    """An Arduino Uno board: pins ``D0``–``D13``, ``A0``–``A5``, and its ``5V`` supply against ``GND``.
+class Board(NoValue):
+    """A microcontroller board: its I/O pins (``PINS``), the supplies it puts out (``SUPPLIES``: pin →
+    volts against ``GND``), and what its chip makes of a pin (``MODES``: mode → conductance to the
+    pin's source, that source's voltage).
 
-    On paper every pin is an input (no current). While simulating, each pin is a voltage
-    source with a resistance, set from outside (inputs ``<label>_<pin>_G`` and ``_E``,
-    e.g. by an emulated ATmega328P): see ``PIN_MODES``.
-    """
+    On paper every pin is an input (no current). While simulating, each pin is a voltage source
+    with a resistance, set from outside (inputs ``<label>_<pin>_G`` and ``_E``, e.g. by an
+    emulated chip)."""
 
-    prefix = "ARD"
-    left, right = ARDUINO_PINS[:14], ARDUINO_PINS[14:] + ("5V", "GND")
+    PINS: tuple[str, ...] = ()
+    SUPPLIES: dict[str, float] = {}
+    MODES: dict[str, tuple[float, float]] = {}
 
     def build(self, label, V, param, ctx):
         g = V["GND"]
-        supply = sp.Symbol(f"I_{label}_5V")
         name = sp.Symbol(label)
-        laws = [Law(V["5V"] - g - 5, SourceVoltage(name))]
-        inflow: dict[str, sp.Expr] = {"5V": -supply}
-        model = Model(inflow, laws, {"I_5V": supply})
-        for pin in ARDUINO_PINS:
+        inflow: dict[str, sp.Expr] = {}
+        model = Model(inflow, [], {})
+        for pin, volts in self.SUPPLIES.items():
+            current = sp.Symbol(f"I_{label}_{pin}")
+            model.laws.append(Law(V[pin] - g - parse(volts), SourceVoltage(name)))
+            model.variables[f"I_{pin}"] = current
+            inflow[pin] = -current
+        for pin in self.PINS:
             if ctx.transient:
                 G, E = sp.Symbol(f"{label}_{pin}_G"), sp.Symbol(f"{label}_{pin}_E")
-                model.inputs |= {G: PIN_MODES["input"][0], E: PIN_MODES["input"][1]}
+                model.inputs |= {G: self.MODES["input"][0], E: self.MODES["input"][1]}
                 inflow[pin] = G * (V[pin] - g - E)
             else:
                 inflow[pin] = sp.Integer(0)
-        inflow["GND"] = supply - sp.Add(*(inflow[p] for p in ARDUINO_PINS))
+        inflow["GND"] = -sp.Add(*inflow.values())
         return model
+
+
+class Arduino(Board):
+    """An Arduino Uno board: pins ``D0``–``D13``, ``A0``–``A5``, and its ``5V`` supply against ``GND``;
+    its ATmega328P's pins as ``PIN_MODES``."""
+
+    prefix = "ARD"
+    left, right = ARDUINO_PINS[:14], ARDUINO_PINS[14:] + ("5V", "GND")
+    PINS, SUPPLIES, MODES = ARDUINO_PINS, {"5V": 5}, PIN_MODES
+
+
+PICO_PINS = tuple(f"GP{i}" for i in range(23)) + ("GP26", "GP27", "GP28")
+PICO_MODES = {  # an RP2040's pin: 3.3 V logic, pull-ups and pull-downs of about 50 kΩ
+    "input": (1e-8, 0.0),
+    "pullup": (1 / 50000, 3.3),
+    "pulldown": (1 / 50000, 0.0),
+    "low": (1 / 40, 0.0),
+    "high": (1 / 40, 3.3),
+}
+
+
+class Pico(Board):
+    """A Raspberry Pi Pico: pins ``GP0``–``GP22`` and ``GP26``–``GP28`` (ADC0–2), its USB's ``VBUS``
+    (5 V) and its regulator's ``3V3`` against ``GND``; an RP2040's pins, 3.3 V logic (``PICO_MODES``).
+    The LED on the board (GP25) is not a pin: the page shows it."""
+
+    prefix = "PICO"
+    left, right = PICO_PINS[:16], PICO_PINS[16:] + ("VBUS", "3V3", "GND")
+    PINS, SUPPLIES, MODES = PICO_PINS, {"VBUS": 5, "3V3": parse("3.3")}, PICO_MODES
+
+
+BOARDS = {"Arduino": Arduino, "Pico": Pico}  # by class name, as a compiled program's kinds have them

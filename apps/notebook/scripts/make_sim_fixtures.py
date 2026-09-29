@@ -5,7 +5,7 @@ in devenv shell) after changing how electro compiles a circuit in time.
 import json
 from pathlib import Path
 
-from electro import DS1307, SSD1306, Arduino, LCD1602I2C, Ultrasonic, net
+from electro import DS1307, LED, SSD1306, Arduino, LCD1602I2C, Pico, Potentiometer, Resistor, Ultrasonic, net
 from electro.devices import ARDUINO_PINS
 from electro.sim import compile_sim
 
@@ -30,3 +30,13 @@ pins = {"ARD_1": [wiring.get(pin) for pin in ARDUINO_PINS] + ["vcc", "GND"], "LC
         "OLED_1": ["GND", "vcc", "scl", "sda"], "RTC_1": ["GND", "vcc", "d2", "d3"]}
 (here / "i2c.live.json").write_text(json.dumps({"program": program, "wires": [], "pins": pins}) + "\n")
 print(here / "i2c.live.json")
+
+# a Pico (fixtures/blink.pico.ino): an LED on GP15 through 220 Ω, a potentiometer on GP26 across its 3V3
+wiring = {"GP15": "led", "GP26": "wiper"}
+board = [wiring.get(pin, f"free_{pin}") for pin in Pico.PINS] + ["vbus", "v33", "GND"]
+circuit = net((Pico(), *board), (Resistor(220), "led", "a"), (LED(), "a", "GND"),
+              (Potentiometer(10000, 0.25), "v33", "GND", "wiper"))
+program = json.loads(compile_sim(circuit).to_json())
+pins = {"PICO_1": [wiring.get(pin) for pin in Pico.PINS] + ["vbus", "v33", "GND"]}
+(here / "pico.live.json").write_text(json.dumps({"program": program, "wires": [], "pins": pins}) + "\n")
+print(here / "pico.live.json")

@@ -9,7 +9,12 @@ import { si } from "./format";
 import { Backpack, Oled, modulesOn, pixelPath, type Device } from "./i2c";
 import { lcd, screen, watch as read, type Lcd, type Screen } from "./lcd";
 import { buzzing, heard, listen, ping, servoing, sonar, turn, watch, type Buzzing, type Servoing, type Sonar } from "./peripherals";
+import { Uno } from "./arduino";
+import { Pico } from "./pico";
 import { Session } from "./session";
+
+/** A board's program, compiled: an Uno's (Intel HEX), a Pico's (its flash image). */
+export type Firmware = { board: "uno"; hex: string } | { board: "pico"; image: Uint8Array };
 
 /** What of an element the runner needs: its kind and text (a position, a reading, an address). */
 export interface Part {
@@ -124,22 +129,22 @@ export class Runner {
     this.recorded = [...new Set([...scope, ...probe])];
   }
 
-  /** An Arduino starts running ``hex`` (a new sketch: the chip starts over). */
-  attach(id: string, hex: string) {
+  /** A board starts running its program (a new one: the chip starts over). */
+  attach(id: string, firmware: Firmware) {
     const s = this.session;
     const at = s.boards.findIndex((b) => b.label === id);
     if (at >= 0) s.boards.splice(at, 1);
-    const board = s.attach(id, hex);
-    board.uno.onSerial = (c) => {
+    const board = s.attach(id, firmware.board === "uno" ? new Uno(firmware.hex) : new Pico(firmware.image));
+    board.chip.onSerial = (c) => {
       this.serial = (this.serial + c).slice(-4000);
     };
-    board.uno.i2c.devices = modulesOn(s, board, Object.fromEntries(this.parts.map((e) => [e.id, e.text])), this.modules);
+    board.chip.i2c.devices = modulesOn(s, board, Object.fromEntries(this.parts.map((e) => [e.id, e.text])), this.modules);
     this.setParts(this.parts); // (a new LCD takes its trimmer)
   }
 
   /** Text typed into the serial monitor: to every Arduino's Serial.read(). */
   send(text: string) {
-    for (const board of this.session.boards) board.uno.send(text);
+    for (const board of this.session.boards) board.chip.send(text);
   }
 
   /** On to ``target`` (s), steps of at most ``dtMax``. */
@@ -213,6 +218,7 @@ export class Runner {
     }
     for (const m of this.servos) (looks[m.id] ??= {}).angle = turn(m, sim.t);
     for (const u of this.sonars) (looks[u.id] ??= {}).ping = sim.t < u.until ? 1 : 0;
+    for (const b of this.session.boards) if (b.chip.led !== undefined) (looks[b.label] ??= {}).led = b.chip.led ? 1 : 0;
     const screens: Record<string, Screen> = {};
     for (const d of this.lcds) screens[d.id] = screen(d, sim.x);
     const oleds: Record<string, OledData> = {};

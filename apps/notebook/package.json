@@ -42,6 +42,7 @@
     "remark-gfm": "^4.0.1",
     "remark-math": "^6.0.0",
     "remark-parse": "^11.0.0",
+    "rp2040js": "^1.4.0",
     "scheduler": "^0.28.0",
     "tailwind-merge": "^3.7.0",
     "unified": "^11.0.5"

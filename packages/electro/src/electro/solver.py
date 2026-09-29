@@ -388,7 +388,9 @@ def _report(solution: Solution) -> Solution:
         if lacking:
             raise MissingData(**solution.diagnose(lacking).fields(), solution=solution)
     elif solution.missing:
-        warnings.warn(Underdetermined(**solution.diagnose().fields()), stacklevel=3)
+        diagnosis = solution.diagnose()
+        if diagnosis is not None:  # (None: only nodes nothing is wired to — a board's free pins — are not known)
+            warnings.warn(Underdetermined(**diagnosis.fields()), stacklevel=3)
     return solution
 
 

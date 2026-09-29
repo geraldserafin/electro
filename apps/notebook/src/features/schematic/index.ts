@@ -3,7 +3,7 @@ export { board, BoardButton, BoardIsland, islandButton } from "./Board";
 export { SchematicEditor } from "./Editor";
 export { library, libraryFor } from "./library";
 export { useKinds } from "./kinds";
-export { canRunInTime, inTimeOnly, updateElement } from "./model";
+export { canRunInTime, inTimeOnly, isBoard, updateElement } from "./model";
 export * as messages from "./messages";
 export { Panel, PanelHead, Section, Tile } from "./Panel";
 export { PdfDrawing } from "./PdfDrawing";

@@ -26,7 +26,7 @@ from sympy.printing.pycode import PythonCodePrinter
 
 from . import components as comp
 from .circuit import GROUND, Circuit
-from .devices import ARDUINO_PINS, EXP_LIMIT, PIN_MODES, Arduino, dlimexp, limexp
+from .devices import BOARDS, EXP_LIMIT, dlimexp, limexp
 from .issues import NoConvergence, NoSuchInput, NotSimulated, ValueNeeded
 from .reasons import KirchhoffCurrent
 from .semantics import compile_circuit
@@ -405,13 +405,16 @@ INPUTS = ("closed", "position", "lux", "temperature")  # an element's input, <la
 
 def _input_values(program: Program, name: str):
     """``name`` → a function from its value to ``[(param index, number)]``: a number, or for an
-    Arduino's pin (``ARD_1.D13``) one of ``PIN_MODES`` ("high", "low", "input", "pullup")."""
+    board's pin (``ARD_1.D13``, ``PICO_1.GP15``) one of its modes ("high", "low", "input", "pullup", …)."""
     if "." in name:
         label, pin = name.split(".", 1)
         G, E = f"{label}_{pin}_G", f"{label}_{pin}_E"
-        if G in program.inputs and pin in ARDUINO_PINS:
+        board = BOARDS.get(program.kinds.get(label, ""))
+        if G in program.inputs and board is not None and pin in board.PINS:
+            modes = board.MODES
+
             def pin_mode(mode):
-                g, e = PIN_MODES[mode] if isinstance(mode, str) else (PIN_MODES["high"][0], float(mode))
+                g, e = modes[mode] if isinstance(mode, str) else (modes["high"][0], float(mode))
                 return [(program.inputs[G], g), (program.inputs[E], e)]
             return pin_mode
     for candidate in (name, *(f"{name}_{suffix}" for suffix in INPUTS)):
@@ -478,7 +481,7 @@ def simulate(circuit: Circuit, t: float = 1.0, *, dt: float | None = None, input
 
     ``dt``: the longest step (default ``t``/500; steps shrink by themselves where things
     change fast). ``inputs``: switches (``{"S_1": 1}``), potentiometers (``{"P_1": 0.3}``),
-    light on a photoresistor in lux, a thermistor's temperature in °C, or Arduino pins (``{"ARD_1.D13": "high"}``), each a value or a function of time.
+    light on a photoresistor in lux, a thermistor's temperature in °C, or a board's pins (``{"ARD_1.D13": "high"}``), each a value or a function of time.
     """
     program = compile_sim(circuit)
     schedule = _schedule(program, inputs)

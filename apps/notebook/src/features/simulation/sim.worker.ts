@@ -2,13 +2,13 @@
 // The simulation off the page's thread: a Runner stepped as the clock goes (times the speed), with
 // all of a core to itself — the page only draws what it is sent, about 30 times a second.
 import { NoConvergence } from "./engine";
-import { Runner, type Frame, type Part } from "./runner";
+import { Runner, type Firmware, type Frame, type Part } from "./runner";
 import type { LiveCircuit } from "./engine";
 
 export type Request =
   | { type: "start"; circuit: LiveCircuit; parts: Part[]; pressed: string[]; speed: number; scope: string[]; probe: string[] }
   | { type: "parts"; parts: Part[]; pressed: string[] } // a switch flipped, a slider moved, a button held
-  | { type: "attach"; id: string; hex: string } // an Arduino's sketch, compiled
+  | { type: "attach"; id: string; firmware: Firmware } // a board's program, compiled
   | { type: "speed"; speed: number }
   | { type: "run"; running: boolean } // paused, or going on
   | { type: "watch"; scope: string[]; probe: string[] }
@@ -88,7 +88,7 @@ self.onmessage = (event: MessageEvent<Request>) => {
   }
   if (!runner) return;
   if (r.type === "parts") runner.setParts(r.parts, r.pressed);
-  else if (r.type === "attach") runner.attach(r.id, r.hex);
+  else if (r.type === "attach") runner.attach(r.id, r.firmware);
   else if (r.type === "speed") runner.speed = speed = r.speed;
   else if (r.type === "watch") runner.watch(r.scope, r.probe);
   else if (r.type === "send") runner.send(r.text);
