@@ -2,7 +2,7 @@
 // and after a run what was found (the solved value, I and U).
 import { memo, useId, useLayoutEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
 import type { ElementData, ElementResult, Point, SymbolLibrary, WireData } from "@/shared/model/types";
-import { hasValue, isComponent, kindInfo, pins, rotate } from "./model";
+import { hasValue, isComponent, isWaveSource, kindInfo, pins, rotate, waveLabel } from "./model";
 
 /** The text next to an element: "R_1 = 100 Ω", "A_1", or a net label's name. */
 function label_(e: ElementData): string {
@@ -11,7 +11,8 @@ function label_(e: ElementData): string {
   if (!isComponent(e.kind)) return "";
   if (!hasValue(e.kind)) return e.id;
   if (kindInfo(e.kind)?.meter && !e.value) return e.id; // no reading: the simulation fills it in
-  return `${e.id} = ${e.value ?? "?"}${e.value && /\d$/.test(e.value) ? ` ${unit}` : ""}`;
+  const wave = isWaveSource(e.kind) ? `, ${waveLabel(e.text)}` : "";
+  return `${e.id} = ${e.value ?? "?"}${e.value && /\d$/.test(e.value) ? ` ${unit}` : ""}${wave}`;
 }
 
 function Label({ text, x, y, anchor, solved }: {
@@ -45,7 +46,10 @@ export const liveColor = (v: number | null, scale: number) =>
  */
 function leads(kind: string, symbolPins: number[][]): number[][] {
   if (kind === "npn" || kind === "pnp") return [[30, 0], [0, 18], [0, -18]];
+  if (kind === "nmos" || kind === "pmos") return [[22, 0], [0, 28], [0, -28]];
   if (kind === "opamp") return [[20, 0], [20, 0], [-20, 0]];
+  if (kind === "vcvs" || kind === "vccs") return [[14, 0], [14, 0], [0, -24], [0, 24]];
+  if (kind === "ccvs" || kind === "cccs") return [[0, 40], [0, -40], [0, -24], [0, 24]];
   if (kind === "potentiometer") return [[0, 0], [0, 0], [0, 27]]; // its ends: the body's gradient
   const xs = symbolPins.map((p) => p[0]), ys = symbolPins.map((p) => p[1]);
   return symbolPins.map(([x, y]) =>
@@ -90,7 +94,7 @@ function ElementView_({ element: e, library, wires, result, selected, closed, li
   const colours = live?.pins.map((v) => liveColor(v, live.scale));
   const shaded = colours && (ps.length === 2 || e.kind === "potentiometer") && colours[0] && colours[1];
   const tinted = shaded ? { stroke: `url(#${CSS.escape(gradient)})`, color: `color-mix(in oklab, ${colours[0]}, ${colours[1]})` } : undefined;
-  const ownLeads = colours && (ps.length > 3 || e.kind === "potentiometer" || e.kind === "npn" || e.kind === "pnp" || e.kind === "opamp")
+  const ownLeads = colours && (ps.length > 3 || e.kind === "potentiometer" || e.kind === "npn" || e.kind === "pnp" || e.kind === "nmos" || e.kind === "pmos" || e.kind === "opamp")
     ? leads(e.kind, symbol.pins).map(([dx, dy], i) => {
       const [rx, ry] = rotate([dx, dy], symbol.upright ? 0 : e.rotation);
       return { from: ps[i], to: [ps[i][0] + rx, ps[i][1] + ry] as Point, colour: colours[i] };

@@ -141,6 +141,128 @@
    "letter": null,
    "upright": false
   },
+  "vcvs": {
+   "pins": [
+    [
+     0,
+     0
+    ],
+    [
+     0,
+     80
+    ],
+    [
+     80,
+     80
+    ],
+    [
+     80,
+     0
+    ]
+   ],
+   "svg": "<path d=\"M0 0H14M0 80H14\"/><path d=\"M20 0h8M24 -4v8M20 80h8\"/><path d=\"M80 0V24M80 56V80M80 24L96 40L80 56L64 40Z\"/><path d=\"M76 34h8M80 30v8M76 47h8\"/>",
+   "letter": null,
+   "upright": false
+  },
+  "vccs": {
+   "pins": [
+    [
+     0,
+     0
+    ],
+    [
+     0,
+     80
+    ],
+    [
+     80,
+     80
+    ],
+    [
+     80,
+     0
+    ]
+   ],
+   "svg": "<path d=\"M0 0H14M0 80H14\"/><path d=\"M20 0h8M24 -4v8M20 80h8\"/><path d=\"M80 0V24M80 56V80M80 24L96 40L80 56L64 40Z\"/><path d=\"M80 51V38\"/><path class=\"fill\" d=\"M80 31l-4 7h8z\"/>",
+   "letter": null,
+   "upright": false
+  },
+  "ccvs": {
+   "pins": [
+    [
+     0,
+     0
+    ],
+    [
+     0,
+     80
+    ],
+    [
+     80,
+     80
+    ],
+    [
+     80,
+     0
+    ]
+   ],
+   "svg": "<path d=\"M0 0V80\"/><path class=\"fill\" d=\"M0 46l-4.5 -8h9z\"/><path d=\"M80 0V24M80 56V80M80 24L96 40L80 56L64 40Z\"/><path d=\"M76 34h8M80 30v8M76 47h8\"/>",
+   "letter": null,
+   "upright": false
+  },
+  "cccs": {
+   "pins": [
+    [
+     0,
+     0
+    ],
+    [
+     0,
+     80
+    ],
+    [
+     80,
+     80
+    ],
+    [
+     80,
+     0
+    ]
+   ],
+   "svg": "<path d=\"M0 0V80\"/><path class=\"fill\" d=\"M0 46l-4.5 -8h9z\"/><path d=\"M80 0V24M80 56V80M80 24L96 40L80 56L64 40Z\"/><path d=\"M80 51V38\"/><path class=\"fill\" d=\"M80 31l-4 7h8z\"/>",
+   "letter": null,
+   "upright": false
+  },
+  "sine_source": {
+   "pins": [
+    [
+     0,
+     0
+    ],
+    [
+     80,
+     0
+    ]
+   ],
+   "svg": "<path d=\"M0 0H27M53 0H80\"/><g transform=\"translate(40 0)\"><circle r=\"13\"/><path d=\"M-8 0C-5.5 -9 -2.5 -9 0 0S5.5 9 8 0\"/><path d=\"M20 -13h6M23 -16v6\"/></g>",
+   "letter": null,
+   "upright": false
+  },
+  "square_source": {
+   "pins": [
+    [
+     0,
+     0
+    ],
+    [
+     80,
+     0
+    ]
+   ],
+   "svg": "<path d=\"M0 0H27M53 0H80\"/><g transform=\"translate(40 0)\"><circle r=\"13\"/><path d=\"M-8 5H-4V-5H4V5H8\"/><path d=\"M20 -13h6M23 -16v6\"/></g>",
+   "letter": null,
+   "upright": false
+  },
   "diode": {
    "pins": [
     [
@@ -168,6 +290,21 @@
     ]
    ],
    "svg": "<path d=\"M0 0H32M48 0H80\"/><g transform=\"translate(40 0)\"><path d=\"M-8 -9L8 0L-8 9Z\"/><path d=\"M8 -9V9\"/><path d=\"M0 -13l7 -8M6 -15l7 -8\"/><path class=\"fill\" d=\"M9 -23.5l-4.5 1.3l3.2 2.8zM15 -25.5l-4.5 1.3l3.2 2.8z\"/></g>",
+   "letter": null,
+   "upright": false
+  },
+  "zener": {
+   "pins": [
+    [
+     0,
+     0
+    ],
+    [
+     80,
+     0
+    ]
+   ],
+   "svg": "<path d=\"M0 0H32M48 0H80\"/><g transform=\"translate(40 0)\"><path d=\"M-8 -9L8 0L-8 9Z\"/><path d=\"M4 -11L8 -9V9L12 11\"/></g>",
    "letter": null,
    "upright": false
   },
@@ -255,6 +392,44 @@
     ]
    ],
    "svg": "<path d=\"M0 0H30\"/><path class=\"thick\" d=\"M30 -13V13\"/><path d=\"M30 -6L60 -22V-40M30 6L60 22V40\"/><path class=\"fill\" d=\"M31 7l9.5 0.6l-3.4 6.3z\"/><circle cx=\"46\" r=\"23\"/>",
+   "letter": null,
+   "upright": false
+  },
+  "nmos": {
+   "pins": [
+    [
+     0,
+     0
+    ],
+    [
+     60,
+     -40
+    ],
+    [
+     60,
+     40
+    ]
+   ],
+   "svg": "<path d=\"M0 0H22M22 -14V14\"/><path class=\"thick\" d=\"M30 -17V-8M30 -4V4M30 8V17\"/><path d=\"M30 -12H60V-40M30 12H60V40M30 0H60V12\"/><path class=\"fill\" d=\"M31 0l8 -4.5v9z\"/>",
+   "letter": null,
+   "upright": false
+  },
+  "pmos": {
+   "pins": [
+    [
+     0,
+     0
+    ],
+    [
+     60,
+     -40
+    ],
+    [
+     60,
+     40
+    ]
+   ],
+   "svg": "<path d=\"M0 0H22M22 -14V14\"/><path class=\"thick\" d=\"M30 -17V-8M30 -4V4M30 8V17\"/><path d=\"M30 -12H60V-40M30 12H60V40M30 0H60V12\"/><path class=\"fill\" d=\"M47 0l-8 -4.5v9z\"/>",
    "letter": null,
    "upright": false
   },

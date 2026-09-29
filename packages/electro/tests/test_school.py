@@ -7,7 +7,7 @@ import electro
 
 from electro import *
 from electro.issues import ConflictingData, Equals, ParallelMismatch, SeriesMismatch
-from electro.reasons import OhmsLaw
+from electro.reasons import ControlledSource, OhmsLaw
 
 
 def test_divider_with_unknown_resistor():
@@ -263,3 +263,46 @@ def test_meter_reading_can_contradict():
     with pytest.raises(Contradiction) as err:
         loop(VoltageSource(12), Resistor(4), Ammeter(2)).solve()
     assert ("A_1", 2) in {(d.symbol.name, d.value) for d in err.value.values}
+
+
+# ------------------------------------------------------------------ controlled sources
+
+
+def test_vcvs_amplifies_the_voltage_it_senses():
+    amp = net((VoltageSource(2), "GND", "in"), (Resistor(1000), "in", "GND"),
+              (VCVS(10), "in", "GND", "GND", "out"), (Resistor(50), "out", "GND"))
+    sol = amp.solve()
+    assert sol["VCVS_1"].U == 20
+    assert sol["R_2"].I == sp.Rational(2, 5)
+    assert sol["E_1"].I == sp.Rational(2, 1000)  # the control side draws nothing
+
+
+def test_vccs_is_a_transconductance():
+    sol = net((VoltageSource(2), "GND", "in"), (VCCS("0.5"), "in", "GND", "GND", "out"), (Resistor(10), "out", "GND")).solve()
+    assert sol["R_1"].U == 10
+
+
+def test_ccvs_and_cccs_sense_the_current_in_series():
+    loop_ = [(VoltageSource(10), "GND", "a"), (Resistor(5), "a", "b")]  # 2 A through the sensing branch b → GND
+    ccvs = net(*loop_, (CCVS(3), "b", "GND", "GND", "out"), (Resistor(1), "out", "GND")).solve()
+    assert ccvs["R_2"].U == 6 and ccvs["CCVS_1"].I == 6
+    cccs = net(*loop_, (CCCS(10), "b", "GND", "GND", "out"), (Resistor(1), "out", "GND")).solve()
+    assert cccs["R_2"].I == 20
+    assert cccs["E_1"].I == 2  # the sensing branch drops nothing: the loop keeps its 2 A
+
+
+def test_the_gain_is_found_from_the_data():
+    # a transistor stage as its small-signal model: r_be, then β·I_b into the collector's resistor
+    stage = net((VoltageSource("10m"), "GND", "in"), (Resistor(1000), "in", "b"),
+                (CCCS(), "b", "GND", "GND", "c"), (Resistor(2000), "c", "GND"))
+    sol = stage.solve(U_R_2=2, find="CCCS_1")
+    assert sol["CCCS_1"].value == 100
+    assert any(isinstance(law.reason, ControlledSource) for step in sol.steps for law in step.laws)
+
+
+def test_controlled_sources_simulate_and_come_back_as_code():
+    amp = net((VoltageSource(2), "GND", "in"), (VCVS(-3), "in", "GND", "GND", "out"), (Resistor(50), "out", "GND"))
+    assert simulate(amp, t=1e-3).at(1e-3)["V_out"] == pytest.approx(-6)
+    scope: dict = {}
+    exec("from electro import *\n" + code(amp), scope)
+    assert scope["uklad"].solve()["R_1"].U == -6

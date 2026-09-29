@@ -21,6 +21,12 @@ export const KINDS = [
   { kind: "inductor", prefix: "L", unit: "H", group: "passive" },
   { kind: "voltage_source", prefix: "E", unit: "V", group: "sources" },
   { kind: "current_source", prefix: "J", unit: "A", group: "sources" },
+  { kind: "sine_source", prefix: "E", unit: "V", group: "sources", live: true },
+  { kind: "square_source", prefix: "E", unit: "V", group: "sources", live: true },
+  { kind: "vcvs", prefix: "VCVS", unit: "", group: "sources" },
+  { kind: "vccs", prefix: "VCCS", unit: "S", group: "sources" },
+  { kind: "ccvs", prefix: "CCVS", unit: "Ω", group: "sources" },
+  { kind: "cccs", prefix: "CCCS", unit: "", group: "sources" },
   { kind: "ammeter", prefix: "A", unit: "A", meter: true, group: "meters" },
   { kind: "voltmeter", prefix: "V", unit: "V", meter: true, group: "meters" },
   { kind: "ground", prefix: "gnd", group: "connections" },
@@ -32,8 +38,11 @@ export const KINDS = [
   { kind: "potentiometer", prefix: "P", unit: "Ω", group: "controls" },
   { kind: "diode", prefix: "D", group: "semiconductors", live: true },
   { kind: "led", prefix: "LED", group: "semiconductors", live: true },
+  { kind: "zener", prefix: "DZ", unit: "V", group: "semiconductors", live: true },
   { kind: "npn", prefix: "Q", group: "semiconductors", live: true },
   { kind: "pnp", prefix: "Q", group: "semiconductors", live: true },
+  { kind: "nmos", prefix: "Q", group: "semiconductors", live: true },
+  { kind: "pmos", prefix: "Q", group: "semiconductors", live: true },
   { kind: "timer555", prefix: "IC", group: "chips", live: true },
   { kind: "arduino", prefix: "ARD", group: "chips", live: true },
 ] as const satisfies readonly KindInfo[];
@@ -46,7 +55,24 @@ export const ledColor = (text: string | null) => LED_COLORS[(text ?? "red") as k
 
 /** What a new element of a kind starts with in ``text``. */
 export const defaultText = (kind: string): string | null =>
-  kind === "label" ? "A" : kind === "led" ? "red" : kind === "arduino" ? BLINK : null;
+  kind === "label" ? "A" : kind === "led" ? "red" : kind === "arduino" ? BLINK
+    : kind === "sine_source" ? "50" : kind === "square_source" ? "1k" : null;
+
+/** A source in time's ``text`` (electro.devices.SquareSource.from_schematic): its frequency as typed, the duty in %. */
+export function wave(text: string | null): { frequency: string; duty: number } {
+  const words = (text ?? "").trim().split(/\s+/).filter(Boolean);
+  const duty = words.length > 1 && words.at(-1)!.endsWith("%") ? Number(words.pop()!.slice(0, -1).replace(",", ".")) : 50;
+  return { frequency: words.join(" "), duty: Number.isFinite(duty) ? duty : 50 };
+}
+export const waveText = (frequency: string, duty: number) => `${frequency.trim()}${duty === 50 ? "" : ` ${duty}%`}`;
+/** "50 Hz", "1kHz 25%": for the label beside the symbol. */
+export function waveLabel(text: string | null): string {
+  const { frequency, duty } = wave(text);
+  const f = /hz$/i.test(frequency) ? frequency : `${frequency}${/\d$/.test(frequency) ? " " : ""}Hz`;
+  return waveText(f, duty);
+}
+export const isControlled = (kind: string) => ["vcvs", "vccs", "ccvs", "cccs"].includes(kind);
+export const isWaveSource = (kind: string) => kind === "sine_source" || kind === "square_source";
 
 export const BLINK = `// Mruga diodą na pinie 13 (wbudowana dioda Arduino Uno też jest na 13).
 void setup() {

@@ -86,6 +86,27 @@ class VoltmeterReading(Reason):
 
 
 @dataclass(frozen=True)
+class ControlVoltage(Reason):
+    """A controlled source's control side senses a voltage: U_c = V_cp − V_cn, no current."""
+
+    label: sp.Symbol
+
+
+@dataclass(frozen=True)
+class ControlCurrent(Reason):
+    """A controlled source's control side is a branch the current goes through: U = 0."""
+
+    label: sp.Symbol
+
+
+@dataclass(frozen=True)
+class ControlledSource(Reason):
+    """The output of a controlled source: its gain times the control quantity."""
+
+    label: sp.Symbol
+
+
+@dataclass(frozen=True)
 class IdealOpAmp(Reason):
     """V+ = V−."""
 

@@ -33,6 +33,7 @@ from .semantics import compile_circuit
 from .values import UNKNOWN
 
 DT = sp.Symbol("dt", positive=True)
+T = sp.Symbol("t", nonnegative=True)  # the time at the end of the step
 G_NODE = 1e-12  # S from every node to ground: a node left floating is not a singular matrix
 RELTOL, VNTOL, ABSTOL = 1e-6, 1e-6, 1e-9
 MAX_NEWTON = 60
@@ -43,13 +44,13 @@ MAX_NEWTON = 60
 
 @dataclass
 class Program:
-    """A circuit compiled for simulation. ``x``: unknowns, ``p``: parameters (``dt``, the states,
-    the inputs); ``kernel`` fills the residuals ``F(x, p)`` and the Jacobian ``J = ∂F/∂x`` (flat,
+    """A circuit compiled for simulation. ``x``: unknowns, ``p``: parameters (``dt``, ``t``, the
+    states, the inputs); ``kernel`` fills the residuals ``F(x, p)`` and the Jacobian ``J = ∂F/∂x`` (flat,
     row by row), ``update`` gives the states after an accepted step."""
 
     unknowns: list[str]
     params: list[str]
-    initial: list[float]  # p at t = 0 (dt: a placeholder)
+    initial: list[float]  # p at t = 0 (dt, t: placeholders, set every step)
     states: list[tuple[int, float | None]]  # param index, the most it may change in a step (None: it jumps)
     inputs: dict[str, int]  # name -> param index
     junctions: list[tuple[int, float, float]]  # unknown index, n·V_T, V_crit
@@ -68,7 +69,7 @@ class Program:
     def functions(self):
         if self._kernel is None:
             scope = {"exp": math.exp, "log": math.log, "limexp": _limexp, "dlimexp": _dlimexp,
-                     "sqrt": math.sqrt, "math": math}
+                     "sqrt": math.sqrt, "sin": math.sin, "cos": math.cos, "floor": math.floor, "pi": math.pi, "math": math}
             exec(f"def kernel(x, p, F, J):\n{self.kernel_body['py']}\n", scope)
             exec(f"def update(x, p, out):\n{self.update_body['py']}\n", scope)
             self._kernel, self._update = scope["kernel"], scope["update"]
@@ -123,7 +124,7 @@ def _code(targets: list[tuple[str, sp.Expr]], xs: list[sp.Symbol], ps: list[sp.S
 
 def compile_sim(circuit: Circuit) -> Program:
     """The circuit's laws in time, as a ``Program``: every value must be known."""
-    system = compile_circuit(circuit, ctx=comp.Context(dt=DT))
+    system = compile_circuit(circuit, ctx=comp.Context(dt=DT, t=T))
     for label, placed in system.parts.items():
         c = placed.component
         if isinstance(c, comp.Hole):
@@ -159,7 +160,7 @@ def compile_sim(circuit: Circuit) -> Program:
             unknowns.append(v)
             exprs.append(G_NODE * v)
 
-    params = [DT, *states, *inputs]
+    params = [DT, T, *states, *inputs]
     exprs = [e.xreplace(known) for e in exprs]
     allowed = set(unknowns) | set(params)
     for e in exprs:
@@ -185,9 +186,9 @@ def compile_sim(circuit: Circuit) -> Program:
     return Program(
         unknowns=[u.name for u in unknowns],
         params=[p.name for p in params],
-        initial=[0.0] + [init for _, init, _ in states.values()] + list(inputs.values()),
-        states=[(1 + k, most) for k, (_, _, most) in enumerate(states.values())],
-        inputs={s.name: 1 + len(states) + k for k, s in enumerate(inputs)},
+        initial=[0.0, 0.0] + [init for _, init, _ in states.values()] + list(inputs.values()),
+        states=[(2 + k, most) for k, (_, _, most) in enumerate(states.values())],
+        inputs={s.name: 2 + len(states) + k for k, s in enumerate(inputs)},
         junctions=[(index[u], nvt, nvt * math.log(nvt / (math.sqrt(2) * i_s))) for u, nvt, i_s in junctions],
         kernel_body=kernel,
         update_body=update,
@@ -255,7 +256,7 @@ class Simulation:
 
     def newton(self, dt: float) -> tuple[list[float], int] | None:
         n, p = self.n, self.p
-        p[0] = dt
+        p[0], p[1] = dt, self.t + dt
         x = list(self.x)
         F, J = [0.0] * n, [0.0] * (n * n)
         for iteration in range(1, MAX_NEWTON + 1):
@@ -276,7 +277,9 @@ class Simulation:
 
     def advance_to(self, target: float, dt_max: float, schedule=None, on_step=None) -> None:
         """Steps up to ``target``: as long as each state allows (``Model.states``), at most ``dt_max``;
-        shorter after a flip-flop switched, or when Newton's method did not converge."""
+        shorter after a flip-flop switched, or when Newton's method did not converge. A state that
+        still moves too far in the shortest step jumps for real (a capacitor put across an ideal
+        source): that step is taken."""
         dt_min = dt_max * 1e-9
         self.step = min(self.step or min(dt_max, 1e-6), dt_max)
         while self.t < target - 1e-15:
@@ -284,7 +287,7 @@ class Simulation:
             if schedule is not None:
                 for i, value in schedule(self.t):
                     self.p[i] = value
-            ok, change = self.advance(h)
+            ok, change = self.advance(h, jump=h <= dt_min)
             if not ok:
                 if h <= dt_min:
                     raise NoConvergence(self.t)
@@ -309,8 +312,9 @@ class Simulation:
             on_step()
         self.advance_to(t_end, dt_max, schedule, on_step)
 
-    def advance(self, dt: float) -> tuple[bool, float]:
-        """Try one step of ``dt``: (accepted?, how much of its allowed change a state used)."""
+    def advance(self, dt: float, jump: bool = False) -> tuple[bool, float]:
+        """Try one step of ``dt``: (accepted?, how much of its allowed change a state used);
+        ``jump``: taken whatever the change, as long as Newton's method converged."""
         found = self.newton(dt)
         if found is None:
             return False, math.inf
@@ -321,7 +325,7 @@ class Simulation:
         for (i, most), value in zip(self.program.states, after):
             if most is not None:
                 change = max(change, abs(value - self.p[i]) / most)
-        if change > 1:
+        if change > 1 and not jump:
             return False, change
         self.x, self.t = x, self.t + dt
         self.switched = False

@@ -5,7 +5,9 @@ import math
 import pytest
 
 from electro import (
-    LED, NPN, Arduino, Button, Capacitor, Inductor, Potentiometer, Resistor, Switch, Timer555, VoltageSource,
+    LED, NPN, Arduino, Button, Capacitor, Inductor, Potentiometer, Resistor, SineSource, SquareSource, Switch, Timer555,
+    Zener, NMOS, PMOS,
+    VoltageSource,
     code, ground, net, node, simulate, supply,
 )
 from electro.issues import NeedsSimulation, NoSuchInput, ValueNeeded
@@ -109,3 +111,100 @@ def test_the_program_in_javascript_is_the_same_program():
     program = compile_sim(supply(5) + Resistor(150) + LED() + ground)
     data = program.to_json()
     assert "limexp(" in data and "F[" in data and "J[" in data
+
+
+def test_sine_source_through_an_rc_low_pass():
+    # f = 1/(2π·RC): the capacitor gets 1/√2 of the amplitude, a quarter period behind at most
+    R, C = 1000, 1e-6
+    f = 1 / (2 * math.pi * R * C)
+    trace = simulate(net((SineSource(10, frequency=f), "GND", "in"), (Resistor(R), "in", "out"),
+                         (Capacitor(C), "out", "GND")), t=10 / f)
+    settled = [v for t, v in zip(trace.t, trace.V("out")) if t > 5 / f]
+    assert max(settled) == pytest.approx(10 / math.sqrt(2), rel=0.03)
+    assert max(v for t, v in zip(trace.t, trace.V("in")) if t > 5 / f) == pytest.approx(10, rel=0.01)
+
+
+def test_square_source_has_its_frequency_and_duty():
+    trace = simulate(net((SquareSource(5, frequency=1000, duty=0.25), "GND", "a"), (Resistor(100), "a", "GND")), t=0.01)
+    v = trace.V("a")
+    rising = [trace.t[i] for i in range(1, len(v)) if v[i - 1] < 2.5 <= v[i]]
+    assert rising[3] - rising[2] == pytest.approx(1e-3, rel=0.02)
+    high = sum(t1 - t0 for t0, t1, u in zip(trace.t, trace.t[1:], v[1:]) if u > 2.5)
+    assert high / trace.t[-1] == pytest.approx(0.25, abs=0.02)
+
+
+def test_sine_source_on_paper_is_a_phasor_and_the_square_needs_time():
+    sine = net((SineSource(10, frequency=50), "GND", "a"), (Resistor(5), "a", "GND"))
+    assert complex(sine.solve(omega=100 * math.pi)["R_1"].I) == pytest.approx(2)
+    with pytest.raises(NeedsSimulation):
+        sine.solve()
+    with pytest.raises(NeedsSimulation):
+        net((SquareSource(5), "GND", "a"), (Resistor(5), "a", "GND")).solve()
+
+
+def test_sources_in_time_come_back_as_code():
+    assert "SineSource(10, frequency=50)" in code(net((SineSource(10), "GND", "a"), (Resistor(5), "a", "GND")))
+    square = SquareSource.from_schematic("5", "2 kHz 25%", "E_1")
+    assert (square.frequency, square.duty) == (2000, 0.25)
+    assert square.options() == ["frequency=2000", "duty=0.25"]
+
+
+def test_zener_holds_its_voltage_whatever_the_load():
+    for load in (1e6, 1000):  # no load; a 1 kΩ load taking a third of the current
+        regulator = net((VoltageSource(12), "GND", "in"), (Resistor(470), "in", "out"),
+                        (Zener(5.1), "GND", "out"), (Resistor(load), "out", "GND"))
+        assert simulate(regulator, t=1e-3).at(1e-3)["V_out"] == pytest.approx(5.1, abs=0.1)
+
+
+def test_zener_forward_is_a_diode():
+    end = simulate(supply(5) + Resistor(1000) + Zener(5.1) + ground, t=1e-3).at(1e-3)
+    assert 0.55 < end["U_DZ_1"] < 0.75
+
+
+def test_zener_clips_a_sine_between_its_forward_drop_and_breakdown():
+    clipper = net((SineSource(10, frequency=50), "GND", "in"), (Resistor(1000), "in", "out"), (Zener(5.1), "GND", "out"))
+    out = simulate(clipper, t=0.04).V("out")
+    assert max(out) == pytest.approx(5.1, abs=0.15)
+    assert min(out) == pytest.approx(-0.7, abs=0.1)
+
+
+def test_nmos_as_a_low_side_switch():
+    def switch(gate):
+        return net((VoltageSource(12), "GND", "vcc"), (Resistor(10), "vcc", "d"),
+                   (VoltageSource(gate), "GND", "in"), (Resistor(100), "in", "g"), (NMOS(), "g", "d", "GND"))
+    on = simulate(switch(5), t=1e-4).at(1e-4)
+    rds = 1 / (NMOS.K * (5 - NMOS.VTH))
+    assert on["I_Q_1_D"] == pytest.approx(12 / (10 + rds), rel=0.05)
+    assert on["I_Q_1_G"] == pytest.approx(0, abs=1e-6)  # charged: the gate takes no current
+    assert simulate(switch(0), t=1e-4).at(1e-4)["I_Q_1_D"] == pytest.approx(0, abs=1e-6)
+
+
+def test_nmos_saturates_at_the_square_law():
+    end = simulate(net((VoltageSource(10), "GND", "d"), (VoltageSource(3), "GND", "g"), (NMOS(), "g", "d", "GND")),
+                   t=1e-5).at(1e-5)
+    assert end["I_Q_1_D"] == pytest.approx(NMOS.K / 2 * (3 - NMOS.VTH) ** 2 * (1 + NMOS.LAMBDA * 10), rel=1e-3)
+
+
+def test_pmos_as_a_high_side_switch():
+    def switch(gate):
+        return net((VoltageSource(5), "GND", "vcc"), (VoltageSource(gate), "GND", "g"),
+                   (PMOS(), "g", "out", "vcc"), (Resistor(100), "out", "GND"))
+    assert simulate(switch(0), t=1e-4).at(1e-4)["V_out"] > 4.8
+    assert simulate(switch(5), t=1e-4).at(1e-4)["V_out"] == pytest.approx(0, abs=1e-3)
+
+
+def test_nmos_body_diode_conducts_backwards():
+    end = simulate(net((VoltageSource(5), "GND", "a"), (Resistor(1000), "a", "s"), (NMOS(), "s", "GND", "s")),
+                   t=1e-4).at(1e-4)
+    assert 0.55 < end["V_s"] < 0.75
+
+
+def test_nmos_follows_a_square_on_its_gate():
+    pwm = net((VoltageSource(12), "GND", "vcc"), (Resistor(100), "vcc", "d"),
+              (SquareSource(5, frequency=1000), "GND", "g"), (NMOS(), "g", "d", "GND"))
+    trace = simulate(pwm, t=3e-3)
+    assert trace.at(0.2e-3)["V_d"] < 1 and trace.at(0.7e-3)["V_d"] > 11.9
+
+
+def test_a_capacitor_across_an_ideal_source_charges_at_once():
+    assert simulate(net((VoltageSource(5), "GND", "a"), (Capacitor(1e-6), "a", "GND")), t=1e-3).at(1e-3)["V_a"] == pytest.approx(5)

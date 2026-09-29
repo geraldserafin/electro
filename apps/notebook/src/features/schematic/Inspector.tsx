@@ -8,7 +8,7 @@ import type { ElementData } from "@/shared/model/types";
 import { cn } from "@/shared/lib/cn";
 import { CodeIcon, Rotate, Trash } from "@/shared/ui/icons";
 import { useKinds } from "./kinds";
-import { LED_COLORS, hasValue, isComponent, kindInfo } from "./model";
+import { LED_COLORS, hasValue, isComponent, isControlled, isWaveSource, kindInfo, wave, waveText } from "./model";
 import { field, Panel, PanelHead, Section, Tile } from "./Panel";
 
 export type Selection =
@@ -39,6 +39,10 @@ export function Inspector({ element, taken, onChange, onRename, onRotate, onRemo
   );
   if (!element) return null;
   const info = kindInfo(element.kind);
+  const valueName = info?.meter ? t("inspector.reading") : element.kind === "sine_source" ? t("inspector.amplitude")
+    : element.kind === "square_source" ? t("inspector.high") : element.kind === "zener" ? t("inspector.zenerValue")
+    : isControlled(element.kind) ? t("inspector.gain") : t("inspector.value");
+  const { frequency, duty } = wave(element.text);
   const commitId = () => {
     const clean = id.trim();
     if (clean && clean !== element.id && !taken.includes(clean)) onRename(clean);
@@ -54,15 +58,32 @@ export function Inspector({ element, taken, onChange, onRename, onRotate, onRemo
         </Section>
       )}
       {!live && hasValue(element.kind) && (
-        <Section label={info?.meter ? t("inspector.reading") : t("inspector.value")}>
+        <Section label={valueName}>
           <span className="relative block">
             <input className={cn(field, "pr-8.5")} value={element.value ?? ""} spellCheck={false}
-                   aria-label={info?.meter ? t("inspector.reading") : t("inspector.value")}
+                   aria-label={valueName}
                    placeholder={info?.meter ? t("inspector.noReading") : "?"}
                    onChange={(e) => onChange({ value: e.target.value.trim() === "" ? null : e.target.value })} />
             {info?.unit && <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted pointer-events-none">{info.unit}</span>}
           </span>
           <p className={hint}>{info?.meter ? t("inspector.readingHint") : t("inspector.valueHint")}</p>
+        </Section>
+      )}
+      {!live && isWaveSource(element.kind) && (
+        <Section label={t("inspector.frequency")}>
+          <span className="relative block">
+            <input className={cn(field, "pr-8.5")} value={frequency} spellCheck={false} aria-label={t("inspector.frequency")}
+                   onChange={(e) => onChange({ text: waveText(e.target.value, duty) })} />
+            {/\d$/.test(frequency) && <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted pointer-events-none">Hz</span>}
+          </span>
+          <p className={hint}>{t("inspector.frequencyHint")}</p>
+        </Section>
+      )}
+      {!live && element.kind === "square_source" && (
+        <Section label={t("inspector.duty", { percent: duty })}>
+          <input type="range" min={1} max={99} step={1} value={duty} className="w-full accent-[var(--accent)]"
+                 aria-label={t("inspector.duty", { percent: duty })}
+                 onChange={(e) => onChange({ text: waveText(frequency, Number(e.target.value)) })} />
         </Section>
       )}
       {!live && element.kind === "led" && (
@@ -92,6 +113,7 @@ export function Inspector({ element, taken, onChange, onRename, onRotate, onRemo
         </Section>
       )}
       {!live && element.kind === "button" && <p className={hint}>{t("inspector.buttonHint")}</p>}
+      {!live && isControlled(element.kind) && <p className={hint}>{t("inspector.controlledHint")}</p>}
       {element.kind === "potentiometer" && (
         <Section label={t("inspector.position", { percent: Math.round(Number(element.text ?? 0.5) * 100) })}>
           <input type="range" min={0} max={1} step={0.01} value={Number(element.text ?? 0.5)} className="w-full accent-[var(--accent)]"
@@ -104,7 +126,8 @@ export function Inspector({ element, taken, onChange, onRename, onRotate, onRemo
           <CodeIcon /> {t("inspector.sketch")}
         </Tile>
       )}
-      {!live && kindInfo(element.kind)?.live && element.kind !== "arduino" && <p className={hint}>{t("inspector.liveOnly")}</p>}
+      {!live && kindInfo(element.kind)?.live && element.kind !== "arduino" &&
+        <p className={hint}>{t(isWaveSource(element.kind) ? "inspector.waveOnly" : "inspector.liveOnly")}</p>}
       {!live && element.kind === "label" && (
         <Section label={t("inspector.node")}>
           <input className={field} value={element.text ?? ""} spellCheck={false} aria-label={t("inspector.node")}

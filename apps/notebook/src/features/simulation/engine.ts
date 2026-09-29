@@ -152,6 +152,7 @@ export class Simulation {
   private newton(dt: number): Float64Array | null {
     const { n, p, F, J } = this;
     p[0] = dt;
+    p[1] = this.t + dt;
     let x = this.xa, next = this.xb;
     x.set(this.x);
     for (let iteration = 1; iteration <= MAX_NEWTON; iteration++) {
@@ -175,8 +176,9 @@ export class Simulation {
     return null;
   }
 
-  /** Try one step of ``dt``: [accepted, how much of its allowed change a state used]. */
-  advance(dt: number): [boolean, number] {
+  /** Try one step of ``dt``: [accepted, how much of its allowed change a state used]; ``jump``: taken
+   *  whatever the change, as long as Newton's method converged (see advanceTo). */
+  advance(dt: number, jump = false): [boolean, number] {
     const x = this.newton(dt);
     if (!x) return [false, Infinity];
     const { states } = this.program;
@@ -186,7 +188,7 @@ export class Simulation {
       const [i, most] = states[k];
       if (most !== null) change = Math.max(change, Math.abs(this.after[k] - this.p[i]) / most);
     }
-    if (change > 1) return [false, change];
+    if (change > 1 && !jump) return [false, change];
     this.x.set(x);
     this.t += dt;
     this.switched = false;
@@ -198,14 +200,15 @@ export class Simulation {
     return [true, change];
   }
 
-  /** Steps up to ``target``, as long as the states allow, at most ``dtMax`` (see sim.py). */
+  /** Steps up to ``target``, as long as the states allow, at most ``dtMax``; in the shortest step a state
+   *  may jump (see sim.py). */
   advanceTo(target: number, dtMax: number, schedule?: Schedule | null, onStep?: () => void) {
     const dtMin = dtMax * 1e-9;
     this.step = Math.min(this.step || Math.min(dtMax, 1e-6), dtMax);
     while (this.t < target - 1e-15) {
       const h = Math.min(this.step, target - this.t);
       if (schedule) for (const [i, value] of schedule(this.t)) this.p[i] = value;
-      const [ok, change] = this.advance(h);
+      const [ok, change] = this.advance(h, h <= dtMin);
       if (!ok) {
         if (h <= dtMin) throw new NoConvergence(this.t);
         this.step = change === Infinity ? h / 4 : h / 2;

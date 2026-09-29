@@ -64,7 +64,10 @@ def _label_lines(element, solution) -> list[tuple[str, str]]:
         if value is None:  # a meter without a reading is just a meter, not an unknown
             return [(label if isinstance(component, (Ammeter, Voltmeter)) else f"{label} = ?", "label")]
         return [(f"{label} = {fmt(value, component.unit)}", "solved")]
-    return [(f"{label} = {fmt(component.value, component.unit)}", "label")]
+    wave = f", {fmt(component.frequency, 'Hz')}" if hasattr(component, "frequency") else ""
+    if getattr(component, "duty", 0.5) != 0.5:
+        wave += f" {component.duty * 100:g}%"
+    return [(f"{label} = {fmt(component.value, component.unit)}{wave}", "label")]
 
 
 def _result_lines(element, solution, flow: Vec) -> list[tuple[str, str]]:

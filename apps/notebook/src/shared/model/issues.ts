@@ -10,7 +10,7 @@ export interface LawData { equation: Tex; reason: Reason }
 
 type Labelled = "OhmsLaw" | "CapacitorOpenDC" | "CapacitorImpedance" | "InductorShortDC" | "InductorImpedance"
   | "SourceVoltage" | "SourceCurrent" | "IdealAmmeter" | "AmmeterReading" | "IdealVoltmeter" | "VoltmeterReading"
-  | "IdealOpAmp" | "UnknownElement" | "VoltageAcross"
+  | "IdealOpAmp" | "UnknownElement" | "VoltageAcross" | "ControlVoltage" | "ControlCurrent" | "ControlledSource"
   | "CapacitorStep" | "InductorStep" | "SwitchClosed" | "SwitchOpen" | "PotentiometerDivider" | "DeviceModel";
 
 export type Reason =

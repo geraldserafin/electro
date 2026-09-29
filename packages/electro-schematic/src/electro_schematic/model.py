@@ -44,15 +44,25 @@ KINDS: dict[str, Kind] = {
     "voltmeter": Kind(TWO_PINS, comp.Voltmeter),
     "hole": Kind(TWO_PINS, comp.Hole),
     "opamp": Kind(((0, 2), (0, 0), (4, 1)), comp.OpAmp),  # plus, minus, out (terminal order)
+    # controlled sources: the control side on the left (cp above cn), the output on the right (n below p)
+    "vcvs": Kind(((0, 0), (0, 4), (4, 4), (4, 0)), comp.VCVS),
+    "vccs": Kind(((0, 0), (0, 4), (4, 4), (4, 0)), comp.VCCS),
+    "ccvs": Kind(((0, 0), (0, 4), (4, 4), (4, 0)), comp.CCVS),
+    "cccs": Kind(((0, 0), (0, 4), (4, 4), (4, 0)), comp.CCCS),
     # in time only (electro.devices): the value, where there is one, is in ``value``; the rest
     # (an LED's colour, a switch's position, a potentiometer's wiper, an Arduino's sketch) in ``text``
+    "sine_source": Kind(TWO_PINS, dev.SineSource),  # the frequency in ``text``
+    "square_source": Kind(TWO_PINS, dev.SquareSource),  # the frequency, then the duty if not 50 %: "1k 25%"
     "diode": Kind(TWO_PINS, dev.Diode),
     "led": Kind(TWO_PINS, dev.LED),
+    "zener": Kind(TWO_PINS, dev.Zener),  # the breakdown voltage in ``value``
     "switch": Kind(TWO_PINS, dev.Switch),
     "button": Kind(TWO_PINS, dev.Button),
     "potentiometer": Kind(((0, 0), (4, 0), (2, -2)), dev.Potentiometer),  # a, b, wiper
     "npn": Kind(((0, 0), (3, -2), (3, 2)), dev.NPN),  # base, collector, emitter
     "pnp": Kind(((0, 0), (3, -2), (3, 2)), dev.PNP),
+    "nmos": Kind(((0, 0), (3, -2), (3, 2)), dev.NMOS),  # gate, drain, source
+    "pmos": Kind(((0, 0), (3, -2), (3, 2)), dev.PMOS),
     # gnd, trig, out, reset, ctrl, thr, dis, vcc (DIP order)
     "timer555": Kind(((2, 6), (0, 2), (6, 3), (4, 0), (4, 6), (0, 3), (0, 4), (2, 0)), dev.Timer555),
     # D0–D13 on top (D13 on the left, as on the board), A0–A5, 5V and GND below
@@ -86,7 +96,7 @@ class Element:
     at: Point
     rotation: int = 0  # 0, 90, 180, 270 (clockwise); 180 on a source = reversed polarity
     value: str | None = None  # as typed: "4.7k", "R", None = unknown
-    text: str | None = None  # net label name; or an LED's colour, a switch's position, an Arduino's sketch
+    text: str | None = None  # net label name; or an LED's colour, a switch's position, a source's frequency, an Arduino's sketch
 
     def __post_init__(self):
         self.at = tuple(self.at)

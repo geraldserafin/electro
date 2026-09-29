@@ -14,8 +14,9 @@ import sympy as sp
 
 from .circuit import GROUND, Circuit, Netlist, Seq, Transpose, ground, open_end, wire
 from .reasons import (
-    AmmeterReading, CapacitorImpedance, CapacitorOpenDC, CapacitorStep, IdealAmmeter, IdealOpAmp, IdealVoltmeter, InductorImpedance,
-    InductorShortDC, InductorStep, OhmsLaw, Reason, SourceCurrent, SourceVoltage, UnknownElement, VoltageAcross, VoltmeterReading,
+    AmmeterReading, CapacitorImpedance, CapacitorOpenDC, CapacitorStep, ControlCurrent, ControlledSource, ControlVoltage,
+    IdealAmmeter, IdealOpAmp, IdealVoltmeter, InductorImpedance, InductorShortDC, InductorStep, OhmsLaw, Reason,
+    SourceCurrent, SourceVoltage, UnknownElement, VoltageAcross, VoltmeterReading,
 )
 
 OPEN = open_end + open_end.transpose()  # 1 → 1 with nothing between: a break in the circuit
@@ -34,10 +35,12 @@ class Law:
 @dataclass(frozen=True)
 class Context:
     """Analysis settings: DC (``omega=None``), AC phasors at angular frequency ``omega``, or one
-    step in time (``dt``: its length, a symbol): what ``electro.sim`` solves over and over."""
+    step in time (``dt``: its length, ``t``: the time at its end, both symbols): what ``electro.sim``
+    solves over and over."""
 
     omega: sp.Expr | None = None
     dt: sp.Expr | None = None
+    t: sp.Expr | None = None
 
     @property
     def transient(self) -> bool:
@@ -233,6 +236,62 @@ class Voltmeter(TwoTerminal):
 
     def law(self, U, I, x, ctx):
         return [(I, IdealVoltmeter), (U - x, VoltmeterReading, "reading")]
+
+
+class Controlled(Component):
+    """A controlled (dependent) source, 2 → 2: control terminals (``cp``, ``cn``) → output (``n``, ``p``).
+
+    The output is a source like ``VoltageSource`` (``+`` on ``p``; ``U = V_p − V_n``, ``I`` flowing
+    through it from ``n`` to ``p``). The control side senses either a voltage ``U_c = V_cp − V_cn``
+    (drawing no current, like a voltmeter) or the current ``I_c`` through a branch from ``cp`` to
+    ``cn`` (dropping no voltage, like an ammeter put in series where the current is measured).
+    ``value``: the gain — the output quantity over the control one.
+    """
+
+    left, right = ("cp", "cn"), ("n", "p")
+    positive = False  # a gain may be negative (an inverting amplifier)
+    senses, drives = "U", "U"  # the control quantity, the output quantity
+
+    def build(self, label, V, param, ctx):
+        U, I = sp.Symbol(f"U_{label}"), sp.Symbol(f"I_{label}")
+        name = sp.Symbol(label)
+        if self.senses == "U":
+            control = sp.Symbol(f"U_{label}_c")
+            laws = [Law(control - (V["cp"] - V["cn"]), ControlVoltage(name), "kvl")]
+            inflow = {"cp": sp.Integer(0), "cn": sp.Integer(0)}
+        else:
+            control = sp.Symbol(f"I_{label}_c")
+            laws = [Law(V["cp"] - V["cn"], ControlCurrent(name))]
+            inflow = {"cp": control, "cn": -control}
+        laws += [
+            Law(U - (V["p"] - V["n"]), VoltageAcross(name), "kvl"),
+            Law((U if self.drives == "U" else I) - param * control, ControlledSource(name)),
+        ]
+        return Model(inflow | {"n": I, "p": -I}, laws, {"U": U, "I": I, f"{self.senses}_c": control}, param)
+
+
+class VCVS(Controlled):
+    """Voltage-controlled voltage source: ``U = μ·U_c``."""
+
+    prefix = "VCVS"
+
+
+class VCCS(Controlled):
+    """Voltage-controlled current source: ``I = g·U_c`` (``g`` in siemens)."""
+
+    prefix, unit, drives = "VCCS", "S", "I"
+
+
+class CCVS(Controlled):
+    """Current-controlled voltage source: ``U = r·I_c`` (``r`` in ohms)."""
+
+    prefix, unit, senses = "CCVS", "Ω", "I"
+
+
+class CCCS(Controlled):
+    """Current-controlled current source: ``I = β·I_c``."""
+
+    prefix, senses, drives = "CCCS", "I", "I"
 
 
 class OpAmp(NoValue):

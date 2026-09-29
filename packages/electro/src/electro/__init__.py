@@ -16,10 +16,13 @@ from .circuit import (
     split, swap, wire, wires,
 )
 from .components import (
-    Ammeter, Capacitor, Component, CurrentSource, Hole, Inductor, Law, Model, NoValue, OpAmp, Resistor,
+    CCCS, CCVS, VCCS, VCVS, Ammeter, Capacitor, Component, CurrentSource, Hole, Inductor, Law, Model, NoValue, OpAmp, Resistor,
     TwoTerminal, VoltageSource, Voltmeter, supply,
 )
-from .devices import LED, NPN, PNP, Arduino, Button, Diode, Potentiometer, Switch, Timer555
+from .devices import (
+    LED, NMOS, NPN, PMOS, PNP, Arduino, Button, Diode, Potentiometer, SineSource, SquareSource, Switch, Timer555,
+    Zener,
+)
 from .issues import Issue
 from .sim import Trace, simulate
 from .solver import Ambiguous, CircuitError, Contradiction, Diagnosis, I, MissingData, P, Solution, U, V, solve
@@ -28,10 +31,11 @@ from .values import fmt, parse
 __all__ = [
     "GROUND", "Circuit", "ground", "join", "loop", "net", "node", "open_end", "parallel", "series",
     "shunt", "spider", "split", "swap", "wire", "wires",
-    "Ammeter", "Capacitor", "Component", "CurrentSource", "Hole", "Inductor", "Law", "Model", "NoValue",
+    "CCCS", "CCVS", "VCCS", "VCVS", "Ammeter", "Capacitor", "Component", "CurrentSource", "Hole", "Inductor", "Law", "Model", "NoValue",
     "OpAmp", "Resistor", "TwoTerminal", "VoltageSource", "Voltmeter", "supply",
     "Relation", "Thevenin", "blackbox", "code", "equivalent", "resistance",
     "Ambiguous", "CircuitError", "Contradiction", "Diagnosis", "MissingData", "I", "P", "U", "V", "Solution", "solve",
     "fmt", "parse", "Eq", "Symbol", "symbols",
-    "LED", "NPN", "PNP", "Arduino", "Button", "Diode", "Potentiometer", "Switch", "Timer555", "Trace", "simulate",
+    "LED", "NMOS", "NPN", "PMOS", "PNP", "Arduino", "Button", "Diode", "Potentiometer", "SineSource", "SquareSource", "Switch",
+    "Timer555", "Trace", "Zener", "simulate",
 ]

@@ -1,13 +1,14 @@
-"""Elements that live in time: diodes and LEDs, switches, a potentiometer, transistors, the 555
-timer and an Arduino board.
+"""Elements that live in time: sine and square sources, diodes, LEDs and Zener diodes, switches,
+a potentiometer, bipolar transistors and MOSFETs, the 555 timer and an Arduino board.
 
 Semiconductors and chips are not linear, so they have laws only in time
 (``ctx.transient``), for ``electro.sim``: the solver on paper says ``NeedsSimulation``.
 Switches, the potentiometer and the Arduino's supply are linear and work on paper too.
 
-The models are the textbook ones, kept small: Shockley's diode, Ebers–Moll's transistor, a
-555 as two comparators and a flip-flop, an Arduino pin as a source with a resistance (what
-the microcontroller sets it to comes from outside — ``Model.inputs`` — e.g. an emulated chip).
+The models are the textbook ones, kept small: Shockley's diode, Ebers–Moll's transistor,
+Shichman–Hodges' MOSFET, a 555 as two comparators and a flip-flop, an Arduino pin as a source
+with a resistance (what the microcontroller sets it to comes from outside — ``Model.inputs`` —
+e.g. an emulated chip).
 """
 
 from __future__ import annotations
@@ -17,9 +18,9 @@ import math
 import sympy as sp
 
 from .components import Component, Context, Law, Model, NoValue, TwoTerminal
-from .issues import NeedsSimulation
+from .issues import BadValue, NeedsSimulation
 from .reasons import DeviceModel, PotentiometerDivider, SourceVoltage, SwitchClosed, SwitchOpen
-from .values import parse
+from .values import UNKNOWN, fmt, parse
 
 VT = 0.025852  # thermal voltage at 27 °C
 GMIN = 1e-12  # S: a tiny leak across every junction, so a reverse-biased one is never an open end
@@ -63,6 +64,100 @@ class dlimexp(sp.Function):
 def _paper_only(label: str, ctx: Context) -> None:
     if not ctx.transient:
         raise NeedsSimulation(sp.Symbol(label))
+
+
+# ------------------------------------------------------------------ sources in time
+
+
+def _frequency(text) -> sp.Expr:
+    """``"50"``, ``"1k"``, ``"1 kHz"`` → Hz."""
+    f = parse(text or None)
+    if not (isinstance(f, sp.Number) and f > 0):
+        raise BadValue(str(text))
+    return f
+
+
+class SineSource(TwoTerminal):
+    """``U = value·sin(2π·f·t)``, ``+`` on the right like ``VoltageSource``; ``value`` is the amplitude.
+
+    On paper only as a phasor (``solve(omega=...)``: the amplitude, phase 0); with DC, it needs time.
+    """
+
+    prefix, unit, active, positive = "E", "V", True, False
+    on_paper = True  # as a phasor
+    STEPS = 40  # at least this many steps a period
+
+    def __init__(self, value=None, frequency=50, label: str | None = None):
+        super().__init__(value, label)
+        self.frequency = _frequency(frequency)
+
+    def build(self, label, V, param, ctx):
+        if not ctx.transient and (ctx.omega is None or not self.on_paper):
+            raise NeedsSimulation(sp.Symbol(label))
+        model = super().build(label, V, param, ctx)
+        if ctx.transient:  # the time as a state: it may move at most a period/STEPS a step
+            model.states[sp.Symbol(f"{label}_t")] = (ctx.t, 0.0, float(1 / self.frequency) / self.STEPS)
+        return model
+
+    def wave(self, x, t):
+        return x * sp.sin(2 * sp.pi * self.frequency * t)
+
+    def law(self, U, I, x, ctx):
+        if ctx.transient:
+            return [(U - self.wave(x, ctx.t), DeviceModel)]
+        return [(U - x, SourceVoltage)]
+
+    def options(self):
+        return [f"frequency={float(self.frequency):g}"]
+
+    @classmethod
+    def from_schematic(cls, value, text, label):
+        """``text``: the frequency (``"50"``, ``"1 kHz"``)."""
+        return cls(parse(value), text or 50, label=label)
+
+    def __repr__(self):
+        args = ["?" if self.value is UNKNOWN else fmt(self.value, self.unit), *self.options()]
+        return f"{type(self).__name__}({', '.join(args + ([f'label={self.label!r}'] if self.label else []))})"
+
+
+class SquareSource(SineSource):
+    """``value`` for the first ``duty`` of every period, then 0 V: a clock, a PWM signal. In time only."""
+
+    on_paper = False
+    STEPS = 100
+
+    def __init__(self, value=None, frequency=1000, duty: float = 0.5, label: str | None = None):
+        super().__init__(value, frequency, label)
+        self.duty = min(1.0, max(0.0, float(duty)))
+
+    def build(self, label, V, param, ctx):
+        model = super().build(label, V, param, ctx)
+        if ctx.transient:  # the level as a state that jumps: after an edge the steps start short again
+            high = sp.Symbol(f"{label}_high")
+            model.states[high] = (self.high(ctx.t), 1.0, None)
+        return model
+
+    def high(self, t):
+        phase = self.frequency * t
+        return sp.Piecewise((1, phase - sp.floor(phase) < self.duty), (0, True))
+
+    def wave(self, x, t):
+        return x * self.high(t)
+
+    def options(self):
+        return super().options() + ([] if self.duty == 0.5 else [f"duty={self.duty:g}"])
+
+    @classmethod
+    def from_schematic(cls, value, text, label):
+        """``text``: the frequency, then the duty in per cent if not 50: ``"1k"``, ``"1 kHz 25%"``."""
+        words = (text or "").split()
+        duty = 0.5
+        if words and words[-1].endswith("%"):
+            try:
+                duty = float(words.pop().rstrip("%").replace(",", ".")) / 100
+            except ValueError:
+                raise BadValue(text) from None
+        return cls(parse(value), " ".join(words) or 1000, duty, label=label)
 
 
 # ------------------------------------------------------------------ diodes
@@ -112,6 +207,35 @@ class LED(Diode):
 
     def __repr__(self):
         return f"LED({self.color!r}{f', label={self.label!r}' if self.label else ''})"
+
+
+class Zener(TwoTerminal):
+    """A Zener diode: ``a`` anode, ``b`` cathode, ``value`` its breakdown voltage ``U_Z``.
+
+    Forward, a diode; reverse, it breaks down: ``I_ZT`` flows at ``U = −U_Z`` and every ``V_T``
+    further multiplies it by e (so it holds ``U_Z`` within a few tenths of a volt from 1 to 50 mA).
+    The breakdown is a junction of its own, ``U_<label>_br = −U − U_Z``, for Newton's step limiting.
+    """
+
+    prefix, unit = "DZ", "V"
+    IS, IZT = 1e-14, 5e-3  # A: saturation current, the current at which U_Z is given (datasheets: 5 mA)
+
+    def build(self, label, V, param, ctx):
+        _paper_only(label, ctx)
+        model = super().build(label, V, param, ctx)
+        U, I = model.variables["U"], model.variables["I"]
+        br = sp.Symbol(f"U_{label}_br")
+        name = DeviceModel(sp.Symbol(label))
+        model.laws += [
+            Law(br + U + param, name, "kvl"),
+            Law(I - (self.IS * (limexp(U / VT) - 1) - self.IZT * limexp(br / VT) + GMIN * U), name),
+        ]
+        model.variables["U_br"] = br
+        model.junctions += [(U, VT, self.IS), (br, VT, self.IZT)]
+        return model
+
+    def law(self, U, I, x, ctx):
+        return []
 
 
 # ------------------------------------------------------------------ switches
@@ -235,6 +359,63 @@ class NPN(NoValue):
 
 
 class PNP(NPN):
+    POLARITY = -1
+
+
+class NMOS(NoValue):
+    """An enhancement MOSFET (Shichman–Hodges, SPICE level 1): gate ``g``, drain ``d``, source ``s``.
+
+    Off below ``VTH``; above it, with ``U_ov = U_GS − VTH``, the channel carries
+    ``K·(U_ov·U_DS − U_DS²/2)`` while ``U_DS < U_ov`` (a resistor, ``1/(K·U_ov)`` near 0 V) and
+    ``K/2·U_ov²`` beyond (a current source), times ``1 + λ·U_DS``. With ``U_DS < 0`` drain and source
+    swap roles. The body diode (source → drain) and the gate's capacitances are there too: a
+    power MOSFET switching a motor from an Arduino's pin. The values are a logic-level one's.
+    """
+
+    prefix = "Q"
+    left, right = ("g",), ("d", "s")
+    POLARITY = 1
+    VTH, K, LAMBDA = 2.0, 0.5, 0.01  # V, A/V², 1/V
+    IS = 1e-14  # A: the body diode
+    CGS, CGD = 1e-9, 2e-10  # F
+
+    def channel(self, ugs, uds):
+        """Drain → source through the channel, for ``uds ≥ 0``."""
+        ov = ugs - self.VTH
+        return sp.Piecewise(
+            (0, ov <= 0),
+            (self.K * (ov * uds - uds**2 / 2) * (1 + self.LAMBDA * uds), uds < ov),
+            (self.K / 2 * ov**2 * (1 + self.LAMBDA * uds), True),
+        )
+
+    def build(self, label, V, param, ctx):
+        _paper_only(label, ctx)
+        s = self.POLARITY
+        Ugs, Uds, body = sp.Symbol(f"U_{label}_GS"), sp.Symbol(f"U_{label}_DS"), sp.Symbol(f"U_{label}_body")
+        Id, Ig = sp.Symbol(f"I_{label}_D"), sp.Symbol(f"I_{label}_G")
+        Ugs0, Ugd0 = sp.Symbol(f"U_{label}_GS_prev"), sp.Symbol(f"U_{label}_GD_prev")
+        Ugd = Ugs - Uds
+        channel = sp.Piecewise((self.channel(Ugs, Uds), Uds >= 0), (-self.channel(Ugd, -Uds), True))
+        diode = self.IS * (limexp(body / VT) - 1) + GMIN * body
+        cgs, cgd = self.CGS * (Ugs - Ugs0) / ctx.dt, self.CGD * (Ugd - Ugd0) / ctx.dt
+        name = DeviceModel(sp.Symbol(label))
+        laws = [
+            Law(Ugs - s * (V["g"] - V["s"]), name, "kvl"),
+            Law(Uds - s * (V["d"] - V["s"]), name, "kvl"),
+            Law(body + Uds, name, "kvl"),
+            Law(Id - s * (channel - diode - cgd), name),
+            Law(Ig - s * (cgs + cgd), name),
+        ]
+        model = Model({"d": Id, "g": Ig, "s": -(Id + Ig)}, laws,
+                      {"U_GS": Ugs, "U_DS": Uds, "U_body": body, "I_D": Id, "I_G": Ig})
+        model.junctions.append((body, VT, self.IS))
+        model.states |= {Ugs0: (Ugs, 0.0, 0.5), Ugd0: (Ugd, 0.0, 0.5)}
+        return model
+
+
+class PMOS(NMOS):
+    """``NMOS`` with every voltage and current the other way: on with the gate ``VTH`` below the source."""
+
     POLARITY = -1
 
 

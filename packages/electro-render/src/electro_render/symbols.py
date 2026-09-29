@@ -32,12 +32,22 @@ SYMBOLS: dict[str, str] = {
     "inductor": _body('<path d="M-20 0' + "a5 5 0 0 1 10 0" * 4 + '"/>'),
     "voltage_source": _body('<circle r="13"/><path d="M-13 0H13"/><path class="fill" d="M13 0l-7 -4v8z"/>', 13),
     "current_source": _body('<circle r="13"/><path d="M0 -13V13"/><path class="fill" d="M24 0l-8 -4.5v9z"/>', 13),
+    # a sine / a square wave in the circle, + by the right terminal
+    "sine_source": _body('<circle r="13"/><path d="M-8 0C-5.5 -9 -2.5 -9 0 0S5.5 9 8 0"/><path d="M20 -13h6M23 -16v6"/>', 13),
+    "square_source": _body('<circle r="13"/><path d="M-8 5H-4V-5H4V5H8"/><path d="M20 -13h6M23 -16v6"/>', 13),
     "ammeter": _body('<circle r="13"/>', 13),
     "voltmeter": _body('<circle r="13"/>', 13),
+    # controlled sources: a diamond, + inside for a voltage, an arrow for a current; the control side
+    # two open terminals (a voltage sensed) or a branch with the current's arrow (a current sensed)
+    "vcvs": '<path d="M0 0H14M0 80H14"/><path d="M20 0h8M24 -4v8M20 80h8"/><path d="M80 0V24M80 56V80M80 24L96 40L80 56L64 40Z"/><path d="M76 34h8M80 30v8M76 47h8"/>',
+    "vccs": '<path d="M0 0H14M0 80H14"/><path d="M20 0h8M24 -4v8M20 80h8"/><path d="M80 0V24M80 56V80M80 24L96 40L80 56L64 40Z"/><path d="M80 51V38"/><path class="fill" d="M80 31l-4 7h8z"/>',
+    "ccvs": '<path d="M0 0V80"/><path class="fill" d="M0 46l-4.5 -8h9z"/><path d="M80 0V24M80 56V80M80 24L96 40L80 56L64 40Z"/><path d="M76 34h8M80 30v8M76 47h8"/>',
+    "cccs": '<path d="M0 0V80"/><path class="fill" d="M0 46l-4.5 -8h9z"/><path d="M80 0V24M80 56V80M80 24L96 40L80 56L64 40Z"/><path d="M80 51V38"/><path class="fill" d="M80 31l-4 7h8z"/>',
     "hole": _body('<rect class="dashed" x="-18" y="-10" width="36" height="20"/>', 18),
     "opamp": '<path d="M0 0H20M0 40H20M60 20H80"/><path d="M20 -10L20 50L62 20Z"/>'
              '<path d="M24 0h7M24 40h7M27.5 36.5v7"/>',
     "diode": _body('<path d="M-8 -9L8 0L-8 9Z"/><path d="M8 -9V9"/>', 8),
+    "zener": _body('<path d="M-8 -9L8 0L-8 9Z"/><path d="M4 -11L8 -9V9L12 11"/>', 8),  # the bar's ends bent: Z
     "led": _body('<path d="M-8 -9L8 0L-8 9Z"/><path d="M8 -9V9"/>'
                  '<path d="M0 -13l7 -8M6 -15l7 -8"/><path class="fill" d="M9 -23.5l-4.5 1.3l3.2 2.8zM15 -25.5l-4.5 1.3l3.2 2.8z"/>', 8),
     # a switch or a button drawn open; closed (class "closed" on it, or on the element around it) as it then is
@@ -52,6 +62,12 @@ SYMBOLS: dict[str, str] = {
            '<path class="fill" d="M60 22l-9.5 -0.6l3.4 -6.3z"/><circle cx="46" r="23"/>',
     "pnp": '<path d="M0 0H30"/><path class="thick" d="M30 -13V13"/><path d="M30 -6L60 -22V-40M30 6L60 22V40"/>'
            '<path class="fill" d="M31 7l9.5 0.6l-3.4 6.3z"/><circle cx="46" r="23"/>',
+    # enhancement MOSFETs: the gate apart from the channel (three segments: off until driven), the body
+    # tied to the source, its arrow into the channel for N, out of it for P
+    "nmos": '<path d="M0 0H22M22 -14V14"/><path class="thick" d="M30 -17V-8M30 -4V4M30 8V17"/>'
+             '<path d="M30 -12H60V-40M30 12H60V40M30 0H60V12"/><path class="fill" d="M31 0l8 -4.5v9z"/>',
+    "pmos": '<path d="M0 0H22M22 -14V14"/><path class="thick" d="M30 -17V-8M30 -4V4M30 8V17"/>'
+             '<path d="M30 -12H60V-40M30 12H60V40M30 0H60V12"/><path class="fill" d="M47 0l-8 -4.5v9z"/>',
     "timer555": '<rect x="20" y="20" width="80" height="80"/>'
                 '<path d="M0 40H20M0 60H20M0 80H20M100 60H120M40 0V20M80 0V20M40 100V120M80 100V120"/>'
                 '<g class="pins"><text x="24" y="43">TRIG</text><text x="24" y="63">THR</text><text x="24" y="83">DIS</text>'

@@ -20,8 +20,8 @@ const doc = (label: string, detail: string, type = "class"): Completion => ({ la
 function electro(t: TFunction<"notebook">): Completion[] {
   const hint = (name: keyof typeof pl.completion) => t(`completion.${name}`);
   return [
-    ...(["Resistor", "Capacitor", "Inductor", "VoltageSource", "CurrentSource", "Ammeter", "Voltmeter", "Hole", "OpAmp",
-      "LED", "Diode", "Switch", "Button", "Potentiometer", "NPN", "PNP", "Timer555", "Arduino"] as const)
+    ...(["Resistor", "Capacitor", "Inductor", "VoltageSource", "CurrentSource", "SineSource", "SquareSource", "VCVS", "VCCS", "CCVS", "CCCS", "Ammeter", "Voltmeter", "Hole", "OpAmp",
+      "LED", "Diode", "Zener", "Switch", "Button", "Potentiometer", "NPN", "PNP", "NMOS", "PMOS", "Timer555", "Arduino"] as const)
       .map((c) => doc(c, hint(c))),
     doc("simulate", hint("simulate"), "function"),
     ...["loop", "net", "series", "parallel", "shunt", "supply", "node"].map((f) => doc(f, hint("circuit"), "function")),
