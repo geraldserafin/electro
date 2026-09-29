@@ -23,6 +23,7 @@ import { column } from "./layout";
 import { Sidebar } from "./Sidebar";
 import { useOutlineOpen } from "./useOutlineOpen";
 import { usePrintKey } from "./usePrintKey";
+import { useRemoved } from "./useRemoved";
 import { useRunner } from "./useRunner";
 import { cn } from "@/shared/lib/cn";
 
@@ -83,6 +84,7 @@ export function Notebook({ initial, revision, reload, onTitle, readOnly = false,
   useEffect(() => (ready ? warmUpWhenIdle() : undefined), [ready]);
 
   usePrintKey(useCallback(() => setExporting(true), []));
+  const removed = useRemoved(() => latest.current.cells, setCells); // a removed cell comes back with Ctrl/⌘ Z
 
   return (
     <div
@@ -116,6 +118,15 @@ export function Notebook({ initial, revision, reload, onTitle, readOnly = false,
       {readOnly
         ? <ReadOnlyNotice onCopy={() => void copy()} />
         : <SyncNotice state={sync.state} onKeepMine={sync.keepMine} onTakeTheirs={sync.takeTheirs} />}
+      {removed.last && (
+        // the last removal: a moment, with the way back
+        <div role="status" className="fixed bottom-5 left-1/2 -translate-x-1/2 z-40 flex items-center gap-3 pl-4 pr-1.5 py-1.5 rounded-xl border border-line bg-paper shadow-menu text-[15px]">
+          {t("cell.removed")}
+          <button className="h-8 px-3 rounded-lg font-medium text-accent hover:bg-accent-soft" onClick={removed.undo}>
+            {t("cell.undo")} <kbd className="ml-1 font-sans text-[13px] text-faint">{/Mac|iPhone|iPad/.test(navigator.platform) ? "⌘Z" : "Ctrl+Z"}</kbd>
+          </button>
+        </div>
+      )}
       {exporting && (
         <ExportDialog notebook={notebook} pdf={pdf} onChange={setPdf}
                       onCode={(codeInPdf) => setNotebook((nb) => ({ ...nb, settings: { ...nb.settings, codeInPdf } }))}
@@ -133,7 +144,7 @@ export function Notebook({ initial, revision, reload, onTitle, readOnly = false,
         {notebook.cells.map((cell, index) => (
           <CellFrame key={cell.id} id={cell.id} type={cell.type} focused={focused === cell.id} onFocus={() => setFocused(cell.id)}
                      onMoveTo={(before) => setCells((cells) => moveRange(cells, index, 1, before))}
-                     onRemove={() => setCells((cells) => cells.filter((c) => c.id !== cell.id))}
+                     onRemove={() => removed.remove(cell.id)}
                      onAdd={(type) => insert(index + 1, type)}>
             {cell.type === "markdown" && <MarkdownCell cell={cell} update={(p) => update(cell.id, p)} />}
             {cell.type === "code" && (

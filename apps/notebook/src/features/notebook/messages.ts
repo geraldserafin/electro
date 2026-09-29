@@ -23,6 +23,8 @@ export const pl = {
     remove: "Usuń komórkę",
     drag: "Przeciągnij, żeby przenieść (albo strzałki ↑ ↓)",
     tabs: "Komórka",
+    removed: "Usunięto komórkę",
+    undo: "Cofnij",
   },
   tab: {
     close: "Zamknij (karta wraca na pierwszy pasek)",
@@ -131,6 +133,8 @@ export const en: typeof pl = {
     remove: "Delete cell",
     drag: "Drag to move (or the arrow keys ↑ ↓)",
     tabs: "Cell",
+    removed: "Cell deleted",
+    undo: "Undo",
   },
   tab: {
     close: "Close (the tab goes back to the first bar)",
