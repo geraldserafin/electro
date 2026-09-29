@@ -6,6 +6,7 @@ import { PinState } from "avr8js";
 import { beforeAll, describe, expect, it } from "vitest";
 import type { Application } from "@yowasp/runtime";
 import { CLOCK, Uno } from "../arduino";
+import { Backpack, Clock, Oled } from "../i2c";
 import { lcd, screen, watch } from "../lcd";
 import { compile, toolchain } from "./toolchain";
 
@@ -77,6 +78,28 @@ void later() { s.write(90); }
     const result = await compile(app, '#include "Print.h"\nvoid setup() {}\nvoid loop() {}\n');
     if (!("hex" in result)) throw new Error(JSON.stringify(result));
   }, 120_000);
+
+  it("I²C: Wire, LiquidCrystal_I2C, Adafruit_SSD1306 (with GFX, BusIO), RTClib", async () => {
+    const build = async (name: string) => {
+      const result = await compile(app, readFileSync(new URL(`../fixtures/${name}.ino`, import.meta.url), "utf8"));
+      if (!("hex" in result)) throw new Error(JSON.stringify(result));
+      return new Uno(result.hex);
+    };
+    const lcdUno = await build("i2c_lcd"), backpack = new Backpack("LCD_1", 0x27, () => true);
+    lcdUno.i2c.devices.push(backpack);
+    lcdUno.runUntil(1.5);
+    expect(backpack.screen().text[0].join("")).toBe("I2C works       ");
+    const oledUno = await build("oled"), oled = new Oled("OLED_1", 0x3c, () => true);
+    oledUno.i2c.devices.push(oled);
+    oledUno.runUntil(0.5);
+    expect(oled.pixels().rows[63][127]).toBe(1);
+    const rtcUno = await build("rtc");
+    rtcUno.i2c.devices.push(new Clock("RTC_1", 0x68, () => true, () => rtcUno.time));
+    let serial = "";
+    rtcUno.onSerial = (c) => (serial += c);
+    rtcUno.runUntil(2.2);
+    expect(serial).toMatch(/2024-5-17 13:45:3[12]/);
+  }, 240_000);
 
   it("says what is wrong, on the sketch's own line", async () => {
     const result = await compile(app, "void setup() {\n  nope();\n}\nvoid loop() {}\n");

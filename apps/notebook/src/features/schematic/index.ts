@@ -3,6 +3,7 @@ export { SchematicEditor } from "./Editor";
 export { library, libraryFor } from "./library";
 export { canRunInTime, inTimeOnly } from "./model";
 export * as messages from "./messages";
+export { pixelPath, type OledScreenData } from "./OledScreen";
 export { Panel, PanelHead, Section, Tile } from "./Panel";
 export { PdfDrawing } from "./PdfDrawing";
 export type { ProbeTarget } from "./Editor";

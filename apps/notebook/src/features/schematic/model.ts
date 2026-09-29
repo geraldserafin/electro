@@ -55,6 +55,9 @@ export const KINDS = [
   { kind: "passive_buzzer", prefix: "BZ", group: "peripherals" },
   { kind: "servo", prefix: "M", group: "peripherals" },
   { kind: "lcd1602", prefix: "LCD", group: "peripherals", live: true },
+  { kind: "lcd1602_i2c", prefix: "LCD", group: "peripherals" },
+  { kind: "ssd1306", prefix: "OLED", group: "peripherals" },
+  { kind: "ds1307", prefix: "RTC", group: "peripherals" },
 ] as const satisfies readonly KindInfo[];
 
 /** An LED's colours (electro.devices.LED_COLORS), for its glow while simulating. */
@@ -67,7 +70,10 @@ export const ledColor = (text: string | null) => LED_COLORS[(text ?? "red") as k
 export const defaultText = (kind: string): string | null =>
   kind === "label" ? "A" : kind === "led" ? "red" : kind === "arduino" ? BLINK
     : kind === "sine_source" ? "50" : kind === "square_source" ? "1k"
-    : kind === "photoresistor" ? "100" : kind === "thermistor" ? "25" : kind === "ultrasonic" ? "100" : null;
+    : kind === "photoresistor" ? "100" : kind === "thermistor" ? "25" : kind === "ultrasonic" ? "100"
+    : kind === "lcd1602_i2c" ? "0x27" : kind === "ssd1306" ? "0x3C" : kind === "ds1307" ? "0x68" : null;
+/** The addresses an I²C module can be set to (the first: as it comes). */
+export const I2C_ADDRESSES: Record<string, string[]> = { lcd1602_i2c: ["0x27", "0x3F"], ssd1306: ["0x3C", "0x3D"] };
 /** What a new element of a kind starts with in ``value``: a part that comes in one usual value. */
 export const defaultValue = (kind: string): string | null => (kind === "photoresistor" || kind === "thermistor" ? "10k" : null);
 /** Set while it runs, from its panel: a potentiometer's wiper, the light on a photoresistor, a thermistor's temperature,

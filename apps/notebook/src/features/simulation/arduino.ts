@@ -3,9 +3,10 @@
 // circuit (electro.devices.PIN_MODES); what the circuit puts on the pins is what digitalRead() and
 // analogRead() see.
 import {
-  AVRADC, AVRIOPort, AVRTimer, AVRUSART, CPU, PinState, adcConfig, avrInstruction, portBConfig, portCConfig,
-  portDConfig, timer0Config, timer1Config, timer2Config, usart0Config,
+  AVRADC, AVRIOPort, AVRTimer, AVRTWI, AVRUSART, CPU, PinState, adcConfig, avrInstruction, portBConfig, portCConfig,
+  portDConfig, timer0Config, timer1Config, timer2Config, twiConfig, usart0Config,
 } from "avr8js";
+import { Bus } from "./i2c";
 
 export const CLOCK = 16e6; // Hz
 // an input reads LOW below 0.3·Vcc and HIGH above 0.6·Vcc; in between it keeps what it read (ATmega328P)
@@ -59,6 +60,8 @@ export class Uno {
   /** Pin changes not yet taken by the circuit, in order. */
   events: PinEvent[] = [];
   onSerial: ((text: string) => void) | null = null;
+  /** Its I²C (A4 SDA, A5 SCL): the devices on it answer the TWI's transactions (i2c.ts). */
+  readonly i2c: Bus;
 
   constructor(hex: string) {
     this.cpu = new CPU(loadHex(hex));
@@ -69,6 +72,8 @@ export class Uno {
     usart.onByteTransmit = (byte) => this.onSerial?.(String.fromCharCode(byte));
     usart.onRxComplete = () => this.receive();
     this.adc = new AVRADC(this.cpu, adcConfig);
+    const twi = new AVRTWI(this.cpu, twiConfig, CLOCK);
+    twi.eventHandler = this.i2c = new Bus(twi);
     this.ports = {
       B: new AVRIOPort(this.cpu, portBConfig),
       C: new AVRIOPort(this.cpu, portCConfig),

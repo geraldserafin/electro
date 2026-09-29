@@ -6,7 +6,7 @@ import pytest
 
 from electro import (
     LED, NPN, Arduino, Button, Capacitor, Inductor, Potentiometer, Resistor, SineSource, SquareSource, Switch, Timer555,
-    Zener, NMOS, PMOS, RGBLED, Buzzer, PassiveBuzzer, Photoresistor, Servo, SevenSegment, Thermistor, LCD1602, Ultrasonic,
+    Zener, NMOS, PMOS, RGBLED, Buzzer, PassiveBuzzer, Photoresistor, Servo, SevenSegment, Thermistor, LCD1602, Ultrasonic, LCD1602I2C, SSD1306, DS1307,
     VoltageSource,
     code, ground, net, node, simulate, supply,
 )
@@ -268,3 +268,14 @@ def test_lcd_senses_its_inputs_and_lights_its_backlight():
     assert end["U_LCD_1_rs"] == pytest.approx(0)
     assert end["I_LCD_1_a"] == pytest.approx(0.02, abs=3e-3)  # 3 V backlight behind 100 Ω
     assert end["I_LCD_1"] == pytest.approx(1e-3)
+
+
+def test_i2c_modules_pull_their_lines_up_and_load_the_supply():
+    bus = net((VoltageSource(5), "GND", "vcc"), (LCD1602I2C(), "GND", "vcc", "sda", "scl"),
+              (SSD1306(address=0x3D), "GND", "vcc", "scl", "sda"), (DS1307(), "GND", "vcc", "sda", "scl"),
+              (Resistor(10000), "sda", "GND"))
+    sol = bus.solve()
+    assert sol["LCD_1"].I == pytest.approx(5 / 200) and sol["RTC_1"].I == pytest.approx(5 / 3300)
+    three = 4700 / 3  # three modules' pull-ups in parallel, against the 10 kΩ to ground
+    assert float(sol["R_1"].U) == pytest.approx(5 * 10000 / (10000 + three))
+    assert "SSD1306(address=0x3D)" in code(bus)

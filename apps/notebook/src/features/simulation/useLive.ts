@@ -13,6 +13,8 @@ import { compileSketch } from "./atoms";
 import { compiler } from "./compiler";
 import { NoConvergence, type LiveCircuit } from "./engine";
 import { si } from "./format";
+import { pixelPath, type OledScreenData } from "@/features/schematic";
+import { Backpack, Oled, modulesOn, type Device } from "./i2c";
 import { lcd, screen, watch as read, type Lcd, type Screen } from "./lcd";
 import { buzzing, heard, listen, ping, servoing, sonar, turn, watch, type Buzzing, type Servoing, type Sonar } from "./peripherals";
 import { Session } from "./session";
@@ -31,7 +33,8 @@ export interface LiveFrame {
   // what else an element shows, as CSS variables of its symbol: an RGB LED's and a display's glow per
   // channel (r, a, dp, …: 0–1), a servo's angle (degrees), a buzzer sounding (sound: 0 or 1)
   looks: Record<string, Record<string, number>>;
-  screens: Record<string, Screen>; // each LCD: what it shows
+  screens: Record<string, Screen>; // each LCD (parallel or on I²C): what it shows
+  oleds: Record<string, OledScreenData>; // each OLED: what it shows
   results: Record<string, ElementResult>; // readings next to the elements
   behind: boolean; // the page cannot keep up: time runs slower than asked
 }
@@ -125,6 +128,8 @@ export function useLive(schematic: SchematicData) {
   const servos = useRef<Servoing[]>([]);
   const lcds = useRef<Lcd[]>([]);
   const sonars = useRef<Sonar[]>([]);
+  // the I²C modules, by id: kept across a new sketch (the display keeps what it showed, as a real one does)
+  const modules = useRef(new Map<string, Device>());
   const sound = useRef(new Sound());
   const [muted, setMuted] = useState(false);
   const mutedRef = useRef(muted);
@@ -173,6 +178,14 @@ export function useLive(schematic: SchematicData) {
     for (const u of sonars.current) (looks[u.id] ??= {}).ping = sim.t < u.until ? 1 : 0;
     const screens: Record<string, Screen> = {};
     for (const d of lcds.current) screens[d.id] = screen(d, sim.x);
+    const oleds: Record<string, OledScreenData> = {};
+    for (const [id, m] of modules.current) {
+      if (m instanceof Backpack) screens[id] = m.screen();
+      else if (m instanceof Oled) {
+        const { rows, on, contrast } = m.pixels();
+        oleds[id] = { path: on ? pixelPath(rows) : "", on, contrast };
+      }
+    }
     const results: Record<string, ElementResult> = {};
     for (const [id, quantities] of Object.entries(c.program.parts)) {
       const current = quantities.I ?? quantities.I_C ?? quantities.I_D ?? quantities.I_5V;
@@ -188,7 +201,7 @@ export function useLive(schematic: SchematicData) {
     }
     glow.current = { since: sim.t, last: sim.t, charge: new Map() };
     setFrame((f) => ({
-      t: sim.t, voltages, scale, leds, looks, screens, results, behind: behind ?? f?.behind ?? false,
+      t: sim.t, voltages, scale, leds, looks, screens, oleds, results, behind: behind ?? f?.behind ?? false,
       wires: c.wires.map((node) => (node === null ? null : voltages[node] ?? null)),
       pins: Object.fromEntries(Object.entries(c.pins).map(([id, nodes]) =>
         [id, nodes.map((node) => (node === null ? null : voltages[node] ?? null))])),
@@ -247,9 +260,11 @@ export function useLive(schematic: SchematicData) {
     const run = (hex: string, where: "page" | "server") => {
       const at = s.boards.findIndex((b) => b.label === id);
       if (at >= 0) s.boards.splice(at, 1); // a new sketch: the chip starts over
-      s.attach(id, hex).uno.onSerial = (c) => {
+      const board = s.attach(id, hex);
+      board.uno.onSerial = (c) => {
         serialText.current = (serialText.current + c).slice(-4000);
       };
+      board.uno.i2c.devices = modulesOn(s, board, Object.fromEntries(latest.current.elements.map((e) => [e.id, e.text])), modules.current);
       setSketches((all) => ({ ...all, [id]: { kind: "running", sketch, where } }));
     };
     // in the page first; the server only if the page's compiler could not be loaded
@@ -312,6 +327,7 @@ export function useLive(schematic: SchematicData) {
       });
       sonars.current = Object.entries(kinds).flatMap(([id, kind]) =>
         kind === "Ultrasonic" && parts[id]?.U_trig !== undefined ? [sonar(id, parts[id].U_trig)] : []);
+      modules.current = new Map();
       setHasSound(buzzers.current.length > 0);
       glow.current = { since: 0, last: 0, charge: new Map() };
       built.current = structure(latest.current);

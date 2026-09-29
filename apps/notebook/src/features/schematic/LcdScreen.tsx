@@ -19,14 +19,17 @@ const CELL = { width: GLASS.width / 16, height: GLASS.height / 2 };
 const DOT = 3; // px: a glyph's dot (5 × 8 of them in a cell)
 const INK = "#1d2b10";
 
-export function LcdScreen({ screen, at, rotation }: { screen: LcdScreenData; at: [number, number]; rotation: number }) {
+export function LcdScreen({ screen, at, rotation, offset = [0, 0] }: {
+  screen: LcdScreenData; at: [number, number]; rotation: number;
+  offset?: [number, number]; // where the glass is unlike the parallel module's (the I²C one: 50 px right, 50 up)
+}) {
   const lit = screen.backlight;
   // unlit it is a dull grey-green; lit, the familiar yellow-green
   const glass = `color-mix(in oklab, #b8e35a ${Math.round(lit * 100)}%, #72805a)`;
   const blinkOn = Math.floor(Date.now() / 400) % 2 === 0;
   const cell = (col: number, line: number) => [GLASS.x + col * CELL.width, GLASS.y + line * CELL.height] as const;
   return (
-    <g className="lcd-screen" transform={`translate(${at[0]} ${at[1]}) rotate(${rotation})`}>
+    <g className="lcd-screen" transform={`translate(${at[0]} ${at[1]}) rotate(${rotation}) translate(${offset[0]} ${offset[1]})`}>
       <rect {...GLASS} rx="2" style={{ fill: glass }} />
       <g style={{ fill: INK, opacity: screen.contrast }}>
         {screen.lines.flatMap((line, row) => line.map((code, col) => {

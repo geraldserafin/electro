@@ -15,6 +15,7 @@ import { HelpPanel } from "./HelpPanel";
 import { Inspector, type Selection } from "./Inspector";
 import { LcdScreen, type LcdScreenData } from "./LcdScreen";
 import { LibraryPanel } from "./LibraryPanel";
+import { OledScreen, type OledScreenData } from "./OledScreen";
 import {
   KINDS, attach, bounds, defaultText, defaultValue, isAdjustable, elbow, inBox, moveGroup, isComponent, isConnectionPoint, junctions,
   ledColor, nextId, moveSegment, openPins, pins, rotatedAbout, same, simplify, updateElement,
@@ -44,6 +45,7 @@ export interface LiveView {
   leds: Record<string, number>; // LED id → brightness 0–1
   looks: Record<string, Record<string, number>>; // what else each element shows (useLive's LiveFrame.looks)
   screens: Record<string, LcdScreenData>; // what each LCD shows
+  oleds: Record<string, OledScreenData>; // what each OLED shows
   pressed: string[]; // buttons held down
   onPress: (id: string, down: boolean) => void;
 }
@@ -640,8 +642,12 @@ export function SchematicEditor({
                          selected={picked(selection).ids.includes(e.id) || (probed?.type === "element" && probed.id === e.id)}
                          onPointerDown={onElementDownStable} />
           ))}
-          {live && value.elements.filter((e) => e.kind === "lcd1602" && live.screens[e.id]).map((e) => (
-            <LcdScreen key={`lcd${e.id}`} screen={live.screens[e.id]} at={[e.at[0] * G, e.at[1] * G]} rotation={e.rotation} />
+          {live && value.elements.filter((e) => (e.kind === "lcd1602" || e.kind === "lcd1602_i2c") && live.screens[e.id]).map((e) => (
+            <LcdScreen key={`lcd${e.id}`} screen={live.screens[e.id]} at={[e.at[0] * G, e.at[1] * G]} rotation={e.rotation}
+                       offset={e.kind === "lcd1602_i2c" ? [50, -50] : undefined} />
+          ))}
+          {live && value.elements.filter((e) => e.kind === "ssd1306" && live.oleds[e.id]).map((e) => (
+            <OledScreen key={`oled${e.id}`} screen={live.oleds[e.id]} at={[e.at[0] * G, e.at[1] * G]} rotation={e.rotation} />
           ))}
           {openPinPoints.map(([x, y]) => (
             <circle key={`o${x},${y}`} className="open-pin" cx={x * G} cy={y * G} r="3.5">

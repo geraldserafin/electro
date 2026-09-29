@@ -9,7 +9,11 @@ for ino in *.ino; do
   dir=$(mktemp -d)
   mkdir "$dir/sketch"
   : > "$dir/sketch/sketch.ino"
-  { echo '#include <Arduino.h>'; echo '#line 1 "sketch.ino"'; cat "$ino"; } > "$dir/sketch/sketch_code.cpp"
+  # as prepareSketch (@electro/notes-api) has it, prototypes apart: the fixtures do not need them
+  { echo '#include <Arduino.h>'
+    echo 'extern "C" __attribute__((weak)) int __cxa_atexit(void (*)(void *), void *, void *) { return 0; }'
+    echo '__attribute__((weak)) void *__dso_handle;'
+    echo '#line 1 "sketch.ino"'; cat "$ino"; } > "$dir/sketch/sketch_code.cpp"
   props=()
   [[ -n "${ARDUINO_COMPILER_PATH:-}" ]] && props+=(--build-property "compiler.path=$ARDUINO_COMPILER_PATH")
   [[ -n "${ARDUINO_CTAGS_PATH:-}" ]] && props+=(--build-property "tools.ctags.path=$ARDUINO_CTAGS_PATH")

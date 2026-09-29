@@ -18,7 +18,8 @@ describe("prepare", () => {
     ].join("\n")
     const out = prepare(sketch)
     expect(out).toContain("void setup();\nvoid loop();\nstatic int blink(unsigned long ms);\n#line 4 \"sketch.ino\"\nvoid setup() {")
-    expect(out.startsWith('#include <Arduino.h>\n#line 1 "sketch.ino"\n// blink\nconst int LED = 13;\n\n')).toBe(true)
+    expect(out.startsWith("#include <Arduino.h>\n")).toBe(true)
+    expect(out).toContain('#line 1 "sketch.ino"\n// blink\nconst int LED = 13;\n\n')
   })
 
   it("leaves out what is not a function definition", () => {

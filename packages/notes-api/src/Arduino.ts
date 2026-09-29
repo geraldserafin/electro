@@ -31,9 +31,15 @@ export class CompilerUnavailable extends Schema.TaggedError<CompilerUnavailable>
   }
 }
 
+// A global object with a destructor (Adafruit_SSD1306 display(...)) has it registered with
+// __cxa_atexit; Arduino's own avr-gcc is built without it, other compilers (nixpkgs' avr-gcc, clang)
+// want it linked in. A sketch never ends, so the destructors never run: weak, doing nothing.
+const RUNTIME = 'extern "C" __attribute__((weak)) int __cxa_atexit(void (*)(void *), void *, void *) { return 0; }\n' +
+  "__attribute__((weak)) void *__dso_handle;\n"
+
 /** What the Arduino IDE does to a sketch: ``#include <Arduino.h>`` on top, and a prototype of each
  *  function before the first one, so a function may be called above its definition. ``#line``
- *  keeps the compiler's line numbers the sketch's own. */
+ *  keeps the compiler's line numbers the sketch's own. (And RUNTIME.) */
 export function prepareSketch(sketch: string): string {
   const blank = (m: string) => m.replace(/[^\n]/g, " ")
   // what to look at: no comments, strings or preprocessor lines (same length, same lines)
@@ -62,7 +68,7 @@ export function prepareSketch(sketch: string): string {
   // the prototypes go on their own lines, just above the line the first function starts on
   const at = first < 0 ? sketch.length : sketch.lastIndexOf("\n", first - 1) + 1
   const line = sketch.slice(0, at).split("\n").length
-  return `#include <Arduino.h>\n#line 1 "sketch.ino"\n${sketch.slice(0, at)}${prototypes.map((p) => `${p}\n`).join("")}` +
+  return `#include <Arduino.h>\n${RUNTIME}#line 1 "sketch.ino"\n${sketch.slice(0, at)}${prototypes.map((p) => `${p}\n`).join("")}` +
     `#line ${line} "sketch.ino"\n${sketch.slice(at)}`
 }
 

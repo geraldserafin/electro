@@ -7,7 +7,8 @@ import { Application, Exit, type Tree } from "@yowasp/runtime";
 import { prepareSketch } from "@electro/notes-api";
 import { parseTar } from "nanotar";
 
-const LIBRARIES = ["SPI", "Wire", "EEPROM", "SoftwareSerial", "Servo", "LiquidCrystal"];
+const LIBRARIES = ["SPI", "Wire", "EEPROM", "SoftwareSerial", "Servo", "LiquidCrystal", "LiquidCrystal_I2C", "Adafruit_BusIO",
+  "Adafruit_GFX", "Adafruit_SSD1306", "RTClib"];
 const FLASH = 32256; // bytes of an Uno's flash the bootloader leaves
 
 /** The same flags make-arduino-sysroot.sh built the core and the libraries with. */
@@ -15,6 +16,7 @@ const FLAGS = [
   "--target=avr", "-mmcu=atmega328p", "-Os", "-ffunction-sections", "-fdata-sections", "-fno-color-diagnostics",
   "-DF_CPU=16000000L", "-DARDUINO=10607", "-DARDUINO_AVR_UNO", "-DARDUINO_ARCH_AVR",
   '-D__ATTR_PROGMEM__=__attribute__((__section__(".progmem.data")))', // clang ignores __progmem__
+  "-D__HAS_DELAY_CYCLES=0", // util/delay.h: not GCC's __builtin_avr_delay_cycles, which clang has not got
   "-nostdlibinc", "-isystem", "/arduino/include", "-I/arduino/core", ...LIBRARIES.map((l) => `-I/arduino/libraries/${l}`),
   "-std=gnu++11", "-fno-exceptions", "-fno-threadsafe-statics", "-fno-rtti", "-w",
 ];

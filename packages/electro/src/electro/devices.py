@@ -492,6 +492,69 @@ class LCD1602(NoValue):
         return model
 
 
+class I2CModule(NoValue):
+    """A module on I²C: ``gnd``, ``vcc``, ``sda``, ``scl`` (in the order its pins are in), at
+    ``address``. Electrically its load across the supply and the pull-ups it has on SDA and SCL;
+    what it does on the bus the page emulates, talking to the Arduino whose A4 (SDA) and A5 (SCL)
+    it is wired to."""
+
+    left, right = ("gnd", "vcc", "sda", "scl"), ()
+    R_LOAD, PULLUP = 1000, 4700  # Ω (whole: exact on paper)
+    ADDRESSES: tuple[int, ...] = (0,)  # the one it comes set to first
+
+    def __init__(self, address: int | None = None, label: str | None = None):
+        super().__init__(label=label)
+        self.address = int(address) if address is not None else self.ADDRESSES[0]
+
+    def build(self, label, V, param, ctx):
+        U, I = sp.Symbol(f"U_{label}"), sp.Symbol(f"I_{label}")
+        name = DeviceModel(sp.Symbol(label))
+        pull = {line: (V[line] - V["vcc"]) / self.PULLUP for line in ("sda", "scl")}
+        laws = [Law(U - (V["vcc"] - V["gnd"]), name, "kvl"), Law(U - self.R_LOAD * I, name)]
+        inflow = pull | {"vcc": I - pull["sda"] - pull["scl"], "gnd": -I}
+        return Model(inflow, laws, {"U": U, "I": I})
+
+    def options(self):
+        return [] if self.address == self.ADDRESSES[0] else [f"address=0x{self.address:02X}"]
+
+    @classmethod
+    def from_schematic(cls, value, text, label):
+        try:
+            return cls(int(text, 0) if text else None, label=label)
+        except ValueError:
+            raise BadValue(text) from None
+
+    def __repr__(self):
+        args = self.options() + ([f"label={self.label!r}"] if self.label else [])
+        return f"{type(self).__name__}({', '.join(args)})"
+
+
+class LCD1602I2C(I2CModule):
+    """A 16×2 LCD with an I²C backpack (a PCF8574: LiquidCrystal_I2C), at 0x27 or 0x3F; the backlight
+    included in its load."""
+
+    prefix = "LCD"
+    R_LOAD = 200  # 25 mA
+    ADDRESSES = (0x27, 0x3F)
+
+
+class SSD1306(I2CModule):
+    """A 0.96" 128×64 OLED (an SSD1306: Adafruit_SSD1306), at 0x3C or 0x3D; its pins GND, VCC, SCL, SDA."""
+
+    prefix = "OLED"
+    left = ("gnd", "vcc", "scl", "sda")
+    R_LOAD = 250  # 20 mA
+    ADDRESSES = (0x3C, 0x3D)
+
+
+class DS1307(I2CModule):
+    """A real-time clock (a DS1307: RTClib), at 0x68; it starts at the page's time."""
+
+    prefix = "RTC"
+    R_LOAD = 3300  # 1.5 mA
+    ADDRESSES = (0x68,)
+
+
 # ------------------------------------------------------------------ switches
 
 G_ON, G_OFF = 1e3, 1e-10  # S: a closed switch is 1 mΩ, an open one 10 GΩ

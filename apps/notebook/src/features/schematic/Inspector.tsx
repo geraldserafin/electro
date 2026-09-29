@@ -8,7 +8,7 @@ import type { ElementData } from "@/shared/model/types";
 import { cn } from "@/shared/lib/cn";
 import { CodeIcon, Rotate, Trash } from "@/shared/ui/icons";
 import { useKinds } from "./kinds";
-import { LED_COLORS, hasValue, isComponent, isControlled, isWaveSource, kindInfo, wave, waveText } from "./model";
+import { I2C_ADDRESSES, LED_COLORS, hasValue, isComponent, isControlled, isWaveSource, kindInfo, wave, waveText } from "./model";
 import { field, Panel, PanelHead, Section, Tile } from "./Panel";
 
 export type Selection =
@@ -152,6 +152,19 @@ export function Inspector({ element, taken, onChange, onRename, onRotate, onRemo
         );
       })()}
       {!live && element.kind === "lcd1602" && <p className={hint}>{t("inspector.lcdHint")}</p>}
+      {!live && I2C_ADDRESSES[element.kind] && (
+        <Section label={t("inspector.address")}>
+          <div className="flex gap-1.5" role="radiogroup" aria-label={t("inspector.address")}>
+            {I2C_ADDRESSES[element.kind].map((a) => (
+              <Tile key={a} role="radio" aria-checked={(element.text ?? I2C_ADDRESSES[element.kind][0]) === a}
+                    on={(element.text ?? I2C_ADDRESSES[element.kind][0]) === a} className="w-auto px-3 font-mono text-[13px]"
+                    onClick={() => onChange({ text: a })}>{a}</Tile>
+            ))}
+          </div>
+        </Section>
+      )}
+      {!live && ["lcd1602_i2c", "ssd1306", "ds1307"].includes(element.kind) && <p className={hint}>{t("inspector.i2cHint")}</p>}
+      {!live && element.kind === "ds1307" && <p className={hint}>{t("inspector.clockHint")}</p>}
       {!live && element.kind === "servo" && <p className={hint}>{t("inspector.servoHint")}</p>}
       {!live && (element.kind === "buzzer" || element.kind === "passive_buzzer") && <p className={hint}>{t(`inspector.${element.kind === "buzzer" ? "buzzerHint" : "passiveBuzzerHint"}`)}</p>}
       {element.kind === "arduino" && onSketch && (

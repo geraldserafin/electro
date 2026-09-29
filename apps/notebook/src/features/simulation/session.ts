@@ -46,7 +46,12 @@ export class Session {
     this.queue.sort((a, b) => a.time - b.time);
   }
 
-  private offset = new WeakMap<Board, number>(); // the circuit's time when each chip was reset (a board replaced by a new sketch goes with it)
+  private offset = new WeakMap<Board, number>();
+
+  /** A board's own time (s): the circuit's when it was reset, plus how long its chip has run since. */
+  clock(board: Board): number {
+    return (this.offset.get(board) ?? 0) + board.uno.time;
+  } // the circuit's time when each chip was reset (a board replaced by a new sketch goes with it)
 
   private drive(board: Board, pin: string, state: keyof typeof PIN_MODES) {
     const [g, e] = PIN_MODES[state];
