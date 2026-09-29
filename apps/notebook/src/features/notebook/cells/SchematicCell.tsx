@@ -360,7 +360,7 @@ export function SchematicCell({ cell, update, library, simulate, running: solvin
       library={library}
       results={running ? live.frame?.results : cell.stale ? undefined : cell.results}
       live={running && live.frame ? {
-        wires: live.frame.wires, pins: live.frame.pins, scale: live.frame.scale, leds: live.frame.leds, pressed: pressedIds,
+        wires: live.frame.wires, pins: live.frame.pins, scale: live.frame.scale, leds: live.frame.leds, looks: live.frame.looks, pressed: pressedIds,
         onPress: (id, down) => {
           pressed.current = down ? [...pressed.current, id] : pressed.current.filter((x) => x !== id);
           setPressedIds(pressed.current);

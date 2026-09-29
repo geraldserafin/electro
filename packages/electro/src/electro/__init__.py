@@ -20,8 +20,8 @@ from .components import (
     TwoTerminal, VoltageSource, Voltmeter, supply,
 )
 from .devices import (
-    LED, NMOS, NPN, PMOS, PNP, Arduino, Button, Diode, Potentiometer, SineSource, SquareSource, Switch, Timer555,
-    Zener,
+    LED, NMOS, NPN, PMOS, PNP, RGBLED, Arduino, Button, Buzzer, Diode, PassiveBuzzer, Photoresistor, Potentiometer,
+    Servo, SevenSegment, SineSource, SquareSource, Switch, Thermistor, Timer555, Zener,
 )
 from .issues import Issue
 from .sim import Trace, simulate
@@ -36,6 +36,7 @@ __all__ = [
     "Relation", "Thevenin", "blackbox", "code", "equivalent", "resistance",
     "Ambiguous", "CircuitError", "Contradiction", "Diagnosis", "MissingData", "I", "P", "U", "V", "Solution", "solve",
     "fmt", "parse", "Eq", "Symbol", "symbols",
-    "LED", "NMOS", "NPN", "PMOS", "PNP", "Arduino", "Button", "Diode", "Potentiometer", "SineSource", "SquareSource", "Switch",
+    "LED", "NMOS", "NPN", "PMOS", "PNP", "RGBLED", "Arduino", "Button", "Buzzer", "Diode", "PassiveBuzzer",
+    "Photoresistor", "Potentiometer", "Servo", "SevenSegment", "SineSource", "SquareSource", "Switch", "Thermistor",
     "Timer555", "Trace", "Zener", "simulate",
 ]

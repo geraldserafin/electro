@@ -13,6 +13,8 @@ export const pl = {
     speed: "Tempo",
     speedTitle: "Ile sekund obwodu na sekundę zegara",
     behind: "wolniej niż zadane — to dużo liczenia",
+    mute: "Wycisz buzzery",
+    unmute: "Włącz dźwięk buzzerów",
   },
   error: {
     dismiss: "Zamknij",
@@ -81,6 +83,8 @@ export const en: typeof pl = {
     speed: "Speed",
     speedTitle: "Seconds of the circuit per second of the clock",
     behind: "slower than asked — a lot to compute",
+    mute: "Mute the buzzers",
+    unmute: "Sound the buzzers",
   },
   error: {
     dismiss: "Dismiss",

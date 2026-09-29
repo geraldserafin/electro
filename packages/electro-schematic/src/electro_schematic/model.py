@@ -56,6 +56,14 @@ KINDS: dict[str, Kind] = {
     "diode": Kind(TWO_PINS, dev.Diode),
     "led": Kind(TWO_PINS, dev.LED),
     "zener": Kind(TWO_PINS, dev.Zener),  # the breakdown voltage in ``value``
+    "rgb_led": Kind(((0, 0), (0, 2), (0, 4), (4, 2)), dev.RGBLED),  # r, g, b on the left, the cathode on the right
+    # a, b, c, d, e, f, g, dp, com — where a 5161AS has them: g f com a b on top, e d c dp below
+    "seven_segment": Kind(((3, 0), (4, 0), (3, 6), (1, 6), (0, 6), (1, 0), (0, 0), (4, 6), (2, 0)), dev.SevenSegment),
+    "photoresistor": Kind(TWO_PINS, dev.Photoresistor),  # the light (lux) in ``text``
+    "thermistor": Kind(TWO_PINS, dev.Thermistor),  # the temperature (°C) in ``text``
+    "buzzer": Kind(TWO_PINS, dev.Buzzer),
+    "passive_buzzer": Kind(TWO_PINS, dev.PassiveBuzzer),
+    "servo": Kind(((0, 0), (0, 1), (0, 2)), dev.Servo),  # signal, +, − (its cable's order)
     "switch": Kind(TWO_PINS, dev.Switch),
     "button": Kind(TWO_PINS, dev.Button),
     "potentiometer": Kind(((0, 0), (4, 0), (2, -2)), dev.Potentiometer),  # a, b, wiper
@@ -96,7 +104,7 @@ class Element:
     at: Point
     rotation: int = 0  # 0, 90, 180, 270 (clockwise); 180 on a source = reversed polarity
     value: str | None = None  # as typed: "4.7k", "R", None = unknown
-    text: str | None = None  # net label name; or an LED's colour, a switch's position, a source's frequency, an Arduino's sketch
+    text: str | None = None  # net label name; or an LED's colour, a switch's position, a source's frequency, a sensor's reading, an Arduino's sketch
 
     def __post_init__(self):
         self.at = tuple(self.at)

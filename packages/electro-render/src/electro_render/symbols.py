@@ -51,6 +51,19 @@ SYMBOLS: dict[str, str] = {
     "led": _body('<path d="M-8 -9L8 0L-8 9Z"/><path d="M8 -9V9"/>'
                  '<path d="M0 -13l7 -8M6 -15l7 -8"/><path class="fill" d="M9 -23.5l-4.5 1.3l3.2 2.8zM15 -25.5l-4.5 1.3l3.2 2.8z"/>', 8),
     # a switch or a button drawn open; closed (class "closed" on it, or on the element around it) as it then is
+    # the arrows: light falling on it
+    "photoresistor": _body('<rect x="-18" y="-7" width="36" height="14"/><path d="M-16 -28L-7 -15M-4 -30L5 -17"/>'
+                           '<path class="fill" d="M-5 -12l-6 -2l3.5 -3.5zM7 -14l-6 -2l3.5 -3.5z"/>', 18),
+    # IEC: a line across it with a foot (it follows something non-linearly), −t° beside: NTC
+    "thermistor": _body('<rect x="-18" y="-7" width="36" height="14"/><path d="M-24 14H-16L16 -14"/>'
+                        '<g class="pins"><text x="12" y="-12">−t°</text></g>', 18),
+    "rgb_led": '<path d="M0 0H18M34 0H60"/><path d="M18 -8L34 0L18 8Z"/><path d="M34 -8V8"/><circle class="on" cx="24" cy="0" r="4" style="stroke:none;fill:#ff3b30;opacity:var(--r,0)"/><path d="M0 40H18M34 40H60"/><path d="M18 32L34 40L18 48Z"/><path d="M34 32V48"/><circle class="on" cx="24" cy="40" r="4" style="stroke:none;fill:#34c759;opacity:var(--g,0)"/><path d="M0 80H18M34 80H60"/><path d="M18 72L34 80L18 88Z"/><path d="M34 72V88"/><circle class="on" cx="24" cy="80" r="4" style="stroke:none;fill:#0a84ff;opacity:var(--b,0)"/><path d="M60 0V80M60 40H80"/><g class="pins"><text x="2" y="-4">R</text><text x="2" y="36">G</text><text x="2" y="76">B</text></g>',
+    "seven_segment": '<rect x="-8" y="20" width="96" height="80" rx="3"/><path d="M0 0V20M20 0V20M40 0V20M60 0V20M80 0V20M0 100V120M20 100V120M60 100V120M80 100V120"/><path class="seg" d="M29 32H51"/><path class="seg" d="M54 35V58"/><path class="seg" d="M54 64V87"/><path class="seg" d="M29 90H51"/><path class="seg" d="M26 64V87"/><path class="seg" d="M26 35V58"/><path class="seg" d="M29 61H51"/><circle class="seg" cx="61" cy="90" r="1.5"/><path class="on" d="M29 32H51" style="opacity:var(--a,0)"/><path class="on" d="M54 35V58" style="opacity:var(--b,0)"/><path class="on" d="M54 64V87" style="opacity:var(--c,0)"/><path class="on" d="M29 90H51" style="opacity:var(--d,0)"/><path class="on" d="M26 64V87" style="opacity:var(--e,0)"/><path class="on" d="M26 35V58" style="opacity:var(--f,0)"/><path class="on" d="M29 61H51" style="opacity:var(--g,0)"/><circle class="on" cx="61" cy="90" r="1.5" style="opacity:var(--dp,0)"/><g class="pins"><text x="2" y="14">g</text><text x="22" y="14">f</text><text x="42" y="14">K</text><text x="62" y="14">a</text><text x="82" y="14">b</text><text x="2" y="112">e</text><text x="22" y="112">d</text><text x="62" y="112">c</text><text x="82" y="112">dp</text></g>',
+    # a buzzer's dome, + by its a terminal; the waves show while it sounds
+    "buzzer": _body('<rect x="-12" y="-6" width="24" height="12"/><path d="M-10 -6A10 10 0 0 1 10 -6"/>'
+                    '<path d="M-28 -12h6M-25 -15v6"/><path class="waves" style="opacity:var(--sound,0)" d="M-7 -19a9 9 0 0 1 14 0M-11 -25a15 15 0 0 1 22 0"/>', 12),
+    "passive_buzzer": _body('<rect x="-10" y="-6" width="8" height="12"/><path d="M-2 -6L8 -13V13L-2 6"/><path class="waves" style="opacity:var(--sound,0)" d="M-7 -19a9 9 0 0 1 14 0M-11 -25a15 15 0 0 1 22 0"/>', 10),
+    "servo": '<path d="M0 0H20M0 20H20M0 40H20"/><rect x="20" y="-14" width="80" height="68" rx="4"/><g class="pins"><text x="24" y="3">S</text><text x="24" y="23">+</text><text x="24" y="43">−</text></g><g class="horn" style="transform-box:fill-box;transform-origin:center;transform:rotate(calc(var(--angle,90) * 1deg - 90deg))"><circle cx="70" cy="20" r="22" style="fill:none;stroke:none"/><path class="thick" d="M70 20V2"/><circle cx="70" cy="20" r="5"/></g>',
     "switch": _body('<circle class="open" cx="-12" r="2.5"/><circle class="open" cx="12" r="2.5"/>'
                     '<path class="when-open" d="M-10 -1.5L11 -12"/><path class="when-closed" d="M-10 -1.5L10 -1.5"/>', 14.5),
     "button": _body('<circle class="open" cx="-12" r="2.5"/><circle class="open" cx="12" r="2.5"/>'
@@ -128,6 +141,7 @@ text{font:13px ui-sans-serif,system-ui,sans-serif;fill:currentColor}.halo{fill:v
 text .sub{font-size:10px}.solved{fill:#2563eb;font-weight:600}.result{fill:#059669}
 .node{font-style:italic}.letter{font-weight:600;text-anchor:middle;dominant-baseline:central}
 .w .when-closed,.closed .when-open{display:none}.closed .when-closed{display:inline}
+.w .seg{stroke-width:4;opacity:.12}.w .on{stroke-width:4;stroke:#ff3b30;fill:#ff3b30}.w .waves{stroke-width:1.4}
 .w .pins text{font-size:9px;stroke:none;fill:currentColor;opacity:.75}.w text.chip{font-size:13px;font-weight:600;stroke:none;fill:currentColor}
 """
 

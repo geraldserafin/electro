@@ -1,6 +1,6 @@
 // One element on the drawing: its symbol, its label ("R_1 = 100 Ω", beside it where no wire runs),
 // and after a run what was found (the solved value, I and U).
-import { memo, useId, useLayoutEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
+import { memo, useId, useLayoutEffect, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent } from "react";
 import type { ElementData, ElementResult, Point, SymbolLibrary, WireData } from "@/shared/model/types";
 import { hasValue, isComponent, isWaveSource, kindInfo, pins, rotate, waveLabel } from "./model";
 
@@ -60,12 +60,16 @@ type Props = {
   element: ElementData; library: SymbolLibrary; wires: WireData[]; result?: ElementResult; selected: boolean;
   closed?: boolean; // a switch or a button: drawn closed
   lit?: number; // an LED while simulating: how bright (0–1)
+  look?: Record<string, number>; // while simulating, what else it shows: its symbol's CSS variables (--a, --angle, …)
   live?: { pins: (number | null)[]; scale: number }; // running: its pins' voltages, the element coloured by them
   onPointerDown: (event: ReactPointerEvent, element: ElementData) => void;
 };
 
 const sameResult = (a?: ElementResult, b?: ElementResult) => a === b || (!!a && !!b
   && a.value === b.value && a.solved === b.solved && a.U === b.U && a.I === b.I && a.P === b.P && a.reversed === b.reversed);
+// a glow to the percent, an angle to the degree: finer is not seen
+const sameLook = (a?: Record<string, number>, b?: Record<string, number>) => a === b || (!!a && !!b
+  && Object.keys(a).length === Object.keys(b).length && Object.keys(a).every((k) => Math.round(a[k] * 100) === Math.round((b[k] ?? NaN) * 100)));
 const sameColours = (a: Props["live"], b: Props["live"]) => a === b || (!!a && !!b && a.pins.length === b.pins.length
   && a.pins.every((v, i) => liveColor(v, a.scale) === liveColor(b.pins[i], b.scale)));
 
@@ -76,9 +80,9 @@ const sameColours = (a: Props["live"], b: Props["live"]) => a === b || (!!a && !
 export const ElementView = memo(ElementView_, (a, b) =>
   a.element === b.element && a.library === b.library && a.wires === b.wires && a.selected === b.selected
   && a.closed === b.closed && (a.lit ?? 0) > 0.01 === (b.lit ?? 0) > 0.01 && a.onPointerDown === b.onPointerDown
-  && sameResult(a.result, b.result) && sameColours(a.live, b.live));
+  && sameResult(a.result, b.result) && sameColours(a.live, b.live) && sameLook(a.look, b.look));
 
-function ElementView_({ element: e, library, wires, result, selected, closed, lit, live, onPointerDown }: Props) {
+function ElementView_({ element: e, library, wires, result, selected, closed, lit, look, live, onPointerDown }: Props) {
   const G = library.grid;
   const symbol = library.kinds[e.kind];
   const ps = pins(e, library).map(([x, y]) => [x * G, y * G] as Point);
@@ -120,7 +124,8 @@ function ElementView_({ element: e, library, wires, result, selected, closed, li
       || (crosses(cx - 20 - labelWidth, cx - 20, cy - 8, cy + 8) && !crosses(cx + 20, cx + 20 + labelWidth, cy - 8, cy + 8))
     : cy - 32 < 0
       || (crosses(cx - labelWidth / 2, cx + labelWidth / 2, cy - 32, cy - 16) && !crosses(cx - labelWidth / 2, cx + labelWidth / 2, cy + 16, cy + 32));
-  const chip = ps.length > 3; // a 555, an Arduino: the label beside the box, top right; no readings (its pins tell)
+  const chip = kindInfo(e.kind)?.group === "chips"; // a 555, an Arduino: the label beside the box, top right; no readings (its pins tell)
+  const vars = look && Object.fromEntries(Object.entries(look).map(([k, v]) => [`--${k}`, Math.round(v * 100) / 100])) as CSSProperties;
   const label = result?.solved && result.value
     ? (e.kind === "hole" ? `${e.id}: ${result.value}` : `${e.id} = ${result.value}`)
     : label_(e);
@@ -129,7 +134,7 @@ function ElementView_({ element: e, library, wires, result, selected, closed, li
     : [];
   return (
     <g className={`element ${selected ? "selected" : ""} ${closed ? "closed" : ""} ${lit && lit > 0.01 ? "lit" : ""}`}
-       data-id={e.id} data-kind={e.kind} onPointerDown={(event) => onPointerDown(event, e)}>
+       data-id={e.id} data-kind={e.kind} style={vars} onPointerDown={(event) => onPointerDown(event, e)}>
       <rect
         className="hit"
         x={Math.min(...xs) - 12} y={Math.min(...ys) - 12}

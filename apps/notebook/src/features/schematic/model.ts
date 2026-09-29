@@ -3,7 +3,8 @@
 // to Python; connectivity and solving stay on the Python side.
 import type { ElementData, Point, SchematicData, SymbolLibrary, WireData } from "@/shared/model/types";
 
-export type KindGroup = "passive" | "sources" | "meters" | "connections" | "other" | "controls" | "semiconductors" | "chips";
+export type KindGroup = "passive" | "sources" | "meters" | "connections" | "other" | "controls" | "sensors" | "semiconductors"
+  | "chips" | "peripherals";
 
 /** What an element is, apart from its name (that is in messages.ts: kinds.<kind>). */
 export interface KindInfo {
@@ -36,8 +37,11 @@ export const KINDS = [
   { kind: "switch", prefix: "S", group: "controls" },
   { kind: "button", prefix: "B", group: "controls" },
   { kind: "potentiometer", prefix: "P", unit: "Ω", group: "controls" },
+  { kind: "photoresistor", prefix: "LDR", unit: "Ω", group: "sensors" },
+  { kind: "thermistor", prefix: "RT", unit: "Ω", group: "sensors" },
   { kind: "diode", prefix: "D", group: "semiconductors", live: true },
   { kind: "led", prefix: "LED", group: "semiconductors", live: true },
+  { kind: "rgb_led", prefix: "LED", group: "semiconductors", live: true },
   { kind: "zener", prefix: "DZ", unit: "V", group: "semiconductors", live: true },
   { kind: "npn", prefix: "Q", group: "semiconductors", live: true },
   { kind: "pnp", prefix: "Q", group: "semiconductors", live: true },
@@ -45,6 +49,10 @@ export const KINDS = [
   { kind: "pmos", prefix: "Q", group: "semiconductors", live: true },
   { kind: "timer555", prefix: "IC", group: "chips", live: true },
   { kind: "arduino", prefix: "ARD", group: "chips", live: true },
+  { kind: "seven_segment", prefix: "DS", group: "peripherals", live: true },
+  { kind: "buzzer", prefix: "BZ", group: "peripherals" },
+  { kind: "passive_buzzer", prefix: "BZ", group: "peripherals" },
+  { kind: "servo", prefix: "M", group: "peripherals" },
 ] as const satisfies readonly KindInfo[];
 
 /** An LED's colours (electro.devices.LED_COLORS), for its glow while simulating. */
@@ -56,7 +64,12 @@ export const ledColor = (text: string | null) => LED_COLORS[(text ?? "red") as k
 /** What a new element of a kind starts with in ``text``. */
 export const defaultText = (kind: string): string | null =>
   kind === "label" ? "A" : kind === "led" ? "red" : kind === "arduino" ? BLINK
-    : kind === "sine_source" ? "50" : kind === "square_source" ? "1k" : null;
+    : kind === "sine_source" ? "50" : kind === "square_source" ? "1k"
+    : kind === "photoresistor" ? "100" : kind === "thermistor" ? "25" : null;
+/** What a new element of a kind starts with in ``value``: a part that comes in one usual value. */
+export const defaultValue = (kind: string): string | null => (kind === "photoresistor" || kind === "thermistor" ? "10k" : null);
+/** Set while it runs, from its panel: a potentiometer's wiper, the light on a photoresistor, a thermistor's temperature. */
+export const isAdjustable = (kind: string) => kind === "potentiometer" || kind === "photoresistor" || kind === "thermistor";
 
 /** A source in time's ``text`` (electro.devices.SquareSource.from_schematic): its frequency as typed, the duty in %. */
 export function wave(text: string | null): { frequency: string; duty: number } {

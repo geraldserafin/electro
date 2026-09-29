@@ -22,6 +22,13 @@ const clock = (t: number, speed: number) => {
   return `${t.toFixed(decimals).padStart(decimals + 4, " ")} s`;
 };
 
+const Speaker = ({ muted }: { muted: boolean }) => (
+  <svg viewBox="0 0 24 24" width={16} height={16} aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
+    <path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z" fill="currentColor" stroke="none" />
+    {muted ? <path d="M16 9.5l5 5M21 9.5l-5 5" /> : <path d="M15.5 9a4 4 0 0 1 0 6M18 6.5a7.5 7.5 0 0 1 0 11" />}
+  </svg>
+);
+
 const icon = "inline-flex items-center justify-center size-7 rounded-md text-muted hover:bg-selected hover:text-fg";
 
 export function LiveControls({ live }: { live: Live }) {
@@ -56,6 +63,12 @@ export function LiveControls({ live }: { live: Live }) {
               title={running ? t("controls.pause") : t("controls.resume")} aria-label={running ? t("controls.pause") : t("controls.resume")}>
         {running ? <Pause /> : <Play />}
       </button>
+      {live.hasSound && (
+        <button className={icon} onClick={() => live.setMuted(!live.muted)} aria-pressed={live.muted}
+                title={live.muted ? t("controls.unmute") : t("controls.mute")} aria-label={live.muted ? t("controls.unmute") : t("controls.mute")}>
+          <Speaker muted={live.muted} />
+        </button>
+      )}
       <button className={cn(icon, "hover:text-danger")} onClick={live.stop} title={t("controls.stop")} aria-label={t("controls.stop")}>
         <Stop />
       </button>

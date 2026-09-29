@@ -400,6 +400,9 @@ class Trace:
         return self.plot()._repr_svg_()
 
 
+INPUTS = ("closed", "position", "lux", "temperature")  # an element's input, <label>_<this>: named by its label alone
+
+
 def _input_values(program: Program, name: str):
     """``name`` → a function from its value to ``[(param index, number)]``: a number, or for an
     Arduino's pin (``ARD_1.D13``) one of ``PIN_MODES`` ("high", "low", "input", "pullup")."""
@@ -411,10 +414,10 @@ def _input_values(program: Program, name: str):
                 g, e = PIN_MODES[mode] if isinstance(mode, str) else (PIN_MODES["high"][0], float(mode))
                 return [(program.inputs[G], g), (program.inputs[E], e)]
             return pin_mode
-    for candidate in (name, f"{name}_closed", f"{name}_position"):
+    for candidate in (name, *(f"{name}_{suffix}" for suffix in INPUTS)):
         if candidate in program.inputs:
             return lambda value, i=program.inputs[candidate]: [(i, float(value))]
-    available = [n.removesuffix("_closed").removesuffix("_position") for n in program.inputs if not n.endswith(("_G", "_E"))]
+    available = [n.rsplit("_", 1)[0] if n.endswith(INPUTS) else n for n in program.inputs if not n.endswith(("_G", "_E"))]
     available += sorted({f"{n.rsplit('_', 2)[0]}.{n.rsplit('_', 2)[1]}" for n in program.inputs if n.endswith("_G")})
     raise NoSuchInput(name, available)
 
@@ -474,8 +477,8 @@ def simulate(circuit: Circuit, t: float = 1.0, *, dt: float | None = None, input
     """The circuit from rest (every capacitor empty) for ``t`` seconds.
 
     ``dt``: the longest step (default ``t``/500; steps shrink by themselves where things
-    change fast). ``inputs``: switches (``{"S_1": 1}``), potentiometers (``{"P_1": 0.3}``)
-    or Arduino pins (``{"ARD_1.D13": "high"}``), each a value or a function of time.
+    change fast). ``inputs``: switches (``{"S_1": 1}``), potentiometers (``{"P_1": 0.3}``),
+    light on a photoresistor in lux, a thermistor's temperature in °C, or Arduino pins (``{"ARD_1.D13": "high"}``), each a value or a function of time.
     """
     program = compile_sim(circuit)
     schedule = _schedule(program, inputs)

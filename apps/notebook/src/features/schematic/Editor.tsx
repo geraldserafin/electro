@@ -15,7 +15,7 @@ import { HelpPanel } from "./HelpPanel";
 import { Inspector, type Selection } from "./Inspector";
 import { LibraryPanel } from "./LibraryPanel";
 import {
-  KINDS, attach, bounds, defaultText, elbow, inBox, moveGroup, isComponent, isConnectionPoint, junctions,
+  KINDS, attach, bounds, defaultText, defaultValue, isAdjustable, elbow, inBox, moveGroup, isComponent, isConnectionPoint, junctions,
   ledColor, nextId, moveSegment, openPins, pins, rotatedAbout, same, simplify, updateElement,
 } from "./model";
 import { SymbolIcon } from "./SymbolIcon";
@@ -41,6 +41,7 @@ export interface LiveView {
   pins: Record<string, (number | null)[]>; // each element's pins' voltages
   scale: number; // the largest |V|: full colour
   leds: Record<string, number>; // LED id → brightness 0–1
+  looks: Record<string, Record<string, number>>; // what else each element shows (useLive's LiveFrame.looks)
   pressed: string[]; // buttons held down
   onPress: (id: string, down: boolean) => void;
 }
@@ -256,7 +257,7 @@ export function SchematicEditor({
     if (tool.type === "place") {
       const element: ElementData = {
         id: nextId(value, tool.kind), kind: tool.kind, at: placedAt(tool.kind, p, library), rotation: 0,
-        value: null, text: defaultText(tool.kind),
+        value: defaultValue(tool.kind), text: defaultText(tool.kind),
       };
       commit(attach({ ...value, elements: [...value.elements, element] }, library, element.id));
       setSelection({ type: "element", id: element.id });
@@ -285,8 +286,8 @@ export function SchematicEditor({
         setProbed({ type: "element", id: e.id });
         return;
       }
-      // interacting: a button is held down, a switch flips, a potentiometer shows its slider — no menus
-      if (!["button", "switch", "potentiometer"].includes(e.kind)) return;
+      // interacting: a button is held down, a switch flips, a potentiometer or a sensor shows its slider — no menus
+      if (!["button", "switch"].includes(e.kind) && !isAdjustable(e.kind)) return;
       event.stopPropagation();
       focusBoard();
       if (e.kind === "button") {
@@ -294,7 +295,7 @@ export function SchematicEditor({
         const release = () => { live.onPress(e.id, false); window.removeEventListener("pointerup", release); };
         window.addEventListener("pointerup", release);
       } else if (e.kind === "switch") commit(updateElement(value, library, e.id, { text: e.text === "closed" ? null : "closed" }));
-      setSelection(e.kind === "potentiometer" ? { type: "element", id: e.id } : null);
+      setSelection(isAdjustable(e.kind) ? { type: "element", id: e.id } : null);
       return;
     }
     event.stopPropagation();
@@ -616,10 +617,23 @@ export function SchematicEditor({
                       style={{ fill: ledColor(e.text), opacity: 0.15 + 0.75 * Math.sqrt(live.leds[e.id]) }} />
             );
           })}
+          {live && value.elements.filter((e) => e.kind === "rgb_led").map((e) => {
+            // the three colours mixed, as the eye sees them a little way off
+            const { r = 0, g = 0, b = 0 } = live.looks[e.id] ?? {};
+            const most = Math.max(r, g, b);
+            if (most <= 0.01) return null;
+            const [, green, , k] = pins(e, library);
+            const rgb = [r, g, b].map((c) => Math.round(255 * c / most)).join(" ");
+            return (
+              <circle key={`glow${e.id}`} className="led-glow" cx={(green[0] + k[0]) / 2 * G} cy={(green[1] + k[1]) / 2 * G} r={30}
+                      style={{ fill: `rgb(${rgb})`, opacity: 0.15 + 0.75 * Math.sqrt(most) }} />
+            );
+          })}
           {value.elements.map((e) => (
             <ElementView key={e.id} element={e} library={library} wires={value.wires} result={results?.[e.id]}
                          closed={e.kind === "switch" ? e.text === "closed" : e.kind === "button" ? !!live?.pressed.includes(e.id) : false}
                          lit={live && e.kind === "led" ? live.leds[e.id] ?? 0 : undefined}
+                         look={live?.looks[e.id]}
                          live={live && { pins: live.pins[e.id] ?? [], scale: live.scale }}
                          selected={picked(selection).ids.includes(e.id) || (probed?.type === "element" && probed.id === e.id)}
                          onPointerDown={onElementDownStable} />
@@ -662,7 +676,7 @@ export function SchematicEditor({
       {live && probed && probe?.(probed, () => setProbed(null))}
       {panel}
       {topRight && <BoardIsland className="top-[calc(var(--board-top,0px)+0.75rem)] right-3">{topRight}</BoardIsland>}
-      {(live ? selectedKind === "potentiometer" && !probed : selectedElement) && (
+      {(live ? isAdjustable(selectedKind ?? "") && !probed : selectedElement) && (
         <Inspector
           key={selectedElement?.id}
           element={selectedElement}

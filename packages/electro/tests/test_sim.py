@@ -6,7 +6,7 @@ import pytest
 
 from electro import (
     LED, NPN, Arduino, Button, Capacitor, Inductor, Potentiometer, Resistor, SineSource, SquareSource, Switch, Timer555,
-    Zener, NMOS, PMOS,
+    Zener, NMOS, PMOS, RGBLED, Buzzer, PassiveBuzzer, Photoresistor, Servo, SevenSegment, Thermistor,
     VoltageSource,
     code, ground, net, node, simulate, supply,
 )
@@ -208,3 +208,40 @@ def test_nmos_follows_a_square_on_its_gate():
 
 def test_a_capacitor_across_an_ideal_source_charges_at_once():
     assert simulate(net((VoltageSource(5), "GND", "a"), (Capacitor(1e-6), "a", "GND")), t=1e-3).at(1e-3)["V_a"] == pytest.approx(5)
+
+
+def test_photoresistor_follows_the_light_on_paper_and_in_time():
+    divider = lambda lux: supply(5) + Resistor(10000) + node("A") + Photoresistor(10000, lux=lux) + ground
+    assert float(divider(10).solve()["LDR_1"].U) == pytest.approx(2.5)  # 10 kΩ at 10 lux: half
+    darker = divider(1).solve()["LDR_1"].U
+    assert float(darker) == pytest.approx(5 * 10000 * 10**0.7 / (10000 + 10000 * 10**0.7), rel=1e-3)
+    trace = simulate(divider(100), t=1e-3, inputs={"LDR_1": lambda t: 10 if t > 5e-4 else 1000})
+    assert trace.at(4e-4)["V_A"] < 0.5 and trace.at(1e-3)["V_A"] == pytest.approx(2.5, abs=0.01)
+
+
+def test_thermistor_is_its_value_at_25_and_less_when_warm():
+    for t, ratio in ((25, 1), (50, math.exp(3950 * (1 / 323.15 - 1 / 298.15)))):
+        sol = (supply(1) + Thermistor(10000, temperature=t) + ground).solve()
+        assert float(sol["RT_1"].I) == pytest.approx(1 / (10000 * ratio), rel=1e-3)
+    assert "Thermistor(10000, temperature=50)" in code(supply(1) + Thermistor(10000, temperature=50) + ground)
+
+
+def test_rgb_led_and_seven_segment_light_each_channel():
+    rgb = net((VoltageSource(5), "GND", "v"), (Resistor(150), "v", "r"), (Resistor(100), "v", "b"),
+              (RGBLED(), "r", "GND", "b", "GND"))  # green tied to the cathode: dark
+    end = simulate(rgb, t=1e-4).at(1e-4)
+    assert end["I_LED_1_r"] == pytest.approx(0.02, abs=2e-3)
+    assert end["I_LED_1_b"] == pytest.approx(0.019, abs=2e-3)
+    assert abs(end["I_LED_1_g"]) < 1e-9
+    one = net((VoltageSource(5), "GND", "v"), (Resistor(150), "v", "b"), (Resistor(150), "v", "c"),
+              (SevenSegment(), "GND", "b", "c", "GND", "GND", "GND", "GND", "GND", "GND"))
+    end = simulate(one, t=1e-4).at(1e-4)
+    assert end["I_DS_1_b"] == end["I_DS_1_c"] == pytest.approx(0.02, abs=2e-3)
+    assert end["I_DS_1_a"] == pytest.approx(0, abs=1e-9)
+
+
+def test_buzzers_and_servo_are_their_loads():
+    assert (supply(5) + Buzzer() + ground).solve()["BZ_1"].I == pytest.approx(5 / 160)
+    assert (supply(5) + PassiveBuzzer() + ground).solve()["BZ_1"].I == pytest.approx(5 / 16)
+    servo = net((VoltageSource(5), "GND", "vcc"), (VoltageSource(3), "GND", "s"), (Servo(), "s", "vcc", "GND")).solve()
+    assert servo["M_1"].I == pytest.approx(0.01) and servo["M_1"].U == 5

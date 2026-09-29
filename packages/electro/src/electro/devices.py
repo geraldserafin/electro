@@ -1,5 +1,6 @@
-"""Elements that live in time: sine and square sources, diodes, LEDs and Zener diodes, switches,
-a potentiometer, bipolar transistors and MOSFETs, the 555 timer and an Arduino board.
+"""Elements that live in time: sine and square sources, diodes, LEDs (single, RGB, seven-segment)
+and Zener diodes, sensors (light, temperature), buzzers and a servo, switches, a potentiometer,
+bipolar transistors and MOSFETs, the 555 timer and an Arduino board.
 
 Semiconductors and chips are not linear, so they have laws only in time
 (``ctx.transient``), for ``electro.sim``: the solver on paper says ``NeedsSimulation``.
@@ -19,7 +20,7 @@ import sympy as sp
 
 from .components import Component, Context, Law, Model, NoValue, TwoTerminal
 from .issues import BadValue, NeedsSimulation
-from .reasons import DeviceModel, PotentiometerDivider, SourceVoltage, SwitchClosed, SwitchOpen
+from .reasons import DeviceModel, OhmsLaw, PotentiometerDivider, SourceVoltage, SwitchClosed, SwitchOpen
 from .values import UNKNOWN, fmt, parse
 
 VT = 0.025852  # thermal voltage at 27 °C
@@ -184,19 +185,71 @@ class Diode(NoValue, TwoTerminal):
 
 # forward voltage at 20 mA by colour
 LED_COLORS = {"red": 2.0, "orange": 2.05, "yellow": 2.1, "green": 2.2, "blue": 3.1, "white": 3.2}
+LED_N, LED_RATED = 2.0, 0.02  # an LED's emission coefficient; its current at full brightness (A)
+
+
+def _led_is(forward: float) -> float:
+    """The saturation current of an LED with ``forward`` volts at ``LED_RATED``."""
+    return LED_RATED / math.exp(forward / (LED_N * VT))
+
+
+def _leds(label: str, V, anodes: dict[str, float], common: str) -> Model:
+    """LEDs from each of ``anodes`` (terminal → forward voltage) to one ``common`` cathode: an RGB
+    LED, a seven-segment display. Each has its own ``U_<terminal>`` and ``I_<terminal>``."""
+    name = DeviceModel(sp.Symbol(label))
+    inflow: dict[str, sp.Expr] = {}
+    model = Model(inflow, [], {})
+    nvt = LED_N * VT
+    for pin, forward in anodes.items():
+        U, I = sp.Symbol(f"U_{label}_{pin}"), sp.Symbol(f"I_{label}_{pin}")
+        i_s = _led_is(forward)
+        model.laws += [Law(U - (V[pin] - V[common]), name, "kvl"), Law(I - (i_s * (limexp(U / nvt) - 1) + GMIN * U), name)]
+        model.variables |= {f"U_{pin}": U, f"I_{pin}": I}
+        model.junctions.append((U, nvt, i_s))
+        inflow[pin] = I
+    inflow[common] = -sp.Add(*inflow.values())
+    return model
+
+
+class RGBLED(NoValue):
+    """Three LEDs in one — red, green, blue — with a common cathode: pins ``r``, ``g``, ``b``, ``k``.
+    Green and blue are InGaN (about 3 V), red about 2 V; each lights fully at 20 mA."""
+
+    prefix = "LED"
+    left, right = ("r", "g", "b"), ("k",)
+    FORWARD = {"r": 2.0, "g": 3.0, "b": 3.1}
+
+    def build(self, label, V, param, ctx):
+        _paper_only(label, ctx)
+        return _leds(label, V, self.FORWARD, "k")
+
+
+SEGMENTS = ("a", "b", "c", "d", "e", "f", "g", "dp")
+
+
+class SevenSegment(NoValue):
+    """A seven-segment digit with a common cathode (a 5161AS): segments ``a``–``g`` and the dot
+    ``dp``, each a red LED to ``com``. ``a`` is on top, then clockwise, ``g`` in the middle."""
+
+    prefix = "DS"
+    left, right = SEGMENTS, ("com",)
+
+    def build(self, label, V, param, ctx):
+        _paper_only(label, ctx)
+        return _leds(label, V, dict.fromkeys(SEGMENTS, LED_COLORS["red"]), "com")
 
 
 class LED(Diode):
     """A diode that lights: ``color`` sets its forward voltage (red ≈ 2 V, blue ≈ 3.1 V at 20 mA)."""
 
     prefix = "LED"
-    N = 2.0
-    RATED = 0.02  # A: full brightness
+    N = LED_N
+    RATED = LED_RATED
 
     def __init__(self, color: str = "red", label: str | None = None):
         super().__init__(label=label)
         self.color = color if color in LED_COLORS else "red"
-        self.IS = self.RATED / math.exp(LED_COLORS[self.color] / (self.N * VT))
+        self.IS = _led_is(LED_COLORS[self.color])
 
     def options(self):
         return [] if self.color == "red" else [repr(self.color)]
@@ -236,6 +289,126 @@ class Zener(TwoTerminal):
 
     def law(self, U, I, x, ctx):
         return []
+
+
+# ------------------------------------------------------------------ sensors
+
+
+class Sensor(TwoTerminal):
+    """A resistor whose resistance depends on what it senses: ``value`` at ``reading`` = ``NOMINAL``,
+    times ``factor(reading)``. At a given reading it is a resistor, on paper too; while simulating
+    the reading is set from outside: input ``<label>_<INPUT>``."""
+
+    unit = "Ω"
+    INPUT, NOMINAL, DEFAULT = "", 0.0, 0.0
+
+    def __init__(self, value=None, reading: float | None = None, label: str | None = None):
+        super().__init__(value, label)
+        self.reading = float(self.DEFAULT if reading is None else reading)
+
+    def factor(self, reading):
+        raise NotImplementedError
+
+    def build(self, label, V, param, ctx):
+        model = super().build(label, V, param, ctx)
+        U, I = model.variables["U"], model.variables["I"]
+        if ctx.transient:
+            reading = sp.Symbol(f"{label}_{self.INPUT}")
+            model.inputs[reading] = self.reading
+            factor = self.factor(reading)
+        else:
+            # exact, as every value on paper is (the solver's arithmetic is exact); 4 digits are plenty
+            factor = parse(f"{float(self.factor(sp.Float(self.reading))):.4g}")
+        model.laws.append(Law(U - param * factor * I, OhmsLaw(sp.Symbol(label))))
+        return model
+
+    def law(self, U, I, x, ctx):
+        return []
+
+    def options(self):
+        return [] if self.reading == self.DEFAULT else [f"{self.INPUT}={self.reading:g}"]
+
+    @classmethod
+    def from_schematic(cls, value, text, label):
+        """``text``: the reading (``"300"`` lux, ``"-5"`` °C)."""
+        try:
+            reading = float(text.replace(",", ".")) if text else None
+        except ValueError:
+            raise BadValue(text) from None
+        return cls(parse(value), reading, label=label)
+
+
+class Photoresistor(Sensor):
+    """A light-dependent resistor: ``value`` is its resistance at 10 lux, ``R = value·(E/10 lx)^−γ``
+    (γ = 0.7, a GL5528's); ``lux`` the light on it (100: a room)."""
+
+    prefix = "LDR"
+    INPUT, NOMINAL, DEFAULT = "lux", 10.0, 100.0
+    GAMMA = 0.7
+
+    def __init__(self, value=None, lux: float | None = None, label: str | None = None):
+        super().__init__(value, None if lux is None else max(0.1, float(lux)), label)
+
+    def factor(self, lux):
+        return (lux / self.NOMINAL) ** -self.GAMMA
+
+
+class Thermistor(Sensor):
+    """An NTC thermistor: ``value`` is its resistance at 25 °C, ``R = value·e^{B·(1/T − 1/T₂₅)}``
+    (B = 3950 K); ``temperature`` in °C."""
+
+    prefix = "RT"
+    INPUT, NOMINAL, DEFAULT = "temperature", 25.0, 25.0
+    B, KELVIN = 3950.0, 273.15
+
+    def __init__(self, value=None, temperature: float | None = None, label: str | None = None):
+        super().__init__(value, temperature, label)
+
+    def factor(self, t):
+        return sp.exp(self.B * (1 / (t + self.KELVIN) - 1 / (self.NOMINAL + self.KELVIN)))
+
+
+# ------------------------------------------------------------------ what makes a sound or moves
+
+
+class Buzzer(NoValue, TwoTerminal):
+    """An active buzzer (its own oscillator inside): ``+`` is ``a``. It sounds, at ``TONE``, above
+    ``ON``; electrically a resistor (a 5 V one draws about 30 mA)."""
+
+    prefix = "BZ"
+    R, ON, TONE = 160.0, 2.5, 2300.0  # Ω, V, Hz
+
+    def law(self, U, I, x, ctx):
+        return [(U - self.R * I, OhmsLaw)]
+
+
+class PassiveBuzzer(Buzzer):
+    """A passive (magnetic) buzzer: it sounds at the frequency it is driven with (``tone()``);
+    electrically its coil, 16 Ω."""
+
+    R = 16.0
+
+
+class Servo(NoValue):
+    """A hobby servo: signal ``sig``, supply ``vcc``, ground ``gnd`` (orange, red, brown). Its
+    angle follows the signal's pulses — 544 µs: 0°, 2400 µs: 180°, as Arduino's Servo library
+    sends them — which the page reads off ``U_sig``. Electrically: the signal input a high
+    resistance, the motor at rest a resistor across the supply."""
+
+    prefix = "M"
+    left, right = ("sig",), ("vcc", "gnd")
+    R_IN, R_LOAD = 100e3, 500.0  # Ω
+
+    def build(self, label, V, param, ctx):
+        Us, U, I = sp.Symbol(f"U_{label}_sig"), sp.Symbol(f"U_{label}"), sp.Symbol(f"I_{label}")
+        name = DeviceModel(sp.Symbol(label))
+        laws = [
+            Law(Us - (V["sig"] - V["gnd"]), name, "kvl"),
+            Law(U - (V["vcc"] - V["gnd"]), name, "kvl"),
+            Law(U - self.R_LOAD * I, name),
+        ]
+        inflow = {"sig": Us / self.R_IN, "vcc": I, "gnd": -(I + Us / self.R_IN)}
+        return Model(inflow, laws, {"U_sig": Us, "U": U, "I": I})
 
 
 # ------------------------------------------------------------------ switches

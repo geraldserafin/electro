@@ -1,7 +1,8 @@
 // A schematic cell running in time: its circuit compiled once (Python: kernel.live), then stepped
 // in the page as the frames go by (engine.ts), with the Arduinos in it running their sketches
-// (session.ts). What the board draws — the wires' voltages, the LEDs' glow, the readings — is taken
-// from it every frame; switches, buttons and potentiometers set its inputs while it runs.
+// (session.ts). What the board draws — the wires' voltages, the LEDs' and segments' glow, a servo's
+// angle, the readings — is taken from it every frame, and the buzzers are heard (sound.ts);
+// switches, buttons, potentiometers and the sensors' light and temperature set its inputs while it runs.
 import { useAtomSet } from "@effect-atom/atom-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { failure } from "@/features/notes/sync";
@@ -12,7 +13,9 @@ import { compileSketch } from "./atoms";
 import { compiler } from "./compiler";
 import { NoConvergence, type LiveCircuit } from "./engine";
 import { si } from "./format";
+import { buzzing, heard, listen, servoing, turn, watch, type Buzzing, type Servoing } from "./peripherals";
 import { Session } from "./session";
+import { Sound, wake } from "./sound";
 
 export type LiveStatus = "off" | "starting" | "running" | "paused";
 
@@ -24,6 +27,9 @@ export interface LiveFrame {
   pins: Record<string, (number | null)[]>; // each element's pins' voltages (null: on no node)
   scale: number; // the largest |V| on the board, for the wires' colours
   leds: Record<string, number>; // LED id → brightness 0–1
+  // what else an element shows, as CSS variables of its symbol: an RGB LED's and a display's glow per
+  // channel (r, a, dp, …: 0–1), a servo's angle (degrees), a buzzer sounding (sound: 0 or 1)
+  looks: Record<string, Record<string, number>>;
   results: Record<string, ElementResult>; // readings next to the elements
   behind: boolean; // the page cannot keep up: time runs slower than asked
 }
@@ -48,10 +54,16 @@ let runningNow = 0; // circuits running on the page: they share the frame's budg
 const SCOPE_POINTS = 600;
 export const SPEEDS = [1, 0.1, 0.01, 0.001];
 
+// electro.devices: what glows (each LED's channels: its current's name, "" for I)
+const LIGHTS: Record<string, string[]> = {
+  LED: [""], RGBLED: ["r", "g", "b"], SevenSegment: ["a", "b", "c", "d", "e", "f", "g", "dp"],
+};
+const LED_RATED = 0.02; // A: full brightness
+
 /** The drawing without what may change while it runs (switches, positions, sketches): if that
  *  is the same, the circuit is too. */
 function structure(sch: SchematicData): string {
-  const inputs = new Set(["switch", "button", "potentiometer", "arduino"]);
+  const inputs = new Set(["switch", "button", "potentiometer", "photoresistor", "thermistor", "arduino"]);
   return JSON.stringify({ ...sch, elements: sch.elements.map((e) => (inputs.has(e.kind) ? { ...e, text: null } : e)) });
 }
 
@@ -60,6 +72,8 @@ function inputsOf(e: ElementData, pressed: Set<string>): [string, number][] {
   if (e.kind === "switch") return [[`${e.id}_closed`, e.text === "closed" ? 1 : 0]];
   if (e.kind === "button") return [[`${e.id}_closed`, pressed.has(e.id) ? 1 : 0]];
   if (e.kind === "potentiometer") return [[`${e.id}_position`, Number(e.text ?? 0.5)]];
+  if (e.kind === "photoresistor") return [[`${e.id}_lux`, Math.max(0.1, Number(e.text ?? 100) || 100)]];
+  if (e.kind === "thermistor") return [[`${e.id}_temperature`, Number(e.text ?? 25) || 0]];
   return [];
 }
 
@@ -103,12 +117,19 @@ export function useLive(schematic: SchematicData) {
       recording.current = { scope: scopeRef.current, probe: probeRef.current, names: [...new Set([...scopeRef.current, ...probeRef.current])] };
     return recording.current.names;
   };
-  const ledCurrents = useRef<[string, number][]>([]); // each LED's id and its current's index in x
+  const lights = useRef<[string, string, number][]>([]); // each LED's id, channel ("" for a plain one), its current's index in x
+  const buzzers = useRef<Buzzing[]>([]);
+  const servos = useRef<Servoing[]>([]);
+  const sound = useRef(new Sound());
+  const [muted, setMuted] = useState(false);
+  const mutedRef = useRef(muted);
+  mutedRef.current = muted;
+  const [hasSound, setHasSound] = useState(false); // a buzzer in it: the bar offers to mute
   const history = useRef(new Map<string, ScopeTrace>());
   const serialText = useRef("");
   const statusRef = useRef(status);
   statusRef.current = status;
-  // each LED's charge since the board was last drawn: its glow is the average current, so PWM dims it
+  // each LED channel's charge since the board was last drawn (id:channel): its glow is the average current, so PWM dims it
   const glow = useRef({ since: 0, last: 0, charge: new Map<string, number>() });
 
   const applyInputs = useCallback(() => {
@@ -126,17 +147,29 @@ export function useLive(schematic: SchematicData) {
     for (const node of Object.keys(c.program.nodes)) voltages[node] = sim.node(node);
     const scale = Math.max(1, ...Object.values(voltages).map(Math.abs));
     const leds: Record<string, number> = {};
+    const looks: Record<string, Record<string, number>> = {};
+    const span = sim.t - glow.current.since;
+    for (const [id, channel, i] of lights.current) {
+      const key = `${id}:${channel}`;
+      const mean = span > 0 && glow.current.charge.has(key) ? glow.current.charge.get(key)! / span : sim.x[i];
+      const bright = Math.min(1, Math.max(0, mean / LED_RATED));
+      if (channel) (looks[id] ??= {})[channel] = bright;
+      else leds[id] = bright;
+    }
+    const audible = statusRef.current === "running" && !mutedRef.current;
+    for (const b of buzzers.current) {
+      if (span <= 0) continue; // nothing has happened since: it sounds as it did
+      const { frequency, volume } = heard(b, span);
+      (looks[b.id] ??= {}).sound = frequency === null ? 0 : 1;
+      // time running slower lowers the tone as much
+      if (audible) sound.current.set(b.id, frequency === null ? null : frequency * speedRef.current, volume);
+    }
+    for (const m of servos.current) (looks[m.id] ??= {}).angle = turn(m, sim.t);
     const results: Record<string, ElementResult> = {};
     for (const [id, quantities] of Object.entries(c.program.parts)) {
-      const kind = c.program.kinds[id];
-      const current = quantities.I ?? quantities.I_C ?? quantities.I_5V;
-      const voltage = quantities.U ?? quantities.U_BE;
+      const current = quantities.I ?? quantities.I_C ?? quantities.I_D ?? quantities.I_5V;
+      const voltage = quantities.U ?? quantities.U_BE ?? quantities.U_GS;
       const I = current === undefined ? null : sim.x[current];
-      if (kind === "LED" && I !== null) {
-        const span = sim.t - glow.current.since;
-        const mean = span > 0 && glow.current.charge.has(id) ? glow.current.charge.get(id)! / span : I;
-        leds[id] = Math.min(1, Math.max(0, mean / 0.02));
-      }
       results[id] = {
         value: "", solved: false,
         U: voltage === undefined ? null : si(Math.abs(sim.x[voltage]), "V"),
@@ -147,7 +180,7 @@ export function useLive(schematic: SchematicData) {
     }
     glow.current = { since: sim.t, last: sim.t, charge: new Map() };
     setFrame((f) => ({
-      t: sim.t, voltages, scale, leds, results, behind: behind ?? f?.behind ?? false,
+      t: sim.t, voltages, scale, leds, looks, results, behind: behind ?? f?.behind ?? false,
       wires: c.wires.map((node) => (node === null ? null : voltages[node] ?? null)),
       pins: Object.fromEntries(Object.entries(c.pins).map(([id, nodes]) =>
         [id, nodes.map((node) => (node === null ? null : voltages[node] ?? null))])),
@@ -162,9 +195,14 @@ export function useLive(schematic: SchematicData) {
     if (!s || !c) return;
     const g = glow.current, dt = s.sim.t - g.last;
     if (dt > 0) {
-      for (const [id, i] of ledCurrents.current) g.charge.set(id, (g.charge.get(id) ?? 0) + Math.max(0, s.sim.x[i]) * dt);
+      for (const [id, channel, i] of lights.current) {
+        const key = `${id}:${channel}`;
+        g.charge.set(key, (g.charge.get(key) ?? 0) + Math.max(0, s.sim.x[i]) * dt);
+      }
+      for (const b of buzzers.current) listen(b, s.sim.x[b.u], dt);
       g.last = s.sim.t;
     }
+    for (const m of servos.current) watch(m, s.sim.x[m.u], s.sim.t);
     const window = Math.max(1e-4, speedRef.current * 2);
     for (const name of recorded()) {
       let trace = history.current.get(name);
@@ -223,6 +261,7 @@ export function useLive(schematic: SchematicData) {
   /** Run the drawing (or `drawing`: one just made from the code view, not on the board yet). */
   const start = useCallback(async (drawing?: SchematicData) => {
     if (drawing) latest.current = drawing;
+    wake(); // (still the click that started it: the page may make sounds)
     setStatus("starting");
     setError(null);
     try {
@@ -236,8 +275,18 @@ export function useLive(schematic: SchematicData) {
       circuit.current = compiled;
       session.current = new Session(compiled);
       const { kinds, parts } = compiled.program;
-      ledCurrents.current = Object.keys(kinds).flatMap((id) =>
-        kinds[id] === "LED" && parts[id]?.I !== undefined ? [[id, parts[id].I] as [string, number]] : []);
+      lights.current = Object.entries(kinds).flatMap(([id, kind]) => (LIGHTS[kind] ?? []).flatMap((channel) => {
+        const i = parts[id]?.[channel ? `I_${channel}` : "I"];
+        return i === undefined ? [] : [[id, channel, i] as [string, string, number]];
+      }));
+      sound.current.close();
+      buzzers.current = Object.entries(kinds).flatMap(([id, kind]) =>
+        (kind === "Buzzer" || kind === "PassiveBuzzer") && parts[id]?.U !== undefined
+          ? [buzzing(id, parts[id].U, kind === "Buzzer")] : []);
+      servos.current = Object.entries(kinds).flatMap(([id, kind]) =>
+        kind === "Servo" && parts[id]?.U_sig !== undefined
+          ? [servoing(id, parts[id].U_sig)] : []);
+      setHasSound(buzzers.current.length > 0);
       glow.current = { since: 0, last: 0, charge: new Map() };
       built.current = structure(latest.current);
       history.current.clear();
@@ -258,6 +307,7 @@ export function useLive(schematic: SchematicData) {
   }, [applyInputs, upload]);
 
   const stop = useCallback(() => {
+    sound.current.close();
     session.current = null;
     circuit.current = null;
     setStatus("off");
@@ -324,7 +374,12 @@ export function useLive(schematic: SchematicData) {
     if (statusRef.current === "paused") show();
   }, [schematic, start, applyInputs, show]);
 
-  useEffect(() => () => { session.current = null; }, []);
+  useEffect(() => () => { session.current = null; sound.current.close(); }, []);
+
+  // paused or muted: quiet at once (running again, the next drawing sets them)
+  useEffect(() => {
+    if (status !== "running" || muted) sound.current.silence();
+  }, [status, muted]);
 
   const onScreen = useRef(true);
   /** Whether the board can be seen (scrolled out of view: nothing is drawn). */
@@ -342,7 +397,11 @@ export function useLive(schematic: SchematicData) {
     start,
     stop,
     pause: () => setStatus((s) => (s === "running" ? "paused" : s)),
-    resume: () => { setError(null); setStatus((s) => (s === "paused" ? "running" : s)); },
+    resume: () => { wake(); setError(null); setStatus((s) => (s === "paused" ? "running" : s)); },
+    /** A buzzer in the circuit (the bar offers to mute it); muted, whether it is. */
+    hasSound,
+    muted,
+    setMuted: (quiet: boolean) => { if (!quiet) wake(); setMuted(quiet); },
     /** A button held down (or let go). */
     press: (id: string, down: boolean) => {
       if (down) pressed.current.add(id);

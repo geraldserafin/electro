@@ -28,7 +28,7 @@ export function Inspector({ element, taken, onChange, onRename, onRotate, onRemo
   onRotate: () => void;
   onRemove: () => void;
   icon: ReactNode;
-  live?: boolean; // running: only what works as an input (a potentiometer's position)
+  live?: boolean; // running: only what works as an input (a potentiometer's position, a sensor's reading)
   onSketch?: () => void; // an Arduino: open its sketch
 }) {
   const { t } = useTranslation("schematic");
@@ -121,6 +121,27 @@ export function Inspector({ element, taken, onChange, onRename, onRotate, onRemo
                  onChange={(e) => onChange({ text: e.target.value })} />
         </Section>
       )}
+      {element.kind === "photoresistor" && (() => {
+        const lux = Math.max(1, Number(element.text ?? 100) || 100);
+        const shown = lux < 10 ? lux.toFixed(1) : String(Math.round(lux));
+        return (
+          <Section label={t("inspector.lux", { lux: shown })}>
+            <input type="range" min={0} max={5} step={0.01} value={Math.log10(lux)} className="w-full accent-[var(--accent)]"
+                   aria-label={t("inspector.lux", { lux: shown })}
+                   onChange={(e) => { const v = 10 ** Number(e.target.value); onChange({ text: v < 10 ? v.toFixed(1) : String(Math.round(v)) }); }} />
+            <p className={hint}>{t("inspector.luxHint")}</p>
+          </Section>
+        );
+      })()}
+      {element.kind === "thermistor" && (
+        <Section label={t("inspector.temperature", { t: Number(element.text ?? 25) })}>
+          <input type="range" min={-20} max={120} step={1} value={Number(element.text ?? 25)} className="w-full accent-[var(--accent)]"
+                 aria-label={t("inspector.temperature", { t: Number(element.text ?? 25) })}
+                 onChange={(e) => onChange({ text: e.target.value })} />
+        </Section>
+      )}
+      {!live && element.kind === "servo" && <p className={hint}>{t("inspector.servoHint")}</p>}
+      {!live && (element.kind === "buzzer" || element.kind === "passive_buzzer") && <p className={hint}>{t(`inspector.${element.kind === "buzzer" ? "buzzerHint" : "passiveBuzzerHint"}`)}</p>}
       {element.kind === "arduino" && onSketch && (
         <Tile className="w-full h-9 gap-2 px-3 grid-flow-col text-[14px] font-medium" onClick={onSketch} title={t("inspector.sketchTitle")}>
           <CodeIcon /> {t("inspector.sketch")}
