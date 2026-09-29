@@ -14,9 +14,15 @@
   .canvas .element { cursor: grab; }
   .canvas.tool-select .segment-h { cursor: ns-resize; }
   .canvas.tool-select .segment-v { cursor: ew-resize; }
-  .canvas .element.selected .w, .canvas .wire.selected { stroke: var(--accent); }
-  .canvas .element.selected .letter { fill: var(--accent); }
-  .canvas .draft { stroke: var(--accent); stroke-dasharray: 5 4; pointer-events: none; }
+  /* the symbols' own style (unlayered, so it wins over this) strokes with currentColor: colour through it */
+  .canvas .element.selected .w, .canvas .wire.selected { color: var(--accent); }
+  .canvas .element.selected .letter { color: var(--accent); }
+  /* what is selected shows plainly: a tinted frame around an element, a glow along a wire, a dashed
+     frame around many things at once */
+  .canvas .frame { fill: var(--tool-active); fill-opacity: 0.45; stroke: var(--accent); stroke-width: 1.2; pointer-events: none; }
+  .canvas .wire-glow { fill: none; stroke: var(--accent); stroke-opacity: 0.25; stroke-width: 8; stroke-linecap: round; stroke-linejoin: round; pointer-events: none; }
+  .canvas .group-frame { fill: none; stroke: var(--accent); stroke-width: 1; stroke-dasharray: 5 4; pointer-events: none; }
+  .canvas .draft { color: var(--accent); stroke-dasharray: 5 4; pointer-events: none; }
   .canvas .open-pin { fill: var(--board); stroke: #e03131; stroke-width: 1.6; pointer-events: none; }
   .canvas .pin-handle { fill: transparent; cursor: crosshair; }
   .canvas.tool-select .pin-handle:hover { fill: var(--tool-active); stroke: var(--accent); stroke-width: 1.2; }

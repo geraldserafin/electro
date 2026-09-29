@@ -1,6 +1,6 @@
 // One element on the drawing: its symbol, its label ("R_1 = 100 Ω", beside it where no wire runs),
 // and after a run what was found (the solved value, I and U).
-import { useId, type PointerEvent as ReactPointerEvent } from "react";
+import { useId, useLayoutEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
 import type { ElementData, ElementResult, Point, SymbolLibrary, WireData } from "@/shared/model/types";
 import { hasValue, isComponent, kindInfo, pins, rotate } from "./model";
 
@@ -63,6 +63,12 @@ export function ElementView({ element: e, library, wires, result, selected, clos
   const symbol = library.kinds[e.kind];
   const ps = pins(e, library).map(([x, y]) => [x * G, y * G] as Point);
   const gradient = useId(); // unique on the page: other boards have their R_1 too
+  // selected: a frame around the symbol as drawn (measured — symbols differ, and rotate)
+  const body = useRef<SVGGElement>(null);
+  const [frame, setFrame] = useState<DOMRect | null>(null);
+  useLayoutEffect(() => {
+    setFrame(selected && body.current ? body.current.getBBox() : null);
+  }, [selected, e.at[0], e.at[1], e.rotation, e.kind, symbol.svg]);
   // running: a two-pin element (and a potentiometer's body) shades from one pin's colour to the
   // other's, so it reads as the wires on both sides do; longer leads get a colour each
   const colours = live?.pins.map((v) => liveColor(v, live.scale));
@@ -115,8 +121,11 @@ export function ElementView({ element: e, library, wires, result, selected, clos
           <stop offset="0.8" style={{ stopColor: colours[1] }} />
         </linearGradient>
       )}
-      <g className="w" transform={`translate(${e.at[0] * G} ${e.at[1] * G}) rotate(${symbol.upright ? 0 : e.rotation})`}
-         style={tinted} dangerouslySetInnerHTML={{ __html: symbol.svg }} />
+      {frame && <rect className="frame" x={frame.x - 6} y={frame.y - 6} width={frame.width + 12} height={frame.height + 12} rx="4" />}
+      <g ref={body}>
+        <g className="w" transform={`translate(${e.at[0] * G} ${e.at[1] * G}) rotate(${symbol.upright ? 0 : e.rotation})`}
+           style={tinted} dangerouslySetInnerHTML={{ __html: symbol.svg }} />
+      </g>
       {ownLeads.map((l, i) => (
         <path key={i} className="lead" d={`M${l.from[0]} ${l.from[1]}L${l.to[0]} ${l.to[1]}`} style={{ stroke: l.colour }} />
       ))}

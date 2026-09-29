@@ -2,7 +2,7 @@ import { useTranslation } from "react-i18next";
 import { BoardIsland } from "./Board";
 import type { pl } from "./messages";
 
-const KEYS = ["select", "wire", "library", "numbers", "full", "rotate", "many", "remove", "escape", "undo", "hand", "pan", "wheel", "zoom", "fit"] as const satisfies readonly (keyof typeof pl.help.keys)[];
+const KEYS = ["select", "wire", "library", "numbers", "full", "rotate", "many", "copy", "remove", "escape", "undo", "hand", "pan", "wheel", "zoom", "fit"] as const satisfies readonly (keyof typeof pl.help.keys)[];
 
 /** The keyboard shortcuts (and what the mouse does), bottom right: as tall as the board lets it
  *  (over the view controls, under the top edge), scrolling inside when the board is low. */

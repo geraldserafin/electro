@@ -1,6 +1,7 @@
-// On the right (drawings start top-left, so this side is usually free): what is selected — an
-// element's label, value (or a meter's reading), a node label's name; or a wire, or a group. A
-// panel like Excalidraw's: sections under plain labels, tiles for choices and actions.
+// On the right (drawings start top-left, so this side is usually free): the element selected — its
+// label, value (or a meter's reading), a node label's name. A panel like Excalidraw's: sections
+// under plain labels, tiles for choices and actions. (A wire or many things selected: no panel —
+// the keys do what there is to do.)
 import { useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import type { ElementData } from "@/shared/model/types";
@@ -13,14 +14,13 @@ import { field, Panel, PanelHead, Section, Tile } from "./Panel";
 export type Selection =
   | { type: "element"; id: string }
   | { type: "wire"; index: number }
-  | { type: "group"; ids: string[]; wires: number[] } // from shift + drag
+  | { type: "group"; ids: string[]; wires: number[] } // shift + click, shift + drag
   | null;
 
 const place = "top-15 right-3 w-66 max-h-[calc(100%-8rem)] overflow-y-auto text-[14px]";
 const hint = "m-0 text-[12px] leading-[1.4] text-faint";
 
-export function Inspector({ selection, element, taken, onChange, onRename, onRotate, onRemove, icon, live, onSketch }: {
-  selection: Selection;
+export function Inspector({ element, taken, onChange, onRename, onRotate, onRemove, icon, live, onSketch }: {
   element: ElementData | null;
   taken: string[];
   onChange: (patch: Partial<ElementData>) => void;
@@ -37,15 +37,6 @@ export function Inspector({ selection, element, taken, onChange, onRename, onRot
   const remove = (
     <Tile className="hover:bg-err-bg hover:text-danger" onClick={onRemove} title={t("inspector.removeTitle")} aria-label={t("inspector.remove")}><Trash /></Tile>
   );
-  if (selection?.type === "group" || selection?.type === "wire")
-    return (
-      <Panel className={place} role="group" aria-label={t("inspector.label")}>
-        <PanelHead caption={selection.type === "group" ? t("inspector.selection") : t("inspector.wire")}
-                   title={selection.type === "group" && t("inspector.count", { elements: selection.ids.length, wires: selection.wires.length })} />
-        {selection.type === "group" && <p className={hint}>{t("inspector.dragAll")}</p>}
-        <Section label={t("inspector.actions")}><div className="flex gap-1.5">{remove}</div></Section>
-      </Panel>
-    );
   if (!element) return null;
   const info = kindInfo(element.kind);
   const commitId = () => {

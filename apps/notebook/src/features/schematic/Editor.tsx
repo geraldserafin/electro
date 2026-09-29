@@ -66,6 +66,27 @@ interface Props {
 
 const PANEL = 260; // screen px the element panel takes on the left (with its margin)
 
+/** What is selected, as elements and wires (one of them alone too). */
+const picked = (s: Selection): { ids: string[]; wires: number[] } =>
+  s?.type === "element" ? { ids: [s.id], wires: [] }
+  : s?.type === "wire" ? { ids: [], wires: [s.index] }
+  : s?.type === "group" ? { ids: s.ids, wires: s.wires }
+  : { ids: [], wires: [] };
+const selectionOf = (ids: string[], wires: number[]): Selection =>
+  ids.length + wires.length === 0 ? null
+  : ids.length === 1 && !wires.length ? { type: "element", id: ids[0] }
+  : !ids.length && wires.length === 1 ? { type: "wire", index: wires[0] }
+  : { type: "group", ids, wires };
+/** Shift + click: in the selection, or out of it again. */
+const toggled = (s: Selection, item: { id: string } | { wire: number }): Selection => {
+  const { ids, wires } = picked(s);
+  if ("id" in item) return selectionOf(ids.includes(item.id) ? ids.filter((x) => x !== item.id) : [...ids, item.id], wires);
+  return selectionOf(ids, wires.includes(item.wire) ? wires.filter((x) => x !== item.wire) : [...wires, item.wire]);
+};
+
+// Ctrl/⌘ C: what was copied, shared by every board on the page (from one cell into another too)
+let clipboard: SchematicData | null = null;
+
 
 /** Where a new element's first pin goes so that its middle lands on ``p`` (on the grid). */
 function placedAt(kind: string, p: Point, lib: SymbolLibrary): Point {
@@ -159,15 +180,37 @@ export function SchematicEditor({
   };
 
   const removeSelected = () => {
-    if (selection?.type === "element")
-      commit({ ...value, elements: value.elements.filter((e) => e.id !== selection.id) });
-    if (selection?.type === "wire") commit({ ...value, wires: value.wires.filter((_, i) => i !== selection.index) });
-    if (selection?.type === "group") {
-      const ids = new Set(selection.ids);
-      const wires = new Set(selection.wires);
-      commit({ elements: value.elements.filter((e) => !ids.has(e.id)), wires: value.wires.filter((_, i) => !wires.has(i)) });
-    }
+    const { ids, wires } = picked(selection);
+    if (ids.length + wires.length)
+      commit({ elements: value.elements.filter((e) => !ids.includes(e.id)), wires: value.wires.filter((_, i) => !wires.includes(i)) });
     setSelection(null);
+  };
+
+  const copySelected = () => {
+    const { ids, wires } = picked(selection);
+    if (!ids.length && !wires.length) return false;
+    clipboard = { elements: value.elements.filter((e) => ids.includes(e.id)), wires: wires.map((i) => value.wires[i]) };
+    return true;
+  };
+
+  /** What was copied, its middle under the pointer (off the board: a little beside where it was); new names, selected. */
+  const paste = () => {
+    if (!clipboard) return;
+    const [x0, y0, x1, y1] = bounds(clipboard, library);
+    const d: Point = cursor ? [cursor[0] - Math.round((x0 + x1) / 2), cursor[1] - Math.round((y0 + y1) / 2)] : [2, 2];
+    const shift = ([x, y]: Point): Point => [x + d[0], y + d[1]];
+    let next = value;
+    const ids: string[] = [];
+    for (const e of clipboard.elements) {
+      const id = nextId(next, e.kind);
+      ids.push(id);
+      next = { ...next, elements: [...next.elements, { ...e, id, at: shift(e.at) }] };
+    }
+    const wires = clipboard.wires.map((_, i) => next.wires.length + i);
+    commit({ ...next, wires: [...next.wires, ...clipboard.wires.map((w) => ({ points: w.points.map(shift) }))] });
+    setTool({ type: "select" });
+    setDraft(null);
+    setSelection(selectionOf(ids, wires));
   };
 
   const undoStep = () => { if (undo()) setSelection(null); };
@@ -252,6 +295,10 @@ export function SchematicEditor({
     }
     event.stopPropagation();
     svgRef.current?.focus({ preventScroll: true });
+    if (event.shiftKey) {
+      setSelection(toggled(selection, { id: e.id }));
+      return;
+    }
     if (selection?.type === "group" && selection.ids.includes(e.id))
       begin({ type: "group", ids: selection.ids, wires: selection.wires, start: toGrid(event), snapshot: value, moved: false });
     else {
@@ -335,8 +382,17 @@ export function SchematicEditor({
     if (tool.type !== "select" || live) return;
     event.stopPropagation();
     svgRef.current?.focus({ preventScroll: true });
-    setSelection({ type: "wire", index: wire });
-    begin({ type: "segment", wire, index, start: toGrid(event), snapshot: value, moved: false });
+    if (event.shiftKey) {
+      setSelection(toggled(selection, { wire }));
+      return;
+    }
+    // a wire of the selection: all of it moves; otherwise the segment, sideways
+    if (selection?.type === "group" && selection.wires.includes(wire))
+      begin({ type: "group", ids: selection.ids, wires: selection.wires, start: toGrid(event), snapshot: value, moved: false });
+    else {
+      setSelection({ type: "wire", index: wire });
+      begin({ type: "segment", wire, index, start: toGrid(event), snapshot: value, moved: false });
+    }
     svgRef.current?.setPointerCapture(event.pointerId);
   };
 
@@ -351,10 +407,10 @@ export function SchematicEditor({
     if (g.type === "move" && g.moved && now) commit(attach(now, library, g.id), g.snapshot);
     if ((g.type === "segment" || g.type === "group") && g.moved && now) commit(now, g.snapshot);
     if (g.type === "box") {
-      const { ids, wires } = inBox(value, library, g.from, g.to);
-      setSelection(ids.length + wires.length === 0 ? null
-        : ids.length === 1 && !wires.length ? { type: "element", id: ids[0] }
-        : { type: "group", ids, wires });
+      // added to what was selected (shift is held for it)
+      const box = inBox(value, library, g.from, g.to);
+      const had = picked(selection);
+      setSelection(selectionOf([...new Set([...had.ids, ...box.ids])], [...new Set([...had.wires, ...box.wires])]));
     }
     const end = toGrid(event);
     if (g.type === "wire" && !same(end, g.from)) addWire(elbow(g.from, end));
@@ -384,6 +440,9 @@ export function SchematicEditor({
     }
     if (mod && event.key.toLowerCase() === "z") { setDraft(null); (event.shiftKey ? redo : undoStep)(); }
     else if (mod && event.key.toLowerCase() === "y") { setDraft(null); redo(); }
+    else if (mod && event.key.toLowerCase() === "c") copySelected();
+    else if (mod && event.key.toLowerCase() === "x") { if (copySelected()) removeSelected(); }
+    else if (mod && event.key.toLowerCase() === "v") paste();
     else if (event.key === "Escape") {
       // one step back at a time: the wire being drawn, the tool / selection, the panel, full screen
       if (draft) setDraft(null);
@@ -440,6 +499,10 @@ export function SchematicEditor({
     return i < 0 ? null : live.wires[i] ?? null;
   };
   const selectedKind = selectedElement?.kind;
+  // many selected: one dashed frame around all of it, besides each thing's own
+  const groupFrame = selection?.type === "group"
+    ? bounds({ elements: value.elements.filter((e) => selection.ids.includes(e.id)), wires: selection.wires.map((i) => value.wires[i]).filter(Boolean) }, library)
+    : null;
 
   const panel = libraryOpen && !live && (
     <LibraryPanel library={library} chosen={tool.type === "place" ? tool.kind : undefined} onChoose={choose}
@@ -509,10 +572,12 @@ export function SchematicEditor({
           <rect className="grid" x={cam.x} y={cam.y} width={view.w / cam.zoom} height={view.h / cam.zoom}
                 fill={`url(#${CSS.escape(gridId)})`} />
 
-          {value.wires.map((w, i) => (
+          {value.wires.map((w, i) => {
+            const chosen = picked(selection).wires.includes(i) || (probed?.type === "wire" && probed.index === i);
+            return (
             <g key={i}>
-              <polyline className={`w wire ${(selection?.type === "wire" && selection.index === i) || (probed?.type === "wire" && probed.index === i)
-                || (selection?.type === "group" && selection.wires.includes(i)) ? "selected" : ""}`}
+              {chosen && <polyline className="wire-glow" points={pointsOf(w.points)} />}
+              <polyline className={`w wire ${chosen ? "selected" : ""}`}
                         style={live ? { stroke: liveColor(live.wires[i] ?? null, live.scale) } : undefined}
                         points={pointsOf(w.points)} />
               {w.points.slice(1).map((q, j) => (
@@ -526,7 +591,12 @@ export function SchematicEditor({
                 </polyline>
               ))}
             </g>
-          ))}
+            );
+          })}
+          {groupFrame && (
+            <rect className="group-frame" x={groupFrame[0] * G - 20} y={groupFrame[1] * G - 20}
+                  width={(groupFrame[2] - groupFrame[0]) * G + 40} height={(groupFrame[3] - groupFrame[1]) * G + 40} rx="6" />
+          )}
           {junctions(value, library).map(([x, y]) => (
             <circle key={`j${x},${y}`} className="dot" cx={x * G} cy={y * G} r="3"
                     style={live ? { fill: liveColor(dotVoltage([x, y]), live.scale) } : undefined} />
@@ -543,8 +613,7 @@ export function SchematicEditor({
                          closed={e.kind === "switch" ? e.text === "closed" : e.kind === "button" ? !!live?.pressed.includes(e.id) : false}
                          lit={live && e.kind === "led" ? live.leds[e.id] ?? 0 : undefined}
                          live={live && { pins: live.pins[e.id] ?? [], scale: live.scale }}
-                         selected={(selection?.type === "element" && selection.id === e.id) || (probed?.type === "element" && probed.id === e.id)
-                           || (selection?.type === "group" && selection.ids.includes(e.id))}
+                         selected={picked(selection).ids.includes(e.id) || (probed?.type === "element" && probed.id === e.id)}
                          onPointerDown={(event) => onElementDown(event, e)} />
           ))}
           {openPins(value, library).map(([x, y]) => (
@@ -585,11 +654,9 @@ export function SchematicEditor({
       {live && probed && probe?.(probed, () => setProbed(null))}
       {panel}
       {topRight && <BoardIsland className="top-[calc(var(--board-top,0px)+0.75rem)] right-3">{topRight}</BoardIsland>}
-      {(live ? selectedKind === "potentiometer" && !probed
-        : selectedElement || selection?.type === "wire" || selection?.type === "group") && (
+      {(live ? selectedKind === "potentiometer" && !probed : selectedElement) && (
         <Inspector
-          key={selectedElement?.id ?? selection?.type ?? "none"}
-          selection={selection}
+          key={selectedElement?.id}
           element={selectedElement}
           live={!!live}
           onSketch={onSketch && selectedElement ? () => onSketch(selectedElement.id) : undefined}
