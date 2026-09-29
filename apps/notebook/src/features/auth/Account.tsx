@@ -2,6 +2,7 @@
 // afresh: nothing of theirs stays in memory).
 import { Result, useAtomSet, useAtomValue } from "@effect-atom/atom-react";
 import { useTranslation } from "react-i18next";
+import { Avatar } from "@/shared/ui/Avatar";
 import { SignOut } from "@/shared/ui/icons";
 import { MenuGroup, MenuItem } from "@/shared/ui/Menu";
 import { logout, meAtom } from "./atoms";
@@ -15,9 +16,7 @@ export function Account() {
   return (
     <MenuGroup label={t("account")}>
       <div className="flex items-center gap-2.5 px-4 py-1.5">
-        {user.avatarUrl
-          ? <img src={user.avatarUrl} alt="" referrerPolicy="no-referrer" className="size-7 flex-none rounded-full" />
-          : <span className="grid place-items-center size-7 flex-none rounded-full bg-selected text-[13px] font-medium">{user.name.slice(0, 1).toUpperCase()}</span>}
+        <Avatar name={user.name} url={user.avatarUrl} />
         <span className="grid min-w-0">
           <span className="truncate text-[14px]">{user.name}</span>
           {user.email && <span className="truncate text-[12px] text-muted">{user.email}</span>}

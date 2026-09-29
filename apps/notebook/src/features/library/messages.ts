@@ -5,6 +5,7 @@ export const pl = {
   newNote: "Notatka",
   newFolder: "Folder",
   folderName: "Nazwa nowego folderu:",
+  share: "Udostępnij",
   rename: "Zmień nazwę",
   renamePrompt: "Nowa nazwa:",
   move: "Przenieś do…",
@@ -16,6 +17,7 @@ export const pl = {
   items_many: "{{count}} elementów",
   empty: "pusty",
   sharedBy: "od {{name}}",
+  shared: "udostępnione",
   readOnly: "tylko odczyt",
   untitled: "Bez tytułu",
   problem: {
@@ -53,6 +55,7 @@ export const en: typeof pl = {
   newNote: "Note",
   newFolder: "Folder",
   folderName: "The new folder's name:",
+  share: "Share",
   rename: "Rename",
   renamePrompt: "New name:",
   move: "Move to…",
@@ -64,6 +67,7 @@ export const en: typeof pl = {
   items_many: "{{count}} items",
   empty: "empty",
   sharedBy: "from {{name}}",
+  shared: "shared",
   readOnly: "read only",
   untitled: "Untitled",
   problem: {

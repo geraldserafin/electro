@@ -26,6 +26,7 @@ const notes = spawn("pnpm", ["exec", "tsx", "src/main.ts"], {
 });
 // signed in: a user and a session made in the database (no provider in a test); the cookie on every call
 const session = "e2e-session";
+const otherSession = "e2e-session-2"; // someone else, for sharing
 const api = (path, init = {}) => fetch(`${notesUrl}${path}`, { ...init, headers: { ...init.headers, cookie: `session=${session}` } });
 const server = spawn("pnpm", ["exec", "vite", "preview", "--port", String(port), "--strictPort"], {
   stdio: "ignore", detached: true, env: { ...process.env, NOTES_SERVER: notesUrl },
@@ -43,7 +44,9 @@ try {
   }
   psql(postgres, `SET search_path TO ${schema};
     INSERT INTO users (id, name) VALUES ('00000000-0000-0000-0000-00000000e2e0', 'E2E');
-    INSERT INTO sessions VALUES ('${createHash("sha256").update(session).digest("hex")}', '00000000-0000-0000-0000-00000000e2e0', now() + interval '1 day')`);
+    INSERT INTO sessions VALUES ('${createHash("sha256").update(session).digest("hex")}', '00000000-0000-0000-0000-00000000e2e0', now() + interval '1 day');
+    INSERT INTO users (id, name, email) VALUES ('00000000-0000-0000-0000-00000000e2e1', 'Ola', 'ola@example.com');
+    INSERT INTO sessions VALUES ('${createHash("sha256").update(otherSession).digest("hex")}', '00000000-0000-0000-0000-00000000e2e1', now() + interval '1 day')`);
   const browser = await webkit.launch();
   const page = await browser.newPage({ viewport: { width: 1440, height: 900 }, locale: "pl-PL" }); // (the app speaks the browser's language)
   await page.context().addCookies([{ name: "session", value: session, url: `http://localhost:${port}` }]);
@@ -573,6 +576,65 @@ try {
     await page.getByRole("navigation", { name: "Ścieżka" }).getByRole("link", { name: "Moje notatki" }).click();
     await notesList.waitFor();
     check("folders: a new folder, a note moved into it, its picture on the home page, inside and back", true);
+  }
+
+  // sharing: the folder by its link; someone else opens it — read only; a copy of a note is theirs
+  {
+    const lab = notesList.locator("li[data-id]", { hasText: "Laboratorium" });
+    await lab.hover();
+    await lab.getByRole("button", { name: "Więcej" }).click();
+    await lab.getByRole("menuitem", { name: "Udostępnij…" }).click();
+    const dialog = page.getByRole("dialog", { name: "Udostępnij „Laboratorium”" });
+    await dialog.getByPlaceholder("E-mail osoby, która już się tu logowała").fill("nikt@example.com");
+    await dialog.getByRole("button", { name: "Zaproś" }).click();
+    const unknown = await dialog.getByRole("alert").innerText({ timeout: 10_000 });
+    await dialog.getByRole("button", { name: "Dostęp ogólny: Tylko zaproszone osoby" }).click();
+    await page.getByRole("menuitemradio", { name: /Każdy z linkiem/ }).click();
+    await dialog.getByRole("button", { name: "Dostęp z linku: Może oglądać" }).waitFor({ timeout: 10_000 });
+    const { link: made } = await (await api(`/api/items/${await lab.getAttribute("data-id")}/sharing`)).json();
+    const link = `${app}/join/${made.token}`;
+    if (process.env.SHOTS) await dialog.screenshot({ path: `${process.env.SHOTS}/share.png` });
+    await page.keyboard.press("Escape");
+    await lab.getByText(/udostępnione/).waitFor({ timeout: 10_000 });
+    check("sharing: an unknown email is said so; a link is made; the card says it is shared",
+      unknown.includes("nikt@example.com") && /\/join\/[\w-]{20,}$/.test(link));
+
+    const other = await browser.newContext({ viewport: { width: 1440, height: 900 }, locale: "pl-PL" });
+    await other.addCookies([{ name: "session", value: otherSession, url: `http://localhost:${port}` }]);
+    const guest = await other.newPage();
+    guest.on("pageerror", (e) => errors.push(e));
+    await guest.goto(link);
+    await guest.waitForURL(/\/f\/[0-9a-f]{32}\/laboratorium$/, { timeout: 10_000 });
+    await guest.getByText("Tylko do odczytu").waitFor();
+    const newButtons = await guest.getByRole("button", { name: "Nowy", exact: true }).count();
+    await guest.getByRole("list", { name: "Zawartość folderu" }).getByRole("link", { name: /Zmienione gdzie indziej/ }).click();
+    await guest.getByText("Tylko do odczytu — zmiany tutaj się nie zapiszą.").waitFor({ timeout: 10_000 });
+    await guest.getByRole("button", { name: "Zrób kopię" }).click();
+    await guest.waitForURL(/\/n\/[0-9a-f]{32}\/zmienione-gdzie-indziej-kopia$/, { timeout: 10_000 });
+    await guest.getByText("Tylko do odczytu — zmiany tutaj się nie zapiszą.").waitFor({ state: "detached" });
+    await guest.goto(app);
+    const theirs = guest.getByRole("list", { name: "Moje notatki" });
+    await theirs.getByText("Zmienione gdzie indziej (kopia)").waitFor({ timeout: 10_000 });
+    const shared = await theirs.locator("li[data-id]", { hasText: "Laboratorium" }).innerText();
+    check("sharing: the link opens the folder read only; a copy of a note is the other's own",
+      newButtons === 0 && shared.includes("od E2E") && shared.includes("tylko odczyt"));
+
+    // the owner sees who joined
+    await lab.hover();
+    await lab.getByRole("button", { name: "Więcej" }).click();
+    await lab.getByRole("menuitem", { name: "Udostępnij…" }).click();
+    await dialog.getByRole("list", { name: "Osoby z dostępem" }).getByText("Ola", { exact: true }).waitFor({ timeout: 10_000 });
+    const role = await dialog.getByRole("button", { name: "Dostęp: Ola: Może oglądać" }).count();
+    if (process.env.SHOTS) {
+      await page.waitForTimeout(400);
+      await page.screenshot({ path: `${process.env.SHOTS}/share-people.png` });
+      await dialog.getByRole("button", { name: "Dostęp: Ola: Może oglądać" }).click();
+      await page.screenshot({ path: `${process.env.SHOTS}/share-picker.png` });
+      await page.keyboard.press("Escape"); // the menu (the dialog stays)
+    }
+    await page.keyboard.press("Escape");
+    check("sharing: who opened the link is among the people, with the link's role", role === 1);
+    await other.close();
   }
 
   check("no page errors", errors.length === 0);

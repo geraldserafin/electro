@@ -8,9 +8,10 @@ import { Config, Effect, Layer, Redacted } from "effect"
 import users from "./migrations/0001_users.js"
 import notes from "./migrations/0002_notes.js"
 import library from "./migrations/0003_library.js"
+import shareLinks from "./migrations/0004_share_links.js"
 
 /** Every migration, by name (a test of one starts the database from those before it: ``layer(url, record)``). */
-export const migrations = { "0001_users": users, "0002_notes": notes, "0003_library": library }
+export const migrations = { "0001_users": users, "0002_notes": notes, "0003_library": library, "0004_share_links": shareLinks }
 
 const loaderOf = (record: Partial<typeof migrations>) => PgMigrator.fromRecord(record)
 

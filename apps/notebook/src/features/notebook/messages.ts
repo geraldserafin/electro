@@ -4,6 +4,7 @@ export const pl = {
   hideOutline: "Schowaj spis treści",
   outlineEmpty: "Nagłówki z tekstu (<code># Tytuł</code>) i schematy pojawią się tutaj.",
   runAll: "Uruchom wszystko",
+  share: "Udostępnij",
   exportPdf: "Eksport do PDF",
   python: {
     loading: "Uruchamiam Pythona…",
@@ -100,6 +101,7 @@ export const en: typeof pl = {
   hideOutline: "Hide the contents",
   outlineEmpty: "Headings from the text (<code># Title</code>) and schematics will show here.",
   runAll: "Run all",
+  share: "Share",
   exportPdf: "Export to PDF",
   python: {
     loading: "Starting Python…",

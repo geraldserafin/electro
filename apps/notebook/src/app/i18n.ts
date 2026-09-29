@@ -11,14 +11,15 @@ import { messages as pdfExport } from "@/features/pdf-export";
 import { messages as library } from "@/features/library";
 import { messages as schematic } from "@/features/schematic";
 import { messages as settings } from "@/features/settings";
+import { messages as sharing } from "@/features/sharing";
 import { messages as simulation } from "@/features/simulation";
 import { messages as solution } from "@/features/solution";
 import { messages as theme } from "@/features/theme";
 import * as pages from "@/pages/messages";
 
 const resources = {
-  pl: { notebook: notebook.pl, notes: notes.pl, schematic: schematic.pl, simulation: simulation.pl, library: library.pl, solution: solution.pl, "pdf-export": pdfExport.pl, theme: theme.pl, settings: settings.pl, language: language.pl, auth: auth.pl, pages: pages.pl },
-  en: { notebook: notebook.en, notes: notes.en, schematic: schematic.en, simulation: simulation.en, library: library.en, solution: solution.en, "pdf-export": pdfExport.en, theme: theme.en, settings: settings.en, language: language.en, auth: auth.en, pages: pages.en },
+  pl: { notebook: notebook.pl, notes: notes.pl, schematic: schematic.pl, simulation: simulation.pl, library: library.pl, sharing: sharing.pl, solution: solution.pl, "pdf-export": pdfExport.pl, theme: theme.pl, settings: settings.pl, language: language.pl, auth: auth.pl, pages: pages.pl },
+  en: { notebook: notebook.en, notes: notes.en, schematic: schematic.en, simulation: simulation.en, library: library.en, sharing: sharing.en, solution: solution.en, "pdf-export": pdfExport.en, theme: theme.en, settings: settings.en, language: language.en, auth: auth.en, pages: pages.en },
 };
 
 declare module "i18next" {

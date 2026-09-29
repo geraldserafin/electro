@@ -10,7 +10,7 @@ import { randomUUID } from "node:crypto"
  * revisions and when they were saved. Their old addresses (/notes/<slug>, older slugs too) stay
  * in `legacy_slugs`, for the redirect; `notes` and `note_slugs` go.
  *
- * `share_links` is for sharing by link (a later step): here already, so the tables stay put.
+ * `share_links` is for sharing by link (a later step; 0004 gives it its final shape).
  */
 export default Effect.gen(function* () {
   const sql = yield* SqlClient.SqlClient

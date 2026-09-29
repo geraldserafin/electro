@@ -1,5 +1,5 @@
 // /f/:id/:name — a folder: the way up to it, its name (renamed here), what is in it. The name in
-// the address follows the folder's.
+// the address follows the folder's. Its owner shares it from here.
 import { Result, useAtomSet, useAtomValue } from "@effect-atom/atom-react";
 import { RANK, slugify } from "@electro/notes-api";
 import { useEffect, useState } from "react";
@@ -8,8 +8,9 @@ import { Link, useNavigate, useParams } from "react-router";
 import { Breadcrumbs, LibraryGrid, useLibraryCalls } from "@/features/library";
 import { CardSkeletons, failure, folderAtom, folderUrl, LIBRARY, patchItem } from "@/features/notes";
 import { SettingsMenu } from "@/features/settings";
-import { Back } from "@/shared/ui/icons";
-import { IslandLink, Islands } from "@/shared/ui/Island";
+import { ShareDialog } from "@/features/sharing";
+import { Back, ShareIcon } from "@/shared/ui/icons";
+import { IslandButton, IslandLink, Islands } from "@/shared/ui/Island";
 import { PageMessage } from "@/shared/ui/PageMessage";
 import { cn } from "@/shared/lib/cn";
 
@@ -21,6 +22,7 @@ export function FolderPage() {
   const patch = useAtomSet(patchItem, { mode: "promiseExit" });
   const [problem, setProblem] = useState<string | null>(null);
   const [editing, setEditing] = useState(false);
+  const [sharing, setSharing] = useState(false);
   const { said, moveTo } = useLibraryCalls(setProblem);
 
   const here = Result.isSuccess(folder) ? folder.value : null;
@@ -56,7 +58,13 @@ export function FolderPage() {
   return (
     <div>
       {backIsland}
-      <Islands side="right"><SettingsMenu /></Islands>
+      <Islands side="right">
+        {role === "owner" && (
+          <IslandButton onClick={() => setSharing(true)} title={t("share")} aria-label={t("share")}><ShareIcon /></IslandButton>
+        )}
+        <SettingsMenu />
+      </Islands>
+      {sharing && here && <ShareDialog item={here.folder} onClose={() => setSharing(false)} />}
       <div className="mx-auto max-w-310 px-8 pt-21 pb-24">
         {here && <Breadcrumbs path={here.path} current={here.folder.name || t("untitled")} onDrop={(card, into) => void moveTo(card, into)} />}
         <div className="flex items-center gap-3 mb-5">

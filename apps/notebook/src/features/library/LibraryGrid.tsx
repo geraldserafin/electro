@@ -1,6 +1,6 @@
 // A grid of folders and notes — the home screen's, or a folder's: folders first (a picture of a
 // few of their notes, like an iPhone's), then notes. "New" comes first (a note or a folder); a card's
-// "⋯" renames, moves ("Move to…") or deletes it; a card dragged onto a folder goes into it.
+// "⋯" renames, moves ("Move to…"), shares or deletes it; a card dragged onto a folder goes into it.
 import { useAtomSet } from "@effect-atom/atom-react";
 import type { ItemCard, Role } from "@electro/notes-api";
 import { Exit, type Cause } from "effect";
@@ -10,6 +10,7 @@ import {
   Card, createFolder, failure, folderUrl, LIBRARY, NewCard, noteUrl, patchItem, removeItem, useCreateNote, useWhen,
 } from "@/features/notes";
 import { library } from "@/features/schematic";
+import { leave, ShareDialog } from "@/features/sharing";
 import { blank } from "@/shared/model/format";
 import { FolderIcon, PageIcon } from "@/shared/ui/icons";
 import { dragging } from "./drag";
@@ -27,6 +28,7 @@ export function LibraryGrid({ items, parentId, container, label, onProblem }: {
   onProblem: (problem: string | null) => void;
 }) {
   const { t } = useTranslation("library");
+  const { t: tSharing } = useTranslation("sharing");
   const when = useWhen();
   const createNote = useCreateNote();
   const folder = useAtomSet(createFolder, { mode: "promiseExit" });
@@ -34,6 +36,8 @@ export function LibraryGrid({ items, parentId, container, label, onProblem }: {
   const remove = useAtomSet(removeItem, { mode: "promiseExit" });
   const { said, moveTo: move } = useLibraryCalls(onProblem);
   const [moving, setMoving] = useState<ItemCard | null>(null);
+  const [sharing, setSharing] = useState<ItemCard | null>(null);
+  const quit = useAtomSet(leave, { mode: "promiseExit" });
   const [over, setOver] = useState<string | null>(null);
   const writable = container === null || container === "owner" || container === "editor";
   const moveTo = (card: ItemCard, into: string | null) => {
@@ -44,6 +48,7 @@ export function LibraryGrid({ items, parentId, container, label, onProblem }: {
   const actions = (card: ItemCard) => {
     const name = card.name || t("untitled");
     return [
+      ...(card.role === "owner" ? [{ label: tSharing("share") + "…", run: () => setSharing(card) }] : []),
       ...(canEdit(card) ? [{
         label: t("rename"),
         run: async () => {
@@ -62,6 +67,14 @@ export function LibraryGrid({ items, parentId, container, label, onProblem }: {
           },
         },
       ] : []),
+      // shared with the user on its own (at the top of their home screen): off it
+      ...(card.owner !== null && container === null ? [{
+        label: tSharing("leave"),
+        danger: true,
+        run: async () => {
+          if (confirm(tSharing("confirmLeave", { name }))) said(await quit({ path: { id: card.id }, reactivityKeys: LIBRARY }));
+        },
+      }] : []),
     ];
   };
 
@@ -89,6 +102,7 @@ export function LibraryGrid({ items, parentId, container, label, onProblem }: {
 
   const meta = (card: ItemCard) => [
     card.owner ? t("sharedBy", { name: card.owner.name }) : null,
+    card.shared ? t("shared") : null,
     card.role === "viewer" ? t("readOnly") : null,
     card.kind === "folder" ? (card.count ? t("items", { count: card.count }) : t("empty")) : card.modified ? when(card.modified) : null,
   ].filter(Boolean).join(" · ");
@@ -123,6 +137,7 @@ export function LibraryGrid({ items, parentId, container, label, onProblem }: {
         ))}
       </ul>
       {moving && <MoveDialog card={moving} onChoose={(into) => void moveTo(moving, into)} onClose={() => setMoving(null)} />}
+      {sharing && <ShareDialog item={sharing} onClose={() => setSharing(null)} />}
     </>
   );
 }

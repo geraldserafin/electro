@@ -99,7 +99,7 @@ const patch = (api: Api, id: string, payload: { name?: string; parentId?: string
 const remove = (api: Api, id: string) => api.library.remove({ path: { id } })
 type Api = Effect.Effect.Success<ReturnType<typeof signedIn>>
 
-/** A share, straight in the database (sharing has no endpoints yet). */
+/** A share, straight in the database (quicker than signing in to add it). */
 const share = (item: string, code: string, role: "editor" | "viewer") =>
   Effect.flatMap(SqlClient.SqlClient, (sql) => sql`
     INSERT INTO shares (item_id, user_id, role)
@@ -314,6 +314,100 @@ describe("sharing", () => {
       yield* share("n1", "olek", "editor")
       expect((yield* olek.library.home()).map((c) => c.name)).toEqual(["Laboratorium", "Wspólne"])
       expect((yield* open(olek, lab.id)).items).toMatchObject([{ id: "n1", role: "editor" }])
+    }).pipe(Effect.provide(TestServer)))
+})
+
+describe("sharing: people and links", () => {
+  it.effect("with someone by their email: they have it, with the role given; the owner changes it, takes it back", () =>
+    Effect.gen(function* () {
+      const ala = yield* signedIn("ala")
+      const olek = yield* signedIn("olek")
+      const lab = yield* folder(ala, "Laboratorium")
+      yield* save(ala, doc("n1", "Mostek"), null, lab.id)
+      const sharing = ala.sharing.get({ path: { id: lab.id } })
+      expect(yield* sharing).toEqual({ owner: { name: "ala", avatarUrl: null }, people: [], link: null })
+      expect((yield* ala.library.home())[0]).toMatchObject({ id: lab.id, shared: false })
+
+      const added = yield* ala.sharing.add({ path: { id: lab.id }, payload: { email: "OLEK@example.com", role: "viewer" } })
+      expect(added.people).toMatchObject([{ name: "olek", email: "olek@example.com", role: "viewer" }])
+      const olekId = added.people[0]!.id
+      expect((yield* ala.library.home())[0]).toMatchObject({ id: lab.id, shared: true })
+      expect((yield* olek.library.home())[0]).toMatchObject({ id: lab.id, role: "viewer", shared: false })
+
+      yield* ala.sharing.setRole({ path: { id: lab.id, user: olekId }, payload: { role: "editor" } })
+      expect((yield* save(olek, doc("n1", "Razem"), 1)).revision).toBe(2)
+      expect((yield* ala.sharing.unshare({ path: { id: lab.id, user: olekId } })).people).toEqual([])
+      expect(yield* olek.library.home()).toEqual([])
+
+      // no one signed in with that email; the owner's own: nothing changes
+      expect(yield* ala.sharing.add({ path: { id: lab.id }, payload: { email: "nikt@example.com", role: "viewer" } }).pipe(Effect.flip))
+        .toMatchObject({ _tag: "NoSuchPerson" })
+      expect((yield* ala.sharing.add({ path: { id: lab.id }, payload: { email: "ala@example.com", role: "editor" } })).people).toEqual([])
+    }).pipe(Effect.provide(TestServer)))
+
+  it.effect("only the owner sees and changes who has it", () =>
+    Effect.gen(function* () {
+      const ala = yield* signedIn("ala")
+      const olek = yield* signedIn("olek")
+      yield* signedIn("ewa")
+      const lab = yield* folder(ala, "Laboratorium")
+      yield* share(lab.id, "olek", "editor")
+      const low = { _tag: "RoleTooLow", needed: "owner", role: "editor" }
+      expect(yield* olek.sharing.get({ path: { id: lab.id } }).pipe(Effect.flip)).toMatchObject(low)
+      expect(yield* olek.sharing.add({ path: { id: lab.id }, payload: { email: "ewa@example.com", role: "editor" } }).pipe(Effect.flip)).toMatchObject(low)
+      expect(yield* olek.sharing.link({ path: { id: lab.id }, payload: { role: "editor" } }).pipe(Effect.flip)).toMatchObject(low)
+      const ewa = yield* signedIn("ewa")
+      expect(yield* ewa.sharing.get({ path: { id: lab.id } }).pipe(Effect.flip)).toMatchObject({ _tag: "NotFound" })
+    }).pipe(Effect.provide(TestServer)))
+
+  it.effect("a link: whoever opens it has the item; its role changes; a new one ends the old; taken away, it leads nowhere", () =>
+    Effect.gen(function* () {
+      const ala = yield* signedIn("ala")
+      const olek = yield* signedIn("olek")
+      const ewa = yield* signedIn("ewa")
+      const lab = yield* folder(ala, "Laboratorium")
+      const path = { id: lab.id }
+      const { link } = yield* ala.sharing.link({ path, payload: { role: "viewer" } })
+      expect(link).toMatchObject({ role: "viewer" })
+      expect(link!.token.length).toBeGreaterThanOrEqual(20)
+      expect((yield* ala.library.home())[0]).toMatchObject({ shared: true })
+
+      expect(yield* olek.sharing.join({ path: { token: link!.token } })).toEqual({ id: lab.id, kind: "folder", name: "Laboratorium" })
+      expect((yield* olek.library.home())[0]).toMatchObject({ id: lab.id, role: "viewer" })
+      expect((yield* ala.sharing.get({ path })).people).toMatchObject([{ name: "olek", role: "viewer" }])
+      // the owner opening it: nothing changes
+      expect(yield* ala.sharing.join({ path: { token: link!.token } })).toMatchObject({ id: lab.id })
+      expect((yield* ala.sharing.get({ path })).people).toHaveLength(1)
+
+      // the role changes (the token stays); who was an editor stays one
+      const editing = yield* ala.sharing.link({ path, payload: { role: "editor" } })
+      expect(editing.link).toEqual({ token: link!.token, role: "editor" })
+      yield* olek.sharing.join({ path: { token: link!.token } })
+      yield* ala.sharing.link({ path, payload: { role: "viewer" } })
+      yield* olek.sharing.join({ path: { token: link!.token } })
+      expect((yield* ala.sharing.get({ path })).people).toMatchObject([{ name: "olek", role: "editor" }])
+
+      const renewed = yield* ala.sharing.newLink({ path })
+      expect(renewed.link!.token).not.toBe(link!.token)
+      expect(yield* ewa.sharing.join({ path: { token: link!.token } }).pipe(Effect.flip)).toMatchObject({ _tag: "NotFound" })
+      yield* ala.sharing.unlink({ path })
+      expect(yield* ewa.sharing.join({ path: { token: renewed.link!.token } }).pipe(Effect.flip)).toMatchObject({ _tag: "NotFound" })
+      expect(yield* ewa.library.home()).toEqual([])
+      // who joined keeps it
+      expect((yield* olek.library.home())[0]).toMatchObject({ id: lab.id })
+    }).pipe(Effect.provide(TestServer)))
+
+  it.effect("leaving: off the home screen, not openable; only what was shared", () =>
+    Effect.gen(function* () {
+      const ala = yield* signedIn("ala")
+      const olek = yield* signedIn("olek")
+      const lab = yield* folder(ala, "Laboratorium")
+      yield* share(lab.id, "olek", "editor")
+      yield* olek.sharing.leave({ path: { id: lab.id } })
+      expect(yield* olek.library.home()).toEqual([])
+      expect(yield* open(olek, lab.id).pipe(Effect.flip)).toMatchObject({ _tag: "NotFound" })
+      expect(yield* olek.sharing.leave({ path: { id: lab.id } }).pipe(Effect.flip)).toMatchObject({ _tag: "NotFound" })
+      expect(yield* open(ala, lab.id)).toMatchObject({ folder: { id: lab.id } })
     }).pipe(Effect.provide(TestServer)))
 })
 

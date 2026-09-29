@@ -1,7 +1,7 @@
 // Saving happens in the background and says nothing while it works. Only when it cannot — the
 // note changed elsewhere, or the server is away — a small notice shows, at the bottom.
 import { useTranslation } from "react-i18next";
-import { WarningIcon } from "@/shared/ui/icons";
+import { Eye, WarningIcon } from "@/shared/ui/icons";
 import type { SyncState } from "./sync";
 
 // data-notice: the notebook keeps its cell focused on a click here
@@ -30,4 +30,17 @@ export function SyncNotice({ state, onKeepMine, onTakeTheirs }: {
       </div>
     );
   return null;
+}
+
+/** Shared with the user to read: it runs and changes here, but nothing is saved — unless they
+ *  make a copy of their own. */
+export function ReadOnlyNotice({ onCopy }: { onCopy: () => void }) {
+  const { t } = useTranslation("notes");
+  return (
+    <div className={notice} data-notice role="status">
+      <Eye />
+      <span>{t("readOnly.text")}</span>
+      <button className={button} onClick={onCopy}>{t("readOnly.copy")}</button>
+    </div>
+  );
 }

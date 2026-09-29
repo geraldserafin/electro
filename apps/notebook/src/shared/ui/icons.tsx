@@ -72,3 +72,7 @@ export const MicrosoftLogo = () => (
 );
 export const FolderIcon = () => <Icon size={16}><path d="M3.5 7.5a2 2 0 012-2h3.8l2 2.2h7.2a2 2 0 012 2V17a2 2 0 01-2 2h-13a2 2 0 01-2-2z" /></Icon>;
 export const PageIcon = () => <Icon size={16}><path d="M6.5 3.5h7l4 4v13h-11z" /><path d="M13.5 3.5v4h4M9.5 12.5h5M9.5 16h5" /></Icon>;
+export const ShareIcon = () => <Icon><circle cx="9.5" cy="8.5" r="3.5" /><path d="M3.5 19.5a6 6 0 0112 0" /><path d="M18.5 8v6M15.5 11h6" /></Icon>;
+export const LockIcon = () => <Icon size={16}><rect x="5" y="10.5" width="14" height="10" rx="2" /><path d="M8.5 10.5V7.5a3.5 3.5 0 017 0v3" /></Icon>;
+export const GlobeIcon = () => <Icon size={16}><circle cx="12" cy="12" r="8.5" /><path d="M3.5 12h17M12 3.5c2.3 2.4 3.5 5.2 3.5 8.5s-1.2 6.1-3.5 8.5c-2.3-2.4-3.5-5.2-3.5-8.5s1.2-6.1 3.5-8.5z" /></Icon>;
+export const LinkIcon = () => <Icon size={16}><path d="M10 14a4 4 0 005.7 0l3-3a4 4 0 00-5.7-5.7l-1.2 1.2" /><path d="M14 10a4 4 0 00-5.7 0l-3 3a4 4 0 005.7 5.7l1.2-1.2" /></Icon>;

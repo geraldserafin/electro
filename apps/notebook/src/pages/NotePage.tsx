@@ -1,13 +1,14 @@
 // /n/:id/:name — a note, read from the server and edited (or only read, if it was shared with the
 // user to read). The way back is the folder it is in; the name in the address follows its title.
 import { useAtomSet } from "@effect-atom/atom-react";
-import { RANK, slugify } from "@electro/notes-api";
+import { previewOf, RANK, slugify, type Role } from "@electro/notes-api";
 import { Exit } from "effect";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Link, useNavigate, useParams } from "react-router";
 import { Notebook, NoteSkeleton } from "@/features/notebook";
-import { failure, folderUrl, fromDocument, getNote, noteUrl } from "@/features/notes";
+import { failure, folderUrl, fromDocument, getNote, noteUrl, toDocument } from "@/features/notes";
+import { ShareDialog } from "@/features/sharing";
 import type { Notebook as NotebookData } from "@/shared/model/types";
 import { Back } from "@/shared/ui/icons";
 import { IslandLink, Islands } from "@/shared/ui/Island";
@@ -15,7 +16,7 @@ import { PageMessage } from "@/shared/ui/PageMessage";
 
 type Loaded =
   | { kind: "loading" }
-  | { kind: "ready"; notebook: NotebookData; revision: number; readOnly: boolean; back: { to: string; label: string } }
+  | { kind: "ready"; notebook: NotebookData; revision: number; role: Role; back: { to: string; label: string } }
   | { kind: "missing" }
   | { kind: "unreachable" };
 
@@ -26,6 +27,7 @@ export function NotePage() {
   const navigate = useNavigate();
   const get = useAtomSet(getNote, { mode: "promiseExit" });
   const [loaded, setLoaded] = useState<Loaded>({ kind: "loading" });
+  const [sharing, setSharing] = useState<NotebookData | null>(null); // open: the note as it was then (its picture)
   const [reads, setReads] = useState(0); // "read it again" (after a conflict, or a failed read)
   const home = { to: "/", label: tLibrary("home") };
 
@@ -41,7 +43,7 @@ export function NotePage() {
       const { document, revision, role, path } = exit.value;
       const up = path.at(-1);
       setLoaded({
-        kind: "ready", notebook: fromDocument(document), revision, readOnly: RANK[role] < RANK.editor,
+        kind: "ready", notebook: fromDocument(document), revision, role,
         back: up ? { to: folderUrl(up.id, up.name), label: up.name } : home,
       });
     });
@@ -52,17 +54,24 @@ export function NotePage() {
 
   if (loaded.kind === "ready") {
     return (
-      <Notebook
-        key={`${loaded.notebook.id}:${reads}`} // a note read again starts afresh
-        initial={loaded.notebook}
-        revision={loaded.revision}
-        reload={() => setReads((n) => n + 1)}
-        readOnly={loaded.readOnly}
-        back={loaded.back}
-        onTitle={(title) => { // the name in the address follows the title
-          if (name !== slugify(title || "notatka")) navigate(noteUrl(id, title), { replace: true });
-        }}
-      />
+      <>
+        <Notebook
+          key={`${loaded.notebook.id}:${reads}`} // a note read again starts afresh
+          initial={loaded.notebook}
+          revision={loaded.revision}
+          reload={() => setReads((n) => n + 1)}
+          readOnly={RANK[loaded.role] < RANK.editor}
+          {...(loaded.role === "owner" ? { onShare: setSharing } : {})}
+          back={loaded.back}
+          onTitle={(next) => { // the name in the address follows the title
+            if (name !== slugify(next || "notatka")) navigate(noteUrl(id, next), { replace: true });
+          }}
+        />
+        {sharing && (
+          <ShareDialog item={{ id, name: sharing.title, kind: "note", preview: previewOf(toDocument(sharing)), previews: [], count: 0 }}
+                       onClose={() => setSharing(null)} />
+        )}
+      </>
     );
   }
   const back = (

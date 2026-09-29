@@ -1,4 +1,4 @@
-/** The HTTP side: the contract's endpoints, implemented with LibraryRepo and Accounts. */
+/** The HTTP side: the contract's endpoints, implemented with LibraryRepo, SharingRepo and Accounts. */
 import { HttpApiBuilder, HttpServerResponse } from "@effect/platform"
 import type { Cookie } from "@effect/platform/Cookies"
 import {
@@ -10,6 +10,7 @@ import { Accounts, SESSION_DAYS } from "./Accounts.js"
 import { ArduinoLive } from "./Arduino.js"
 import { LibraryRepo } from "./LibraryRepo.js"
 import { Providers } from "./Providers.js"
+import { SharingRepo } from "./SharingRepo.js"
 
 export const LibraryLive = HttpApiBuilder.group(NotesApi, "library", (handlers) =>
   Effect.gen(function* () {
@@ -28,6 +29,22 @@ export const LibraryLive = HttpApiBuilder.group(NotesApi, "library", (handlers) 
       .handle("patch", ({ path, payload }) => as((u) => repo.patch(u.id, path.id, payload)))
       .handle("remove", ({ path }) => as((u) => repo.remove(u.id, path.id)))
       .handle("legacy", ({ path }) => as((u) => repo.legacy(u.id, path.ref)))
+  }))
+
+export const SharingLive = HttpApiBuilder.group(NotesApi, "sharing", (handlers) =>
+  Effect.gen(function* () {
+    const repo = yield* SharingRepo
+    const as = <A, E, R>(f: (user: User) => Effect.Effect<A, E, R>) => Effect.flatMap(CurrentUser, f)
+    return handlers
+      .handle("get", ({ path }) => as((u) => repo.get(u.id, path.id)))
+      .handle("add", ({ path, payload }) => as((u) => repo.add(u.id, path.id, payload.email, payload.role)))
+      .handle("setRole", ({ path, payload }) => as((u) => repo.setRole(u.id, path.id, path.user, payload.role)))
+      .handle("unshare", ({ path }) => as((u) => repo.unshare(u.id, path.id, path.user)))
+      .handle("leave", ({ path }) => as((u) => repo.leave(u.id, path.id)))
+      .handle("link", ({ path, payload }) => as((u) => repo.link(u.id, path.id, payload.role)))
+      .handle("newLink", ({ path }) => as((u) => repo.newLink(u.id, path.id)))
+      .handle("unlink", ({ path }) => as((u) => repo.unlink(u.id, path.id)))
+      .handle("join", ({ path }) => as((u) => repo.join(u.id, path.token)))
   }))
 
 /** Only a path on this site: never off to another one after signing in. */
@@ -110,7 +127,7 @@ export const SystemLive = HttpApiBuilder.group(NotesApi, "system", (handlers) =>
 
 /** The whole API; needs a database (SqlClient) and the OAuth Providers. */
 export const ApiLive = HttpApiBuilder.api(NotesApi).pipe(
-  Layer.provide([LibraryLive, AuthLive, SystemLive, ArduinoLive]),
+  Layer.provide([LibraryLive, SharingLive, AuthLive, SystemLive, ArduinoLive]),
   Layer.provide(AuthenticationLive),
-  Layer.provide([LibraryRepo.Default, Accounts.Default]),
+  Layer.provide([LibraryRepo.Default, SharingRepo.Default, Accounts.Default]),
 )

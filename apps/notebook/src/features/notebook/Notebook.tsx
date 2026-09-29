@@ -2,14 +2,15 @@
 // The page (pages/NotePage.tsx) reads the note by its address and hands it over.
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { SyncNotice, useNoteSync } from "@/features/notes";
+import { ReadOnlyNotice, SyncNotice, useCreateNote, useNoteSync } from "@/features/notes";
 import { ExportDialog, PdfContext, pdfOf, warmUpWhenIdle, type PdfSettings } from "@/features/pdf-export";
 import { kernel, usePython } from "@/features/python";
 import { library } from "@/features/schematic";
 import { SettingsMenu } from "@/features/settings";
 import { newCell } from "@/shared/model/cells";
+import { copyOf } from "@/shared/model/format";
 import type { Cell, CellType, Notebook as NotebookData } from "@/shared/model/types";
-import { Back, Export, OutlineIcon, RunAll } from "@/shared/ui/icons";
+import { Back, Export, OutlineIcon, RunAll, ShareIcon } from "@/shared/ui/icons";
 import { IslandButton, IslandLink, Islands } from "@/shared/ui/Island";
 import { AddRow } from "./AddRow";
 import { CellFrame } from "./CellFrame";
@@ -28,13 +29,15 @@ import { cn } from "@/shared/lib/cn";
  * ``initial``/``revision``: the note as read from the server; ``reload``: read it again (after a
  * conflict, to take the server's version).
  */
-export function Notebook({ initial, revision, reload, onTitle, readOnly = false, back }: {
+export function Notebook({ initial, revision, reload, onTitle, readOnly = false, back, onShare }: {
   initial: NotebookData; revision: number | null; reload: () => void;
   onTitle?: (title: string) => void; // the title changed (the address shows it)
   readOnly?: boolean; // shared with the user to read: it runs, it is not saved
   back: { to: string; label: string }; // the way back: the folder it is in
+  onShare?: (notebook: NotebookData) => void; // the user's own: who else has it (and its picture, as it is now)
 }) {
   const { t } = useTranslation("notebook");
+  const { t: tNotes } = useTranslation("notes");
   const [notebook, setNotebook] = useState<NotebookData>(initial);
   const latest = useRef(notebook);
   latest.current = notebook;
@@ -42,6 +45,11 @@ export function Notebook({ initial, revision, reload, onTitle, readOnly = false,
   const ready = python.kind === "ready";
   const [focused, setFocused] = useState<string | null>(null);
   const sync = useNoteSync(notebook, revision, reload, readOnly);
+  const create = useCreateNote();
+  const copy = async () => { // a read-only note, the user's own to change (as it is now, with what they changed here)
+    const own = copyOf(latest.current);
+    if (!(await create({ ...own, title: tNotes("readOnly.copyTitle", { title: own.title || t("untitled") }) }))) alert(tNotes("readOnly.copyFailed"));
+  };
   useEffect(() => onTitle?.(notebook.title), [notebook.title]); // eslint-disable-line react-hooks/exhaustive-deps
   const [outline, setOutline] = useOutlineOpen();
   const [exporting, setExporting] = useState(false);
@@ -90,12 +98,15 @@ export function Notebook({ initial, revision, reload, onTitle, readOnly = false,
       </Islands>
       <Sidebar open={outline} title={notebook.title} onTitle={setTitle} cells={notebook.cells} />
       <Islands side="right">
+        {onShare && <IslandButton onClick={() => onShare(latest.current)} title={t("share")} aria-label={t("share")}><ShareIcon /></IslandButton>}
         <IslandButton waiting={!ready} onClick={runAll} disabled={!ready}
                       title={ready ? t("runAll") : python.kind === "error" ? t("python.failed", { error: python.error }) : t("python.loading")} aria-label={t("runAll")}><RunAll /></IslandButton>
         <IslandButton onClick={() => setExporting(true)} title={t("exportPdf")} aria-label={t("exportPdf")}><Export /></IslandButton>
         <SettingsMenu />
       </Islands>
-      <SyncNotice state={sync.state} onKeepMine={sync.keepMine} onTakeTheirs={sync.takeTheirs} />
+      {readOnly
+        ? <ReadOnlyNotice onCopy={() => void copy()} />
+        : <SyncNotice state={sync.state} onKeepMine={sync.keepMine} onTakeTheirs={sync.takeTheirs} />}
       {exporting && (
         <ExportDialog notebook={notebook} pdf={pdf} onChange={setPdf}
                       onCode={(codeInPdf) => setNotebook((nb) => ({ ...nb, settings: { ...nb.settings, codeInPdf } }))}

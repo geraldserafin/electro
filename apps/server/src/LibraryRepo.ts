@@ -29,6 +29,7 @@ const CardRow = Schema.Struct({
   preview: Schema.NullOr(NotePreview),
   previews: Schema.Array(NotePreview),
   count: Schema.Int,
+  shared: Schema.Boolean, // shared with anyone, or by a link
   shared_role: Schema.NullOr(Schema.Literal("editor", "viewer")), // a share of this very item with the user
 })
 type CardRow = typeof CardRow.Type
@@ -117,6 +118,7 @@ export class LibraryRepo extends Effect.Service<LibraryRepo>()("LibraryRepo", {
                SELECT c.preview FROM items c WHERE c.parent_id = i.id AND c.kind = 'note' AND c.preview IS NOT NULL
                ORDER BY c.saved_at DESC LIMIT 4
              ) p), '[]'::jsonb) AS previews,
+             (EXISTS (SELECT 1 FROM shares s WHERE s.item_id = i.id) OR EXISTS (SELECT 1 FROM share_links l WHERE l.item_id = i.id)) AS shared,
              (SELECT s.role FROM shares s WHERE s.item_id = i.id AND s.user_id = ${user}) AS shared_role
       FROM items i JOIN users u ON u.id = i.owner_id
       WHERE ${where}
@@ -145,6 +147,7 @@ export class LibraryRepo extends Effect.Service<LibraryRepo>()("LibraryRepo", {
       role: r.owner_id === user ? "owner" : better(inherited, r.shared_role) ?? "viewer",
       owner: r.owner_id === user ? null : { name: r.owner_name, avatarUrl: r.owner_avatar },
       modified: r.modified, savedAt: r.saved_at.toISOString(), preview: r.preview, previews: r.previews, count: r.count,
+      shared: r.owner_id === user && r.shared,
     })
 
     const cardOf = (user: UserId, id: string, role: Role) =>
@@ -290,7 +293,7 @@ export class LibraryRepo extends Effect.Service<LibraryRepo>()("LibraryRepo", {
         Effect.flatMap(([row]) => row ? Effect.succeed({ id: row.item_id }) : Effect.fail(new NotFound({ id: ref }))),
       )
 
-    return { home, folder, destinations, note, createFolder, save, patch, remove, legacy } as const
+    return { access, home, folder, destinations, note, createFolder, save, patch, remove, legacy } as const
   }),
 }) {}
 

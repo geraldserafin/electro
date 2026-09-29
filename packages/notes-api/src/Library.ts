@@ -39,6 +39,7 @@ export const ItemCard = Schema.Struct({
   preview: Schema.NullOr(NotePreview), // a note's first page
   previews: Schema.Array(NotePreview), // a folder's: up to four of its notes, the newest first
   count: Schema.Int, // a folder's: what is in it
+  shared: Schema.Boolean, // the user's own, shared with someone (or by a link)
 }).annotations({ identifier: "ItemCard" })
 export type ItemCard = typeof ItemCard.Type
 
