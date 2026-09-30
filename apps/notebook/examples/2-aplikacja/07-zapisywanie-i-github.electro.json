@@ -1,0 +1,18 @@
+{
+  "format": "electro-notebook",
+  "version": 2,
+  "id": "d6cf96a6a5d94ba1",
+  "title": "7. Zapisywanie i GitHub",
+  "created": "2026-10-01T00:00:00Z",
+  "modified": "2026-10-01T00:00:00Z",
+  "settings": {
+    "codeInPdf": true
+  },
+  "cells": [
+    {
+      "id": "fc5936f3",
+      "type": "markdown",
+      "source": "# Gdzie są moje notatki?\n\nNotatki są **w tej przeglądarce** — w małym repozytorium git, które aplikacja prowadzi sama. Każda\nzmiana zapisuje się od razu, bez klikania, i przetrwa zamknięcie karty i restart komputera. Nic nie\nwychodzi do internetu, dopóki sam tego nie zechcesz.\n\n## Przycisk zapisu\n\nIkona dyskietki w prawym górnym rogu (albo **⌘S / Ctrl+S**) zamyka **sesję**: wszystkie zmiany od\nostatniego zapisu stają się jednym wpisem w historii notatek. Kropka na przycisku znaczy, że są zmiany\njeszcze niezapisane w historii. Sesja zapisuje się też sama: po pół godzinie bez zmian i przy następnym\notwarciu aplikacji.\n\n## GitHub\n\nJeśli chcesz mieć notatki także na innym komputerze — albo po prostu kopię w bezpiecznym miejscu — połącz\nGitHuba: menu **⋯** → **Połącz z GitHubem**. Aplikacja założy Ci prywatne repozytorium `electro-notes`\ni od tej pory:\n\n- w trakcie pracy zmiany co chwilę lądują na GitHubie na osobnej gałęzi (bezpieczne, choć jeszcze nie\n  w historii),\n- zapis (⌘S) wysyła całą sesję jako jeden commit na gałąź `main`,\n- przy otwarciu aplikacji pobiera to, co zmieniłeś na innym komputerze.\n\nGdy ta sama notatka zmieniła się w dwóch miejscach naraz, nic nie przepada: zostaje Twoja wersja,\na obok pojawia się kopia z dopiskiem **(z GitHuba)**.\n\n## Pliki\n\nKażda notatka to jeden plik `.electro.json` (w repozytorium na GitHubie — w folderze `notes`). Taki plik\notworzysz na stronie głównej przyciskiem **Otwórz plik**: stanie się nową notatką.\n\n## Kursy i przykłady\n\nLekcję z kursu możesz od razu zmieniać i uruchamiać, ale nic się w niej nie zapisuje — do Twoich\nnotatek trafi dopiero, gdy klikniesz **Dodaj do moich notatek** na dole strony. Przycisk **Dodaj cały\nkurs do notatek** na stronie kursu kopiuje wszystkie lekcje naraz, do nowego folderu."
+    }
+  ]
+}

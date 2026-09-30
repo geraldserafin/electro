@@ -1,0 +1,331 @@
+{
+  "format": "electro-notebook",
+  "version": 2,
+  "id": "edbee9b39aaf629b",
+  "title": "Radar",
+  "created": "2026-10-01T00:00:00Z",
+  "modified": "2026-10-01T00:00:00Z",
+  "settings": {
+    "codeInPdf": true
+  },
+  "cells": [
+    {
+      "id": "40027318",
+      "type": "markdown",
+      "source": "# Radar\n\nSerwo obraca czujnik odległości od 0° do 180° i z powrotem, a OLED rysuje ekran radaru: półokrąg ze\nwskazówką i echami przeszkód. Kąt i odległość zamieniają się na punkt na ekranie przez sinus\ni cosinus — współrzędne biegunowe na kartezjańskie.\n\nUruchom ⚡ i przesuwaj przeszkodę suwakiem czujnika w trakcie obrotu — echa przesuwają się bliżej\ni dalej. (Symulowany czujnik widzi przeszkodę w każdym kierunku w tej samej odległości; w prawdziwym\nświecie zobaczyłbyś kształt pokoju.)"
+    },
+    {
+      "id": "0ee7feb2",
+      "type": "schematic",
+      "name": "radar",
+      "schematic": {
+        "version": 1,
+        "elements": [
+          {
+            "id": "ARD_1",
+            "kind": "arduino",
+            "at": [
+              16,
+              17
+            ],
+            "rotation": 0,
+            "value": null,
+            "text": "// RADAR: serwo obraca czujnik odległości HC-SR04 od 0° do 180° i z powrotem, a OLED rysuje ekran\n// radaru — półokrąg, wskazówkę i echa przeszkód, które powoli gasną. Przesuwaj przeszkodę suwakiem\n// czujnika i patrz, jak zmienia się jej odległość na ekranie.\n// Serwo na D9, TRIG D6, ECHO D7, OLED na I²C (A4, A5).\n#include <Servo.h>\n#include <Wire.h>\n#include <Adafruit_GFX.h>\n#include <Adafruit_SSD1306.h>\n\nAdafruit_SSD1306 oled(128, 64, &Wire, -1);\nServo servo;\nconst byte TRIG = 6, ECHO = 7;\nconst int CX = 64, CY = 63, R = 60, RANGE = 100;  // środek, promień w pikselach, zasięg w cm\nconst int STEP = 6;                                // co ile stopni pomiar\nuint8_t echo[181 / STEP + 1];                      // odległość (cm) dla każdego kierunku; 0: nic\nint angle = 0, dir = 1;\n\nlong distanceCm() {\n  digitalWrite(TRIG, HIGH);\n  delayMicroseconds(10);\n  digitalWrite(TRIG, LOW);\n  long us = pulseIn(ECHO, HIGH, 12000UL);  // dalej niż 2 m: brak echa\n  return us ? us / 58 : 0;\n}\n\nvoid setup() {\n  pinMode(TRIG, OUTPUT);\n  pinMode(ECHO, INPUT);\n  servo.attach(9);\n  oled.begin(SSD1306_SWITCHCAPVCC, 0x3C);\n  Wire.setClock(400000);\n  oled.setTextColor(SSD1306_WHITE);\n}\n\nvoid loop() {\n  servo.write(angle);\n  delay(25);  // serwo potrzebuje chwili, żeby się obrócić\n  long cm = distanceCm();\n  echo[angle / STEP] = cm > 0 && cm <= RANGE ? cm : 0;\n\n  oled.clearDisplay();\n  oled.drawCircle(CX, CY, R, SSD1306_WHITE);\n  oled.drawCircle(CX, CY, R / 2, SSD1306_WHITE);\n  oled.drawFastHLine(0, CY, 128, SSD1306_WHITE);\n  float a = angle * PI / 180;\n  oled.drawLine(CX, CY, CX + R * cos(a), CY - R * sin(a), SSD1306_WHITE);\n  for (int i = 0; i <= 180 / STEP; i++)\n    if (echo[i]) {\n      float b = i * STEP * PI / 180;\n      int r = echo[i] * R / RANGE;\n      oled.fillCircle(CX + r * cos(b), CY - r * sin(b), 2, SSD1306_WHITE);\n    }\n  oled.setCursor(0, 0);\n  oled.print(angle);\n  oled.print((char)247);\n  oled.setCursor(92, 0);\n  if (cm > 0 && cm <= RANGE) {\n    oled.print(cm);\n    oled.print(\"cm\");\n  } else oled.print(\"--\");\n  oled.display();\n\n  angle += dir * STEP;\n  if (angle >= 180 || angle <= 0) dir = -dir;\n}\n"
+          },
+          {
+            "id": "OLED_1",
+            "kind": "ssd1306",
+            "at": [
+              42,
+              21
+            ],
+            "rotation": 0,
+            "value": null,
+            "text": "0x3C"
+          },
+          {
+            "id": "M_1",
+            "kind": "servo",
+            "at": [
+              20,
+              7
+            ],
+            "rotation": 0,
+            "value": null,
+            "text": null
+          },
+          {
+            "id": "US_1",
+            "kind": "ultrasonic",
+            "at": [
+              4,
+              9
+            ],
+            "rotation": 0,
+            "value": null,
+            "text": "60"
+          }
+        ],
+        "wires": [
+          {
+            "points": [
+              [
+                20,
+                7
+              ],
+              [
+                19,
+                7
+              ],
+              [
+                19,
+                16
+              ],
+              [
+                22,
+                16
+              ],
+              [
+                22,
+                17
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                44,
+                21
+              ],
+              [
+                44,
+                20
+              ],
+              [
+                34,
+                20
+              ],
+              [
+                34,
+                25
+              ],
+              [
+                30,
+                25
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                45,
+                21
+              ],
+              [
+                45,
+                19
+              ],
+              [
+                35,
+                19
+              ],
+              [
+                35,
+                26
+              ],
+              [
+                29,
+                26
+              ],
+              [
+                29,
+                25
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                6,
+                13
+              ],
+              [
+                6,
+                15
+              ],
+              [
+                25,
+                15
+              ],
+              [
+                25,
+                17
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                5,
+                13
+              ],
+              [
+                5,
+                14
+              ],
+              [
+                26,
+                14
+              ],
+              [
+                26,
+                17
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                20,
+                9
+              ],
+              [
+                16,
+                9
+              ],
+              [
+                16,
+                13
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                16,
+                13
+              ],
+              [
+                16,
+                26
+              ],
+              [
+                21,
+                26
+              ],
+              [
+                21,
+                25
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                42,
+                21
+              ],
+              [
+                42,
+                13
+              ],
+              [
+                16,
+                13
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                7,
+                13
+              ],
+              [
+                16,
+                13
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                15,
+                16
+              ],
+              [
+                15,
+                25
+              ],
+              [
+                19,
+                25
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                4,
+                13
+              ],
+              [
+                4,
+                16
+              ],
+              [
+                15,
+                16
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                20,
+                8
+              ],
+              [
+                15,
+                8
+              ],
+              [
+                15,
+                12
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                15,
+                12
+              ],
+              [
+                15,
+                16
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                43,
+                21
+              ],
+              [
+                43,
+                12
+              ],
+              [
+                15,
+                12
+              ]
+            ]
+          }
+        ]
+      },
+      "view": "schematic"
+    }
+  ]
+}

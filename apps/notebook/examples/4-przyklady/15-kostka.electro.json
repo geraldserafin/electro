@@ -1,0 +1,583 @@
+{
+  "format": "electro-notebook",
+  "version": 2,
+  "id": "dbb9e1b388dab210",
+  "title": "Elektroniczna kostka do gry",
+  "created": "2026-10-01T00:00:00Z",
+  "modified": "2026-10-01T00:00:00Z",
+  "settings": {
+    "codeInPdf": true
+  },
+  "cells": [
+    {
+      "id": "6b3cef95",
+      "type": "markdown",
+      "source": "# Kostka do gry\n\nNaciśnij przycisk, a cyfry na wyświetlaczu zaczną się kręcić — coraz wolniej, aż kostka „stanie” na\nwyniku od 1 do 6. Każdy segment wyświetlacza to osobna dioda z własnym opornikiem; cyfry są zapisane\njako maski bitowe (bit 0 — segment a, …, bit 6 — segment g).\n\n**Skąd losowość?** Komputer liczy deterministycznie — `random()` daje ciąg liczb, który tylko wygląda na\nlosowy, i za każdym razem zaczynałby się tak samo. Dlatego szkic ustawia **ziarno** z chwili naciśnięcia,\nzmierzonej w mikrosekundach: tego człowiek nie powtórzy.\n\n**Jak grać:** uruchom ⚡, kliknij schemat i naciśnij **spację**."
+    },
+    {
+      "id": "87b83878",
+      "type": "schematic",
+      "name": "kostka",
+      "schematic": {
+        "version": 1,
+        "elements": [
+          {
+            "id": "ARD_1",
+            "kind": "arduino",
+            "at": [
+              6,
+              33
+            ],
+            "rotation": 0,
+            "value": null,
+            "text": "// KOSTKA DO GRY: naciśnij przycisk (D12, spacja), a na wyświetlaczu 7-segmentowym cyfry kręcą się\n// coraz wolniej, aż zatrzymają się na wyniku od 1 do 6 — jak turlająca się kostka.\n// Segmenty a–g na D2–D8 (każdy przez swój opornik), wspólna katoda do masy; buzzer pasywny na D9.\nconst byte SEG[7] = {2, 3, 4, 5, 6, 7, 8};\nconst byte DIGITS[10] = {0b0111111, 0b0000110, 0b1011011, 0b1001111, 0b1100110,\n                         0b1101101, 0b1111101, 0b0000111, 0b1111111, 0b1101111};\nconst byte KEY = 12, BUZZER = 9;\n\nvoid show(int n) {\n  for (int i = 0; i < 7; i++) digitalWrite(SEG[i], (DIGITS[n] >> i) & 1);\n}\n\nvoid setup() {\n  for (byte s : SEG) pinMode(s, OUTPUT);\n  pinMode(KEY, INPUT_PULLUP);\n  Serial.begin(9600);\n  show(0);\n}\n\nvoid loop() {\n  if (digitalRead(KEY) == HIGH) return;\n  randomSeed(micros());  // chwila naciśnięcia jest losowa: ziarno dla random()\n  int n = 1;\n  for (int pause = 20; pause < 300; pause = pause * 11 / 10) {  // coraz wolniej\n    n = random(1, 7);\n    show(n);\n    tone(BUZZER, 1500, 5);\n    delay(pause);\n  }\n  tone(BUZZER, 880, 150);\n  Serial.print(\"Wypadlo: \");\n  Serial.println(n);\n  while (digitalRead(KEY) == LOW) delay(5);\n}\n"
+          },
+          {
+            "id": "DS_1",
+            "kind": "seven_segment",
+            "at": [
+              33,
+              11
+            ],
+            "rotation": 0,
+            "value": null,
+            "text": null
+          },
+          {
+            "id": "R_1",
+            "kind": "resistor",
+            "at": [
+              26,
+              29
+            ],
+            "rotation": 270,
+            "value": "220",
+            "text": null
+          },
+          {
+            "id": "R_2",
+            "kind": "resistor",
+            "at": [
+              28,
+              29
+            ],
+            "rotation": 270,
+            "value": "220",
+            "text": null
+          },
+          {
+            "id": "R_3",
+            "kind": "resistor",
+            "at": [
+              30,
+              29
+            ],
+            "rotation": 270,
+            "value": "220",
+            "text": null
+          },
+          {
+            "id": "R_4",
+            "kind": "resistor",
+            "at": [
+              32,
+              29
+            ],
+            "rotation": 270,
+            "value": "220",
+            "text": null
+          },
+          {
+            "id": "R_5",
+            "kind": "resistor",
+            "at": [
+              34,
+              29
+            ],
+            "rotation": 270,
+            "value": "220",
+            "text": null
+          },
+          {
+            "id": "R_6",
+            "kind": "resistor",
+            "at": [
+              36,
+              29
+            ],
+            "rotation": 270,
+            "value": "220",
+            "text": null
+          },
+          {
+            "id": "R_7",
+            "kind": "resistor",
+            "at": [
+              38,
+              29
+            ],
+            "rotation": 270,
+            "value": "220",
+            "text": null
+          },
+          {
+            "id": "B_1",
+            "kind": "button",
+            "at": [
+              4,
+              27
+            ],
+            "rotation": 90,
+            "value": null,
+            "text": "Space"
+          },
+          {
+            "id": "BZ_1",
+            "kind": "passive_buzzer",
+            "at": [
+              28,
+              37
+            ],
+            "rotation": 0,
+            "value": null,
+            "text": null
+          },
+          {
+            "id": "t1",
+            "kind": "terminal",
+            "at": [
+              37,
+              17
+            ],
+            "rotation": 0,
+            "value": null,
+            "text": null
+          }
+        ],
+        "wires": [
+          {
+            "points": [
+              [
+                4,
+                31
+              ],
+              [
+                9,
+                31
+              ],
+              [
+                9,
+                33
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                33,
+                17
+              ],
+              [
+                33,
+                25
+              ],
+              [
+                34,
+                25
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                26,
+                29
+              ],
+              [
+                20,
+                29
+              ],
+              [
+                20,
+                33
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                34,
+                17
+              ],
+              [
+                34,
+                18
+              ],
+              [
+                32,
+                18
+              ],
+              [
+                32,
+                25
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                28,
+                29
+              ],
+              [
+                28,
+                30
+              ],
+              [
+                19,
+                30
+              ],
+              [
+                19,
+                33
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                36,
+                17
+              ],
+              [
+                36,
+                19
+              ],
+              [
+                30,
+                19
+              ],
+              [
+                30,
+                25
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                30,
+                29
+              ],
+              [
+                30,
+                31
+              ],
+              [
+                18,
+                31
+              ],
+              [
+                18,
+                33
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                34,
+                11
+              ],
+              [
+                34,
+                10
+              ],
+              [
+                38,
+                10
+              ],
+              [
+                38,
+                20
+              ],
+              [
+                36,
+                20
+              ],
+              [
+                36,
+                25
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                32,
+                29
+              ],
+              [
+                32,
+                32
+              ],
+              [
+                17,
+                32
+              ],
+              [
+                17,
+                33
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                33,
+                11
+              ],
+              [
+                31,
+                11
+              ],
+              [
+                31,
+                24
+              ],
+              [
+                38,
+                24
+              ],
+              [
+                38,
+                25
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                28,
+                37
+              ],
+              [
+                24,
+                37
+              ],
+              [
+                24,
+                28
+              ],
+              [
+                12,
+                28
+              ],
+              [
+                12,
+                33
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                34,
+                29
+              ],
+              [
+                35,
+                29
+              ],
+              [
+                35,
+                23
+              ],
+              [
+                16,
+                23
+              ],
+              [
+                16,
+                33
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                37,
+                11
+              ],
+              [
+                37,
+                9
+              ],
+              [
+                28,
+                9
+              ],
+              [
+                28,
+                25
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                36,
+                11
+              ],
+              [
+                36,
+                8
+              ],
+              [
+                26,
+                8
+              ],
+              [
+                26,
+                25
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                36,
+                29
+              ],
+              [
+                36,
+                30
+              ],
+              [
+                29,
+                30
+              ],
+              [
+                29,
+                24
+              ],
+              [
+                15,
+                24
+              ],
+              [
+                15,
+                33
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                38,
+                29
+              ],
+              [
+                37,
+                29
+              ],
+              [
+                37,
+                22
+              ],
+              [
+                13,
+                22
+              ],
+              [
+                13,
+                33
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                4,
+                27
+              ],
+              [
+                5,
+                27
+              ],
+              [
+                5,
+                42
+              ],
+              [
+                11,
+                42
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                11,
+                42
+              ],
+              [
+                11,
+                41
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                32,
+                37
+              ],
+              [
+                32,
+                42
+              ],
+              [
+                27,
+                42
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                27,
+                42
+              ],
+              [
+                11,
+                42
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                35,
+                11
+              ],
+              [
+                35,
+                7
+              ],
+              [
+                27,
+                7
+              ],
+              [
+                27,
+                42
+              ]
+            ]
+          }
+        ]
+      },
+      "view": "schematic"
+    }
+  ]
+}

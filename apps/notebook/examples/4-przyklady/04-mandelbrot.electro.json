@@ -1,0 +1,254 @@
+{
+  "format": "electro-notebook",
+  "version": 2,
+  "id": "82e0aaa952264d6c",
+  "title": "Fraktal Mandelbrota",
+  "created": "2026-10-01T00:00:00Z",
+  "modified": "2026-10-01T00:00:00Z",
+  "settings": {
+    "codeInPdf": true
+  },
+  "cells": [
+    {
+      "id": "51dde736",
+      "type": "markdown",
+      "source": "# Zbiór Mandelbrota\n\nNajsłynniejszy obiekt matematyki eksperymentalnej. Weź liczbę zespoloną $c$ i powtarzaj\n$z \\to z^2 + c$, zaczynając od $z = 0$. Dla jednych $c$ ciąg ucieka do nieskończoności, dla innych\nzostaje blisko zera — te drugie tworzą zbiór Mandelbrota (czarny). Brzeg zbioru jest nieskończenie\nskomplikowany: przybliżaj go, a zawsze znajdziesz nowe spirale, gałęzie i miniaturowe kopie całości.\n\nSzkic liczy każdy piksel ekranu 320×240 i koloruje go według tego, jak szybko $z$ uciekło, a potem\nprzybliża obraz dwukrotnie, w stronę „Doliny Konika Morskiego”. Obraz powstaje wiersz po wierszu —\nwidać, ile to liczenia. Przycisk (klawisz **R**) wraca do początku.\n\n**Stały przecinek:** RP2040 nie ma koprocesora do ułamków, więc szkic liczy na liczbach całkowitych,\nw których $1 = 2^{24}$. Mnożenie dwóch takich liczb to zwykłe mnożenie i przesunięcie o 24 bity w prawo —\nkilkanaście razy szybciej niż `float` liczony programowo."
+    },
+    {
+      "id": "1960e285",
+      "type": "schematic",
+      "name": "mandelbrot",
+      "schematic": {
+        "version": 1,
+        "elements": [
+          {
+            "id": "PICO_1",
+            "kind": "pico",
+            "at": [
+              8,
+              7
+            ],
+            "rotation": 0,
+            "value": null,
+            "text": "// FRAKTAL MANDELBROTA na Raspberry Pi Pico i kolorowym TFT 320×240. Dla każdego piksela c liczymy\n// z → z² + c od z = 0: jeśli z ucieka do nieskończoności, piksel dostaje kolor tym jaśniejszy,\n// im szybciej uciekł; jeśli nie — jest czarny (należy do zbioru). Potem obraz przybliża się do\n// „Doliny Konika Morskiego”, coraz głębiej. Liczymy na liczbach całkowitych (stały przecinek, 1 = 2^24):\n// RP2040 nie ma sprzętowego mnożenia liczb zmiennoprzecinkowych.\n// TFT: SCK GP18, MOSI GP19, CS GP17, DC GP20, RESET GP21, podświetlenie GP22. Przycisk na GP2: od nowa.\n#include <SPI.h>\n#include <Adafruit_GFX.h>\n#include <Adafruit_ILI9341.h>\n\nAdafruit_ILI9341 tft(17, 20, 21);\nconst int W = 320, H = 240, MAX_ITER = 64, RESET = 2;\nconst int FRAC = 24;  // bitów po przecinku\ntypedef int64_t fixed;\nconst fixed ONE = (fixed)1 << FRAC;\n\nuint16_t palette[MAX_ITER + 1];\ndouble zoom = 3.0;                           // szerokość obrazu w jednostkach płaszczyzny\nconst double CX = -0.743643, CY = 0.131825;  // Dolina Konika Morskiego\nuint16_t line[W];\n\nuint16_t rgb(int r, int g, int b) { return tft.color565(r, g, b); }\n\nvoid setup() {\n  pinMode(RESET, INPUT_PULLUP);\n  pinMode(22, OUTPUT);\n  digitalWrite(22, HIGH);\n  tft.begin();\n  tft.setRotation(1);\n  for (int i = 0; i < MAX_ITER; i++) {  // tęczowa paleta, gładko\n    float t = (float)i / MAX_ITER;\n    palette[i] = rgb(9 * (1 - t) * t * t * t * 255, 15 * (1 - t) * (1 - t) * t * t * 255,\n                     8.5 * (1 - t) * (1 - t) * (1 - t) * t * 255);\n  }\n  palette[MAX_ITER] = ILI9341_BLACK;\n}\n\nvoid loop() {\n  double left = CX - zoom / 2, top = CY + zoom * H / W / 2, step = zoom / W;\n  fixed fstep = step * ONE, ci = top * ONE;\n  for (int y = 0; y < H; y++, ci -= fstep) {\n    fixed cr = left * ONE;\n    for (int x = 0; x < W; x++, cr += fstep) {\n      fixed zr = 0, zi = 0;\n      int i = 0;\n      while (i < MAX_ITER) {\n        fixed zr2 = (zr * zr) >> FRAC, zi2 = (zi * zi) >> FRAC;\n        if (zr2 + zi2 > 4 * ONE) break;  // |z| > 2: ucieka\n        zi = ((zr * zi) >> (FRAC - 1)) + ci;\n        zr = zr2 - zi2 + cr;\n        i++;\n      }\n      line[x] = palette[i];\n    }\n    tft.drawRGBBitmap(0, y, line, W, 1);  // wiersz po wierszu: widać, jak powstaje\n    if (digitalRead(RESET) == LOW) zoom = 3.0;\n  }\n  tft.setCursor(4, 4);\n  tft.setTextColor(ILI9341_WHITE);\n  tft.print(\"x\");\n  tft.print(3.0 / zoom, 0);\n  zoom *= 0.5;\n  if (zoom < 1e-5) zoom = 3.0;  // dalej zabrakłoby bitów po przecinku\n}\n"
+          },
+          {
+            "id": "TFT_1",
+            "kind": "ili9341",
+            "at": [
+              24,
+              13
+            ],
+            "rotation": 0,
+            "value": null,
+            "text": null
+          },
+          {
+            "id": "t_TFT_1",
+            "kind": "terminal",
+            "at": [
+              24,
+              21
+            ],
+            "rotation": 0,
+            "value": null,
+            "text": null
+          },
+          {
+            "id": "B_1",
+            "kind": "button",
+            "at": [
+              4,
+              26
+            ],
+            "rotation": 90,
+            "value": null,
+            "text": "r"
+          }
+        ],
+        "wires": [
+          {
+            "points": [
+              [
+                24,
+                16
+              ],
+              [
+                16,
+                16
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                24,
+                17
+              ],
+              [
+                16,
+                17
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                24,
+                18
+              ],
+              [
+                16,
+                18
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                24,
+                19
+              ],
+              [
+                16,
+                19
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                24,
+                20
+              ],
+              [
+                17,
+                20
+              ],
+              [
+                17,
+                15
+              ],
+              [
+                16,
+                15
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                24,
+                13
+              ],
+              [
+                24,
+                8
+              ],
+              [
+                16,
+                8
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                24,
+                15
+              ],
+              [
+                18,
+                15
+              ],
+              [
+                18,
+                21
+              ],
+              [
+                16,
+                21
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                4,
+                26
+              ],
+              [
+                4,
+                9
+              ],
+              [
+                8,
+                9
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                24,
+                14
+              ],
+              [
+                19,
+                14
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                19,
+                14
+              ],
+              [
+                17,
+                14
+              ],
+              [
+                17,
+                9
+              ],
+              [
+                16,
+                9
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                4,
+                30
+              ],
+              [
+                19,
+                30
+              ],
+              [
+                19,
+                14
+              ]
+            ]
+          }
+        ]
+      },
+      "view": "schematic"
+    },
+    {
+      "id": "3cf198c9",
+      "type": "code",
+      "source": "# ten sam zbiór w Pythonie, w małej rozdzielczości — znakami\nfor y in range(12, -13, -2):\n    wiersz = \"\"\n    for x in range(-40, 16):\n        c, z, i = complex(x / 20, y / 10), 0, 0\n        while abs(z) <= 2 and i < 30:\n            z, i = z * z + c, i + 1\n        wiersz += \"#\" if i == 30 else \" .:-=+*%@\"[min(i, 8)]\n    print(wiersz)",
+      "outputs": [
+        {
+          "type": "stream",
+          "data": "........::::::::::-------------------------:::::::::::::\n......:::::----------------======++*%@@@#+====----::::::\n....::----------------=======++**%@@####@@*++++==------:\n..::-------------====++++**%@##@@##########@@@@@@+=-----\n.:-------===++%@%%%%%%%%%@@@###################@@@+==---\n.-======++++*%@@@#######@@#######################%+===--\n##############################################@@%*+===--\n.-======++++*%@@@#######@@#######################%+===--\n.:-------===++%@%%%%%%%%%@@@###################@@@+==---\n..::-------------====++++**%@##@@##########@@@@@@+=-----\n....::----------------=======++**%@@####@@*++++==------:\n......:::::----------------======++*%@@@#+====----::::::\n........::::::::::-------------------------:::::::::::::\n"
+        }
+      ]
+    }
+  ]
+}

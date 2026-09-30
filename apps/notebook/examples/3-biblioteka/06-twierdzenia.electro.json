@@ -1,0 +1,77 @@
+{
+  "format": "electro-notebook",
+  "version": 2,
+  "id": "52aec6c08459beaa",
+  "title": "6. Thévenin, Norton i czarne skrzynki",
+  "created": "2026-10-01T00:00:00Z",
+  "modified": "2026-10-01T00:00:00Z",
+  "settings": {
+    "codeInPdf": true
+  },
+  "cells": [
+    {
+      "id": "e1d409ea",
+      "type": "markdown",
+      "source": "# Twierdzenia o obwodach\n\n**Twierdzenie Thévenina:** każdy liniowy obwód widziany z dwóch zacisków zachowuje się jak jedno źródło\nnapięcia $E_{th}$ z jednym opornikiem $R_{th}$. **Norton:** albo jak źródło prądu z opornikiem\nrównolegle. To ogromne uproszczenie: zamiast liczyć cały obwód dla każdego obciążenia, liczysz go raz.\n\n`equivalent(obwod)` znajduje $E_{th}$ i $R_{th}$ obwodu „1 zacisk wychodzi”, a `resistance()` — opór\nzastępczy."
+    },
+    {
+      "id": "0a4f8ee8",
+      "type": "code",
+      "source": "zrodlo = supply(12) + Resistor(10) + shunt(Resistor(10)) + Resistor(5)\nequivalent(zrodlo)",
+      "outputs": [
+        {
+          "type": "text",
+          "data": "E_th = 6 V, R_th = 10 Ω"
+        }
+      ]
+    },
+    {
+      "id": "2d3085db",
+      "type": "markdown",
+      "source": "Dzielnik 12 V z dwóch oporników 10 Ω i szeregowy 5 Ω to dla obciążenia po prostu 6 V przez 10 Ω.\nSprawdź: obciążenie 10 Ω dostanie połowę z 6 V — 3 V."
+    },
+    {
+      "id": "8dd5a0e1",
+      "type": "code",
+      "source": "(zrodlo + Resistor(10, label=\"R_obc\") + ground).solve()[\"R_obc\"]",
+      "outputs": [
+        {
+          "type": "text",
+          "data": "R_obc = 10 Ω      U = 3 V   I = 300 mA   P = 900 mW"
+        }
+      ]
+    },
+    {
+      "id": "c2cc6adb",
+      "type": "markdown",
+      "source": "## Czarna skrzynka\n\n`blackbox(obwod)` eliminuje wszystko, co jest w środku, i zostawia tylko **relację na zaciskach**:\nrównania wiążące napięcia i prądy na brzegach. Dwa obwody są równoważne dokładnie wtedy, gdy mają tę\nsamą czarną skrzynkę — tak wyrażają się twierdzenia Thévenina i Nortona."
+    },
+    {
+      "id": "086ae0d8",
+      "type": "code",
+      "source": "blackbox(Resistor(10) | Resistor(10))",
+      "outputs": [
+        {
+          "type": "text",
+          "data": "-5*I_out1 + V_in1 - V_out1 = 0\nI_in1 - I_out1 = 0"
+        }
+      ]
+    },
+    {
+      "id": "7688b5fc",
+      "type": "code",
+      "source": "blackbox(Resistor(5))",
+      "outputs": [
+        {
+          "type": "text",
+          "data": "-5*I_out1 + V_in1 - V_out1 = 0\nI_in1 - I_out1 = 0"
+        }
+      ]
+    },
+    {
+      "id": "932b5d91",
+      "type": "markdown",
+      "source": "Obie skrzynki są identyczne: dwa oporniki 10 Ω równolegle i jeden opornik 5 Ω są — widziane z zacisków —\ntym samym obwodem."
+    }
+  ]
+}

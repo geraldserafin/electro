@@ -2,7 +2,7 @@ import { useState } from "react";
 
 const KEY = "electro-outline";
 
-/** Is the table of contents open: as last left in this browser; at first, on wide screens. */
+/** Is the table of contents open: as last left in this browser; at first, closed. */
 export function useOutlineOpen(): [boolean, (open: boolean) => void] {
   const [open, setOpen] = useState(() => {
     try {
@@ -11,7 +11,7 @@ export function useOutlineOpen(): [boolean, (open: boolean) => void] {
     } catch {
       // no storage: the default
     }
-    return window.innerWidth >= 1200;
+    return false;
   });
   const set = (next: boolean) => {
     setOpen(next);

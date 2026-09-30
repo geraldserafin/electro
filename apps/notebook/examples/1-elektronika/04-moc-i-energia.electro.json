@@ -1,0 +1,218 @@
+{
+  "format": "electro-notebook",
+  "version": 2,
+  "id": "7abbcd6aa242fa4e",
+  "title": "4. Moc i energia",
+  "created": "2026-10-01T00:00:00Z",
+  "modified": "2026-10-01T00:00:00Z",
+  "settings": {
+    "codeInPdf": true
+  },
+  "cells": [
+    {
+      "id": "5036abfc",
+      "type": "markdown",
+      "source": "# Moc i energia\n\nPrąd płynący przez element wykonuje pracę: żarówka świeci i grzeje, silnik się kręci, opornik się\nnagrzewa. Jak szybko to się dzieje, mówi **moc**:\n\n$$P = U \\cdot I$$\n\nMierzymy ją w **watach** (W). Z prawem Ohma daje to jeszcze dwa przydatne wzory:\n$P = I^2 R$ i $P = \\frac{U^2}{R}$.\n\n**Energia** to moc razy czas. Żarówka 3 W świecąca przez godzinę zużywa 3 watogodziny (Wh); licznik\nw domu liczy kilowatogodziny, kWh."
+    },
+    {
+      "id": "cb3b5f52",
+      "type": "markdown",
+      "source": "Poniżej dwie żarówki na 12 V: mocna (12 Ω) i słaba (48 Ω). Kliknij ▶ i porównaj moce $P$ w tabeli pod\nschematem. Która świeci jaśniej, gdy uruchomisz ⚡?"
+    },
+    {
+      "id": "e9b059a0",
+      "type": "schematic",
+      "name": "dwie_zarowki",
+      "schematic": {
+        "version": 1,
+        "elements": [
+          {
+            "id": "E_1",
+            "kind": "voltage_source",
+            "at": [
+              4,
+              13
+            ],
+            "rotation": 270,
+            "value": "12",
+            "text": null
+          },
+          {
+            "id": "H_1",
+            "kind": "lamp",
+            "at": [
+              10,
+              7
+            ],
+            "rotation": 90,
+            "value": "12",
+            "text": "12"
+          },
+          {
+            "id": "H_2",
+            "kind": "lamp",
+            "at": [
+              16,
+              7
+            ],
+            "rotation": 90,
+            "value": "48",
+            "text": "12"
+          },
+          {
+            "id": "gnd1",
+            "kind": "ground",
+            "at": [
+              4,
+              13
+            ],
+            "rotation": 0,
+            "value": null,
+            "text": null
+          }
+        ],
+        "wires": [
+          {
+            "points": [
+              [
+                4,
+                9
+              ],
+              [
+                4,
+                7
+              ],
+              [
+                10,
+                7
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                10,
+                7
+              ],
+              [
+                16,
+                7
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                10,
+                11
+              ],
+              [
+                10,
+                13
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                16,
+                11
+              ],
+              [
+                16,
+                13
+              ],
+              [
+                10,
+                13
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                10,
+                13
+              ],
+              [
+                4,
+                13
+              ]
+            ]
+          }
+        ]
+      },
+      "view": "schematic",
+      "results": {
+        "E_1": {
+          "value": "12 V",
+          "solved": false,
+          "U": "12 V",
+          "I": "1.25 A",
+          "P": "15 W",
+          "reversed": false
+        },
+        "H_1": {
+          "value": "12 Ω",
+          "solved": false,
+          "U": "12 V",
+          "I": "1 A",
+          "P": "12 W",
+          "reversed": false
+        },
+        "H_2": {
+          "value": "48 Ω",
+          "solved": false,
+          "U": "12 V",
+          "I": "250 mA",
+          "P": "3 W",
+          "reversed": false
+        }
+      },
+      "problems": []
+    },
+    {
+      "id": "de08f928",
+      "type": "code",
+      "source": "sol = dwie_zarowki.solve()\nfor h in [\"H_1\", \"H_2\"]:\n    print(h, \"P =\", sol[h].P, \"W\")",
+      "outputs": [
+        {
+          "type": "stream",
+          "data": "H_1 P = 12 W\nH_2 P = 3 W\n"
+        }
+      ]
+    },
+    {
+      "id": "d5a2b644",
+      "type": "markdown",
+      "source": "## Opornik też się grzeje\n\nKażdy opornik ma dopuszczalną moc — zwykłe, małe oporniki tylko **0,25 W**. Jeśli podłączysz opornik\n100 Ω wprost do 5 V, wydzieli się w nim $P = \\frac{5^2}{100} = 0{,}25\\,\\mathrm{W}$ — na granicy. Przy\n12 V byłoby to 1,44 W: prawdziwy opornik by się przypalił."
+    },
+    {
+      "id": "758fecb4",
+      "type": "code",
+      "source": "for u in [5, 9, 12]:\n    p = (supply(u) + Resistor(100) + ground).solve()[\"R_1\"].P\n    print(f\"{u:>2} V na 100 Ω: {float(p):.2f} W\", \"— za dużo!\" if p > 0.25 else \"\")",
+      "outputs": [
+        {
+          "type": "stream",
+          "data": " 5 V na 100 Ω: 0.25 W \n 9 V na 100 Ω: 0.81 W — za dużo!\n12 V na 100 Ω: 1.44 W — za dużo!\n"
+        }
+      ]
+    },
+    {
+      "id": "23155f5f",
+      "type": "markdown",
+      "source": "## Ile wytrzyma bateria?\n\nPojemność baterii podaje się w miliamperogodzinach (mAh). Bateria 2000 mAh da 20 mA przez 100 godzin —\nalbo 1 A przez 2 godziny. Dioda LED biorąca 10 mA świeciłaby z niej przez ponad 8 dni:"
+    },
+    {
+      "id": "e4e9fb33",
+      "type": "code",
+      "source": "pojemnosc = 2000  # mAh\nprad = 10  # mA\nprint(pojemnosc / prad, \"godzin, czyli\", round(pojemnosc / prad / 24, 1), \"dni\")",
+      "outputs": [
+        {
+          "type": "stream",
+          "data": "200.0 godzin, czyli 8.3 dni\n"
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,263 @@
+{
+  "format": "electro-notebook",
+  "version": 2,
+  "id": "f02dc987d3de096b",
+  "title": "Gra w życie",
+  "created": "2026-10-01T00:00:00Z",
+  "modified": "2026-10-01T00:00:00Z",
+  "settings": {
+    "codeInPdf": true
+  },
+  "cells": [
+    {
+      "id": "167d8213",
+      "type": "markdown",
+      "source": "# Gra w życie\n\nAutomat komórkowy Johna Conwaya (1970). Plansza z komórkami — żywymi albo martwymi — i dwie reguły:\n\n- martwa komórka z dokładnie **trzema** żywymi sąsiadami ożywa,\n- żywa komórka z **dwoma albo trzema** żywymi sąsiadami przeżywa; każda inna umiera.\n\nNic więcej — a z tych reguł wyrastają szybowce, które przemierzają planszę, oscylatory, „działa” strzelające\nszybowcami, a nawet (na dużych planszach) cały komputer. Gra w życie jest równoważna maszynie Turinga.\n\nUruchom ⚡ i patrz. Przycisk (klawisz **R**) losuje nową planszę. Każda komórka to jeden bit, więc plansza\n64×32 zajmuje tylko 256 bajtów."
+    },
+    {
+      "id": "894ddd7b",
+      "type": "schematic",
+      "name": "gra_w_zycie",
+      "schematic": {
+        "version": 1,
+        "elements": [
+          {
+            "id": "ARD_1",
+            "kind": "arduino",
+            "at": [
+              5,
+              23
+            ],
+            "rotation": 0,
+            "value": null,
+            "text": "// GRA W ŻYCIE Johna Conwaya na OLED-zie: komórka rodzi się, gdy ma dokładnie 3 żywych sąsiadów,\n// i przeżywa z 2 albo 3 — z tych dwóch reguł wychodzą szybowce, oscylatory i całe „ekosystemy”.\n// Przycisk na D2 (klawisz R) losuje nową planszę. Plansza 64×32 komórek, każda 2×2 piksele,\n// zawinięta w torus (co wyjdzie z prawej, wraca z lewej).\n#include <Wire.h>\n#include <Adafruit_GFX.h>\n#include <Adafruit_SSD1306.h>\n\nAdafruit_SSD1306 oled(128, 64, &Wire, -1);\nconst byte RESET = 2;\nconst int W = 64, H = 32;\nuint8_t grid[H][W / 8], next[H][W / 8];  // bit na komórkę: 256 bajtów na planszę\nunsigned long generation;\n\nbool alive(int x, int y) {\n  x = (x + W) % W;\n  y = (y + H) % H;\n  return grid[y][x >> 3] & (1 << (x & 7));\n}\n\nvoid randomize() {\n  for (int y = 0; y < H; y++)\n    for (int b = 0; b < W / 8; b++) grid[y][b] = random(256) & random(256);  // ok. 25% żywych\n  // i szybowiec, żeby było co oglądać\n  const int gx = 5, gy = 5;\n  const byte glider[3] = {0b010, 0b001, 0b111};\n  for (int y = 0; y < 3; y++)\n    for (int x = 0; x < 3; x++)\n      if (glider[y] & (4 >> x)) grid[gy + y][(gx + x) >> 3] |= 1 << ((gx + x) & 7);\n  generation = 0;\n}\n\nvoid setup() {\n  pinMode(RESET, INPUT_PULLUP);\n  oled.begin(SSD1306_SWITCHCAPVCC, 0x3C);\n  Wire.setClock(400000);\n  randomSeed(analogRead(A0));\n  randomize();\n}\n\nvoid loop() {\n  if (digitalRead(RESET) == LOW) randomize();\n  oled.clearDisplay();\n  int population = 0;\n  for (int y = 0; y < H; y++)\n    for (int x = 0; x < W; x++) {\n      int n = 0;\n      for (int dy = -1; dy <= 1; dy++)\n        for (int dx = -1; dx <= 1; dx++)\n          if ((dx || dy) && alive(x + dx, y + dy)) n++;\n      bool me = alive(x, y);\n      bool lives = n == 3 || (me && n == 2);\n      if (lives) {\n        next[y][x >> 3] |= 1 << (x & 7);\n        population++;\n      } else next[y][x >> 3] &= ~(1 << (x & 7));\n      if (me) oled.fillRect(x * 2, y * 2, 2, 2, SSD1306_WHITE);\n    }\n  memcpy(grid, next, sizeof grid);\n  generation++;\n  oled.display();\n  if (population == 0) randomize();\n}\n"
+          },
+          {
+            "id": "OLED_1",
+            "kind": "ssd1306",
+            "at": [
+              27,
+              9
+            ],
+            "rotation": 0,
+            "value": null,
+            "text": "0x3C"
+          },
+          {
+            "id": "BZ_1",
+            "kind": "passive_buzzer",
+            "at": [
+              27,
+              27
+            ],
+            "rotation": 0,
+            "value": null,
+            "text": null
+          },
+          {
+            "id": "B_1",
+            "kind": "button",
+            "at": [
+              20,
+              17
+            ],
+            "rotation": 90,
+            "value": null,
+            "text": "r"
+          }
+        ],
+        "wires": [
+          {
+            "points": [
+              [
+                20,
+                21
+              ],
+              [
+                19,
+                21
+              ],
+              [
+                19,
+                23
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                27,
+                27
+              ],
+              [
+                27,
+                22
+              ],
+              [
+                12,
+                22
+              ],
+              [
+                12,
+                23
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                29,
+                9
+              ],
+              [
+                29,
+                8
+              ],
+              [
+                22,
+                8
+              ],
+              [
+                22,
+                23
+              ],
+              [
+                23,
+                23
+              ],
+              [
+                23,
+                31
+              ],
+              [
+                19,
+                31
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                30,
+                9
+              ],
+              [
+                35,
+                9
+              ],
+              [
+                35,
+                32
+              ],
+              [
+                18,
+                32
+              ],
+              [
+                18,
+                31
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                28,
+                9
+              ],
+              [
+                28,
+                7
+              ],
+              [
+                5,
+                7
+              ],
+              [
+                5,
+                31
+              ],
+              [
+                8,
+                31
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                20,
+                17
+              ],
+              [
+                4,
+                17
+              ],
+              [
+                4,
+                32
+              ],
+              [
+                10,
+                32
+              ],
+              [
+                10,
+                31
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                31,
+                27
+              ],
+              [
+                31,
+                21
+              ],
+              [
+                21,
+                21
+              ],
+              [
+                21,
+                17
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                21,
+                17
+              ],
+              [
+                20,
+                17
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                27,
+                9
+              ],
+              [
+                21,
+                9
+              ],
+              [
+                21,
+                17
+              ]
+            ]
+          }
+        ]
+      },
+      "view": "schematic"
+    }
+  ]
+}

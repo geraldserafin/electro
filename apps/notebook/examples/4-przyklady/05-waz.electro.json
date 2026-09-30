@@ -1,0 +1,400 @@
+{
+  "format": "electro-notebook",
+  "version": 2,
+  "id": "e9e37697bb7e4962",
+  "title": "Wąż",
+  "created": "2026-10-01T00:00:00Z",
+  "modified": "2026-10-01T00:00:00Z",
+  "settings": {
+    "codeInPdf": true
+  },
+  "cells": [
+    {
+      "id": "3e6ddee0",
+      "type": "markdown",
+      "source": "# Wąż\n\nGra z telefonów Nokii z 1997 roku: wąż pełznie po planszy, zjada jedzenie i rośnie, a gra kończy się, gdy\nwjedzie w ścianę albo we własny ogon. Z każdym punktem jest szybciej.\n\n**Jak grać:** uruchom ⚡, kliknij schemat i steruj **strzałkami**. Po końcu gry dowolny kierunek zaczyna\nod nowa.\n\n**Ciało węża** to dwie tablice współrzędnych: głowa pod indeksem 0, a przy każdym ruchu wszystko\nprzesuwa się o jedno miejsce dalej. Arduino Uno ma tylko 2 KB pamięci RAM, z czego 1 KB zajmuje obraz\nOLED-a — dlatego wąż ma najwyżej 120 segmentów."
+    },
+    {
+      "id": "80c7f8bb",
+      "type": "schematic",
+      "name": "waz",
+      "schematic": {
+        "version": 1,
+        "elements": [
+          {
+            "id": "ARD_1",
+            "kind": "arduino",
+            "at": [
+              5,
+              23
+            ],
+            "rotation": 0,
+            "value": null,
+            "text": "// WĄŻ na OLED-zie 128×64: zbieraj jedzenie, rośnij, nie wjedź w siebie ani w ścianę.\n// Strzałki: przyciski na D2 (góra), D3 (dół), D4 (lewo), D5 (prawo), do masy. Buzzer pasywny na D8.\n#include <Wire.h>\n#include <Adafruit_GFX.h>\n#include <Adafruit_SSD1306.h>\n\nAdafruit_SSD1306 oled(128, 64, &Wire, -1);\n\nconst byte UP = 2, DOWN = 3, LEFT = 4, RIGHT = 5, BUZZER = 8;\nconst byte CELL = 4;                  // kratka ma 4×4 piksele\nconst byte COLS = 32, ROWS = 14;      // plansza: 32×14 kratek (pod paskiem z wynikiem)\nconst byte TOP = 8;                   // pasek z wynikiem na górze\nconst int MAX_LEN = 120;\n\nbyte xs[MAX_LEN], ys[MAX_LEN];        // ciało węża: głowa pod indeksem 0\nint len;\nchar dx, dy;                          // kierunek ruchu\nbyte foodX, foodY;\nint score, best;\nbool over;\n\nvoid placeFood() {\n  while (true) {\n    foodX = random(COLS);\n    foodY = random(ROWS);\n    bool onSnake = false;\n    for (int i = 0; i < len; i++)\n      if (xs[i] == foodX && ys[i] == foodY) onSnake = true;\n    if (!onSnake) return;\n  }\n}\n\nvoid start() {\n  len = 4;\n  for (int i = 0; i < len; i++) {\n    xs[i] = 10 - i;\n    ys[i] = 7;\n  }\n  dx = 1;\n  dy = 0;\n  score = 0;\n  over = false;\n  placeFood();\n}\n\nvoid setup() {\n  for (byte p = UP; p <= RIGHT; p++) pinMode(p, INPUT_PULLUP);\n  oled.begin(SSD1306_SWITCHCAPVCC, 0x3C);\n  Wire.setClock(400000);  // szybkie I²C: więcej klatek na sekundę\n  oled.setTextColor(SSD1306_WHITE);\n  randomSeed(analogRead(A0));\n  start();\n}\n\nvoid readKeys() {\n  // (nie da się zawrócić w miejscu: wąż wjechałby w siebie)\n  if (digitalRead(UP) == LOW && dy == 0) { dx = 0; dy = -1; }\n  else if (digitalRead(DOWN) == LOW && dy == 0) { dx = 0; dy = 1; }\n  else if (digitalRead(LEFT) == LOW && dx == 0) { dx = -1; dy = 0; }\n  else if (digitalRead(RIGHT) == LOW && dx == 0) { dx = 1; dy = 0; }\n}\n\nvoid step() {\n  int nx = xs[0] + dx, ny = ys[0] + dy;\n  if (nx < 0 || nx >= COLS || ny < 0 || ny >= ROWS) { over = true; return; }\n  for (int i = 0; i < len - 1; i++)\n    if (xs[i] == nx && ys[i] == ny) { over = true; return; }\n  bool eats = nx == foodX && ny == foodY;\n  if (eats && len < MAX_LEN) len++;\n  for (int i = len - 1; i > 0; i--) {\n    xs[i] = xs[i - 1];\n    ys[i] = ys[i - 1];\n  }\n  xs[0] = nx;\n  ys[0] = ny;\n  if (eats) {\n    score++;\n    tone(BUZZER, 1500, 40);\n    placeFood();\n  }\n}\n\nvoid draw() {\n  oled.clearDisplay();\n  oled.setCursor(0, 0);\n  oled.print(\"Wynik \");\n  oled.print(score);\n  oled.setCursor(80, 0);\n  oled.print(\"Max \");\n  oled.print(best);\n  oled.drawRect(0, TOP - 1, 128, ROWS * CELL + 2, SSD1306_WHITE);\n  for (int i = 0; i < len; i++)\n    oled.fillRect(xs[i] * CELL, TOP + ys[i] * CELL, CELL - (i ? 1 : 0), CELL - (i ? 1 : 0), SSD1306_WHITE);\n  oled.drawRoundRect(foodX * CELL, TOP + foodY * CELL, CELL, CELL, 1, SSD1306_WHITE);\n  oled.display();\n}\n\nvoid loop() {\n  if (over) {\n    if (score > best) best = score;\n    tone(BUZZER, 200, 400);\n    oled.fillRect(24, 24, 80, 20, SSD1306_BLACK);\n    oled.drawRect(24, 24, 80, 20, SSD1306_WHITE);\n    oled.setCursor(34, 30);\n    oled.print(\"KONIEC GRY\");\n    oled.display();\n    while (digitalRead(UP) && digitalRead(DOWN) && digitalRead(LEFT) && digitalRead(RIGHT)) delay(10);\n    start();\n  }\n  unsigned long until = millis() + max(60, 160 - score * 4);  // coraz szybciej\n  while (millis() < until) readKeys();\n  step();\n  draw();\n}\n"
+          },
+          {
+            "id": "OLED_1",
+            "kind": "ssd1306",
+            "at": [
+              27,
+              9
+            ],
+            "rotation": 0,
+            "value": null,
+            "text": "0x3C"
+          },
+          {
+            "id": "BZ_1",
+            "kind": "passive_buzzer",
+            "at": [
+              27,
+              27
+            ],
+            "rotation": 0,
+            "value": null,
+            "text": null
+          },
+          {
+            "id": "B_1",
+            "kind": "button",
+            "at": [
+              20,
+              17
+            ],
+            "rotation": 90,
+            "value": null,
+            "text": "ArrowUp"
+          },
+          {
+            "id": "B_2",
+            "kind": "button",
+            "at": [
+              17,
+              17
+            ],
+            "rotation": 90,
+            "value": null,
+            "text": "ArrowDown"
+          },
+          {
+            "id": "B_3",
+            "kind": "button",
+            "at": [
+              14,
+              17
+            ],
+            "rotation": 90,
+            "value": null,
+            "text": "ArrowLeft"
+          },
+          {
+            "id": "B_4",
+            "kind": "button",
+            "at": [
+              11,
+              17
+            ],
+            "rotation": 90,
+            "value": null,
+            "text": "ArrowRight"
+          }
+        ],
+        "wires": [
+          {
+            "points": [
+              [
+                20,
+                21
+              ],
+              [
+                19,
+                21
+              ],
+              [
+                19,
+                23
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                17,
+                21
+              ],
+              [
+                18,
+                21
+              ],
+              [
+                18,
+                23
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                14,
+                21
+              ],
+              [
+                14,
+                22
+              ],
+              [
+                17,
+                22
+              ],
+              [
+                17,
+                23
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                11,
+                21
+              ],
+              [
+                12,
+                21
+              ],
+              [
+                12,
+                16
+              ],
+              [
+                16,
+                16
+              ],
+              [
+                16,
+                23
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                27,
+                27
+              ],
+              [
+                27,
+                23
+              ],
+              [
+                22,
+                23
+              ],
+              [
+                22,
+                15
+              ],
+              [
+                13,
+                15
+              ],
+              [
+                13,
+                23
+              ],
+              [
+                12,
+                23
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                29,
+                9
+              ],
+              [
+                29,
+                8
+              ],
+              [
+                21,
+                8
+              ],
+              [
+                21,
+                22
+              ],
+              [
+                23,
+                22
+              ],
+              [
+                23,
+                31
+              ],
+              [
+                19,
+                31
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                30,
+                9
+              ],
+              [
+                35,
+                9
+              ],
+              [
+                35,
+                32
+              ],
+              [
+                18,
+                32
+              ],
+              [
+                18,
+                31
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                28,
+                9
+              ],
+              [
+                28,
+                7
+              ],
+              [
+                5,
+                7
+              ],
+              [
+                5,
+                31
+              ],
+              [
+                8,
+                31
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                14,
+                17
+              ],
+              [
+                11,
+                17
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                17,
+                17
+              ],
+              [
+                14,
+                17
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                20,
+                17
+              ],
+              [
+                17,
+                17
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                11,
+                17
+              ],
+              [
+                4,
+                17
+              ],
+              [
+                4,
+                32
+              ],
+              [
+                10,
+                32
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                10,
+                32
+              ],
+              [
+                10,
+                31
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                31,
+                27
+              ],
+              [
+                31,
+                33
+              ],
+              [
+                10,
+                33
+              ],
+              [
+                10,
+                32
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                27,
+                9
+              ],
+              [
+                20,
+                9
+              ],
+              [
+                20,
+                17
+              ]
+            ]
+          }
+        ]
+      },
+      "view": "schematic"
+    }
+  ]
+}

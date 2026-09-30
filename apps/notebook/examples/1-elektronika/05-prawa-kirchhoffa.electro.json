@@ -1,0 +1,349 @@
+{
+  "format": "electro-notebook",
+  "version": 2,
+  "id": "ec3b6e608aa4dbad",
+  "title": "5. Prawa Kirchhoffa",
+  "created": "2026-10-01T00:00:00Z",
+  "modified": "2026-10-01T00:00:00Z",
+  "settings": {
+    "codeInPdf": true
+  },
+  "cells": [
+    {
+      "id": "4be02bef",
+      "type": "markdown",
+      "source": "# Prawa Kirchhoffa\n\nDwa proste prawa pozwalają policzyć każdy obwód — nawet taki, którego nie da się rozłożyć na „szeregowo”\ni „równolegle”.\n\n**I prawo (prądowe):** ile prądu wpływa do węzła, tyle z niego wypływa. Ładunek nie znika i nie bierze\nsię znikąd. Jeśli do rozgałęzienia wpływa 3 A, a jedną gałęzią odpływa 1 A, to drugą — 2 A.\n\n**II prawo (napięciowe):** idąc wokół dowolnej zamkniętej pętli i dodając napięcia (źródła na plus,\nspadki na elementach na minus), zawsze dostaniesz zero. To jak chodzenie po górach: wracając do punktu\nstartu, jesteś na tej samej wysokości."
+    },
+    {
+      "id": "6b67c920",
+      "type": "markdown",
+      "source": "Oto obwód z **dwoma** źródłami: nie da się go uprościć do jednego opornika. Kliknij ▶ — solver ułoży\nrównania z praw Kirchhoffa i je rozwiąże."
+    },
+    {
+      "id": "a02ca44a",
+      "type": "schematic",
+      "name": "dwa_zrodla",
+      "schematic": {
+        "version": 1,
+        "elements": [
+          {
+            "id": "E_1",
+            "kind": "voltage_source",
+            "at": [
+              4,
+              13
+            ],
+            "rotation": 270,
+            "value": "12",
+            "text": null
+          },
+          {
+            "id": "R_1",
+            "kind": "resistor",
+            "at": [
+              6,
+              7
+            ],
+            "rotation": 0,
+            "value": "4",
+            "text": null
+          },
+          {
+            "id": "R_2",
+            "kind": "resistor",
+            "at": [
+              12,
+              9
+            ],
+            "rotation": 90,
+            "value": "6",
+            "text": null
+          },
+          {
+            "id": "R_3",
+            "kind": "resistor",
+            "at": [
+              14,
+              7
+            ],
+            "rotation": 0,
+            "value": "3",
+            "text": null
+          },
+          {
+            "id": "E_2",
+            "kind": "voltage_source",
+            "at": [
+              20,
+              13
+            ],
+            "rotation": 270,
+            "value": "6",
+            "text": null
+          },
+          {
+            "id": "gnd1",
+            "kind": "ground",
+            "at": [
+              4,
+              13
+            ],
+            "rotation": 0,
+            "value": null,
+            "text": null
+          }
+        ],
+        "wires": [
+          {
+            "points": [
+              [
+                4,
+                9
+              ],
+              [
+                4,
+                7
+              ],
+              [
+                6,
+                7
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                10,
+                7
+              ],
+              [
+                12,
+                7
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                12,
+                7
+              ],
+              [
+                14,
+                7
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                12,
+                7
+              ],
+              [
+                12,
+                9
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                18,
+                7
+              ],
+              [
+                20,
+                7
+              ],
+              [
+                20,
+                9
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                12,
+                13
+              ],
+              [
+                4,
+                13
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                20,
+                13
+              ],
+              [
+                12,
+                13
+              ]
+            ]
+          }
+        ]
+      },
+      "view": "schematic",
+      "results": {
+        "E_1": {
+          "value": "12 V",
+          "solved": false,
+          "U": "12 V",
+          "I": "1.333 A",
+          "P": "16 W",
+          "reversed": false
+        },
+        "R_1": {
+          "value": "4 Ω",
+          "solved": false,
+          "U": "5.333 V",
+          "I": "1.333 A",
+          "P": "7.111 W",
+          "reversed": false
+        },
+        "R_2": {
+          "value": "6 Ω",
+          "solved": false,
+          "U": "6.667 V",
+          "I": "1.111 A",
+          "P": "7.407 W",
+          "reversed": false
+        },
+        "R_3": {
+          "value": "3 Ω",
+          "solved": false,
+          "U": "666.7 mV",
+          "I": "222.2 mA",
+          "P": "148.1 mW",
+          "reversed": false
+        },
+        "E_2": {
+          "value": "6 V",
+          "solved": false,
+          "U": "-6 V",
+          "I": "222.2 mA",
+          "P": "-1.333 W",
+          "reversed": true
+        }
+      },
+      "problems": []
+    },
+    {
+      "id": "93c98f7a",
+      "type": "markdown",
+      "source": "Każdy krok ma swoje uzasadnienie — przy niektórych zobaczysz właśnie „I prawo Kirchhoffa” albo\n„II prawo Kirchhoffa”:"
+    },
+    {
+      "id": "a9322d89",
+      "type": "code",
+      "source": "steps(dwa_zrodla.solve(find=[\"I_R_1\", \"I_R_2\", \"I_R_3\"]))",
+      "outputs": [
+        {
+          "type": "solution",
+          "data": {
+            "type": "Steps",
+            "data": [
+              "E_{1} = 12\\,\\mathrm{V}",
+              "R_{1} = 4\\,\\mathrm{\\Omega}",
+              "R_{2} = 6\\,\\mathrm{\\Omega}",
+              "R_{3} = 3\\,\\mathrm{\\Omega}",
+              "E_{2} = 6\\,\\mathrm{V}"
+            ],
+            "assumed": [],
+            "steps": [
+              {
+                "type": "FormulaStep",
+                "chain": "U_{E_{1}} = E_{1} = 12\\,\\mathrm{V}",
+                "reason": {
+                  "type": "SourceVoltage",
+                  "label": "E_{1}"
+                }
+              },
+              {
+                "type": "FormulaStep",
+                "chain": "U_{E_{2}} = E_{2} = 6\\,\\mathrm{V}",
+                "reason": {
+                  "type": "SourceVoltage",
+                  "label": "E_{2}"
+                }
+              },
+              {
+                "type": "FormulaStep",
+                "chain": "V_{n1} = U_{E_{1}} + V_{\\mathrm{GND}} = 12 + 0 = 12\\,\\mathrm{V}",
+                "reason": {
+                  "type": "VoltageAcross",
+                  "label": "E_{1}"
+                }
+              },
+              {
+                "type": "FormulaStep",
+                "chain": "V_{n3} = U_{E_{2}} + V_{\\mathrm{GND}} = 6 + 0 = 6\\,\\mathrm{V}",
+                "reason": {
+                  "type": "VoltageAcross",
+                  "label": "E_{2}"
+                }
+              },
+              {
+                "type": "SystemStep",
+                "equations": [
+                  "U_{R_{1}} - I_{R_{1}} \\cdot R_{1} = 0",
+                  "U_{R_{2}} - I_{R_{2}} \\cdot R_{2} = 0",
+                  "U_{R_{3}} - I_{R_{3}} \\cdot R_{3} = 0",
+                  "U_{R_{1}} + V_{n2} - V_{n1} = 0",
+                  "U_{R_{2}} + V_{\\mathrm{GND}} - V_{n2} = 0",
+                  "U_{R_{3}} + V_{n3} - V_{n2} = 0",
+                  "I_{R_{1}} - I_{E_{1}} = 0",
+                  "I_{R_{2}} + I_{R_{3}} - I_{R_{1}} = 0",
+                  "- I_{E_{2}} - I_{R_{3}} = 0"
+                ],
+                "results": [
+                  "I_{E_{1}} = 1.333\\,\\mathrm{A}",
+                  "I_{E_{2}} = -222.2\\,\\mathrm{mA}",
+                  "I_{R_{1}} = 1.333\\,\\mathrm{A}",
+                  "I_{R_{2}} = 1.111\\,\\mathrm{A}",
+                  "I_{R_{3}} = 222.2\\,\\mathrm{mA}",
+                  "U_{R_{1}} = 5.333\\,\\mathrm{V}",
+                  "U_{R_{2}} = 6.667\\,\\mathrm{V}",
+                  "U_{R_{3}} = 666.7\\,\\mathrm{mV}",
+                  "V_{n2} = 6.667\\,\\mathrm{V}"
+                ]
+              }
+            ],
+            "answer": [
+              "I_{R_{1}} = 1.333\\,\\mathrm{A}",
+              "I_{R_{2}} = 1.111\\,\\mathrm{A}",
+              "I_{R_{3}} = 222.2\\,\\mathrm{mA}"
+            ],
+            "missing": null
+          }
+        }
+      ]
+    },
+    {
+      "id": "1294633d",
+      "type": "markdown",
+      "source": "## Sprawdź I prawo sam\n\nPrąd z $R_1$ wpływa do węzła u góry i rozdziela się na $R_2$ i $R_3$. Ich suma musi się zgadzać:"
+    },
+    {
+      "id": "ece9f61a",
+      "type": "code",
+      "source": "sol = dwa_zrodla.solve()\nprint(\"I_R_1 =\", sol[\"R_1\"].I, \" I_R_2 + I_R_3 =\", sol[\"R_2\"].I + sol[\"R_3\"].I)",
+      "outputs": [
+        {
+          "type": "stream",
+          "data": "I_R_1 = 4/3  I_R_2 + I_R_3 = 4/3\n"
+        }
+      ]
+    },
+    {
+      "id": "88ee5e6a",
+      "type": "markdown",
+      "source": "## Spróbuj sam\n\n1. Zmień $E_2$ na 12 V. W którą stronę płynie teraz prąd przez $R_3$? (Ujemny wynik znaczy: w drugą\n   stronę, niż zakładała strzałka.)\n2. Odwróć $E_2$ — zaznacz i obróć dwa razy klawiszem R. Co się zmieniło?"
+    }
+  ]
+}

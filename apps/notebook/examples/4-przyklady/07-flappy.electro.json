@@ -1,0 +1,263 @@
+{
+  "format": "electro-notebook",
+  "version": 2,
+  "id": "6107acec3848a5b0",
+  "title": "Flappy Bird",
+  "created": "2026-10-01T00:00:00Z",
+  "modified": "2026-10-01T00:00:00Z",
+  "settings": {
+    "codeInPdf": true
+  },
+  "cells": [
+    {
+      "id": "8891f8b6",
+      "type": "markdown",
+      "source": "# Flappy\n\nJeden przycisk, grawitacja i rury. Każde naciśnięcie podrywa ptaka do góry, a potem spada coraz\nszybciej — jak w prawdziwej fizyce: prędkość rośnie o stałą wartość w każdej klatce (przyspieszenie),\na wysokość zmienia się o prędkość.\n\n**Jak grać:** uruchom ⚡, kliknij schemat i naciskaj **spację**."
+    },
+    {
+      "id": "2c2bde9f",
+      "type": "schematic",
+      "name": "flappy",
+      "schematic": {
+        "version": 1,
+        "elements": [
+          {
+            "id": "ARD_1",
+            "kind": "arduino",
+            "at": [
+              5,
+              23
+            ],
+            "rotation": 0,
+            "value": null,
+            "text": "// FLAPPY na OLED-zie: jeden przycisk (D2, spacja) podrywa ptaka do góry, grawitacja ciągnie w dół.\n// Przelatuj przez szczeliny w rurach. Buzzer pasywny na D8.\n#include <Wire.h>\n#include <Adafruit_GFX.h>\n#include <Adafruit_SSD1306.h>\n\nAdafruit_SSD1306 oled(128, 64, &Wire, -1);\nconst byte FLAP = 2, BUZZER = 8;\nconst int GAP = 24, PIPE_W = 10, PIPES = 3;\n\nfloat y, v;              // ptak: wysokość i prędkość\nint pipeX[PIPES], pipeGap[PIPES];\nint score, best;\nbool wasDown;\n\n// ptak 8×6\nconst uint8_t BIRD[] PROGMEM = {0x3C, 0x4A, 0xFF, 0xFE, 0x7C, 0x38};\n\nvoid start() {\n  y = 30;\n  v = 0;\n  score = 0;\n  for (int i = 0; i < PIPES; i++) {\n    pipeX[i] = 128 + i * 48;\n    pipeGap[i] = random(6, 64 - GAP - 6);\n  }\n}\n\nvoid setup() {\n  pinMode(FLAP, INPUT_PULLUP);\n  oled.begin(SSD1306_SWITCHCAPVCC, 0x3C);\n  Wire.setClock(400000);\n  oled.setTextColor(SSD1306_WHITE);\n  randomSeed(analogRead(A0));\n  start();\n}\n\nbool crashed() {\n  if (y < 0 || y > 58) return true;\n  for (int i = 0; i < PIPES; i++)\n    if (pipeX[i] < 28 && pipeX[i] + PIPE_W > 20 && (y < pipeGap[i] || y + 6 > pipeGap[i] + GAP)) return true;\n  return false;\n}\n\nvoid loop() {\n  bool down = digitalRead(FLAP) == LOW;\n  if (down && !wasDown) {  // naciśnięcie, nie trzymanie\n    v = -2.6;\n    tone(BUZZER, 1000, 15);\n  }\n  wasDown = down;\n  v += 0.25;\n  y += v;\n  for (int i = 0; i < PIPES; i++) {\n    pipeX[i] -= 2;\n    if (pipeX[i] == 18) {\n      score++;\n      tone(BUZZER, 1800, 30);\n    }\n    if (pipeX[i] < -PIPE_W) {\n      pipeX[i] += PIPES * 48;\n      pipeGap[i] = random(6, 64 - GAP - 6);\n    }\n  }\n  oled.clearDisplay();\n  for (int i = 0; i < PIPES; i++) {\n    oled.fillRect(pipeX[i], 0, PIPE_W, pipeGap[i], SSD1306_WHITE);\n    oled.fillRect(pipeX[i], pipeGap[i] + GAP, PIPE_W, 64 - pipeGap[i] - GAP, SSD1306_WHITE);\n  }\n  oled.drawBitmap(20, (int)y, BIRD, 8, 6, SSD1306_WHITE);\n  oled.setCursor(56, 0);\n  oled.print(score);\n  oled.display();\n  if (crashed()) {\n    if (score > best) best = score;\n    tone(BUZZER, 150, 500);\n    oled.fillRect(20, 20, 88, 26, SSD1306_BLACK);\n    oled.drawRect(20, 20, 88, 26, SSD1306_WHITE);\n    oled.setCursor(30, 24);\n    oled.print(\"Wynik: \");\n    oled.print(score);\n    oled.setCursor(30, 35);\n    oled.print(\"Rekord: \");\n    oled.print(best);\n    oled.display();\n    delay(800);\n    while (digitalRead(FLAP) == HIGH) delay(10);\n    start();\n  }\n  delay(20);\n}\n"
+          },
+          {
+            "id": "OLED_1",
+            "kind": "ssd1306",
+            "at": [
+              27,
+              9
+            ],
+            "rotation": 0,
+            "value": null,
+            "text": "0x3C"
+          },
+          {
+            "id": "BZ_1",
+            "kind": "passive_buzzer",
+            "at": [
+              27,
+              27
+            ],
+            "rotation": 0,
+            "value": null,
+            "text": null
+          },
+          {
+            "id": "B_1",
+            "kind": "button",
+            "at": [
+              20,
+              17
+            ],
+            "rotation": 90,
+            "value": null,
+            "text": "Space"
+          }
+        ],
+        "wires": [
+          {
+            "points": [
+              [
+                20,
+                21
+              ],
+              [
+                19,
+                21
+              ],
+              [
+                19,
+                23
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                27,
+                27
+              ],
+              [
+                27,
+                22
+              ],
+              [
+                12,
+                22
+              ],
+              [
+                12,
+                23
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                29,
+                9
+              ],
+              [
+                29,
+                8
+              ],
+              [
+                22,
+                8
+              ],
+              [
+                22,
+                23
+              ],
+              [
+                23,
+                23
+              ],
+              [
+                23,
+                31
+              ],
+              [
+                19,
+                31
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                30,
+                9
+              ],
+              [
+                35,
+                9
+              ],
+              [
+                35,
+                32
+              ],
+              [
+                18,
+                32
+              ],
+              [
+                18,
+                31
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                28,
+                9
+              ],
+              [
+                28,
+                7
+              ],
+              [
+                5,
+                7
+              ],
+              [
+                5,
+                31
+              ],
+              [
+                8,
+                31
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                20,
+                17
+              ],
+              [
+                4,
+                17
+              ],
+              [
+                4,
+                32
+              ],
+              [
+                10,
+                32
+              ],
+              [
+                10,
+                31
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                31,
+                27
+              ],
+              [
+                31,
+                21
+              ],
+              [
+                21,
+                21
+              ],
+              [
+                21,
+                17
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                21,
+                17
+              ],
+              [
+                20,
+                17
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                27,
+                9
+              ],
+              [
+                21,
+                9
+              ],
+              [
+                21,
+                17
+              ]
+            ]
+          }
+        ]
+      },
+      "view": "schematic"
+    }
+  ]
+}

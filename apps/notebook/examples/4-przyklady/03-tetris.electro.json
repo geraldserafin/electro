@@ -1,0 +1,399 @@
+{
+  "format": "electro-notebook",
+  "version": 2,
+  "id": "7e8b520e5fc75506",
+  "title": "Tetris na kolorowym wyświetlaczu",
+  "created": "2026-10-01T00:00:00Z",
+  "modified": "2026-10-01T00:00:00Z",
+  "settings": {
+    "codeInPdf": true
+  },
+  "cells": [
+    {
+      "id": "1604ecc8",
+      "type": "markdown",
+      "source": "# Tetris\n\nKlasyk Aleksieja Pażytnowa z 1984 roku na Raspberry Pi Pico z kolorowym TFT 240×320. Siedem klocków\n(tetromino) w czterech obrotach każdy zapisanych jako 16-bitowe maski 4×4, plansza 10×20, punkty jak\nw wersji z Game Boya.\n\n**Jak grać:** kliknij schemat i użyj klawiatury: **← →** przesuwają, **↑** obraca, **↓** przyspiesza,\n**spacja** zrzuca klocek na dół.\n\nDwa pomysły warte podejrzenia w szkicu:\n\n- **rysowanie tylko zmian** — szkic pamięta, co jest na ekranie, i wysyła przez SPI tylko kratki, które\n  się zmieniły; pełny ekran to 150 KB, a jedna kratka — 450 bajtów,\n- **odbicie od ściany** (*wall kick*) — obrót przy krawędzi próbuje przesunąć klocek o kratkę albo dwie,\n  zamiast po prostu odmówić."
+    },
+    {
+      "id": "becd718d",
+      "type": "schematic",
+      "name": "tetris",
+      "schematic": {
+        "version": 1,
+        "elements": [
+          {
+            "id": "PICO_1",
+            "kind": "pico",
+            "at": [
+              20,
+              7
+            ],
+            "rotation": 0,
+            "value": null,
+            "text": "// TETRIS na Raspberry Pi Pico i kolorowym TFT 240×320 (ILI9341 na SPI).\n// Klawisze: ← → przesuwają, ↑ obraca, ↓ przyspiesza, spacja zrzuca klocek na dół.\n// Pełny rząd znika; im więcej rzędów naraz, tym więcej punktów. Co 10 rzędów — szybciej.\n// TFT: SCK GP18, MOSI GP19, CS GP17, DC GP20, RESET GP21, podświetlenie GP22.\n// Przyciski do masy: ← GP2, → GP3, ↑ GP4, ↓ GP5, spacja GP6.\n#include <SPI.h>\n#include <Adafruit_GFX.h>\n#include <Adafruit_ILI9341.h>\n\nAdafruit_ILI9341 tft(17, 20, 21);\nconst int LEFT = 2, RIGHT = 3, ROTATE = 4, DOWN = 5, DROP = 6;\nconst int COLS = 10, ROWS = 20, CELL = 15, X0 = 8, Y0 = 10;  // plansza na ekranie\n\n// siedem klocków, każdy w czterech obrotach: 16 bitów = siatka 4×4 (wiersz po wierszu)\nconst uint16_t SHAPES[7][4] = {\n  {0x0F00, 0x2222, 0x00F0, 0x4444},  // I\n  {0x8E00, 0x6440, 0x0E20, 0x44C0},  // J\n  {0x2E00, 0x4460, 0x0E80, 0xC440},  // L\n  {0x6600, 0x6600, 0x6600, 0x6600},  // O\n  {0x6C00, 0x4620, 0x06C0, 0x8C40},  // S\n  {0x4E00, 0x4640, 0x0E40, 0x4C40},  // T\n  {0xC600, 0x2640, 0x0C60, 0x4C80},  // Z\n};\nconst uint16_t COLORS[8] = {ILI9341_BLACK, ILI9341_CYAN, ILI9341_BLUE, ILI9341_ORANGE,\n                            ILI9341_YELLOW, ILI9341_GREEN, ILI9341_MAGENTA, ILI9341_RED};\n\nuint8_t board[ROWS][COLS];    // 0: pusto, 1–7: kolor klocka, który tu leży\nuint8_t shown[ROWS][COLS];    // co jest narysowane (rysujemy tylko zmiany: SPI nie jest za darmo)\nint piece, turn, px, py, nextPiece;\nlong score, lines;\nbool over;\n\nbool cell(int p, int r, int x, int y) { return SHAPES[p][r] & (0x8000 >> (y * 4 + x)); }\n\nbool fits(int p, int r, int nx, int ny) {\n  for (int y = 0; y < 4; y++)\n    for (int x = 0; x < 4; x++)\n      if (cell(p, r, x, y)) {\n        int bx = nx + x, by = ny + y;\n        if (bx < 0 || bx >= COLS || by >= ROWS) return false;\n        if (by >= 0 && board[by][bx]) return false;\n      }\n  return true;\n}\n\nvoid drawCell(int x, int y, uint8_t c) {\n  int sx = X0 + x * CELL, sy = Y0 + y * CELL;\n  if (!c) {\n    tft.fillRect(sx, sy, CELL, CELL, ILI9341_BLACK);\n    return;\n  }\n  tft.fillRect(sx, sy, CELL - 1, CELL - 1, COLORS[c]);\n  tft.drawFastHLine(sx, sy, CELL - 1, ILI9341_WHITE);  // odblask\n  tft.drawFastVLine(sx, sy, CELL - 1, ILI9341_WHITE);\n}\n\nvoid drawBoard() {  // plansza z klockiem w locie; tylko to, co się zmieniło\n  uint8_t now[ROWS][COLS];\n  memcpy(now, board, sizeof now);\n  if (!over)\n    for (int y = 0; y < 4; y++)\n      for (int x = 0; x < 4; x++)\n        if (cell(piece, turn, x, y) && py + y >= 0) now[py + y][px + x] = piece + 1;\n  for (int y = 0; y < ROWS; y++)\n    for (int x = 0; x < COLS; x++)\n      if (now[y][x] != shown[y][x]) {\n        drawCell(x, y, now[y][x]);\n        shown[y][x] = now[y][x];\n      }\n}\n\nvoid drawPanel() {\n  tft.fillRect(170, 10, 70, 200, ILI9341_BLACK);\n  tft.setTextColor(ILI9341_WHITE);\n  tft.setTextSize(1);\n  tft.setCursor(172, 12);\n  tft.print(\"NASTEPNY\");\n  for (int y = 0; y < 4; y++)\n    for (int x = 0; x < 4; x++)\n      if (cell(nextPiece, 0, x, y)) tft.fillRect(176 + x * 12, 28 + y * 12, 11, 11, COLORS[nextPiece + 1]);\n  tft.setCursor(172, 90);\n  tft.print(\"WYNIK\");\n  tft.setTextSize(2);\n  tft.setCursor(172, 102);\n  tft.print(score);\n  tft.setTextSize(1);\n  tft.setCursor(172, 130);\n  tft.print(\"LINIE\");\n  tft.setTextSize(2);\n  tft.setCursor(172, 142);\n  tft.print(lines);\n}\n\nvoid spawn() {\n  piece = nextPiece;\n  nextPiece = random(7);\n  turn = 0;\n  px = 3;\n  py = -1;\n  if (!fits(piece, turn, px, py)) over = true;\n  drawPanel();\n}\n\nvoid land() {\n  for (int y = 0; y < 4; y++)\n    for (int x = 0; x < 4; x++)\n      if (cell(piece, turn, x, y) && py + y >= 0) board[py + y][px + x] = piece + 1;\n  int cleared = 0;\n  for (int y = ROWS - 1; y >= 0; y--) {\n    bool full = true;\n    for (int x = 0; x < COLS; x++) full = full && board[y][x];\n    if (full) {\n      cleared++;\n      for (int k = y; k > 0; k--) memcpy(board[k], board[k - 1], COLS);\n      memset(board[0], 0, COLS);\n      y++;  // ten sam wiersz jeszcze raz: spadło na niego to, co było wyżej\n    }\n  }\n  const int POINTS[5] = {0, 100, 300, 500, 800};\n  score += POINTS[cleared];\n  lines += cleared;\n  spawn();\n}\n\nvoid start() {\n  memset(board, 0, sizeof board);\n  score = lines = 0;\n  over = false;\n  nextPiece = random(7);\n  spawn();\n}\n\nvoid setup() {\n  for (int p = LEFT; p <= DROP; p++) pinMode(p, INPUT_PULLUP);\n  pinMode(22, OUTPUT);\n  digitalWrite(22, HIGH);\n  tft.begin();\n  tft.fillScreen(ILI9341_BLACK);\n  tft.drawRect(X0 - 2, Y0 - 2, COLS * CELL + 3, ROWS * CELL + 3, ILI9341_DARKGREY);\n  memset(shown, 0, sizeof shown);\n  randomSeed(micros());\n  start();\n}\n\n// przycisk: raz od razu, a trzymany — powtarza co chwilę\nbool key(int pin, uint32_t &next, int repeat) {\n  if (digitalRead(pin) == HIGH) {\n    next = 0;\n    return false;\n  }\n  if (millis() < next) return false;\n  next = millis() + (next ? repeat : 170);\n  return true;\n}\n\nuint32_t nextL, nextR, nextT, nextD, nextDrop, fallAt;\n\nvoid loop() {\n  if (over) {\n    tft.setTextColor(ILI9341_WHITE, ILI9341_RED);\n    tft.setTextSize(2);\n    tft.setCursor(22, 150);\n    tft.print(\" KONIEC GRY \");\n    while (digitalRead(DROP) == HIGH) delay(10);\n    while (digitalRead(DROP) == LOW) delay(10);\n    tft.fillRect(X0, Y0, COLS * CELL, ROWS * CELL, ILI9341_BLACK);\n    memset(shown, 0, sizeof shown);\n    start();\n    return;\n  }\n  if (key(LEFT, nextL, 70) && fits(piece, turn, px - 1, py)) px--;\n  if (key(RIGHT, nextR, 70) && fits(piece, turn, px + 1, py)) px++;\n  if (key(ROTATE, nextT, 250)) {\n    int r = (turn + 1) % 4;\n    for (int kick : {0, -1, 1, -2, 2})  // obrót przy ścianie: odsuń klocek, jeśli trzeba\n      if (fits(piece, r, px + kick, py)) {\n        turn = r;\n        px += kick;\n        break;\n      }\n  }\n  if (key(DROP, nextDrop, 400)) {\n    while (fits(piece, turn, px, py + 1)) py++;\n    score += 2;\n    land();\n  }\n  int speed = max(80, 600 - (int)(lines / 10) * 60);\n  if (digitalRead(DOWN) == LOW) speed = 50;\n  if (millis() >= fallAt) {\n    fallAt = millis() + speed;\n    if (fits(piece, turn, px, py + 1)) py++;\n    else land();\n  }\n  drawBoard();\n  delay(10);\n}\n"
+          },
+          {
+            "id": "TFT_1",
+            "kind": "ili9341",
+            "at": [
+              36,
+              13
+            ],
+            "rotation": 0,
+            "value": null,
+            "text": null
+          },
+          {
+            "id": "t_TFT_1",
+            "kind": "terminal",
+            "at": [
+              36,
+              21
+            ],
+            "rotation": 0,
+            "value": null,
+            "text": null
+          },
+          {
+            "id": "B_1",
+            "kind": "button",
+            "at": [
+              16,
+              26
+            ],
+            "rotation": 90,
+            "value": null,
+            "text": "ArrowLeft"
+          },
+          {
+            "id": "B_2",
+            "kind": "button",
+            "at": [
+              13,
+              26
+            ],
+            "rotation": 90,
+            "value": null,
+            "text": "ArrowRight"
+          },
+          {
+            "id": "B_3",
+            "kind": "button",
+            "at": [
+              10,
+              26
+            ],
+            "rotation": 90,
+            "value": null,
+            "text": "ArrowUp"
+          },
+          {
+            "id": "B_4",
+            "kind": "button",
+            "at": [
+              7,
+              26
+            ],
+            "rotation": 90,
+            "value": null,
+            "text": "ArrowDown"
+          },
+          {
+            "id": "B_5",
+            "kind": "button",
+            "at": [
+              4,
+              26
+            ],
+            "rotation": 90,
+            "value": null,
+            "text": "Space"
+          }
+        ],
+        "wires": [
+          {
+            "points": [
+              [
+                36,
+                16
+              ],
+              [
+                28,
+                16
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                36,
+                17
+              ],
+              [
+                28,
+                17
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                36,
+                18
+              ],
+              [
+                28,
+                18
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                36,
+                19
+              ],
+              [
+                28,
+                19
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                36,
+                20
+              ],
+              [
+                29,
+                20
+              ],
+              [
+                29,
+                15
+              ],
+              [
+                28,
+                15
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                36,
+                13
+              ],
+              [
+                36,
+                8
+              ],
+              [
+                28,
+                8
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                36,
+                15
+              ],
+              [
+                30,
+                15
+              ],
+              [
+                30,
+                21
+              ],
+              [
+                28,
+                21
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                16,
+                26
+              ],
+              [
+                16,
+                9
+              ],
+              [
+                20,
+                9
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                13,
+                26
+              ],
+              [
+                13,
+                10
+              ],
+              [
+                20,
+                10
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                10,
+                26
+              ],
+              [
+                10,
+                11
+              ],
+              [
+                20,
+                11
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                7,
+                26
+              ],
+              [
+                7,
+                12
+              ],
+              [
+                20,
+                12
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                4,
+                26
+              ],
+              [
+                4,
+                13
+              ],
+              [
+                20,
+                13
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                36,
+                14
+              ],
+              [
+                31,
+                14
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                31,
+                14
+              ],
+              [
+                29,
+                14
+              ],
+              [
+                29,
+                9
+              ],
+              [
+                28,
+                9
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                16,
+                30
+              ],
+              [
+                31,
+                30
+              ],
+              [
+                31,
+                14
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                13,
+                30
+              ],
+              [
+                16,
+                30
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                10,
+                30
+              ],
+              [
+                13,
+                30
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                7,
+                30
+              ],
+              [
+                10,
+                30
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                4,
+                30
+              ],
+              [
+                7,
+                30
+              ]
+            ]
+          }
+        ]
+      },
+      "view": "schematic"
+    }
+  ]
+}

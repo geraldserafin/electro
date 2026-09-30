@@ -3,7 +3,6 @@
 import type { ButtonHTMLAttributes, ReactNode } from "react";
 import { Link, type LinkProps } from "react-router";
 import { cn } from "@/shared/lib/cn";
-import { Bolt } from "./icons";
 
 const corner = { left: "left-3", right: "right-3" };
 
@@ -49,14 +48,35 @@ export function IslandLink(props: LinkProps) {
   return <Link {...props} className={button()} />;
 }
 
-/** The bolt and the app's name. */
-export function Brand({ title }: { title?: string }) {
+/** Who made it, and how to reach him: a quiet line at the bottom of the home page. */
+export const AUTHOR = {
+  name: "Gerald Serafin",
+  links: [
+    { label: "GitHub", href: "https://github.com/geraldserafin" },
+    { label: "LinkedIn", href: "https://www.linkedin.com/in/gerald-serafin/" },
+    { label: "serafingerald@protonmail.com", href: "mailto:serafingerald@protonmail.com" },
+  ],
+};
+
+export function Credits({ madeBy }: { madeBy: string }) {
   return (
-    <Island>
-      <span className="grid place-items-center size-8 flex-none rounded-lg text-[#f9ab00]" title={title}>
-        <Bolt />
+    <footer className="mt-20 flex flex-wrap items-center justify-center gap-x-3 gap-y-1 font-mono text-[12px] text-faint">
+      <span>
+        {madeBy} <span className="text-muted">{AUTHOR.name}</span>
       </span>
-      <span className="pr-2.5 pl-0.5 text-[17px] font-medium">electro</span>
-    </Island>
+      {AUTHOR.links.map((l) => (
+        <span key={l.href} className="flex items-center gap-3">
+          <span aria-hidden>·</span>
+          <a
+            className="text-faint no-underline hover:text-fg"
+            href={l.href}
+            target={l.href.startsWith("http") ? "_blank" : undefined}
+            rel="noreferrer"
+          >
+            {l.label}
+          </a>
+        </span>
+      ))}
+    </footer>
   );
 }

@@ -1,18 +1,17 @@
-// / — the user's library: their own folders and notes, and what others shared with them; a new
-// note or folder; a note from a file or an example (at the top).
+// / — the user's library: their own folders and notes; a new note or folder; a note from a file (at
+// the top). Under it, the courses and examples (features/examples).
 import { Result, useAtomRefresh, useAtomValue } from "@effect-atom/atom-react";
-import { previewOf } from "@electro/notes-api";
 import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { EXAMPLES, fromExample } from "@/features/examples";
+import { COURSES, CourseCard } from "@/features/examples";
 import { LibraryGrid } from "@/features/library";
-import { Card, CardSkeletons, homeAtom, toDocument, useCreateNote } from "@/features/notes";
-import { library } from "@/features/schematic";
+import { CardSkeletons, homeAtom, useCreateNote } from "@/features/notes";
 import { SettingsMenu } from "@/features/settings";
 import { cn } from "@/shared/lib/cn";
 import { copyOf, FormatError, upload } from "@/shared/model/format";
-import { Brand, IslandButton, Islands } from "@/shared/ui/Island";
+import { Credits, Islands } from "@/shared/ui/Island";
 import { Upload } from "@/shared/ui/icons";
+import { MenuItem } from "@/shared/ui/Menu";
 
 const grid = "grid grid-cols-[repeat(auto-fill,212px)] gap-x-6 gap-y-7";
 const note = "mt-6 mb-3.5 text-[14px] text-muted";
@@ -41,13 +40,7 @@ export function Home() {
 
   return (
     <div>
-      <Islands side="left">
-        <Brand title={t("brand")} />
-      </Islands>
       <Islands side="right">
-        <IslandButton onClick={() => fileInput.current?.click()} title={t("openFileTitle")} aria-label={t("openFile")}>
-          <Upload />
-        </IslandButton>
         <input
           ref={fileInput}
           type="file"
@@ -59,7 +52,13 @@ export function Home() {
             if (file) void start(async () => copyOf(await upload(file)));
           }}
         />
-        <SettingsMenu />
+        <SettingsMenu
+          actions={
+            <MenuItem icon={<Upload />} onSelect={() => fileInput.current?.click()}>
+              {t("openFile")}…
+            </MenuItem>
+          }
+        />
       </Islands>
 
       <div className="mx-auto max-w-310 px-8 pt-21 pb-24">
@@ -78,19 +77,13 @@ export function Home() {
         )}
         {Result.isFailure(items) && <p className={note}>{t("listUnavailable")}</p>}
 
-        <h2 className="mt-12 mb-4 text-[16px] font-medium text-muted">{t("examples")}</h2>
-        <ul className={grid} aria-label={t("examples")}>
-          {EXAMPLES.map(({ name, notebook }) => (
-            <Card
-              key={name}
-              title={notebook.title}
-              meta={t("fromExample")}
-              library={library}
-              preview={previewOf(toDocument(notebook))}
-              onClick={() => start(async () => fromExample(name)!)}
-            />
+        <h2 className="mt-12 mb-4 text-[16px] font-medium text-muted">{t("courses")}</h2>
+        <ul className={grid} aria-label={t("courses")}>
+          {COURSES.map((course, i) => (
+            <CourseCard key={course.slug} course={course} index={i} />
           ))}
         </ul>
+        <Credits madeBy={t("madeBy")} />
       </div>
     </div>
   );

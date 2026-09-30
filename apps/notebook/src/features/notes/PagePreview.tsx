@@ -20,7 +20,7 @@ export function PagePreview({
       {preview.cells.map((cell, i) =>
         cell.type === "markdown" ? (
           <div key={i} className="markdown-view">
-            <Markdown source={cell.source} />
+            <Markdown source={cell.source} links={false} />
           </div>
         ) : cell.type === "code" ? (
           <pre key={i} className="page-code">

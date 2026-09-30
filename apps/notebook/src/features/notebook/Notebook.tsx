@@ -48,6 +48,7 @@ export function Notebook({
   reload,
   onTitle,
   readOnly = false,
+  example = false,
   back,
   onShare,
 }: {
@@ -56,6 +57,7 @@ export function Notebook({
   reload: () => void;
   onTitle?: (title: string) => void; // the title changed (the address shows it)
   readOnly?: boolean; // shared with the user to read: it runs, it is not saved
+  example?: boolean; // a lesson (features/examples), read-only too: added to the notes as it is, under its own title
   back: { to: string; label: string }; // the way back: the folder it is in
   onShare?: (notebook: NotebookData) => void; // the user's own: who else has it (and its picture, as it is now)
 }) {
@@ -72,8 +74,8 @@ export function Notebook({
   const copy = async () => {
     // a read-only note, the user's own to change (as it is now, with what they changed here)
     const own = copyOf(latest.current);
-    if (!(await create({ ...own, title: tNotes("readOnly.copyTitle", { title: own.title || t("untitled") }) })))
-      alert(tNotes("readOnly.copyFailed"));
+    const title = example ? own.title : tNotes("readOnly.copyTitle", { title: own.title || t("untitled") });
+    if (!(await create({ ...own, title }))) alert(tNotes("readOnly.copyFailed"));
   };
   useEffect(() => onTitle?.(notebook.title), [notebook.title]); // eslint-disable-line react-hooks/exhaustive-deps
   const [outline, setOutline] = useOutlineOpen();
@@ -111,6 +113,7 @@ export function Notebook({
 
   return (
     <div
+      className="animate-[fade-in_0.25s_ease_both]" // read from this browser in a moment: it comes in, no placeholder before it
       // a click outside every cell (and the app's islands, the notice, the dialog) leaves the cell
       // being worked on (the export dialog is a portal: its clicks bubble here too, and are not outside)
       onPointerDownCapture={(e) => {
@@ -183,7 +186,7 @@ export function Notebook({
         />
       </Islands>
       {readOnly ? (
-        <ReadOnlyNotice onCopy={() => void copy()} />
+        <ReadOnlyNotice onCopy={() => void copy()} example={example} />
       ) : (
         <SyncNotice state={sync.state} onKeepMine={sync.keepMine} onTakeTheirs={sync.takeTheirs} />
       )}

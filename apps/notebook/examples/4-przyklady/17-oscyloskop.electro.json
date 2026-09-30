@@ -1,0 +1,341 @@
+{
+  "format": "electro-notebook",
+  "version": 2,
+  "id": "448540e5b45e6ad6",
+  "title": "Oscyloskop na Arduino",
+  "created": "2026-10-01T00:00:00Z",
+  "modified": "2026-10-01T00:00:00Z",
+  "settings": {
+    "codeInPdf": true
+  },
+  "cells": [
+    {
+      "id": "025d2214",
+      "type": "markdown",
+      "source": "# Oscyloskop z Arduino\n\nArduino mierzy napięcie na A0 128 razy z rzędu, najszybciej jak umie (ok. 9000 pomiarów na sekundę),\ni rysuje przebieg na OLED-zie. Z tego, co ile próbek przebieg przechodzi w górę przez połowę zakresu,\nliczy częstotliwość. Potencjometr zmienia podstawę czasu — przerwę między próbkami.\n\nNa wejściu jest sinusoida 50 Hz o amplitudzie 2 V, podniesiona o 2,5 V źródłem stałym: przetwornik\nArduino mierzy tylko od 0 do 5 V i ujemnych napięć by nie zobaczył. Zmień częstotliwość źródła $E_2$\ni porównaj z tym, co pokazuje ekran.\n\n**Twierdzenie o próbkowaniu:** żeby odtworzyć sygnał, trzeba mierzyć więcej niż dwa razy na jego\nokres. Ustaw źródło na 2000 Hz i zobacz, co się dzieje, gdy próbek jest za mało (*aliasing*)."
+    },
+    {
+      "id": "68a3f9d2",
+      "type": "schematic",
+      "name": "oscyloskop",
+      "schematic": {
+        "version": 1,
+        "elements": [
+          {
+            "id": "ARD_1",
+            "kind": "arduino",
+            "at": [
+              4,
+              23
+            ],
+            "rotation": 0,
+            "value": null,
+            "text": "// OSCYLOSKOP na OLED-zie: Arduino mierzy napięcie na A0 128 razy z rzędu i rysuje przebieg,\n// a z przejść przez połowę zakresu liczy częstotliwość. Potencjometr na A1 zmienia podstawę czasu.\n// Na wejściu: sinusoida 50 Hz z przesunięciem 2,5 V (bo Arduino mierzy tylko od 0 do 5 V).\n#include <Wire.h>\n#include <Adafruit_GFX.h>\n#include <Adafruit_SSD1306.h>\n\nAdafruit_SSD1306 oled(128, 64, &Wire, -1);\nint samples[128];\n\nvoid setup() {\n  oled.begin(SSD1306_SWITCHCAPVCC, 0x3C);\n  Wire.setClock(400000);\n  oled.setTextColor(SSD1306_WHITE);\n}\n\nvoid loop() {\n  int pause = map(analogRead(A1), 0, 1023, 0, 1000);  // µs między próbkami (sam pomiar trwa ok. 112 µs)\n  unsigned long start = micros();\n  for (int i = 0; i < 128; i++) {\n    samples[i] = analogRead(A0);\n    if (pause) delayMicroseconds(pause);\n  }\n  float us = (micros() - start) / 128.0;  // na próbkę\n\n  // wyzwalanie i częstotliwość: przejścia w górę przez połowę zakresu\n  int first = -1, last = -1, crossings = 0;\n  for (int i = 1; i < 128; i++)\n    if (samples[i - 1] < 512 && samples[i] >= 512) {\n      if (first < 0) first = i;\n      last = i;\n      crossings++;\n    }\n\n  oled.clearDisplay();\n  for (int y = 0; y < 64; y += 8)\n    for (int x = 0; x < 128; x += 16) oled.drawPixel(x, y, SSD1306_WHITE);  // siatka\n  for (int i = 1; i < 128; i++)\n    oled.drawLine(i - 1, 63 - samples[i - 1] / 17, i, 63 - samples[i] / 17, SSD1306_WHITE);\n  oled.setCursor(0, 0);\n  if (crossings >= 2) {\n    float period = (last - first) * us / (crossings - 1);  // µs\n    oled.print(1e6 / period, 1);\n    oled.print(\" Hz\");\n  } else oled.print(\"-- Hz\");\n  oled.setCursor(76, 0);\n  oled.print((int)(us * 16 / 1000));\n  oled.print(\" ms/dz\");\n  oled.display();\n}\n"
+          },
+          {
+            "id": "OLED_1",
+            "kind": "ssd1306",
+            "at": [
+              26,
+              9
+            ],
+            "rotation": 0,
+            "value": null,
+            "text": "0x3C"
+          },
+          {
+            "id": "E_1",
+            "kind": "voltage_source",
+            "at": [
+              10,
+              45
+            ],
+            "rotation": 270,
+            "value": "2.5",
+            "text": null
+          },
+          {
+            "id": "E_2",
+            "kind": "sine_source",
+            "at": [
+              10,
+              41
+            ],
+            "rotation": 270,
+            "value": "2",
+            "text": "50"
+          },
+          {
+            "id": "R_1",
+            "kind": "resistor",
+            "at": [
+              8,
+              35
+            ],
+            "rotation": 0,
+            "value": "1k",
+            "text": null
+          },
+          {
+            "id": "P_1",
+            "kind": "potentiometer",
+            "at": [
+              18,
+              37
+            ],
+            "rotation": 0,
+            "value": "10k",
+            "text": "0.2"
+          }
+        ],
+        "wires": [
+          {
+            "points": [
+              [
+                8,
+                35
+              ],
+              [
+                8,
+                37
+              ],
+              [
+                10,
+                37
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                12,
+                35
+              ],
+              [
+                13,
+                35
+              ],
+              [
+                13,
+                31
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                20,
+                35
+              ],
+              [
+                14,
+                35
+              ],
+              [
+                14,
+                31
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                28,
+                9
+              ],
+              [
+                28,
+                8
+              ],
+              [
+                21,
+                8
+              ],
+              [
+                21,
+                23
+              ],
+              [
+                22,
+                23
+              ],
+              [
+                22,
+                31
+              ],
+              [
+                18,
+                31
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                29,
+                9
+              ],
+              [
+                34,
+                9
+              ],
+              [
+                34,
+                32
+              ],
+              [
+                17,
+                32
+              ],
+              [
+                17,
+                31
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                22,
+                37
+              ],
+              [
+                22,
+                34
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                22,
+                34
+              ],
+              [
+                7,
+                34
+              ],
+              [
+                7,
+                31
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                27,
+                9
+              ],
+              [
+                27,
+                7
+              ],
+              [
+                20,
+                7
+              ],
+              [
+                20,
+                22
+              ],
+              [
+                23,
+                22
+              ],
+              [
+                23,
+                34
+              ],
+              [
+                22,
+                34
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                10,
+                45
+              ],
+              [
+                6,
+                45
+              ],
+              [
+                6,
+                36
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                18,
+                37
+              ],
+              [
+                18,
+                36
+              ],
+              [
+                6,
+                36
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                6,
+                36
+              ],
+              [
+                6,
+                32
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                6,
+                32
+              ],
+              [
+                9,
+                32
+              ],
+              [
+                9,
+                31
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                26,
+                9
+              ],
+              [
+                4,
+                9
+              ],
+              [
+                4,
+                32
+              ],
+              [
+                6,
+                32
+              ]
+            ]
+          }
+        ]
+      },
+      "view": "schematic"
+    }
+  ]
+}

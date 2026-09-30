@@ -1,0 +1,463 @@
+{
+  "format": "electro-notebook",
+  "version": 2,
+  "id": "561e9ddd38ef873d",
+  "title": "Mostek H: silnik w obie strony",
+  "created": "2026-10-01T00:00:00Z",
+  "modified": "2026-10-01T00:00:00Z",
+  "settings": {
+    "codeInPdf": true
+  },
+  "cells": [
+    {
+      "id": "5c5d0963",
+      "type": "markdown",
+      "source": "# Mostek H\n\nŻeby silnik prądu stałego kręcił się w drugą stronę, trzeba odwrócić napięcie na jego zaciskach.\nRobią to cztery tranzystory ułożone w literę **H**: silnik w poprzeczce, po dwa tranzystory z każdej\nstrony — górny do plusa, dolny do masy. Włączone po przekątnej (lewy górny i prawy dolny) puszczają prąd\nw jedną stronę, druga przekątna — w drugą.\n\nTu górne tranzystory to MOSFET-y z kanałem P (włącza je stan **niski** na bramce), a dolne — z kanałem N\n(włącza je stan **wysoki**). Prędkość ustawia **PWM** na dolnym tranzystorze: szybkie włączanie\ni wyłączanie, średnio tyle napięcia, ile wynosi wypełnienie.\n\nUruchom ⚡ i przesuwaj suwak potencjometru: środek to stop, lewo i prawo — obroty w obie strony.\nNigdy nie wolno włączyć obu tranzystorów z jednej strony naraz: zwarłyby zasilanie do masy (to się\nnazywa *shoot-through*). Szkic dlatego najpierw wszystko wyłącza, czeka chwilę, a dopiero potem\nwłącza nową parę."
+    },
+    {
+      "id": "787ab3d4",
+      "type": "schematic",
+      "name": "mostek_h",
+      "schematic": {
+        "version": 1,
+        "elements": [
+          {
+            "id": "ARD_1",
+            "kind": "arduino",
+            "at": [
+              2,
+              23
+            ],
+            "rotation": 0,
+            "value": null,
+            "text": "// MOSTEK H: cztery tranzystory MOSFET pozwalają kręcić silnikiem w obie strony. Potencjometr na A0:\n// środek — stop, w lewo — obroty w lewo, w prawo — w prawo, tym szybciej, im dalej od środka (PWM).\n// Górne tranzystory (P) włącza stan niski, dolne (N) — wysoki. Nigdy nie włączamy obu z jednej strony\n// naraz: zwarcie zasilania do masy!\n// Lewa strona: górny D5, dolny D6; prawa: górny D9, dolny D10.\nconst byte TOP_L = 5, LOW_L = 6, TOP_R = 9, LOW_R = 10;\n\nvoid off() {\n  digitalWrite(LOW_L, LOW);\n  digitalWrite(LOW_R, LOW);\n  digitalWrite(TOP_L, HIGH);\n  digitalWrite(TOP_R, HIGH);\n}\n\nvoid setup() {\n  pinMode(TOP_L, OUTPUT);\n  pinMode(LOW_L, OUTPUT);\n  pinMode(TOP_R, OUTPUT);\n  pinMode(LOW_R, OUTPUT);\n  off();\n  Serial.begin(9600);\n}\n\nvoid loop() {\n  int v = analogRead(A0) - 512;  // -512 … 511\n  int speed = constrain(map(abs(v), 40, 511, 0, 255), 0, 255);\n  off();\n  delayMicroseconds(50);  // przerwa, zanim włączy się druga para (tranzystory wyłączają się chwilę)\n  if (v > 40) {           // w prawo: lewy górny + prawy dolny\n    digitalWrite(TOP_L, LOW);\n    analogWrite(LOW_R, speed);\n  } else if (v < -40) {   // w lewo: prawy górny + lewy dolny\n    digitalWrite(TOP_R, LOW);\n    analogWrite(LOW_L, speed);\n  }\n  Serial.print(v > 40 ? \"w prawo \" : v < -40 ? \"w lewo \" : \"stop \");\n  Serial.println(speed);\n  delay(200);\n}\n"
+          },
+          {
+            "id": "E_1",
+            "kind": "voltage_source",
+            "at": [
+              28,
+              31
+            ],
+            "rotation": 270,
+            "value": "6",
+            "text": null
+          },
+          {
+            "id": "Q_1",
+            "kind": "pmos",
+            "at": [
+              16,
+              9
+            ],
+            "rotation": 0,
+            "value": null,
+            "text": null
+          },
+          {
+            "id": "Q_2",
+            "kind": "nmos",
+            "at": [
+              16,
+              17
+            ],
+            "rotation": 0,
+            "value": null,
+            "text": null
+          },
+          {
+            "id": "Q_3",
+            "kind": "pmos",
+            "at": [
+              32,
+              9
+            ],
+            "rotation": 180,
+            "value": null,
+            "text": null
+          },
+          {
+            "id": "Q_4",
+            "kind": "nmos",
+            "at": [
+              32,
+              17
+            ],
+            "rotation": 180,
+            "value": null,
+            "text": null
+          },
+          {
+            "id": "M_1",
+            "kind": "motor",
+            "at": [
+              21,
+              13
+            ],
+            "rotation": 0,
+            "value": null,
+            "text": null
+          },
+          {
+            "id": "P_1",
+            "kind": "potentiometer",
+            "at": [
+              10,
+              37
+            ],
+            "rotation": 0,
+            "value": "10k",
+            "text": "0.8"
+          }
+        ],
+        "wires": [
+          {
+            "points": [
+              [
+                12,
+                35
+              ],
+              [
+                11,
+                35
+              ],
+              [
+                11,
+                31
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                16,
+                17
+              ],
+              [
+                12,
+                17
+              ],
+              [
+                12,
+                23
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                14,
+                37
+              ],
+              [
+                14,
+                34
+              ],
+              [
+                5,
+                34
+              ],
+              [
+                5,
+                31
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                16,
+                9
+              ],
+              [
+                13,
+                9
+              ],
+              [
+                13,
+                23
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                19,
+                15
+              ],
+              [
+                20,
+                15
+              ],
+              [
+                20,
+                13
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                20,
+                13
+              ],
+              [
+                20,
+                7
+              ],
+              [
+                19,
+                7
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                21,
+                13
+              ],
+              [
+                20,
+                13
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                25,
+                13
+              ],
+              [
+                28,
+                13
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                28,
+                13
+              ],
+              [
+                29,
+                13
+              ],
+              [
+                29,
+                11
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                29,
+                19
+              ],
+              [
+                28,
+                19
+              ],
+              [
+                28,
+                13
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                32,
+                17
+              ],
+              [
+                32,
+                18
+              ],
+              [
+                7,
+                18
+              ],
+              [
+                7,
+                23
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                32,
+                9
+              ],
+              [
+                32,
+                10
+              ],
+              [
+                8,
+                10
+              ],
+              [
+                8,
+                23
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                29,
+                7
+              ],
+              [
+                30,
+                7
+              ],
+              [
+                30,
+                12
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                30,
+                12
+              ],
+              [
+                30,
+                27
+              ],
+              [
+                28,
+                27
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                19,
+                11
+              ],
+              [
+                19,
+                12
+              ],
+              [
+                30,
+                12
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                10,
+                37
+              ],
+              [
+                10,
+                32
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                10,
+                32
+              ],
+              [
+                10,
+                31
+              ],
+              [
+                7,
+                31
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                28,
+                31
+              ],
+              [
+                28,
+                32
+              ],
+              [
+                20,
+                32
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                20,
+                32
+              ],
+              [
+                10,
+                32
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                19,
+                19
+              ],
+              [
+                20,
+                19
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                20,
+                19
+              ],
+              [
+                20,
+                32
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                29,
+                15
+              ],
+              [
+                21,
+                15
+              ],
+              [
+                21,
+                19
+              ],
+              [
+                20,
+                19
+              ]
+            ]
+          }
+        ]
+      },
+      "view": "schematic"
+    }
+  ]
+}

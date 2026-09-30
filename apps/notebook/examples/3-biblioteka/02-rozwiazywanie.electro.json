@@ -1,0 +1,170 @@
+{
+  "format": "electro-notebook",
+  "version": 2,
+  "id": "90b2fe175e3e98b6",
+  "title": "2. Rozwiązywanie",
+  "created": "2026-10-01T00:00:00Z",
+  "modified": "2026-10-01T00:00:00Z",
+  "settings": {
+    "codeInPdf": true
+  },
+  "cells": [
+    {
+      "id": "26536f5b",
+      "type": "markdown",
+      "source": "# Rozwiązywanie\n\n`obwod.solve()` rozwiązuje obwód i zwraca **rozwiązanie**. Z niego odczytujesz wszystko, czego\npotrzebujesz:\n\n- `sol[\"R_1\"]` — element: jego wartość, napięcie `U`, prąd `I`, moc `P`,\n- `sol[\"R_1\"].I`, `.U`, `.P` — pojedyncze wielkości (dokładne: ułamki, pierwiastki),\n- `sol.V(\"A\")` — potencjał nazwanego węzła, `sol.U(\"A\", \"B\")` — napięcie między dwoma."
+    },
+    {
+      "id": "c3069839",
+      "type": "code",
+      "source": "dzielnik = supply(12) + Resistor(1000) + node(\"wy\") + shunt(Resistor(2000))\nsol = dzielnik.solve()\nprint(sol[\"R_1\"])\nprint(\"V_wy =\", sol.V(\"wy\"), \"V\")\nprint(\"moc R_2:\", sol[\"R_2\"].P, \"W  ≈\", float(sol[\"R_2\"].P), \"W\")",
+      "outputs": [
+        {
+          "type": "stream",
+          "data": "R_1 = 1 kΩ        U = 4 V   I = 4 mA   P = 16 mW\nV_wy = 8 V\nmoc R_2: 4/125 W  ≈ 0.032 W\n"
+        }
+      ]
+    },
+    {
+      "id": "a6a2b175",
+      "type": "markdown",
+      "source": "## Dane i niewiadome\n\nElement bez wartości (`Resistor()`) to niewiadoma. Dane z zadania podaje się jako argumenty: nazwa\nwielkości to litera i nazwa elementu — `I_R_1` (prąd), `U_R_2` (napięcie), `P_R_1` (moc). `find=` mówi,\nczego szukasz — wtedy wynik to odpowiedź, a `steps()` pokazuje tylko potrzebne kroki."
+    },
+    {
+      "id": "0402d6a3",
+      "type": "code",
+      "source": "zadanie = loop(VoltageSource(label=\"E\"), Resistor(3), (Resistor(18) + Ammeter(2)) | (Resistor(3) + Resistor(6)))\nsol = zadanie.solve(find=\"E\")\nsol",
+      "outputs": [
+        {
+          "type": "text",
+          "data": "E = 54 V"
+        }
+      ]
+    },
+    {
+      "id": "c3852d3e",
+      "type": "code",
+      "source": "steps(sol)",
+      "outputs": [
+        {
+          "type": "solution",
+          "data": {
+            "type": "Steps",
+            "data": [
+              "R_{1} = 3\\,\\mathrm{\\Omega}",
+              "R_{2} = 18\\,\\mathrm{\\Omega}",
+              "A_{1} = 2\\,\\mathrm{A}",
+              "R_{3} = 3\\,\\mathrm{\\Omega}",
+              "R_{4} = 6\\,\\mathrm{\\Omega}"
+            ],
+            "assumed": [],
+            "steps": [
+              {
+                "type": "FormulaStep",
+                "chain": "I_{A_{1}} = A_{1} = 2\\,\\mathrm{A}",
+                "reason": {
+                  "type": "AmmeterReading",
+                  "label": "A_{1}"
+                }
+              },
+              {
+                "type": "FormulaStep",
+                "chain": "U_{A_{1}} = 0\\,\\mathrm{V}",
+                "reason": {
+                  "type": "IdealAmmeter",
+                  "label": "A_{1}"
+                }
+              },
+              {
+                "type": "FormulaStep",
+                "chain": "V_{n4} = U_{A_{1}} + V_{n1} = 0 + 0 = 0\\,\\mathrm{V}",
+                "reason": {
+                  "type": "VoltageAcross",
+                  "label": "A_{1}"
+                }
+              },
+              {
+                "type": "FormulaStep",
+                "chain": "I_{R_{2}} = I_{A_{1}} = 2\\,\\mathrm{A}",
+                "reason": {
+                  "type": "KirchhoffCurrent",
+                  "node": "n4"
+                }
+              },
+              {
+                "type": "FormulaStep",
+                "chain": "U_{R_{2}} = I_{R_{2}} \\cdot R_{2} = 2 \\cdot 18 = 36\\,\\mathrm{V}",
+                "reason": {
+                  "type": "OhmsLaw",
+                  "label": "R_{2}"
+                }
+              },
+              {
+                "type": "FormulaStep",
+                "chain": "V_{n3} = U_{R_{2}} + V_{n4} = 36 + 0 = 36\\,\\mathrm{V}",
+                "reason": {
+                  "type": "VoltageAcross",
+                  "label": "R_{2}"
+                }
+              },
+              {
+                "type": "SystemStep",
+                "equations": [
+                  "U_{E} - E = 0",
+                  "U_{R_{1}} - I_{R_{1}} \\cdot R_{1} = 0",
+                  "U_{R_{3}} - I_{R_{3}} \\cdot R_{3} = 0",
+                  "U_{R_{4}} - I_{R_{4}} \\cdot R_{4} = 0",
+                  "U_{E} + V_{n1} - V_{n2} = 0",
+                  "U_{R_{1}} + V_{n3} - V_{n2} = 0",
+                  "U_{R_{3}} + V_{n5} - V_{n3} = 0",
+                  "U_{R_{4}} + V_{n1} - V_{n5} = 0",
+                  "I_{R_{1}} - I_{E} = 0",
+                  "I_{R_{2}} + I_{R_{3}} - I_{R_{1}} = 0",
+                  "I_{R_{4}} - I_{R_{3}} = 0"
+                ],
+                "results": [
+                  "E = 54\\,\\mathrm{V}",
+                  "I_{E} = 6\\,\\mathrm{A}",
+                  "I_{R_{1}} = 6\\,\\mathrm{A}",
+                  "I_{R_{3}} = 4\\,\\mathrm{A}",
+                  "I_{R_{4}} = 4\\,\\mathrm{A}",
+                  "U_{E} = 54\\,\\mathrm{V}",
+                  "U_{R_{1}} = 18\\,\\mathrm{V}",
+                  "U_{R_{3}} = 12\\,\\mathrm{V}",
+                  "U_{R_{4}} = 24\\,\\mathrm{V}",
+                  "V_{n2} = 54\\,\\mathrm{V}",
+                  "V_{n5} = 24\\,\\mathrm{V}"
+                ]
+              }
+            ],
+            "answer": [
+              "E = 54\\,\\mathrm{V}"
+            ],
+            "missing": null
+          }
+        }
+      ]
+    },
+    {
+      "id": "b4f6963c",
+      "type": "markdown",
+      "source": "Dane mogą też być dowolnym równaniem — `Eq(...)` z wielkości `U(\"R_1\")`, `I(\"R_1\")`, `P(\"R_1\")`,\n`V(\"A\")`. Tu wiemy tylko, że na $R_1$ jest dwa razy większe napięcie niż na $R_2$:"
+    },
+    {
+      "id": "21aa803d",
+      "type": "code",
+      "source": "dwa = supply(9) + Resistor(300) + Resistor() + ground\ndwa.solve(Eq(U(\"R_1\"), 2 * U(\"R_2\")), find=\"R_2\")",
+      "outputs": [
+        {
+          "type": "text",
+          "data": "R_2 = 150 Ω"
+        }
+      ]
+    },
+    {
+      "id": "b5216564",
+      "type": "markdown",
+      "source": "## Jak to działa\n\nSolver najpierw **propaguje**: szuka równania z jedną niewiadomą (prawo Ohma, prawa Kirchhoffa, prawo\nźródła…), wylicza ją i zapisuje krok — dokładnie jak na kartce. Gdy to nie wystarcza (np. w mostku),\nrozwiązuje pozostały układ równań naraz. Wszystkie liczby są dokładne (`sympy`): $\\frac{1}{3}$ zostaje\nułamkiem, a nie 0,333…."
+    }
+  ]
+}

@@ -1,0 +1,4 @@
+{
+ "title": "Biblioteka electro",
+ "description": "Obwody zapisane w Pythonie: szeregowo to +, równolegle to |, a solver rozwiązuje je krok po kroku, z niewiadomymi, literami i prądem zmiennym. Do tego netlisty, twierdzenia Thévenina i Nortona, symulacja w czasie z kodu i trochę teorii kategorii, na której to wszystko stoi."
+}

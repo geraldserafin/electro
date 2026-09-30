@@ -1,0 +1,445 @@
+{
+  "format": "electro-notebook",
+  "version": 2,
+  "id": "3be2364eae7e16ac",
+  "title": "2. Opór i prawo Ohma",
+  "created": "2026-10-01T00:00:00Z",
+  "modified": "2026-10-01T00:00:00Z",
+  "settings": {
+    "codeInPdf": true
+  },
+  "cells": [
+    {
+      "id": "18eb398a",
+      "type": "markdown",
+      "source": "# Opór i prawo Ohma\n\n**Opornik** (rezystor) to element, który utrudnia przepływ prądu. Im większy opór, tym mniejszy prąd przy\ntym samym napięciu. Związek między nimi odkrył Georg Ohm w 1827 roku:\n\n$$U = R \\cdot I$$\n\nNapięcie na oporniku to jego opór razy prąd, który przez niego płynie. Można to przekształcić na dwa\npozostałe sposoby — i to są trzy najczęściej używane wzory w całej elektronice:\n\n$$I = \\frac{U}{R} \\qquad R = \\frac{U}{I}$$\n\nPrzykład: bateria 9 V i opornik 1 kΩ. Prąd: $I = \\frac{9\\,\\mathrm{V}}{1000\\,Ω} = 9\\,\\mathrm{mA}$."
+    },
+    {
+      "id": "b3598c41",
+      "type": "markdown",
+      "source": "## Mierniki\n\nŻeby to sprawdzić, potrzebujemy mierników:\n\n- **amperomierz** ($A$) mierzy prąd, więc wstawia się go **w** obwód, szeregowo — prąd musi przez niego\n  przepłynąć,\n- **woltomierz** ($V$) mierzy napięcie między dwoma punktami, więc dołącza się go **obok** elementu,\n  równolegle.\n\nKliknij ▶ **Oblicz**, żeby zobaczyć, co pokazują."
+    },
+    {
+      "id": "7823daa1",
+      "type": "schematic",
+      "name": "pomiar",
+      "schematic": {
+        "version": 1,
+        "elements": [
+          {
+            "id": "E_1",
+            "kind": "voltage_source",
+            "at": [
+              4,
+              13
+            ],
+            "rotation": 270,
+            "value": "9",
+            "text": null
+          },
+          {
+            "id": "A_1",
+            "kind": "ammeter",
+            "at": [
+              6,
+              7
+            ],
+            "rotation": 0,
+            "value": null,
+            "text": null
+          },
+          {
+            "id": "R_1",
+            "kind": "resistor",
+            "at": [
+              14,
+              7
+            ],
+            "rotation": 90,
+            "value": "1k",
+            "text": null
+          },
+          {
+            "id": "V_1",
+            "kind": "voltmeter",
+            "at": [
+              18,
+              7
+            ],
+            "rotation": 90,
+            "value": null,
+            "text": null
+          },
+          {
+            "id": "gnd1",
+            "kind": "ground",
+            "at": [
+              4,
+              13
+            ],
+            "rotation": 0,
+            "value": null,
+            "text": null
+          }
+        ],
+        "wires": [
+          {
+            "points": [
+              [
+                4,
+                9
+              ],
+              [
+                4,
+                7
+              ],
+              [
+                6,
+                7
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                10,
+                7
+              ],
+              [
+                14,
+                7
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                14,
+                7
+              ],
+              [
+                18,
+                7
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                14,
+                11
+              ],
+              [
+                14,
+                13
+              ],
+              [
+                4,
+                13
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                18,
+                11
+              ],
+              [
+                18,
+                13
+              ],
+              [
+                14,
+                13
+              ]
+            ]
+          }
+        ]
+      },
+      "view": "schematic",
+      "results": {
+        "E_1": {
+          "value": "9 V",
+          "solved": false,
+          "U": "9 V",
+          "I": "9 mA",
+          "P": "81 mW",
+          "reversed": false
+        },
+        "A_1": {
+          "value": "9 mA",
+          "solved": true,
+          "U": "0 V",
+          "I": "9 mA",
+          "P": "0 W",
+          "reversed": false
+        },
+        "R_1": {
+          "value": "1 kΩ",
+          "solved": false,
+          "U": "9 V",
+          "I": "9 mA",
+          "P": "81 mW",
+          "reversed": false
+        },
+        "V_1": {
+          "value": "9 V",
+          "solved": true,
+          "U": "9 V",
+          "I": "0 A",
+          "P": "0 W",
+          "reversed": false
+        }
+      },
+      "problems": []
+    },
+    {
+      "id": "81efaff4",
+      "type": "markdown",
+      "source": "## Im większy opór, tym mniejszy prąd\n\nTen sam obwód można zapisać kodem — tu dla kilku różnych oporników naraz. `supply(9)` to bateria 9 V\nod masy, `+` łączy elementy jeden za drugim, a `ground` wraca do masy:"
+    },
+    {
+      "id": "b571a1f9",
+      "type": "code",
+      "source": "for r in [100, 470, 1000, 4700, 10000]:\n    sol = (supply(9) + Resistor(r) + ground).solve()\n    print(f\"R = {r:>6} Ω   I = {float(sol['R_1'].I) * 1000:6.2f} mA\")",
+      "outputs": [
+        {
+          "type": "stream",
+          "data": "R =    100 Ω   I =  90.00 mA\nR =    470 Ω   I =  19.15 mA\nR =   1000 Ω   I =   9.00 mA\nR =   4700 Ω   I =   1.91 mA\nR =  10000 Ω   I =   0.90 mA\n"
+        }
+      ]
+    },
+    {
+      "id": "2933112b",
+      "type": "markdown",
+      "source": "## Opór nieznany\n\nCzęsto jest odwrotnie: znamy napięcie, zmierzyliśmy prąd, a chcemy wiedzieć, jaki to opornik. Zostaw\nwartość opornika **pustą** — to znaczy „nie wiem” — a w amperomierzu wpisz odczyt, 20 mA. Solver sam\nużyje prawa Ohma: $R = \\frac{U}{I} = \\frac{9\\,\\mathrm{V}}{0{,}02\\,\\mathrm{A}} = 450\\,Ω$."
+    },
+    {
+      "id": "b929e192",
+      "type": "schematic",
+      "name": "nieznany",
+      "schematic": {
+        "version": 1,
+        "elements": [
+          {
+            "id": "E_1",
+            "kind": "voltage_source",
+            "at": [
+              4,
+              13
+            ],
+            "rotation": 270,
+            "value": "9",
+            "text": null
+          },
+          {
+            "id": "A_1",
+            "kind": "ammeter",
+            "at": [
+              6,
+              7
+            ],
+            "rotation": 0,
+            "value": "20m",
+            "text": null
+          },
+          {
+            "id": "R_1",
+            "kind": "resistor",
+            "at": [
+              14,
+              7
+            ],
+            "rotation": 90,
+            "value": null,
+            "text": null
+          },
+          {
+            "id": "gnd1",
+            "kind": "ground",
+            "at": [
+              4,
+              13
+            ],
+            "rotation": 0,
+            "value": null,
+            "text": null
+          }
+        ],
+        "wires": [
+          {
+            "points": [
+              [
+                4,
+                9
+              ],
+              [
+                4,
+                7
+              ],
+              [
+                6,
+                7
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                10,
+                7
+              ],
+              [
+                14,
+                7
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                14,
+                11
+              ],
+              [
+                14,
+                13
+              ],
+              [
+                4,
+                13
+              ]
+            ]
+          }
+        ]
+      },
+      "view": "schematic",
+      "results": {
+        "E_1": {
+          "value": "9 V",
+          "solved": false,
+          "U": "9 V",
+          "I": "20 mA",
+          "P": "180 mW",
+          "reversed": false
+        },
+        "A_1": {
+          "value": "20 mA",
+          "solved": false,
+          "U": "0 V",
+          "I": "20 mA",
+          "P": "0 W",
+          "reversed": false
+        },
+        "R_1": {
+          "value": "450 Ω",
+          "solved": true,
+          "U": "9 V",
+          "I": "20 mA",
+          "P": "180 mW",
+          "reversed": false
+        }
+      },
+      "problems": []
+    },
+    {
+      "id": "56363eee",
+      "type": "markdown",
+      "source": "A tak wygląda to samo rozwiązanie krok po kroku, z uzasadnieniem każdego kroku:"
+    },
+    {
+      "id": "ecdd597b",
+      "type": "code",
+      "source": "steps(nieznany.solve(find=\"R_1\"))",
+      "outputs": [
+        {
+          "type": "solution",
+          "data": {
+            "type": "Steps",
+            "data": [
+              "E_{1} = 9\\,\\mathrm{V}",
+              "A_{1} = 20\\,\\mathrm{mA}"
+            ],
+            "assumed": [],
+            "steps": [
+              {
+                "type": "FormulaStep",
+                "chain": "I_{A_{1}} = A_{1} = 20\\,\\mathrm{mA}",
+                "reason": {
+                  "type": "AmmeterReading",
+                  "label": "A_{1}"
+                }
+              },
+              {
+                "type": "FormulaStep",
+                "chain": "U_{E_{1}} = E_{1} = 9\\,\\mathrm{V}",
+                "reason": {
+                  "type": "SourceVoltage",
+                  "label": "E_{1}"
+                }
+              },
+              {
+                "type": "FormulaStep",
+                "chain": "U_{A_{1}} = 0\\,\\mathrm{V}",
+                "reason": {
+                  "type": "IdealAmmeter",
+                  "label": "A_{1}"
+                }
+              },
+              {
+                "type": "FormulaStep",
+                "chain": "V_{n1} = U_{E_{1}} + V_{\\mathrm{GND}} = 9 + 0 = 9\\,\\mathrm{V}",
+                "reason": {
+                  "type": "VoltageAcross",
+                  "label": "E_{1}"
+                }
+              },
+              {
+                "type": "FormulaStep",
+                "chain": "V_{n2} = V_{n1} - U_{A_{1}} = 9 - 0 = 9\\,\\mathrm{V}",
+                "reason": {
+                  "type": "VoltageAcross",
+                  "label": "A_{1}"
+                }
+              },
+              {
+                "type": "FormulaStep",
+                "chain": "U_{R_{1}} = V_{n2} - V_{\\mathrm{GND}} = 9 - 0 = 9\\,\\mathrm{V}",
+                "reason": {
+                  "type": "VoltageAcross",
+                  "label": "R_{1}"
+                }
+              },
+              {
+                "type": "FormulaStep",
+                "chain": "I_{R_{1}} = I_{A_{1}} = 20\\,\\mathrm{mA}",
+                "reason": {
+                  "type": "KirchhoffCurrent",
+                  "node": "n2"
+                }
+              },
+              {
+                "type": "FormulaStep",
+                "chain": "R_{1} = \\frac{U_{R_{1}}}{I_{R_{1}}} = \\frac{9}{0.02} = 450\\,\\mathrm{\\Omega}",
+                "reason": {
+                  "type": "OhmsLaw",
+                  "label": "R_{1}"
+                }
+              }
+            ],
+            "answer": [
+              "R_{1} = 450\\,\\mathrm{\\Omega}"
+            ],
+            "missing": null
+          }
+        }
+      ]
+    },
+    {
+      "id": "64ff4938",
+      "type": "markdown",
+      "source": "## Spróbuj sam\n\n1. W schemacie `pomiar` zmień opornik na 4,7 kΩ (wpisz `4.7k`). Ile pokazuje amperomierz?\n2. W schemacie `nieznany` wpisz odczyt amperomierza `90m`. Jaki wyszedł opór?\n3. Prawo Ohma działa w każdą stronę: jakie napięcie jest potrzebne, żeby przez 220 Ω popłynęło 15 mA?\n   Policz w komórce z kodem: `220 * 0.015`."
+    }
+  ]
+}

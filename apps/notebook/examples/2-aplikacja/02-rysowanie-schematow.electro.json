@@ -1,0 +1,84 @@
+{
+  "format": "electro-notebook",
+  "version": 2,
+  "id": "a1bc5771a459da97",
+  "title": "2. Rysowanie schematów",
+  "created": "2026-10-01T00:00:00Z",
+  "modified": "2026-10-01T00:00:00Z",
+  "settings": {
+    "codeInPdf": true
+  },
+  "cells": [
+    {
+      "id": "afa90a83",
+      "type": "markdown",
+      "source": "# Rysowanie schematów\n\nKliknij schemat, żeby zaczął reagować na klawisze. Na górze jest pasek **narzędzi**:\n\n| narzędzie | klawisz | co robi |\n|---|:-:|---|\n| Zaznacz | V | zaznacza i przesuwa elementy i przewody |\n| Rączka | H | przesuwa widok (albo przeciągnij tło, albo spacja) |\n| Przewód | W | klik — początek, kolejne kliki — załamania, klik w zacisk — koniec |\n| Elementy | K lub / | panel wszystkich elementów z wyszukiwarką |\n| elementy z paska | 1–0 | opornik, źródło, masa… — pierwsze z biblioteki |\n\nZaznaczony element: **R** obraca go o 90° (dwa razy — odwraca, np. biegunowość źródła), **Del** usuwa,\n**⌘C / ⌘V** kopiuje i wkleja pod kursorem. **Shift + klik** albo **Shift + przeciąganie** zaznacza wiele\nnaraz. **⌘Z** cofa, **F** włącza pełny ekran. Ikona **?** w rogu schematu przypomina wszystkie skróty."
+    },
+    {
+      "id": "a7a58866",
+      "type": "markdown",
+      "source": "## Jak łączą się przewody\n\n- Przewody łączą się tylko **końcami** — z zaciskiem albo z innym przewodem (nawet w połowie jego\n  długości, tworząc rozgałęzienie „T”, które widać jako kropkę).\n- Przewód, który tylko **przechodzi** nad zaciskiem albo krzyżuje inny przewód, **nie łączy się** z nim.\n- **Czerwona kropka** to zacisk, do którego nic nie jest podłączone.\n- **Etykieta** (z biblioteki, sekcja Połączenia) nazywa węzeł: dwie etykiety o tej samej nazwie są\n  połączone, choć nie ma między nimi przewodu. **Masa** to specjalna etykieta: punkt 0 V.\n\n## Ćwiczenie: dokończ obwód\n\nElementy już stoją, brakuje przewodów. Połącz baterię, opornik i diodę w pętlę (narzędzie **Przewód**,\nklawisz W), a potem sprawdź, czy dioda świeci (⚡). Czerwone kropki znikną, gdy wszystko będzie\npodłączone."
+    },
+    {
+      "id": "2d81238c",
+      "type": "schematic",
+      "name": "do_dokonczenia",
+      "schematic": {
+        "version": 1,
+        "elements": [
+          {
+            "id": "E_1",
+            "kind": "voltage_source",
+            "at": [
+              4,
+              13
+            ],
+            "rotation": 270,
+            "value": "9",
+            "text": null
+          },
+          {
+            "id": "R_1",
+            "kind": "resistor",
+            "at": [
+              8,
+              7
+            ],
+            "rotation": 0,
+            "value": "330",
+            "text": null
+          },
+          {
+            "id": "LED_1",
+            "kind": "led",
+            "at": [
+              18,
+              8
+            ],
+            "rotation": 90,
+            "value": null,
+            "text": "red"
+          },
+          {
+            "id": "gnd1",
+            "kind": "ground",
+            "at": [
+              4,
+              13
+            ],
+            "rotation": 0,
+            "value": null,
+            "text": null
+          }
+        ],
+        "wires": []
+      },
+      "view": "schematic"
+    },
+    {
+      "id": "25b72db5",
+      "type": "markdown",
+      "source": "## Wartości\n\nZaznacz element, a z prawej pojawi się jego **panel**: nazwa (np. `R_1`), wartość i to, co jeszcze da się\nustawić (kolor diody, częstotliwość źródła…). Wartość wpisujesz z przedrostkiem — `4.7k`, `100n`, `2m`;\n**pusta** wartość znaczy „nie wiem” (solver jej szuka), a **litera** — symbol, z którym wynik wyjdzie\njako wzór.\n\n## Schemat jako kod\n\nPasek nad schematem ma kartę **Kod**: to ten sam obwód zapisany w Pythonie. Zmień w nim wartość\ni wróć do schematu — rysunek się zaktualizuje. Elementy dodaje się na rysunku, a w kodzie zmienia\ntylko wartości."
+    }
+  ]
+}

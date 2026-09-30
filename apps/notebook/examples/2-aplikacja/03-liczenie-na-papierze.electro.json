@@ -1,0 +1,567 @@
+{
+  "format": "electro-notebook",
+  "version": 2,
+  "id": "3070f6afd7890fe6",
+  "title": "3. Liczenie na papierze",
+  "created": "2026-10-01T00:00:00Z",
+  "modified": "2026-10-01T00:00:00Z",
+  "settings": {
+    "codeInPdf": true
+  },
+  "cells": [
+    {
+      "id": "a4d3f235",
+      "type": "markdown",
+      "source": "# Liczenie na papierze\n\nObwód z opornikami, źródłami, kondensatorami i cewkami (bez diod i tranzystorów) jest **liniowy** —\nda się go policzyć dokładnie, tak jak na kartce. Robi to przycisk ▶ **Policz** nad schematem (albo\nShift+Enter): przy każdym elemencie pojawia się napięcie i prąd, a pod schematem — tabela wyników.\nStrzałka przy prądzie pokazuje, w którą stronę naprawdę płynie.\n\nGdy zmienisz coś na schemacie, wyniki robią się szare: są nieaktualne, dopóki nie klikniesz ▶ znowu."
+    },
+    {
+      "id": "8842744d",
+      "type": "markdown",
+      "source": "## Niewiadome i dane\n\nTu jest mostek Wheatstone'a: $R_x$ ma pustą wartość, a amperomierz pokazuje zero — mostek jest\nw równowadze. To wystarczy, żeby wyznaczyć $R_x$: kliknij ▶."
+    },
+    {
+      "id": "e46cc8c2",
+      "type": "schematic",
+      "name": "mostek",
+      "schematic": {
+        "version": 1,
+        "elements": [
+          {
+            "id": "E_1",
+            "kind": "voltage_source",
+            "at": [
+              4,
+              21
+            ],
+            "rotation": 270,
+            "value": "10",
+            "text": null
+          },
+          {
+            "id": "R_1",
+            "kind": "resistor",
+            "at": [
+              12,
+              7
+            ],
+            "rotation": 90,
+            "value": "100",
+            "text": null
+          },
+          {
+            "id": "R_x",
+            "kind": "resistor",
+            "at": [
+              12,
+              13
+            ],
+            "rotation": 90,
+            "value": null,
+            "text": null
+          },
+          {
+            "id": "R_3",
+            "kind": "resistor",
+            "at": [
+              22,
+              7
+            ],
+            "rotation": 90,
+            "value": "50",
+            "text": null
+          },
+          {
+            "id": "R_4",
+            "kind": "resistor",
+            "at": [
+              22,
+              13
+            ],
+            "rotation": 90,
+            "value": "100",
+            "text": null
+          },
+          {
+            "id": "A_1",
+            "kind": "ammeter",
+            "at": [
+              15,
+              12
+            ],
+            "rotation": 0,
+            "value": "0",
+            "text": null
+          },
+          {
+            "id": "gnd1",
+            "kind": "ground",
+            "at": [
+              4,
+              21
+            ],
+            "rotation": 0,
+            "value": null,
+            "text": null
+          }
+        ],
+        "wires": [
+          {
+            "points": [
+              [
+                4,
+                17
+              ],
+              [
+                4,
+                7
+              ],
+              [
+                12,
+                7
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                12,
+                7
+              ],
+              [
+                22,
+                7
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                12,
+                11
+              ],
+              [
+                12,
+                13
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                22,
+                11
+              ],
+              [
+                22,
+                13
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                12,
+                12
+              ],
+              [
+                15,
+                12
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                19,
+                12
+              ],
+              [
+                22,
+                12
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                12,
+                17
+              ],
+              [
+                12,
+                21
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                22,
+                17
+              ],
+              [
+                22,
+                21
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                4,
+                21
+              ],
+              [
+                22,
+                21
+              ]
+            ]
+          }
+        ]
+      },
+      "view": "schematic",
+      "results": {
+        "E_1": {
+          "value": "10 V",
+          "solved": false,
+          "U": "10 V",
+          "I": "100 mA",
+          "P": "1 W",
+          "reversed": false
+        },
+        "R_1": {
+          "value": "100 Ω",
+          "solved": false,
+          "U": "3.333 V",
+          "I": "33.33 mA",
+          "P": "111.1 mW",
+          "reversed": false
+        },
+        "R_x": {
+          "value": "200 Ω",
+          "solved": true,
+          "U": "6.667 V",
+          "I": "33.33 mA",
+          "P": "222.2 mW",
+          "reversed": false
+        },
+        "R_3": {
+          "value": "50 Ω",
+          "solved": false,
+          "U": "3.333 V",
+          "I": "66.67 mA",
+          "P": "222.2 mW",
+          "reversed": false
+        },
+        "R_4": {
+          "value": "100 Ω",
+          "solved": false,
+          "U": "6.667 V",
+          "I": "66.67 mA",
+          "P": "444.4 mW",
+          "reversed": false
+        },
+        "A_1": {
+          "value": "0 A",
+          "solved": false,
+          "U": "0 V",
+          "I": "0 A",
+          "P": "0 W",
+          "reversed": false
+        }
+      },
+      "problems": []
+    },
+    {
+      "id": "2a3e4eb7",
+      "type": "markdown",
+      "source": "## Kiedy danych brakuje\n\nJeśli niewiadomych jest więcej niż danych, solver nie zgaduje — policzy, co się da, a w rogu schematu\npojawi się ostrzeżenie. Kliknij je: dowiesz się, czego nie da się wyznaczyć, ilu danych brakuje\ni **które pomiary by wystarczyły**. Tu nieznane są oba oporniki, a znany jest tylko prąd:"
+    },
+    {
+      "id": "b809c93e",
+      "type": "schematic",
+      "name": "za_malo_danych",
+      "schematic": {
+        "version": 1,
+        "elements": [
+          {
+            "id": "E_1",
+            "kind": "voltage_source",
+            "at": [
+              4,
+              13
+            ],
+            "rotation": 270,
+            "value": "12",
+            "text": null
+          },
+          {
+            "id": "A_1",
+            "kind": "ammeter",
+            "at": [
+              6,
+              7
+            ],
+            "rotation": 0,
+            "value": "0.5",
+            "text": null
+          },
+          {
+            "id": "R_1",
+            "kind": "resistor",
+            "at": [
+              12,
+              7
+            ],
+            "rotation": 0,
+            "value": null,
+            "text": null
+          },
+          {
+            "id": "R_2",
+            "kind": "resistor",
+            "at": [
+              18,
+              7
+            ],
+            "rotation": 90,
+            "value": null,
+            "text": null
+          },
+          {
+            "id": "gnd1",
+            "kind": "ground",
+            "at": [
+              4,
+              13
+            ],
+            "rotation": 0,
+            "value": null,
+            "text": null
+          }
+        ],
+        "wires": [
+          {
+            "points": [
+              [
+                4,
+                9
+              ],
+              [
+                4,
+                7
+              ],
+              [
+                6,
+                7
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                10,
+                7
+              ],
+              [
+                12,
+                7
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                16,
+                7
+              ],
+              [
+                18,
+                7
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                18,
+                11
+              ],
+              [
+                18,
+                13
+              ],
+              [
+                4,
+                13
+              ]
+            ]
+          }
+        ]
+      },
+      "view": "schematic",
+      "results": {
+        "E_1": {
+          "value": "12 V",
+          "solved": false,
+          "U": "12 V",
+          "I": "500 mA",
+          "P": "6 W",
+          "reversed": false
+        },
+        "A_1": {
+          "value": "500 mA",
+          "solved": false,
+          "U": "0 V",
+          "I": "500 mA",
+          "P": "0 W",
+          "reversed": false
+        },
+        "R_1": {
+          "value": "?",
+          "solved": false,
+          "U": null,
+          "I": "500 mA",
+          "P": null,
+          "reversed": false
+        },
+        "R_2": {
+          "value": "?",
+          "solved": false,
+          "U": null,
+          "I": "500 mA",
+          "P": null,
+          "reversed": false
+        }
+      },
+      "problems": [
+        {
+          "kind": "warning",
+          "issue": {
+            "type": "Underdetermined",
+            "targets": [
+              "U_{R_{1}}",
+              "R_{1}",
+              "U_{R_{2}}",
+              "R_{2}",
+              "V_{n3}"
+            ],
+            "needed": null,
+            "options": []
+          }
+        }
+      ]
+    },
+    {
+      "id": "8a617fff",
+      "type": "markdown",
+      "source": "Dostaw woltomierz równolegle do $R_2$ (z biblioteki: **Mierniki**) i wpisz w nim odczyt, np. `8`. Po ▶\noba opory są już znane.\n\n## Krok po kroku\n\nW komórce z kodem `steps(...)` pokazuje całe rozwiązanie: dane, każdy krok z wzorem i uzasadnieniem\n(prawo Ohma, prawa Kirchhoffa…) i odpowiedź. `find=` mówi, czego szukamy — wtedy kroki niepotrzebne do\nodpowiedzi są pominięte."
+    },
+    {
+      "id": "aa01a780",
+      "type": "code",
+      "source": "steps(mostek.solve(find=\"R_x\"))",
+      "outputs": [
+        {
+          "type": "solution",
+          "data": {
+            "type": "Steps",
+            "data": [
+              "E_{1} = 10\\,\\mathrm{V}",
+              "R_{1} = 100\\,\\mathrm{\\Omega}",
+              "R_{3} = 50\\,\\mathrm{\\Omega}",
+              "R_{4} = 100\\,\\mathrm{\\Omega}",
+              "A_{1} = 0\\,\\mathrm{A}"
+            ],
+            "assumed": [],
+            "steps": [
+              {
+                "type": "FormulaStep",
+                "chain": "I_{A_{1}} = A_{1} = 0\\,\\mathrm{A}",
+                "reason": {
+                  "type": "AmmeterReading",
+                  "label": "A_{1}"
+                }
+              },
+              {
+                "type": "FormulaStep",
+                "chain": "U_{E_{1}} = E_{1} = 10\\,\\mathrm{V}",
+                "reason": {
+                  "type": "SourceVoltage",
+                  "label": "E_{1}"
+                }
+              },
+              {
+                "type": "FormulaStep",
+                "chain": "U_{A_{1}} = 0\\,\\mathrm{V}",
+                "reason": {
+                  "type": "IdealAmmeter",
+                  "label": "A_{1}"
+                }
+              },
+              {
+                "type": "FormulaStep",
+                "chain": "V_{n1} = U_{E_{1}} + V_{\\mathrm{GND}} = 10 + 0 = 10\\,\\mathrm{V}",
+                "reason": {
+                  "type": "VoltageAcross",
+                  "label": "E_{1}"
+                }
+              },
+              {
+                "type": "SystemStep",
+                "equations": [
+                  "U_{R_{1}} - I_{R_{1}} \\cdot R_{1} = 0",
+                  "U_{R_{x}} - I_{R_{x}} \\cdot R_{x} = 0",
+                  "U_{R_{3}} - I_{R_{3}} \\cdot R_{3} = 0",
+                  "U_{R_{4}} - I_{R_{4}} \\cdot R_{4} = 0",
+                  "U_{R_{1}} + V_{n2} - V_{n1} = 0",
+                  "U_{R_{x}} + V_{\\mathrm{GND}} - V_{n2} = 0",
+                  "U_{R_{3}} + V_{n3} - V_{n1} = 0",
+                  "U_{R_{4}} + V_{\\mathrm{GND}} - V_{n3} = 0",
+                  "U_{A_{1}} + V_{n3} - V_{n2} = 0",
+                  "I_{R_{1}} + I_{R_{3}} - I_{E_{1}} = 0",
+                  "I_{A_{1}} + I_{R_{x}} - I_{R_{1}} = 0",
+                  "I_{R_{4}} - I_{A_{1}} - I_{R_{3}} = 0"
+                ],
+                "results": [
+                  "I_{E_{1}} = 100\\,\\mathrm{mA}",
+                  "I_{R_{1}} = 33.33\\,\\mathrm{mA}",
+                  "I_{R_{3}} = 66.67\\,\\mathrm{mA}",
+                  "I_{R_{4}} = 66.67\\,\\mathrm{mA}",
+                  "I_{R_{x}} = 33.33\\,\\mathrm{mA}",
+                  "R_{x} = 200\\,\\mathrm{\\Omega}",
+                  "U_{R_{1}} = 3.333\\,\\mathrm{V}",
+                  "U_{R_{3}} = 3.333\\,\\mathrm{V}",
+                  "U_{R_{4}} = 6.667\\,\\mathrm{V}",
+                  "U_{R_{x}} = 6.667\\,\\mathrm{V}",
+                  "V_{n2} = 6.667\\,\\mathrm{V}",
+                  "V_{n3} = 6.667\\,\\mathrm{V}"
+                ]
+              }
+            ],
+            "answer": [
+              "R_{x} = 200\\,\\mathrm{\\Omega}"
+            ],
+            "missing": null
+          }
+        }
+      ]
+    },
+    {
+      "id": "617713d4",
+      "type": "markdown",
+      "source": "## Wzory zamiast liczb\n\nWartość może być literą. Wtedy wynik jest wzorem — dobrze to sprawdza rozwiązania z zeszytu:"
+    },
+    {
+      "id": "26a565b3",
+      "type": "code",
+      "source": "uklad = supply(\"E\") + Resistor(\"R_1\") + (Resistor(\"R_2\") | Resistor(\"R_3\")) + ground\nuklad.solve(find=\"I_R_1\")",
+      "outputs": [
+        {
+          "type": "text",
+          "data": "I_R_1 = E*(R_2 + R_3)/(R_1*R_2 + R_1*R_3 + R_2*R_3) A"
+        }
+      ]
+    }
+  ]
+}

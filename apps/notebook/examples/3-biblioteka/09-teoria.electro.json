@@ -1,0 +1,34 @@
+{
+  "format": "electro-notebook",
+  "version": 2,
+  "id": "5206e73e6d32dd97",
+  "title": "9. Teoria: obwody jako kategoria",
+  "created": "2026-10-01T00:00:00Z",
+  "modified": "2026-10-01T00:00:00Z",
+  "settings": {
+    "codeInPdf": true
+  },
+  "cells": [
+    {
+      "id": "be4b687c",
+      "type": "markdown",
+      "source": "# Co jest pod spodem\n\nTa lekcja jest dla ciekawych — nie trzeba jej znać, żeby korzystać z biblioteki. `electro` traktuje\nobwody jako **morfizmy kategorii hipergrafowej**. Brzmi groźnie, ale znaczy coś prostego: obwód to\n„pudełko z zaciskami po lewej i prawej”, a jedyne, co z pudełkami robimy, to składanie.\n\n```\nObwód (drzewo składni)  ──netlista──►  Netlista (kospan)  ──semantyka──►  równania / relacje\n```\n\n- **Obiekty** to liczby naturalne — ile zacisków. **Morfizmy** to obwody: $m \\to n$.\n- `f + g` to **złożenie** (szeregowo): prawe zaciski `f` sklejone z lewymi `g`.\n- `f @ g` to **iloczyn monoidalny**: obok siebie, bez połączenia.\n- **Węzeł** to *pająk* algebry Frobeniusa: `split` rozdziela jeden przewód na dwa, `join` łączy dwa\n  w jeden. Równanie $\\mathrm{split} + \\mathrm{join} = \\mathrm{wire}$ to fizycznie I prawo Kirchhoffa\n  (prądy się sumują) i to, że węzeł ma jeden potencjał.\n- **Równolegle** nie jest osobnym działaniem, tylko skrótem: `f | g = split + (f @ g) + join`.\n- `f.transpose()` zamienia lewą stronę z prawą (*sztylet*)."
+    },
+    {
+      "id": "5a968c07",
+      "type": "code",
+      "source": "rownolegle = split + (Resistor(10) @ Resistor(10)) + join\nprint(\"split + (R @ R) + join:\", resistance(rownolegle), \"Ω\")\nprint(\"R | R:                 \", resistance(Resistor(10) | Resistor(10)), \"Ω\")",
+      "outputs": [
+        {
+          "type": "stream",
+          "data": "split + (R @ R) + join: 5 Ω\nR | R:                  5 Ω\n"
+        }
+      ]
+    },
+    {
+      "id": "e9d9b1a4",
+      "type": "markdown",
+      "source": "## Semantyka\n\nKażdy element to **relacja** między potencjałami i prądami na zaciskach (opornik: $U = RI$), a obwód\nzłożony z elementów — relacja złożona z relacji. `blackbox` eliminuje zmienne wewnętrzne i zostawia\nrelację na brzegu: dwa obwody są równoważne, gdy mają tę samą czarną skrzynkę. Złożenie w kategorii\nobwodów przechodzi na złożenie relacji — dlatego solver może pracować na dowolnie złożonych kawałkach\ni zawsze dostanie ten sam wynik, jakby liczył całość.\n\n**Netlista** to kospan: zaciski lewe → węzły ← zaciski prawe. Złożenie `+` to wypchnięcie (*pushout*):\nsklejenie węzłów. Schemat narysowany na siatce jest jeszcze jedną składnią tego samego — dwa zaciski\nw tym samym punkcie siatki to jeden węzeł, dokładnie jak dwa zaciski z tą samą nazwą w `net(...)`.\n\nPo więcej: John Baez i Brendan Fong, *A Compositional Framework for Passive Linear Networks* (2015)."
+    }
+  ]
+}

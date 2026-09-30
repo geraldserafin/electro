@@ -1,0 +1,246 @@
+{
+  "format": "electro-notebook",
+  "version": 2,
+  "id": "0e03369bbac21e9d",
+  "title": "Termometr cyfrowy",
+  "created": "2026-10-01T00:00:00Z",
+  "modified": "2026-10-01T00:00:00Z",
+  "settings": {
+    "codeInPdf": true
+  },
+  "cells": [
+    {
+      "id": "b7b13880",
+      "type": "markdown",
+      "source": "# Termometr\n\nTermistor NTC to opornik, którego opór spada, gdy robi się cieplej: 10 kΩ przy 25 °C, ok. 3,6 kΩ przy\n50 °C. W dzielniku z opornikiem 10 kΩ zamienia temperaturę na napięcie, które mierzy Arduino. Z napięcia\nliczy opór termistora, a z oporu temperaturę:\n\n$$\\frac{1}{T} = \\frac{1}{T_0} + \\frac{1}{B} \\ln\\frac{R}{R_0}$$\n\n($T$ w kelwinach, $T_0 = 298{,}15$ K, $R_0 = 10$ kΩ, $B = 3950$ K — z karty katalogowej termistora).\n\nUruchom ⚡ i zmieniaj temperaturę suwakiem termistora; LCD pokazuje też minimum i maksimum."
+    },
+    {
+      "id": "e7867b48",
+      "type": "schematic",
+      "name": "termometr",
+      "schematic": {
+        "version": 1,
+        "elements": [
+          {
+            "id": "ARD_1",
+            "kind": "arduino",
+            "at": [
+              2,
+              7
+            ],
+            "rotation": 0,
+            "value": null,
+            "text": "// TERMOMETR: termistor NTC 10 kΩ w dzielniku z opornikiem 10 kΩ, na A0. Z napięcia liczymy opór,\n// a z oporu temperaturę — równaniem Steinharta–Harta w wersji z parametrem B (3950 K).\n// Wynik na LCD 16×2 (I²C) razem z minimum i maksimum. Zmieniaj temperaturę suwakiem termistora.\n#include <LiquidCrystal_I2C.h>\n#include <math.h>\n\nLiquidCrystal_I2C lcd(0x27, 16, 2);\nconst float R_FIXED = 10000, R0 = 10000, T0 = 298.15, B = 3950;  // T0: 25 °C w kelwinach\nfloat lowest = 1000, highest = -1000;\n\n// stopień: znak 0 w pamięci wyświetlacza\nbyte degree[8] = {0b00110, 0b01001, 0b01001, 0b00110, 0, 0, 0, 0};\n\nvoid setup() {\n  lcd.init();\n  lcd.backlight();\n  lcd.createChar(0, degree);\n  Serial.begin(9600);\n}\n\nvoid loop() {\n  int raw = analogRead(A0);                        // termistor u góry, opornik u dołu dzielnika\n  float r = R_FIXED * (1023.0 / max(raw, 1) - 1);   // opór termistora\n  float t = 1 / (1 / T0 + log(r / R0) / B) - 273.15;\n  lowest = min(lowest, t);\n  highest = max(highest, t);\n  lcd.setCursor(0, 0);\n  lcd.print(\"T = \");\n  lcd.print(t, 1);\n  lcd.write(byte(0));\n  lcd.print(\"C    \");\n  lcd.setCursor(0, 1);\n  lcd.print(\"min \");\n  lcd.print(lowest, 0);\n  lcd.print(\" max \");\n  lcd.print(highest, 0);\n  lcd.print(\"   \");\n  Serial.println(t, 2);\n  delay(300);\n}\n"
+          },
+          {
+            "id": "RT_1",
+            "kind": "thermistor",
+            "at": [
+              6,
+              21
+            ],
+            "rotation": 0,
+            "value": "10k",
+            "text": "22"
+          },
+          {
+            "id": "R_1",
+            "kind": "resistor",
+            "at": [
+              14,
+              21
+            ],
+            "rotation": 0,
+            "value": "10k",
+            "text": null
+          },
+          {
+            "id": "LCD_1",
+            "kind": "lcd1602_i2c",
+            "at": [
+              28,
+              17
+            ],
+            "rotation": 0,
+            "value": null,
+            "text": "0x27"
+          }
+        ],
+        "wires": [
+          {
+            "points": [
+              [
+                28,
+                19
+              ],
+              [
+                15,
+                19
+              ],
+              [
+                15,
+                15
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                28,
+                20
+              ],
+              [
+                16,
+                20
+              ],
+              [
+                16,
+                15
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                10,
+                21
+              ],
+              [
+                11,
+                21
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                11,
+                21
+              ],
+              [
+                11,
+                15
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                14,
+                21
+              ],
+              [
+                11,
+                21
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                18,
+                21
+              ],
+              [
+                18,
+                18
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                18,
+                18
+              ],
+              [
+                7,
+                18
+              ],
+              [
+                7,
+                15
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                28,
+                17
+              ],
+              [
+                18,
+                17
+              ],
+              [
+                18,
+                18
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                6,
+                21
+              ],
+              [
+                6,
+                16
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                6,
+                16
+              ],
+              [
+                6,
+                15
+              ],
+              [
+                5,
+                15
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                28,
+                18
+              ],
+              [
+                19,
+                18
+              ],
+              [
+                19,
+                16
+              ],
+              [
+                6,
+                16
+              ]
+            ]
+          }
+        ]
+      },
+      "view": "schematic"
+    },
+    {
+      "id": "dd44a6c6",
+      "type": "code",
+      "source": "import math\n# ta sama zależność w Pythonie: temperatura → opór termistora → napięcie na A0\nfor t in [0, 10, 20, 25, 30, 40, 50]:\n    r = 10_000 * math.exp(3950 * (1 / (t + 273.15) - 1 / 298.15))\n    u = 5 * 10_000 / (r + 10_000)\n    print(f\"{t:>3} °C: R = {r / 1000:5.2f} kΩ, U_A0 = {u:.2f} V\")",
+      "outputs": [
+        {
+          "type": "stream",
+          "data": "  0 °C: R = 33.62 kΩ, U_A0 = 1.15 V\n 10 °C: R = 20.17 kΩ, U_A0 = 1.66 V\n 20 °C: R = 12.54 kΩ, U_A0 = 2.22 V\n 25 °C: R = 10.00 kΩ, U_A0 = 2.50 V\n 30 °C: R =  8.04 kΩ, U_A0 = 2.77 V\n 40 °C: R =  5.30 kΩ, U_A0 = 3.27 V\n 50 °C: R =  3.59 kΩ, U_A0 = 3.68 V\n"
+        }
+      ]
+    }
+  ]
+}

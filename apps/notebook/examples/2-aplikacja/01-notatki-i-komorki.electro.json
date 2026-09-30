@@ -1,0 +1,172 @@
+{
+  "format": "electro-notebook",
+  "version": 2,
+  "id": "a11fea6621c4ec3d",
+  "title": "1. Notatki i komórki",
+  "created": "2026-10-01T00:00:00Z",
+  "modified": "2026-10-01T00:00:00Z",
+  "settings": {
+    "codeInPdf": true
+  },
+  "cells": [
+    {
+      "id": "3ad1bf14",
+      "type": "markdown",
+      "source": "# Notatka to ciąg komórek\n\nKażda notatka składa się z **komórek** trzech rodzajów:\n\n- **Tekst** — Markdown: nagłówki, pogrubienia, listy, tabele i wzory w LaTeX-u, jak ta komórka,\n- **Kod** — Python z biblioteką `electro` do liczenia obwodów,\n- **Schemat** — obwód narysowany na siatce, który można policzyć albo uruchomić w czasie.\n\nNową komórkę dodajesz przyciskami **Tekst**, **Kod** i **Schemat**, które pojawiają się pod komórką\ni między komórkami, gdy najedziesz myszką. Komórkę przesuwasz, łapiąc za uchwyt z lewej (albo\nstrzałkami ↑ ↓), a usuwasz ikoną kosza — przez chwilę można to cofnąć. Tytuł notatki zmieniasz,\nklikając go."
+    },
+    {
+      "id": "e10cee7c",
+      "type": "markdown",
+      "source": "## Tekst\n\nKliknij tę komórkę dwa razy, żeby zobaczyć, jak jest napisana. Markdown to zwykły tekst z kilkoma\nznakami:\n\n- `# Nagłówek`, `## Mniejszy nagłówek` — nagłówki trafiają do **spisu treści** z lewej,\n- `**pogrubienie**`, `*kursywa*`, `` `kod` ``,\n- `- punkt listy`, `1. punkt numerowany`,\n- wzór w linii: `$U = R \\cdot I$` daje $U = R \\cdot I$, a osobny, na środku, w podwójnych dolarach:\n\n$$P = U \\cdot I = I^2 R = \\frac{U^2}{R}$$\n\n| tabela | też | działa |\n|---|:-:|--:|\n| do lewej | środek | do prawej |"
+    },
+    {
+      "id": "87c72047",
+      "type": "markdown",
+      "source": "## Kod\n\nKomórka z kodem to Python. Uruchamiasz ją przyciskiem ▶ albo **Shift+Enter**; wynik pojawia się pod\nnią. Wszystkie komórki dzielą zmienne — to, co zdefiniujesz w jednej, widać w następnych. **Uruchom\nwszystko** (w prawym górnym rogu) wykonuje całą notatkę od góry. Za pierwszym razem przeglądarka\nładuje Pythona — to chwila."
+    },
+    {
+      "id": "bbb7dcdd",
+      "type": "code",
+      "source": "napiecie = 12\nopor = 470\nprad = napiecie / opor\nprint(f\"I = {prad * 1000:.1f} mA\")",
+      "outputs": [
+        {
+          "type": "stream",
+          "data": "I = 25.5 mA\n"
+        }
+      ]
+    },
+    {
+      "id": "6a79bc8a",
+      "type": "code",
+      "source": "# ta komórka widzi zmienne z poprzedniej\nmoc = napiecie * prad\nround(moc, 3)",
+      "outputs": [
+        {
+          "type": "text",
+          "data": "0.306"
+        }
+      ]
+    },
+    {
+      "id": "7e2c890b",
+      "type": "markdown",
+      "source": "## Schemat\n\nSchemat ma **nazwę** (na pasku nad nim) — i pod tą nazwą jest zmienną w kodzie. Ten nazywa się\n`przyklad`:"
+    },
+    {
+      "id": "9c5b6a60",
+      "type": "schematic",
+      "name": "przyklad",
+      "schematic": {
+        "version": 1,
+        "elements": [
+          {
+            "id": "E_1",
+            "kind": "voltage_source",
+            "at": [
+              4,
+              13
+            ],
+            "rotation": 270,
+            "value": "12",
+            "text": null
+          },
+          {
+            "id": "R_1",
+            "kind": "resistor",
+            "at": [
+              6,
+              7
+            ],
+            "rotation": 0,
+            "value": "470",
+            "text": null
+          },
+          {
+            "id": "LED_1",
+            "kind": "led",
+            "at": [
+              14,
+              7
+            ],
+            "rotation": 90,
+            "value": null,
+            "text": "green"
+          },
+          {
+            "id": "gnd1",
+            "kind": "ground",
+            "at": [
+              4,
+              13
+            ],
+            "rotation": 0,
+            "value": null,
+            "text": null
+          }
+        ],
+        "wires": [
+          {
+            "points": [
+              [
+                4,
+                9
+              ],
+              [
+                4,
+                7
+              ],
+              [
+                6,
+                7
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                10,
+                7
+              ],
+              [
+                14,
+                7
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                14,
+                11
+              ],
+              [
+                14,
+                13
+              ],
+              [
+                4,
+                13
+              ]
+            ]
+          }
+        ]
+      },
+      "view": "schematic"
+    },
+    {
+      "id": "94f595fd",
+      "type": "code",
+      "source": "wynik = simulate(przyklad, t=0.01)\nprint(\"prąd diody:\", round(wynik.at(0.01)[\"I_LED_1\"] * 1000, 1), \"mA\")",
+      "outputs": [
+        {
+          "type": "stream",
+          "data": "prąd diody: 20.8 mA\n"
+        }
+      ]
+    },
+    {
+      "id": "26e66b74",
+      "type": "markdown",
+      "source": "## Spis treści i PDF\n\nIkona w lewym górnym rogu otwiera **spis treści**: nagłówki i schematy notatki. Przeciągając nagłówek,\nprzenosisz całą sekcję pod nim. Menu **⋯** w prawym górnym rogu ma **Eksport do PDF** (⌘P / Ctrl+P):\nnotatka składa się w porządny dokument — z motywem do wyboru, schematami i wzorami. Tam też jest wybór\nsymboli: europejskie (IEC — opornik to prostokąt) albo amerykańskie (IEEE — zygzak)."
+    }
+  ]
+}

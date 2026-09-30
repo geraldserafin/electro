@@ -1,0 +1,517 @@
+{
+  "format": "electro-notebook",
+  "version": 2,
+  "id": "2f21a169fc4ee36b",
+  "title": "Simon: gra pamięciowa",
+  "created": "2026-10-01T00:00:00Z",
+  "modified": "2026-10-01T00:00:00Z",
+  "settings": {
+    "codeInPdf": true
+  },
+  "cells": [
+    {
+      "id": "9b32f4a1",
+      "type": "markdown",
+      "source": "# Simon\n\nElektroniczna gra z 1978 roku: cztery kolory, cztery dźwięki. Arduino pokazuje sekwencję, a Ty ją\npowtarzasz. Z każdą rundą sekwencja jest o jeden kolor dłuższa — i szybsza. Poziom widać na monitorze\nportu szeregowego (zakładka **Konsola**).\n\n**Jak grać:** uruchom ⚡, kliknij schemat i naciskaj klawisze **1–4** (albo przytrzymuj przyciski myszką)."
+    },
+    {
+      "id": "071e71b0",
+      "type": "schematic",
+      "name": "simon",
+      "schematic": {
+        "version": 1,
+        "elements": [
+          {
+            "id": "ARD_1",
+            "kind": "arduino",
+            "at": [
+              15,
+              17
+            ],
+            "rotation": 0,
+            "value": null,
+            "text": "// SIMON: gra pamięciowa. Arduino pokazuje coraz dłuższą sekwencję kolorów (diody i dźwięki),\n// a Ty ją powtarzasz przyciskami. Pomyłka — koniec gry, a wynik to długość, do której doszedłeś.\n// Diody na D8–D11 (zielona, czerwona, żółta, niebieska), przyciski na D2–D5 (klawisze 1–4), buzzer na D12.\nconst byte LEDS[4] = {8, 9, 10, 11};\nconst byte KEYS[4] = {2, 3, 4, 5};\nconst int NOTES[4] = {392, 330, 262, 196};  // G4, E4, C4, G3 — jak w oryginale\nconst byte BUZZER = 12;\nconst int MAX = 50;\n\nbyte sequence[MAX];\nint length;\n\nvoid show(byte color, int ms) {\n  digitalWrite(LEDS[color], HIGH);\n  tone(BUZZER, NOTES[color], ms);\n  delay(ms);\n  digitalWrite(LEDS[color], LOW);\n  delay(ms / 3);\n}\n\nint waitForKey() {  // który przycisk (0–3), albo -1, gdy gracz za długo myśli\n  unsigned long until = millis() + 3000;\n  while (millis() < until)\n    for (byte k = 0; k < 4; k++)\n      if (digitalRead(KEYS[k]) == LOW) {\n        digitalWrite(LEDS[k], HIGH);\n        tone(BUZZER, NOTES[k]);\n        while (digitalRead(KEYS[k]) == LOW) delay(5);  // czekaj, aż puści\n        noTone(BUZZER);\n        digitalWrite(LEDS[k], LOW);\n        return k;\n      }\n  return -1;\n}\n\nvoid gameOver() {\n  Serial.print(\"Koniec! Wynik: \");\n  Serial.println(length - 1);\n  for (int f = 400; f > 100; f -= 20) {\n    tone(BUZZER, f, 20);\n    delay(20);\n  }\n  for (int i = 0; i < 3; i++) {\n    for (byte c = 0; c < 4; c++) digitalWrite(LEDS[c], HIGH);\n    delay(150);\n    for (byte c = 0; c < 4; c++) digitalWrite(LEDS[c], LOW);\n    delay(150);\n  }\n  delay(1000);\n  length = 0;\n}\n\nvoid setup() {\n  for (byte c = 0; c < 4; c++) {\n    pinMode(LEDS[c], OUTPUT);\n    pinMode(KEYS[c], INPUT_PULLUP);\n  }\n  Serial.begin(9600);\n  Serial.println(\"Simon: powtarzaj sekwencje!\");\n  randomSeed(analogRead(A0));\n}\n\nvoid loop() {\n  sequence[length++] = random(4);\n  delay(600);\n  int speed = max(150, 450 - length * 20);\n  for (int i = 0; i < length; i++) show(sequence[i], speed);\n  for (int i = 0; i < length; i++)\n    if (waitForKey() != sequence[i]) {\n      gameOver();\n      return;\n    }\n  Serial.print(\"Poziom \");\n  Serial.println(length);\n  if (length == MAX) length = 0;\n}\n"
+          },
+          {
+            "id": "R_1",
+            "kind": "resistor",
+            "at": [
+              13,
+              15
+            ],
+            "rotation": 270,
+            "value": "220",
+            "text": null
+          },
+          {
+            "id": "LED_1",
+            "kind": "led",
+            "at": [
+              13,
+              11
+            ],
+            "rotation": 270,
+            "value": null,
+            "text": "green"
+          },
+          {
+            "id": "B_1",
+            "kind": "button",
+            "at": [
+              35,
+              7
+            ],
+            "rotation": 90,
+            "value": null,
+            "text": "1"
+          },
+          {
+            "id": "R_2",
+            "kind": "resistor",
+            "at": [
+              10,
+              15
+            ],
+            "rotation": 270,
+            "value": "220",
+            "text": null
+          },
+          {
+            "id": "LED_2",
+            "kind": "led",
+            "at": [
+              10,
+              11
+            ],
+            "rotation": 270,
+            "value": null,
+            "text": "red"
+          },
+          {
+            "id": "B_2",
+            "kind": "button",
+            "at": [
+              38,
+              7
+            ],
+            "rotation": 90,
+            "value": null,
+            "text": "2"
+          },
+          {
+            "id": "R_3",
+            "kind": "resistor",
+            "at": [
+              7,
+              15
+            ],
+            "rotation": 270,
+            "value": "220",
+            "text": null
+          },
+          {
+            "id": "LED_3",
+            "kind": "led",
+            "at": [
+              7,
+              11
+            ],
+            "rotation": 270,
+            "value": null,
+            "text": "yellow"
+          },
+          {
+            "id": "B_3",
+            "kind": "button",
+            "at": [
+              41,
+              7
+            ],
+            "rotation": 90,
+            "value": null,
+            "text": "3"
+          },
+          {
+            "id": "R_4",
+            "kind": "resistor",
+            "at": [
+              4,
+              15
+            ],
+            "rotation": 270,
+            "value": "220",
+            "text": null
+          },
+          {
+            "id": "LED_4",
+            "kind": "led",
+            "at": [
+              4,
+              11
+            ],
+            "rotation": 270,
+            "value": null,
+            "text": "blue"
+          },
+          {
+            "id": "B_4",
+            "kind": "button",
+            "at": [
+              44,
+              7
+            ],
+            "rotation": 90,
+            "value": null,
+            "text": "4"
+          },
+          {
+            "id": "BZ_1",
+            "kind": "passive_buzzer",
+            "at": [
+              37,
+              21
+            ],
+            "rotation": 0,
+            "value": null,
+            "text": null
+          }
+        ],
+        "wires": [
+          {
+            "points": [
+              [
+                13,
+                15
+              ],
+              [
+                22,
+                15
+              ],
+              [
+                22,
+                17
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                35,
+                11
+              ],
+              [
+                29,
+                11
+              ],
+              [
+                29,
+                17
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                10,
+                15
+              ],
+              [
+                10,
+                16
+              ],
+              [
+                21,
+                16
+              ],
+              [
+                21,
+                17
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                7,
+                15
+              ],
+              [
+                7,
+                17
+              ],
+              [
+                14,
+                17
+              ],
+              [
+                14,
+                14
+              ],
+              [
+                20,
+                14
+              ],
+              [
+                20,
+                17
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                38,
+                11
+              ],
+              [
+                38,
+                12
+              ],
+              [
+                28,
+                12
+              ],
+              [
+                28,
+                17
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                4,
+                15
+              ],
+              [
+                4,
+                18
+              ],
+              [
+                15,
+                18
+              ],
+              [
+                15,
+                13
+              ],
+              [
+                19,
+                13
+              ],
+              [
+                19,
+                17
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                41,
+                11
+              ],
+              [
+                41,
+                13
+              ],
+              [
+                27,
+                13
+              ],
+              [
+                27,
+                17
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                37,
+                21
+              ],
+              [
+                33,
+                21
+              ],
+              [
+                33,
+                10
+              ],
+              [
+                18,
+                10
+              ],
+              [
+                18,
+                17
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                44,
+                11
+              ],
+              [
+                44,
+                14
+              ],
+              [
+                26,
+                14
+              ],
+              [
+                26,
+                17
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                20,
+                26
+              ],
+              [
+                20,
+                25
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                41,
+                21
+              ],
+              [
+                41,
+                26
+              ],
+              [
+                20,
+                26
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                13,
+                7
+              ],
+              [
+                12,
+                7
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                12,
+                7
+              ],
+              [
+                12,
+                26
+              ],
+              [
+                20,
+                26
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                10,
+                7
+              ],
+              [
+                12,
+                7
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                7,
+                7
+              ],
+              [
+                10,
+                7
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                35,
+                7
+              ],
+              [
+                13,
+                7
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                4,
+                7
+              ],
+              [
+                7,
+                7
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                38,
+                7
+              ],
+              [
+                35,
+                7
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                41,
+                7
+              ],
+              [
+                38,
+                7
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                44,
+                7
+              ],
+              [
+                41,
+                7
+              ]
+            ]
+          }
+        ]
+      },
+      "view": "schematic"
+    }
+  ]
+}

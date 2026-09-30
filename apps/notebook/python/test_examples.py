@@ -6,7 +6,7 @@ from pathlib import Path
 import pytest
 from electro_notebook import kernel
 
-EXAMPLES = sorted((Path(__file__).parent.parent / "examples").glob("*.electro.json"))
+EXAMPLES = sorted((Path(__file__).parent.parent / "examples").glob("*/*.electro.json"))
 
 
 def run_notebook(path: Path) -> list[tuple[str, list[dict]]]:
@@ -28,7 +28,13 @@ def test_example_runs_without_errors(path):
 
 
 def test_unknowns_and_holes_give_the_described_answers():
-    outputs = [o for _, outs in run_notebook(Path(EXAMPLES[0]).parent / "nieznane-i-dziury.electro.json") for o in outs]
+    outputs = [
+        o
+        for _, outs in run_notebook(
+            Path(__file__).parent.parent / "examples/3-biblioteka/03-niewiadome-i-dziury.electro.json"
+        )
+        for o in outs
+    ]
     text = "\n".join(o["data"] for o in outputs if isinstance(o["data"], str))
     issues = [o["issue"] for o in outputs if o["type"] == "issue"]
     for expected in [

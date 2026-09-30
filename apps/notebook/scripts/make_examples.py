@@ -1,4 +1,4 @@
-"""Builds apps/notebook/examples/nieznane-i-dziury.electro.json (format: electro_notes) (run from the repo root with PYTHONPATH set, e.g. in devenv shell)."""
+"""Builds apps/notebook/examples/3-biblioteka/03-niewiadome-i-dziury.electro.json (format: electro_notes) (run from the repo root with PYTHONPATH set, e.g. in devenv shell)."""
 
 import json
 import secrets
@@ -256,14 +256,14 @@ notebook = from_dict(
         "format": FORMAT,
         "version": VERSION,
         "id": "przyklad-nieznane-i-dziury",
-        "title": "Przykłady: niewiadome i dziury",
+        "title": "3. Niewiadome i dziury",
         "created": "2026-09-27T00:00:00Z",
         "modified": "2026-09-27T00:00:00Z",
         "settings": {"codeInPdf": True},
         "cells": cells,
     }
 )
-path = "apps/notebook/examples/nieznane-i-dziury.electro.json"
+path = "apps/notebook/examples/3-biblioteka/03-niewiadome-i-dziury.electro.json"
 with open(path, "w", encoding="utf-8") as f:
     f.write(notebook.dumps() + "\n")
 print(path, notebook)

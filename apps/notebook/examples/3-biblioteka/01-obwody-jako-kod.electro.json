@@ -1,0 +1,81 @@
+{
+  "format": "electro-notebook",
+  "version": 2,
+  "id": "cb7e4778d27aa17c",
+  "title": "1. Obwody jako kod",
+  "created": "2026-10-01T00:00:00Z",
+  "modified": "2026-10-01T00:00:00Z",
+  "settings": {
+    "codeInPdf": true
+  },
+  "cells": [
+    {
+      "id": "10a96395",
+      "type": "markdown",
+      "source": "# Obwody jako kod\n\nW każdej komórce z kodem jest już załadowana biblioteka `electro`. Obwód buduje się z **klocków**\n(elementów) i dwóch działań:\n\n- `a + b` — **szeregowo**: jeden za drugim,\n- `a | b` — **równolegle**: obok siebie, między tymi samymi węzłami.\n\nKażdy klocek ma zaciski z lewej i z prawej. Opornik to „1 → 1”: jeden zacisk wchodzi, jeden wychodzi.\n`supply(12)` to źródło 12 V wychodzące z masy (0 → 1), a `ground` wraca do masy (1 → 0). Cały obwód\nod masy do masy jest zamknięty (0 → 0)."
+    },
+    {
+      "id": "cdb0091f",
+      "type": "code",
+      "source": "uklad = supply(12) + Resistor(100) + (Resistor(200) | Resistor(300)) + ground\nuklad",
+      "outputs": [
+        {
+          "type": "text",
+          "data": "ground.transpose() + VoltageSource(12 V) + Resistor(100 Ω) + (Resistor(200 Ω) | Resistor(300 Ω)) + ground"
+        }
+      ]
+    },
+    {
+      "id": "1293c823",
+      "type": "markdown",
+      "source": "Wartości można pisać tak jak na schemacie: `\"4.7k\"`, `\"4k7\"`, `\"0,5\"`, `\"100n\"`. Każdy element dostaje\nnazwę sam (`R_1`, `R_2`, …), w kolejności wpisania; własną nadaje `label=`.\n\n`schematic()` rysuje obwód z kodu, a `code()` robi odwrotnie — z każdego obwodu (także\nnarysowanego) pisze kod, który go buduje:"
+    },
+    {
+      "id": "12919208",
+      "type": "code",
+      "source": "schematic(uklad)",
+      "outputs": [
+        {
+          "type": "svg",
+          "data": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"36 13 448 161\" width=\"448\" height=\"161\"><style>\n.w{stroke:currentColor;stroke-width:1.6;fill:none;stroke-linecap:round;stroke-linejoin:round}\n.w .thick{stroke-width:3}.w .fill{fill:currentColor;stroke:none}.w .dashed{stroke-dasharray:4 3}\n.w .open{fill:none}.dot{fill:currentColor}\ntext{font:13px ui-sans-serif,system-ui,sans-serif;fill:currentColor}.halo{fill:var(--paper,#fff)}\ntext .sub{font-size:10px}.solved{fill:#2563eb;font-weight:600}.result{fill:#059669}\n.node{font-style:italic}.letter{font-weight:600;text-anchor:middle;dominant-baseline:central}\n.w .when-closed,.closed .when-open{display:none}.closed .when-closed{display:inline}\n.w .seg{stroke-width:4;opacity:.12}.w .on{stroke-width:4;stroke:#ff3b30;fill:#ff3b30}.w .waves{stroke-width:1.4}\n.w .pins text{font-size:9px;stroke:none;fill:currentColor;opacity:.75}.w text.chip{font-size:13px;font-weight:600;stroke:none;fill:currentColor}\n</style><path class=\"w\" d=\"M60 60L80 60M160 60L180 60M180 60L200 60M280 60L300 60M320 60L340 60M420 60L440 60M320 140L340 140M420 140L440 140M300 60L320 60M440 60L460 60M320 60L320 140M440 60L440 140\"/><circle class=\"dot\" cx=\"320\" cy=\"60\" r=\"3\"/><circle class=\"dot\" cx=\"440\" cy=\"60\" r=\"3\"/><g class=\"w\" transform=\"translate(60 60) rotate(0)\"><path d=\"M0 0v10M-11 10h22M-7 14h14M-3 18h6\"/></g><g class=\"w\" transform=\"translate(80 60) rotate(0)\"><path d=\"M0 0H27M53 0H80\"/><g transform=\"translate(40 0)\"><circle r=\"13\"/><path d=\"M-13 0H13\"/><path class=\"fill\" d=\"M13 0l-7 -4v8z\"/></g></g><g class=\"w\" transform=\"translate(200 60) rotate(0)\"><path d=\"M0 0H22M58 0H80\"/><g transform=\"translate(40 0)\"><rect x=\"-18\" y=\"-7\" width=\"36\" height=\"14\"/></g></g><g class=\"w\" transform=\"translate(340 60) rotate(0)\"><path d=\"M0 0H22M58 0H80\"/><g transform=\"translate(40 0)\"><rect x=\"-18\" y=\"-7\" width=\"36\" height=\"14\"/></g></g><g class=\"w\" transform=\"translate(340 140) rotate(0)\"><path d=\"M0 0H22M58 0H80\"/><g transform=\"translate(40 0)\"><rect x=\"-18\" y=\"-7\" width=\"36\" height=\"14\"/></g></g><g class=\"w\" transform=\"translate(460 60) rotate(0)\"><path d=\"M0 0v10M-11 10h22M-7 14h14M-3 18h6\"/></g><rect class=\"halo\" x=\"84.7\" y=\"26\" width=\"70.6\" height=\"15\" rx=\"2\"/><rect class=\"halo\" x=\"201\" y=\"26\" width=\"78\" height=\"15\" rx=\"2\"/><rect class=\"halo\" x=\"341\" y=\"26\" width=\"78\" height=\"15\" rx=\"2\"/><rect class=\"halo\" x=\"341\" y=\"106\" width=\"78\" height=\"15\" rx=\"2\"/><text class=\"label\" x=\"120\" y=\"37\" text-anchor=\"middle\" xml:space=\"preserve\">E<tspan class=\"sub\" dy=\"4\">1</tspan><tspan dy=\"-4\"> = 12 V</tspan></text><text class=\"label\" x=\"240\" y=\"37\" text-anchor=\"middle\" xml:space=\"preserve\">R<tspan class=\"sub\" dy=\"4\">1</tspan><tspan dy=\"-4\"> = 100 Ω</tspan></text><text class=\"label\" x=\"380\" y=\"37\" text-anchor=\"middle\" xml:space=\"preserve\">R<tspan class=\"sub\" dy=\"4\">2</tspan><tspan dy=\"-4\"> = 200 Ω</tspan></text><text class=\"label\" x=\"380\" y=\"117\" text-anchor=\"middle\" xml:space=\"preserve\">R<tspan class=\"sub\" dy=\"4\">3</tspan><tspan dy=\"-4\"> = 300 Ω</tspan></text></svg>"
+        }
+      ]
+    },
+    {
+      "id": "f238c33d",
+      "type": "code",
+      "source": "print(code(uklad))",
+      "outputs": [
+        {
+          "type": "stream",
+          "data": "uklad = loop(VoltageSource(12), Resistor(100), Resistor(200) | Resistor(300))\n"
+        }
+      ]
+    },
+    {
+      "id": "112e1e60",
+      "type": "markdown",
+      "source": "## Klocki\n\n| zapis | co to |\n|---|---|\n| `Resistor(10)`, `Capacitor(\"1u\")`, `Inductor(\"2m\")` | opornik, kondensator, cewka |\n| `VoltageSource(12)`, `CurrentSource(\"0,5\")` | źródło napięcia (+ z prawej), źródło prądu (pcha w prawo) |\n| `Ammeter()`, `Voltmeter()` | idealne mierniki; argument to odczyt z zadania |\n| `supply(v)`, `ground` | źródło od masy; powrót do masy |\n| `shunt(x)` | element od linii do masy (linia biegnie dalej) |\n| `loop(a, b, c)` | zamknięta pętla z elementów po kolei |\n| `x.transpose()` | ten sam element odwrócony (źródło — zmiana biegunowości) |\n| `node(\"A\")` | nazwany punkt: potem `sol.V(\"A\")` |\n\n`loop` jest najwygodniejszy do zadań z jedną pętlą, a `shunt` do „drabinek”:"
+    },
+    {
+      "id": "6fcc2eba",
+      "type": "code",
+      "source": "drabinka = supply(10) + Resistor(1) + shunt(Resistor(2)) + Resistor(1) + shunt(Resistor(2)) + Resistor(2) + ground\nprint(\"prąd ze źródła:\", drabinka.solve()[\"R_1\"].I, \"A\")\nschematic(drabinka)",
+      "outputs": [
+        {
+          "type": "stream",
+          "data": "prąd ze źródła: 5 A\n"
+        },
+        {
+          "type": "svg",
+          "data": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"36 13 1008 161\" width=\"1008\" height=\"161\"><style>\n.w{stroke:currentColor;stroke-width:1.6;fill:none;stroke-linecap:round;stroke-linejoin:round}\n.w .thick{stroke-width:3}.w .fill{fill:currentColor;stroke:none}.w .dashed{stroke-dasharray:4 3}\n.w .open{fill:none}.dot{fill:currentColor}\ntext{font:13px ui-sans-serif,system-ui,sans-serif;fill:currentColor}.halo{fill:var(--paper,#fff)}\ntext .sub{font-size:10px}.solved{fill:#2563eb;font-weight:600}.result{fill:#059669}\n.node{font-style:italic}.letter{font-weight:600;text-anchor:middle;dominant-baseline:central}\n.w .when-closed,.closed .when-open{display:none}.closed .when-closed{display:inline}\n.w .seg{stroke-width:4;opacity:.12}.w .on{stroke-width:4;stroke:#ff3b30;fill:#ff3b30}.w .waves{stroke-width:1.4}\n.w .pins text{font-size:9px;stroke:none;fill:currentColor;opacity:.75}.w text.chip{font-size:13px;font-weight:600;stroke:none;fill:currentColor}\n</style><path class=\"w\" d=\"M60 60L80 60M160 60L180 60M180 60L200 60M280 60L300 60M300 60L420 60M420 60L540 60M540 60L560 60M640 60L660 60M660 60L780 60M780 60L900 60M900 60L920 60M1000 60L1020 60\"/><circle class=\"dot\" cx=\"420\" cy=\"60\" r=\"3\"/><circle class=\"dot\" cx=\"780\" cy=\"60\" r=\"3\"/><g class=\"w\" transform=\"translate(60 60) rotate(0)\"><path d=\"M0 0v10M-11 10h22M-7 14h14M-3 18h6\"/></g><g class=\"w\" transform=\"translate(80 60) rotate(0)\"><path d=\"M0 0H27M53 0H80\"/><g transform=\"translate(40 0)\"><circle r=\"13\"/><path d=\"M-13 0H13\"/><path class=\"fill\" d=\"M13 0l-7 -4v8z\"/></g></g><g class=\"w\" transform=\"translate(200 60) rotate(0)\"><path d=\"M0 0H22M58 0H80\"/><g transform=\"translate(40 0)\"><rect x=\"-18\" y=\"-7\" width=\"36\" height=\"14\"/></g></g><g class=\"w\" transform=\"translate(420 60) rotate(90)\"><path d=\"M0 0H22M58 0H80\"/><g transform=\"translate(40 0)\"><rect x=\"-18\" y=\"-7\" width=\"36\" height=\"14\"/></g></g><g class=\"w\" transform=\"translate(420 140) rotate(0)\"><path d=\"M0 0v10M-11 10h22M-7 14h14M-3 18h6\"/></g><g class=\"w\" transform=\"translate(560 60) rotate(0)\"><path d=\"M0 0H22M58 0H80\"/><g transform=\"translate(40 0)\"><rect x=\"-18\" y=\"-7\" width=\"36\" height=\"14\"/></g></g><g class=\"w\" transform=\"translate(780 60) rotate(90)\"><path d=\"M0 0H22M58 0H80\"/><g transform=\"translate(40 0)\"><rect x=\"-18\" y=\"-7\" width=\"36\" height=\"14\"/></g></g><g class=\"w\" transform=\"translate(780 140) rotate(0)\"><path d=\"M0 0v10M-11 10h22M-7 14h14M-3 18h6\"/></g><g class=\"w\" transform=\"translate(920 60) rotate(0)\"><path d=\"M0 0H22M58 0H80\"/><g transform=\"translate(40 0)\"><rect x=\"-18\" y=\"-7\" width=\"36\" height=\"14\"/></g></g><g class=\"w\" transform=\"translate(1020 60) rotate(0)\"><path d=\"M0 0v10M-11 10h22M-7 14h14M-3 18h6\"/></g><rect class=\"halo\" x=\"84.7\" y=\"26\" width=\"70.6\" height=\"15\" rx=\"2\"/><rect class=\"halo\" x=\"208.4\" y=\"26\" width=\"63.2\" height=\"15\" rx=\"2\"/><rect class=\"halo\" x=\"335.8\" y=\"93\" width=\"63.2\" height=\"15\" rx=\"2\"/><rect class=\"halo\" x=\"568.4\" y=\"26\" width=\"63.2\" height=\"15\" rx=\"2\"/><rect class=\"halo\" x=\"695.8\" y=\"93\" width=\"63.2\" height=\"15\" rx=\"2\"/><rect class=\"halo\" x=\"928.4\" y=\"26\" width=\"63.2\" height=\"15\" rx=\"2\"/><text class=\"label\" x=\"120\" y=\"37\" text-anchor=\"middle\" xml:space=\"preserve\">E<tspan class=\"sub\" dy=\"4\">1</tspan><tspan dy=\"-4\"> = 10 V</tspan></text><text class=\"label\" x=\"240\" y=\"37\" text-anchor=\"middle\" xml:space=\"preserve\">R<tspan class=\"sub\" dy=\"4\">1</tspan><tspan dy=\"-4\"> = 1 Ω</tspan></text><text class=\"label\" x=\"399\" y=\"104\" text-anchor=\"end\" xml:space=\"preserve\">R<tspan class=\"sub\" dy=\"4\">2</tspan><tspan dy=\"-4\"> = 2 Ω</tspan></text><text class=\"label\" x=\"600\" y=\"37\" text-anchor=\"middle\" xml:space=\"preserve\">R<tspan class=\"sub\" dy=\"4\">3</tspan><tspan dy=\"-4\"> = 1 Ω</tspan></text><text class=\"label\" x=\"759\" y=\"104\" text-anchor=\"end\" xml:space=\"preserve\">R<tspan class=\"sub\" dy=\"4\">4</tspan><tspan dy=\"-4\"> = 2 Ω</tspan></text><text class=\"label\" x=\"960\" y=\"37\" text-anchor=\"middle\" xml:space=\"preserve\">R<tspan class=\"sub\" dy=\"4\">5</tspan><tspan dy=\"-4\"> = 2 Ω</tspan></text></svg>"
+        }
+      ]
+    },
+    {
+      "id": "d15aaf66",
+      "type": "markdown",
+      "source": "## Ze schematu do kodu i z powrotem\n\nKażdy schemat w notatce jest w kodzie zmienną o swojej nazwie (np. `uklad1`) — obiektem, na którym\ndziała wszystko z tej lekcji: `.solve()`, `code()`, `schematic()`. A każdy obwód z kodu można\n**narysować jako schemat do edycji**: dodaj komórkę Schemat, otwórz jej kartę **Kod**, wklej kod\ni wróć do rysunku."
+    }
+  ]
+}

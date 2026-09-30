@@ -51,14 +51,14 @@ export function SyncNotice({
 
 /** Shared with the user to read: it runs and changes here, but nothing is saved — unless they
  *  make a copy of their own. */
-export function ReadOnlyNotice({ onCopy }: { onCopy: () => void }) {
+export function ReadOnlyNotice({ onCopy, example = false }: { onCopy: () => void; example?: boolean }) {
   const { t } = useTranslation("notes");
   return (
     <div className={notice} data-notice role="status">
       <Eye />
-      <span>{t("readOnly.text")}</span>
+      <span>{t(example ? "readOnly.exampleText" : "readOnly.text")}</span>
       <button className={button} onClick={onCopy}>
-        {t("readOnly.copy")}
+        {t(example ? "readOnly.addExample" : "readOnly.copy")}
       </button>
     </div>
   );

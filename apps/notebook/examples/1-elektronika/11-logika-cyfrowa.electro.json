@@ -1,0 +1,878 @@
+{
+  "format": "electro-notebook",
+  "version": 2,
+  "id": "d3ccf732ba5d1f37",
+  "title": "11. Logika cyfrowa",
+  "created": "2026-10-01T00:00:00Z",
+  "modified": "2026-10-01T00:00:00Z",
+  "settings": {
+    "codeInPdf": true
+  },
+  "cells": [
+    {
+      "id": "9eb54078",
+      "type": "markdown",
+      "source": "# Zera i jedynki\n\nKomputery nie liczą napięć z przecinkiem — rozróżniają tylko dwa stany: **niskie** napięcie (blisko 0 V)\nto **0**, **wysokie** (blisko 5 V) to **1**. Tak jest odporniej: nieważne, czy jest 4,7 V, czy 5,1 V —\nto i tak 1.\n\n**Bramka logiczna** to mały układ z tranzystorów, który z wejść w stanach 0/1 robi wyjście 0/1 według\nprostej reguły:\n\n| wejścia A B | NOT A | AND | OR | XOR | NAND | NOR |\n|:-:|:-:|:-:|:-:|:-:|:-:|:-:|\n| 0 0 | 1 | 0 | 0 | 0 | 1 | 1 |\n| 0 1 | 1 | 0 | 1 | 1 | 1 | 0 |\n| 1 0 | 0 | 0 | 1 | 1 | 1 | 0 |\n| 1 1 | 0 | 1 | 1 | 0 | 0 | 0 |\n\n**AND** („i”) daje 1, gdy oba wejścia są 1. **OR** („lub”) — gdy choć jedno. **XOR** („albo”) — gdy są\nróżne. **NOT** odwraca. N przed nazwą znaczy: to samo, odwrócone. Na schematach bramki nie mają\nnarysowanego zasilania — tak się je rysuje w logice; tu pracują przy 5 V."
+    },
+    {
+      "id": "9ee722c1",
+      "type": "markdown",
+      "source": "## Sprawdź tabelkę\n\nDwa przyciski ($A$ i $B$) sterują trzema bramkami naraz. Oporniki 10 kΩ trzymają wejścia na 0, dopóki\nprzycisk nie da im 5 V. Uruchom ⚡ i przytrzymuj przyciski (także oba naraz — przyciski mają przypisane\nklawisze **A** i **B**: kliknij najpierw schemat)."
+    },
+    {
+      "id": "0fb86a9d",
+      "type": "schematic",
+      "name": "bramki",
+      "schematic": {
+        "version": 1,
+        "elements": [
+          {
+            "id": "E_1",
+            "kind": "voltage_source",
+            "at": [
+              4,
+              20
+            ],
+            "rotation": 270,
+            "value": "5",
+            "text": null
+          },
+          {
+            "id": "B_1",
+            "kind": "button",
+            "at": [
+              12,
+              8
+            ],
+            "rotation": 90,
+            "value": null,
+            "text": "a"
+          },
+          {
+            "id": "B_2",
+            "kind": "button",
+            "at": [
+              16,
+              8
+            ],
+            "rotation": 90,
+            "value": null,
+            "text": "b"
+          },
+          {
+            "id": "R_1",
+            "kind": "resistor",
+            "at": [
+              12,
+              16
+            ],
+            "rotation": 90,
+            "value": "10k",
+            "text": null
+          },
+          {
+            "id": "R_2",
+            "kind": "resistor",
+            "at": [
+              16,
+              16
+            ],
+            "rotation": 90,
+            "value": "10k",
+            "text": null
+          },
+          {
+            "id": "U_1",
+            "kind": "and_gate",
+            "at": [
+              22,
+              7
+            ],
+            "rotation": 0,
+            "value": null,
+            "text": null
+          },
+          {
+            "id": "R_3",
+            "kind": "resistor",
+            "at": [
+              26,
+              8
+            ],
+            "rotation": 0,
+            "value": "220",
+            "text": null
+          },
+          {
+            "id": "LED_1",
+            "kind": "led",
+            "at": [
+              32,
+              8
+            ],
+            "rotation": 90,
+            "value": null,
+            "text": "green"
+          },
+          {
+            "id": "U_2",
+            "kind": "or_gate",
+            "at": [
+              22,
+              13
+            ],
+            "rotation": 0,
+            "value": null,
+            "text": null
+          },
+          {
+            "id": "R_4",
+            "kind": "resistor",
+            "at": [
+              26,
+              14
+            ],
+            "rotation": 0,
+            "value": "220",
+            "text": null
+          },
+          {
+            "id": "LED_2",
+            "kind": "led",
+            "at": [
+              32,
+              14
+            ],
+            "rotation": 90,
+            "value": null,
+            "text": "yellow"
+          },
+          {
+            "id": "U_3",
+            "kind": "xor_gate",
+            "at": [
+              22,
+              19
+            ],
+            "rotation": 0,
+            "value": null,
+            "text": null
+          },
+          {
+            "id": "R_5",
+            "kind": "resistor",
+            "at": [
+              26,
+              20
+            ],
+            "rotation": 0,
+            "value": "220",
+            "text": null
+          },
+          {
+            "id": "LED_3",
+            "kind": "led",
+            "at": [
+              32,
+              20
+            ],
+            "rotation": 90,
+            "value": null,
+            "text": "blue"
+          },
+          {
+            "id": "gnd1",
+            "kind": "ground",
+            "at": [
+              4,
+              20
+            ],
+            "rotation": 0,
+            "value": null,
+            "text": null
+          }
+        ],
+        "wires": [
+          {
+            "points": [
+              [
+                32,
+                8
+              ],
+              [
+                30,
+                8
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                32,
+                14
+              ],
+              [
+                30,
+                14
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                32,
+                20
+              ],
+              [
+                30,
+                20
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                12,
+                8
+              ],
+              [
+                4,
+                8
+              ],
+              [
+                4,
+                16
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                16,
+                8
+              ],
+              [
+                12,
+                8
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                22,
+                9
+              ],
+              [
+                22,
+                12
+              ],
+              [
+                16,
+                12
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                16,
+                16
+              ],
+              [
+                16,
+                15
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                16,
+                15
+              ],
+              [
+                16,
+                12
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                22,
+                15
+              ],
+              [
+                21,
+                15
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                21,
+                15
+              ],
+              [
+                16,
+                15
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                22,
+                21
+              ],
+              [
+                21,
+                21
+              ],
+              [
+                21,
+                15
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                12,
+                16
+              ],
+              [
+                12,
+                13
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                12,
+                13
+              ],
+              [
+                12,
+                12
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                22,
+                13
+              ],
+              [
+                21,
+                13
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                22,
+                7
+              ],
+              [
+                21,
+                7
+              ],
+              [
+                21,
+                13
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                21,
+                13
+              ],
+              [
+                20,
+                13
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                20,
+                13
+              ],
+              [
+                12,
+                13
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                22,
+                19
+              ],
+              [
+                20,
+                19
+              ],
+              [
+                20,
+                13
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                12,
+                20
+              ],
+              [
+                4,
+                20
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                16,
+                20
+              ],
+              [
+                12,
+                20
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                32,
+                18
+              ],
+              [
+                31,
+                18
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                31,
+                18
+              ],
+              [
+                17,
+                18
+              ],
+              [
+                17,
+                20
+              ],
+              [
+                16,
+                20
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                32,
+                24
+              ],
+              [
+                31,
+                24
+              ],
+              [
+                31,
+                18
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                32,
+                12
+              ],
+              [
+                31,
+                12
+              ],
+              [
+                31,
+                18
+              ]
+            ]
+          }
+        ]
+      },
+      "view": "schematic"
+    },
+    {
+      "id": "8402d409",
+      "type": "markdown",
+      "source": "## Pamięć z dwóch bramek\n\nPołącz dwie bramki NOR „na krzyż” — wyjście każdej do wejścia drugiej — a dostaniesz **zatrzask**:\nnajprostszą pamięć, jeden bit. Krótkie naciśnięcie **S** (*set*) zapala diodę i dioda **zostaje\nzapalona**, choć przycisk już puszczony. **R** (*reset*) ją gasi. Z milionów takich komórek zbudowana jest\npamięć komputera."
+    },
+    {
+      "id": "982f8a8d",
+      "type": "schematic",
+      "name": "zatrzask",
+      "schematic": {
+        "version": 1,
+        "elements": [
+          {
+            "id": "E_1",
+            "kind": "voltage_source",
+            "at": [
+              4,
+              21
+            ],
+            "rotation": 270,
+            "value": "5",
+            "text": null
+          },
+          {
+            "id": "B_1",
+            "kind": "button",
+            "at": [
+              12,
+              7
+            ],
+            "rotation": 90,
+            "value": null,
+            "text": "s"
+          },
+          {
+            "id": "B_2",
+            "kind": "button",
+            "at": [
+              16,
+              7
+            ],
+            "rotation": 90,
+            "value": null,
+            "text": "r"
+          },
+          {
+            "id": "R_1",
+            "kind": "resistor",
+            "at": [
+              12,
+              17
+            ],
+            "rotation": 90,
+            "value": "10k",
+            "text": null
+          },
+          {
+            "id": "R_2",
+            "kind": "resistor",
+            "at": [
+              16,
+              17
+            ],
+            "rotation": 90,
+            "value": "10k",
+            "text": null
+          },
+          {
+            "id": "U_1",
+            "kind": "nor_gate",
+            "at": [
+              22,
+              9
+            ],
+            "rotation": 0,
+            "value": null,
+            "text": null
+          },
+          {
+            "id": "U_2",
+            "kind": "nor_gate",
+            "at": [
+              22,
+              14
+            ],
+            "rotation": 0,
+            "value": null,
+            "text": null
+          },
+          {
+            "id": "R_3",
+            "kind": "resistor",
+            "at": [
+              32,
+              10
+            ],
+            "rotation": 0,
+            "value": "220",
+            "text": null
+          },
+          {
+            "id": "LED_1",
+            "kind": "led",
+            "at": [
+              38,
+              10
+            ],
+            "rotation": 90,
+            "value": null,
+            "text": "red"
+          },
+          {
+            "id": "gnd1",
+            "kind": "ground",
+            "at": [
+              4,
+              21
+            ],
+            "rotation": 0,
+            "value": null,
+            "text": null
+          }
+        ],
+        "wires": [
+          {
+            "points": [
+              [
+                38,
+                10
+              ],
+              [
+                36,
+                10
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                22,
+                16
+              ],
+              [
+                23,
+                16
+              ],
+              [
+                23,
+                10
+              ],
+              [
+                26,
+                10
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                16,
+                17
+              ],
+              [
+                16,
+                14
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                16,
+                14
+              ],
+              [
+                16,
+                11
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                22,
+                14
+              ],
+              [
+                16,
+                14
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                22,
+                11
+              ],
+              [
+                26,
+                11
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                26,
+                11
+              ],
+              [
+                26,
+                15
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                32,
+                10
+              ],
+              [
+                32,
+                11
+              ],
+              [
+                26,
+                11
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                12,
+                17
+              ],
+              [
+                12,
+                12
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                12,
+                12
+              ],
+              [
+                12,
+                11
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                22,
+                9
+              ],
+              [
+                17,
+                9
+              ],
+              [
+                17,
+                12
+              ],
+              [
+                12,
+                12
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                12,
+                7
+              ],
+              [
+                4,
+                7
+              ],
+              [
+                4,
+                17
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                16,
+                7
+              ],
+              [
+                12,
+                7
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                12,
+                21
+              ],
+              [
+                4,
+                21
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                16,
+                21
+              ],
+              [
+                12,
+                21
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                38,
+                14
+              ],
+              [
+                38,
+                21
+              ],
+              [
+                16,
+                21
+              ]
+            ]
+          }
+        ]
+      },
+      "view": "schematic"
+    },
+    {
+      "id": "ee468fe7",
+      "type": "markdown",
+      "source": "## Dodawanie\n\nJak dodać dwie jednobitowe liczby? $0+0=0$, $0+1=1$, $1+0=1$, $1+1=10$ (dwójkowo: „dwa” to „jeden\ndalej, zero tutaj”). Cyfra wyniku to dokładnie XOR, a przeniesienie na następną pozycję to AND. Bramka\nXOR i bramka AND razem to **półsumator** — schemat `bramki` powyżej już nim jest: dioda niebieska to\nsuma, zielona — przeniesienie. Tak liczy każdy procesor, tylko na 64 bitach naraz."
+    }
+  ]
+}

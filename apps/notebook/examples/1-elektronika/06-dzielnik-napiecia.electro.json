@@ -1,0 +1,472 @@
+{
+  "format": "electro-notebook",
+  "version": 2,
+  "id": "dd0fc001e34c5fb2",
+  "title": "6. Dzielnik napięcia i czujniki",
+  "created": "2026-10-01T00:00:00Z",
+  "modified": "2026-10-01T00:00:00Z",
+  "settings": {
+    "codeInPdf": true
+  },
+  "cells": [
+    {
+      "id": "27edce54",
+      "type": "markdown",
+      "source": "# Dzielnik napięcia\n\nDwa oporniki szeregowo dzielą napięcie w proporcji swoich oporów. Napięcie na dolnym:\n\n$$U_{wy} = U \\cdot \\frac{R_2}{R_1 + R_2}$$\n\nTo jeden z najważniejszych układów: tak zmniejsza się napięcie, tak działają potencjometry i tak\nodczytuje się większość czujników."
+    },
+    {
+      "id": "6453a523",
+      "type": "schematic",
+      "name": "dzielnik",
+      "schematic": {
+        "version": 1,
+        "elements": [
+          {
+            "id": "E_1",
+            "kind": "voltage_source",
+            "at": [
+              4,
+              15
+            ],
+            "rotation": 270,
+            "value": "10",
+            "text": null
+          },
+          {
+            "id": "R_1",
+            "kind": "resistor",
+            "at": [
+              10,
+              7
+            ],
+            "rotation": 90,
+            "value": "1k",
+            "text": null
+          },
+          {
+            "id": "R_2",
+            "kind": "resistor",
+            "at": [
+              10,
+              11
+            ],
+            "rotation": 90,
+            "value": "4k",
+            "text": null
+          },
+          {
+            "id": "V_1",
+            "kind": "voltmeter",
+            "at": [
+              14,
+              11
+            ],
+            "rotation": 90,
+            "value": null,
+            "text": null
+          },
+          {
+            "id": "gnd1",
+            "kind": "ground",
+            "at": [
+              4,
+              15
+            ],
+            "rotation": 0,
+            "value": null,
+            "text": null
+          }
+        ],
+        "wires": [
+          {
+            "points": [
+              [
+                4,
+                11
+              ],
+              [
+                4,
+                7
+              ],
+              [
+                10,
+                7
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                10,
+                11
+              ],
+              [
+                14,
+                11
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                10,
+                15
+              ],
+              [
+                4,
+                15
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                14,
+                15
+              ],
+              [
+                10,
+                15
+              ]
+            ]
+          }
+        ]
+      },
+      "view": "schematic",
+      "results": {
+        "E_1": {
+          "value": "10 V",
+          "solved": false,
+          "U": "10 V",
+          "I": "2 mA",
+          "P": "20 mW",
+          "reversed": false
+        },
+        "R_1": {
+          "value": "1 kΩ",
+          "solved": false,
+          "U": "2 V",
+          "I": "2 mA",
+          "P": "4 mW",
+          "reversed": false
+        },
+        "R_2": {
+          "value": "4 kΩ",
+          "solved": false,
+          "U": "8 V",
+          "I": "2 mA",
+          "P": "16 mW",
+          "reversed": false
+        },
+        "V_1": {
+          "value": "8 V",
+          "solved": true,
+          "U": "8 V",
+          "I": "0 A",
+          "P": "0 W",
+          "reversed": false
+        }
+      },
+      "problems": []
+    },
+    {
+      "id": "b81e8052",
+      "type": "markdown",
+      "source": "Solver umie też liczyć na literach. Zamiast liczb wpisz symbole — dostaniesz wzór. `node(\"wy\")` nazywa\npunkt między opornikami, a `shunt(...)` wstawia element od tego punktu do masy:"
+    },
+    {
+      "id": "9cef51b7",
+      "type": "code",
+      "source": "dz = supply(\"U\") + Resistor(\"R_a\") + node(\"wy\") + shunt(Resistor(\"R_b\"))\ndz.solve().V(\"wy\")",
+      "outputs": [
+        {
+          "type": "markdown",
+          "data": "$\\displaystyle \\frac{R_{b} U}{R_{a} + R_{b}}$"
+        }
+      ]
+    },
+    {
+      "id": "e6f4a738",
+      "type": "markdown",
+      "source": "## Potencjometr\n\nPotencjometr to opornik z suwakiem: jeden element, który jest od razu dzielnikiem. Przesuwając suwak,\nzmieniasz proporcję. Uruchom ⚡, kliknij potencjometr i przesuwaj suwak (albo użyj zakładki\n**Regulacja** pod schematem) — woltomierz pokazuje od 0 do 5 V."
+    },
+    {
+      "id": "5f2ec95f",
+      "type": "schematic",
+      "name": "suwak",
+      "schematic": {
+        "version": 1,
+        "elements": [
+          {
+            "id": "E_1",
+            "kind": "voltage_source",
+            "at": [
+              4,
+              15
+            ],
+            "rotation": 270,
+            "value": "5",
+            "text": null
+          },
+          {
+            "id": "P_1",
+            "kind": "potentiometer",
+            "at": [
+              8,
+              9
+            ],
+            "rotation": 0,
+            "value": "10k",
+            "text": "0.3"
+          },
+          {
+            "id": "V_1",
+            "kind": "voltmeter",
+            "at": [
+              10,
+              7
+            ],
+            "rotation": 0,
+            "value": null,
+            "text": null
+          },
+          {
+            "id": "gnd1",
+            "kind": "ground",
+            "at": [
+              4,
+              15
+            ],
+            "rotation": 0,
+            "value": null,
+            "text": null
+          }
+        ],
+        "wires": [
+          {
+            "points": [
+              [
+                4,
+                11
+              ],
+              [
+                4,
+                9
+              ],
+              [
+                8,
+                9
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                12,
+                9
+              ],
+              [
+                16,
+                9
+              ],
+              [
+                16,
+                15
+              ],
+              [
+                4,
+                15
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                14,
+                7
+              ],
+              [
+                18,
+                7
+              ],
+              [
+                18,
+                15
+              ],
+              [
+                16,
+                15
+              ]
+            ]
+          }
+        ]
+      },
+      "view": "schematic"
+    },
+    {
+      "id": "4ebfe4fb",
+      "type": "markdown",
+      "source": "## Czujnik światła\n\n**Fotorezystor** to opornik, którego opór maleje, gdy pada na niego światło: w ciemności ma dziesiątki\nkiloomów, w słońcu kilkaset omów. W dzielniku zmienia się więc napięcie — i to napięcie może odczytać\nArduino. Uruchom ⚡, kliknij fotorezystor i zmieniaj światło."
+    },
+    {
+      "id": "f4ff3619",
+      "type": "schematic",
+      "name": "swiatlo",
+      "schematic": {
+        "version": 1,
+        "elements": [
+          {
+            "id": "E_1",
+            "kind": "voltage_source",
+            "at": [
+              4,
+              15
+            ],
+            "rotation": 270,
+            "value": "5",
+            "text": null
+          },
+          {
+            "id": "R_1",
+            "kind": "resistor",
+            "at": [
+              10,
+              7
+            ],
+            "rotation": 90,
+            "value": "10k",
+            "text": null
+          },
+          {
+            "id": "LDR_1",
+            "kind": "photoresistor",
+            "at": [
+              10,
+              11
+            ],
+            "rotation": 90,
+            "value": "10k",
+            "text": "100"
+          },
+          {
+            "id": "V_1",
+            "kind": "voltmeter",
+            "at": [
+              14,
+              11
+            ],
+            "rotation": 90,
+            "value": null,
+            "text": null
+          },
+          {
+            "id": "gnd1",
+            "kind": "ground",
+            "at": [
+              4,
+              15
+            ],
+            "rotation": 0,
+            "value": null,
+            "text": null
+          }
+        ],
+        "wires": [
+          {
+            "points": [
+              [
+                4,
+                11
+              ],
+              [
+                4,
+                7
+              ],
+              [
+                10,
+                7
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                10,
+                11
+              ],
+              [
+                14,
+                11
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                10,
+                15
+              ],
+              [
+                4,
+                15
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                14,
+                15
+              ],
+              [
+                10,
+                15
+              ]
+            ]
+          }
+        ]
+      },
+      "view": "schematic",
+      "results": {
+        "E_1": {
+          "value": "5 V",
+          "solved": false,
+          "U": "5 V",
+          "I": "416.8 µA",
+          "P": "2.084 mW",
+          "reversed": false
+        },
+        "R_1": {
+          "value": "10 kΩ",
+          "solved": false,
+          "U": "4.168 V",
+          "I": "416.8 µA",
+          "P": "1.738 mW",
+          "reversed": false
+        },
+        "LDR_1": {
+          "value": "10 kΩ",
+          "solved": false,
+          "U": "831.6 mV",
+          "I": "416.8 µA",
+          "P": "346.6 µW",
+          "reversed": false
+        },
+        "V_1": {
+          "value": "831.6 mV",
+          "solved": true,
+          "U": "831.6 mV",
+          "I": "0 A",
+          "P": "0 W",
+          "reversed": false
+        }
+      },
+      "problems": []
+    },
+    {
+      "id": "f4c880a7",
+      "type": "markdown",
+      "source": "## Spróbuj sam\n\n1. W dzielniku zamień $R_2$ na 1 kΩ. Ile wychodzi teraz? (Równe oporniki dzielą napięcie na pół.)\n2. Zamień miejscami opornik i fotorezystor w ostatnim schemacie. Co się dzieje z napięciem, gdy robi się\n   ciemniej?\n3. W kodzie zamień litery na liczby — `supply(12) + Resistor(1000) + Resistor(2000) + ground` — i sprawdź\n   wzór."
+    }
+  ]
+}

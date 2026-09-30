@@ -1,0 +1,61 @@
+{
+  "format": "electro-notebook",
+  "version": 2,
+  "id": "0ae39c18f403dac3",
+  "title": "5. Prąd zmienny",
+  "created": "2026-10-01T00:00:00Z",
+  "modified": "2026-10-01T00:00:00Z",
+  "settings": {
+    "codeInPdf": true
+  },
+  "cells": [
+    {
+      "id": "76a95afc",
+      "type": "markdown",
+      "source": "# Prąd zmienny: wskazy\n\nPrzy napięciu sinusoidalnym kondensator i cewka zachowują się jak „opory”, które zależą od\nczęstotliwości — **impedancje**:\n\n$$Z_C = \\frac{1}{j\\omega C} \\qquad Z_L = j\\omega L \\qquad \\omega = 2\\pi f$$\n\n`solve(omega=...)` liczy obwód metodą **wskazów** (liczb zespolonych): moduł to amplituda, a argument —\nprzesunięcie fazy. Bez `omega` liczony jest stan ustalony przy prądzie stałym (kondensator to przerwa,\ncewka — przewód)."
+    },
+    {
+      "id": "d4ebe54b",
+      "type": "code",
+      "source": "import math\nf = 50\nrc = supply(10) + Resistor(1000) + node(\"wy\") + shunt(Capacitor(\"3.3u\"))\nwy = rc.solve(omega=2 * math.pi * f).V(\"wy\")\nprint(\"U_wy =\", complex(wy))\nprint(f\"amplituda {abs(complex(wy)):.2f} V, faza {math.degrees(math.atan2(complex(wy).imag, complex(wy).real)):.1f}°\")",
+      "outputs": [
+        {
+          "type": "stream",
+          "data": "U_wy = (4.819741849361943-4.996749643431072j)\namplituda 6.94 V, faza -46.0°\n"
+        }
+      ]
+    },
+    {
+      "id": "5b3bc8b4",
+      "type": "markdown",
+      "source": "## Charakterystyka filtru\n\nFiltr RC przepuszcza niskie częstotliwości, a tłumi wysokie. Częstotliwość graniczna\n$f_g = \\frac{1}{2\\pi RC} \\approx 48$ Hz — tam zostaje $\\frac{1}{\\sqrt 2} \\approx 71\\%$ amplitudy:"
+    },
+    {
+      "id": "b7c3e319",
+      "type": "code",
+      "source": "for f in [5, 20, 48, 100, 500, 2000]:\n    wy = complex(rc.solve(omega=2 * math.pi * f).V(\"wy\"))\n    print(f\"{f:>5} Hz: {abs(wy) / 10 * 100:5.1f}% \", \"█\" * round(abs(wy) * 4))",
+      "outputs": [
+        {
+          "type": "stream",
+          "data": "    5 Hz:  99.5%  ████████████████████████████████████████\n   20 Hz:  92.4%  █████████████████████████████████████\n   48 Hz:  70.9%  ████████████████████████████\n  100 Hz:  43.4%  █████████████████\n  500 Hz:   9.6%  ████\n 2000 Hz:   2.4%  █\n"
+        }
+      ]
+    },
+    {
+      "id": "976a6511",
+      "type": "markdown",
+      "source": "## Rezonans\n\nCewka i kondensator razem mają częstotliwość, przy której ich impedancje się znoszą:\n$f_0 = \\frac{1}{2\\pi\\sqrt{LC}}$. W obwodzie szeregowym RLC prąd jest wtedy największy:"
+    },
+    {
+      "id": "2930458c",
+      "type": "code",
+      "source": "L_, C_ = 0.01, 1e-6\nf0 = 1 / (2 * math.pi * math.sqrt(L_ * C_))\nprint(f\"f0 = {f0:.0f} Hz\")\nrlc = loop(VoltageSource(1), Resistor(10), Inductor(L_), Capacitor(C_))\nfor f in [0.5 * f0, 0.9 * f0, f0, 1.1 * f0, 2 * f0]:\n    i = abs(complex(rlc.solve(omega=2 * math.pi * f)[\"R_1\"].I))\n    print(f\"{f:7.0f} Hz: I = {i * 1000:6.2f} mA\")",
+      "outputs": [
+        {
+          "type": "stream",
+          "data": "f0 = 1592 Hz\n    796 Hz: I =   6.65 mA\n   1432 Hz: I =  42.81 mA\n   1592 Hz: I = 100.00 mA\n   1751 Hz: I =  46.40 mA\n   3183 Hz: I =   6.65 mA\n"
+        }
+      ]
+    }
+  ]
+}

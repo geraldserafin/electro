@@ -1,0 +1,202 @@
+{
+  "format": "electro-notebook",
+  "version": 2,
+  "id": "ccb75c5ec33ba589",
+  "title": "5. Arduino i Pico w przeglądarce",
+  "created": "2026-10-01T00:00:00Z",
+  "modified": "2026-10-01T00:00:00Z",
+  "settings": {
+    "codeInPdf": true
+  },
+  "cells": [
+    {
+      "id": "2328f4c8",
+      "type": "markdown",
+      "source": "# Płytki: Arduino Uno i Raspberry Pi Pico\n\nNa schemacie mogą stać prawdziwe płytki z mikrokontrolerami. Każda ma swój **szkic** — program w C++\n(Arduino). Zaznacz płytkę i kliknij **Szkic** w jej panelu (albo kartę szkicu nad schematem): edytor\notworzy się obok rysunku. Po ⚡ przeglądarka **kompiluje** szkic (pierwszy raz pobiera kompilator,\npotem to sekunda) i uruchamia go na emulowanym procesorze — tym samym kodzie maszynowym, który\ndostałby prawdziwy układ.\n\n- **Arduino Uno** — ATmega328P, 16 MHz, logika 5 V, piny D0–D13 i A0–A5,\n- **Raspberry Pi Pico** — RP2040, dwa rdzenie 133 MHz, logika **3,3 V**, piny GP0–GP28.\n\nDostępne biblioteki: `Servo`, `LiquidCrystal`, `LiquidCrystal_I2C`, `Wire`, `SPI`, `EEPROM`,\n`Adafruit_SSD1306` (z `Adafruit_GFX`), `RTClib`, a na Pico także `Adafruit_ILI9341`.\n\n## Monitor portu szeregowego\n\nTo, co szkic wypisze przez `Serial.print`, pojawia się w zakładce **Konsola** pod schematem. Można tam\nteż pisać — szkic odczyta to przez `Serial.read()`. Błędy kompilacji pokazują się w tym samym miejscu,\nz numerem linii."
+    },
+    {
+      "id": "0a6ba137",
+      "type": "markdown",
+      "source": "## Przykład: LCD na I²C\n\nWyświetlacz z konwerterem I²C potrzebuje tylko czterech przewodów: zasilanie, masa, SDA (A4) i SCL (A5).\nUruchom ⚡ i kręć potencjometrem."
+    },
+    {
+      "id": "03ebe8fd",
+      "type": "schematic",
+      "name": "lcd",
+      "schematic": {
+        "version": 1,
+        "elements": [
+          {
+            "id": "ARD_1",
+            "kind": "arduino",
+            "at": [
+              2,
+              7
+            ],
+            "rotation": 0,
+            "value": null,
+            "text": "// Licznik i napięcie z potencjometru na wyświetlaczu LCD z konwerterem I²C (adres 0x27).\n#include <LiquidCrystal_I2C.h>\n\nLiquidCrystal_I2C lcd(0x27, 16, 2);\n\nvoid setup() {\n  lcd.init();\n  lcd.backlight();\n  lcd.print(\"Czesc!\");\n  Serial.begin(9600);\n}\n\nvoid loop() {\n  static unsigned long start = millis();\n  float u = analogRead(A0) * 5.0 / 1023;\n  lcd.setCursor(0, 1);\n  lcd.print(\"A0=\");\n  lcd.print(u, 2);\n  lcd.print(\"V t=\");\n  lcd.print((millis() - start) / 1000);\n  lcd.print(\"s  \");\n  Serial.println(u);\n  delay(200);\n}\n"
+          },
+          {
+            "id": "LCD_1",
+            "kind": "lcd1602_i2c",
+            "at": [
+              28,
+              17
+            ],
+            "rotation": 0,
+            "value": null,
+            "text": "0x27"
+          },
+          {
+            "id": "P_1",
+            "kind": "potentiometer",
+            "at": [
+              10,
+              21
+            ],
+            "rotation": 0,
+            "value": "10k",
+            "text": "0.5"
+          }
+        ],
+        "wires": [
+          {
+            "points": [
+              [
+                12,
+                19
+              ],
+              [
+                11,
+                19
+              ],
+              [
+                11,
+                15
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                28,
+                19
+              ],
+              [
+                15,
+                19
+              ],
+              [
+                15,
+                15
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                28,
+                20
+              ],
+              [
+                16,
+                20
+              ],
+              [
+                16,
+                15
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                10,
+                21
+              ],
+              [
+                10,
+                17
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                10,
+                17
+              ],
+              [
+                10,
+                15
+              ],
+              [
+                7,
+                15
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                28,
+                17
+              ],
+              [
+                10,
+                17
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                14,
+                21
+              ],
+              [
+                14,
+                18
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                14,
+                18
+              ],
+              [
+                5,
+                18
+              ],
+              [
+                5,
+                15
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                28,
+                18
+              ],
+              [
+                14,
+                18
+              ]
+            ]
+          }
+        ]
+      },
+      "view": "schematic"
+    },
+    {
+      "id": "0dbc7beb",
+      "type": "markdown",
+      "source": "## Programy z plików\n\nPico może też dostać gotowy program: plik **.uf2** albo **.bin**, jak prawdziwe Pico przeciągane na dysk\nUSB. Zaznacz płytkę i kliknij **Wgraj plik .uf2 / .bin** albo po prostu upuść plik na płytkę. Tak\nuruchamia się Doom w folderze Przykłady.\n\n## Gdy komputer nie nadąża\n\nEmulacja procesora to dużo liczenia. Gdy przeglądarka nie nadąża, Pico zwalnia — przy płytce widać\nwtedy jego obecne taktowanie (np. **PICO_1 · 80 MHz**). Program działa tak samo, tylko wolniej."
+    }
+  ]
+}

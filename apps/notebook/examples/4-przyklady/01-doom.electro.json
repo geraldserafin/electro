@@ -1,0 +1,529 @@
+{
+  "format": "electro-notebook",
+  "version": 2,
+  "id": "363a1aadbbfbfe10",
+  "title": "DOOM na Raspberry Pi Pico",
+  "created": "2026-10-01T00:00:00Z",
+  "modified": "2026-10-01T00:00:00Z",
+  "settings": {
+    "codeInPdf": true
+  },
+  "cells": [
+    {
+      "id": "d54e2b74",
+      "type": "markdown",
+      "source": "# DOOM na Raspberry Pi Pico\n\nTak, ten Doom: shareware'owy DOOM1.WAD z 1993 roku, epizod pierwszy, na emulowanym Raspberry Pi Pico\n(RP2040: dwa rdzenie Cortex-M0+, 264 KB RAM) z kolorowym wyświetlaczem **TFT 320×240** na SPI\n(ILI9341: SCK GP18, MOSI GP19, CS GP17, DC GP20, RESET GP21, podświetlenie GP22) i ośmioma przyciskami.\n\nObwód jest gotowy — brakuje programu. Doom to nie szkic, tylko gotowy obraz pamięci flash, taki jak\nplik UF2 przeciągany na prawdziwe Pico:\n\n1. **Zbuduj go**: w repozytorium Electro `apps/notebook/scripts/make-pico-doom.sh doom.bin` (potrzebne git\n   i nix). Skrypt bierze port [kilograham/rp2040-doom](https://github.com/kilograham/rp2040-doom), wyświetlacz\n   z [pondahai/rp2040-doom-ili9341](https://github.com/pondahai/rp2040-doom-ili9341) i małą łatkę pod\n   emulator (bez dźwięku, klatki przez DMA).\n2. **Wgraj go**: zaznacz płytkę i kliknij **Wgraj plik .uf2 / .bin** — albo po prostu upuść plik na płytkę.\n   Plik zapisze się razem z notatkami, a pierwsza linia programu płytki będzie na niego wskazywać.\n3. Uruchom symulację (⚡). Po chwili ekran tytułowy i demo; **kliknij schemat** i graj z klawiatury:\n   **Enter** — menu i wybór (New Game), **strzałki** — ruch, **Ctrl** — strzał, **spacja** — drzwi,\n   **Esc** — menu.\n\nGdy komputer nie nadąża, rdzenie zwalniają — o ile, widać przy płytce (np. **PICO_1 · 150 MHz**)."
+    },
+    {
+      "id": "71ad1c71",
+      "type": "schematic",
+      "name": "doom",
+      "schematic": {
+        "version": 1,
+        "elements": [
+          {
+            "id": "PICO_1",
+            "kind": "pico",
+            "at": [
+              29,
+              7
+            ],
+            "rotation": 0,
+            "value": null,
+            "text": "// Tu przyjdzie Doom: zbuduj doom.bin (apps/notebook/scripts/make-pico-doom.sh) i wgraj go —\n// zaznacz płytkę → „Wgraj plik .uf2 / .bin” albo upuść plik na płytkę. Ten szkic zostanie pod linią z plikiem.\n// TFT: SCK GP18, MOSI GP19, CS GP17, DC GP20, RESET GP21, podświetlenie GP22.\n// Przyciski do GND: ↑ GP9, ↓ GP5, ← GP8, → GP6, strzał GP3, użyj GP2, Enter GP4, menu GP28.\n\nvoid setup() {}\n\nvoid loop() {}\n"
+          },
+          {
+            "id": "TFT_1",
+            "kind": "ili9341",
+            "at": [
+              45,
+              13
+            ],
+            "rotation": 0,
+            "value": null,
+            "text": null
+          },
+          {
+            "id": "t_TFT_1",
+            "kind": "terminal",
+            "at": [
+              45,
+              21
+            ],
+            "rotation": 0,
+            "value": null,
+            "text": null
+          },
+          {
+            "id": "B_1",
+            "kind": "button",
+            "at": [
+              25,
+              26
+            ],
+            "rotation": 90,
+            "value": null,
+            "text": "ArrowUp"
+          },
+          {
+            "id": "B_2",
+            "kind": "button",
+            "at": [
+              22,
+              26
+            ],
+            "rotation": 90,
+            "value": null,
+            "text": "ArrowDown"
+          },
+          {
+            "id": "B_3",
+            "kind": "button",
+            "at": [
+              19,
+              26
+            ],
+            "rotation": 90,
+            "value": null,
+            "text": "ArrowLeft"
+          },
+          {
+            "id": "B_4",
+            "kind": "button",
+            "at": [
+              16,
+              26
+            ],
+            "rotation": 90,
+            "value": null,
+            "text": "ArrowRight"
+          },
+          {
+            "id": "B_5",
+            "kind": "button",
+            "at": [
+              13,
+              26
+            ],
+            "rotation": 90,
+            "value": null,
+            "text": "Control"
+          },
+          {
+            "id": "B_6",
+            "kind": "button",
+            "at": [
+              10,
+              26
+            ],
+            "rotation": 90,
+            "value": null,
+            "text": "Space"
+          },
+          {
+            "id": "B_7",
+            "kind": "button",
+            "at": [
+              7,
+              26
+            ],
+            "rotation": 90,
+            "value": null,
+            "text": "Enter"
+          },
+          {
+            "id": "B_8",
+            "kind": "button",
+            "at": [
+              4,
+              26
+            ],
+            "rotation": 90,
+            "value": null,
+            "text": "Escape"
+          }
+        ],
+        "wires": [
+          {
+            "points": [
+              [
+                45,
+                16
+              ],
+              [
+                37,
+                16
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                45,
+                17
+              ],
+              [
+                37,
+                17
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                45,
+                18
+              ],
+              [
+                37,
+                18
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                45,
+                19
+              ],
+              [
+                37,
+                19
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                45,
+                20
+              ],
+              [
+                38,
+                20
+              ],
+              [
+                38,
+                15
+              ],
+              [
+                37,
+                15
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                45,
+                13
+              ],
+              [
+                45,
+                8
+              ],
+              [
+                37,
+                8
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                45,
+                15
+              ],
+              [
+                39,
+                15
+              ],
+              [
+                39,
+                21
+              ],
+              [
+                37,
+                21
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                25,
+                26
+              ],
+              [
+                25,
+                16
+              ],
+              [
+                29,
+                16
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                22,
+                26
+              ],
+              [
+                22,
+                12
+              ],
+              [
+                29,
+                12
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                19,
+                26
+              ],
+              [
+                19,
+                15
+              ],
+              [
+                29,
+                15
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                16,
+                26
+              ],
+              [
+                16,
+                13
+              ],
+              [
+                29,
+                13
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                13,
+                26
+              ],
+              [
+                13,
+                10
+              ],
+              [
+                29,
+                10
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                10,
+                26
+              ],
+              [
+                10,
+                9
+              ],
+              [
+                29,
+                9
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                7,
+                26
+              ],
+              [
+                7,
+                11
+              ],
+              [
+                29,
+                11
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                4,
+                26
+              ],
+              [
+                4,
+                24
+              ],
+              [
+                40,
+                24
+              ],
+              [
+                40,
+                11
+              ],
+              [
+                37,
+                11
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                45,
+                14
+              ],
+              [
+                41,
+                14
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                41,
+                14
+              ],
+              [
+                38,
+                14
+              ],
+              [
+                38,
+                9
+              ],
+              [
+                37,
+                9
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                25,
+                30
+              ],
+              [
+                41,
+                30
+              ],
+              [
+                41,
+                14
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                22,
+                30
+              ],
+              [
+                25,
+                30
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                19,
+                30
+              ],
+              [
+                22,
+                30
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                16,
+                30
+              ],
+              [
+                19,
+                30
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                13,
+                30
+              ],
+              [
+                16,
+                30
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                10,
+                30
+              ],
+              [
+                13,
+                30
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                7,
+                30
+              ],
+              [
+                10,
+                30
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                4,
+                30
+              ],
+              [
+                7,
+                30
+              ]
+            ]
+          }
+        ]
+      },
+      "view": "schematic"
+    },
+    {
+      "id": "4a35bfa0",
+      "type": "markdown",
+      "source": "## Jak to możliwe?\n\nEmulator wykonuje instrukcja po instrukcji ten sam kod maszynowy, który działałby na prawdziwym Pico,\nrazem z peryferiami: SPI z DMA wysyła klatki do wyświetlacza, a sterownik ILI9341 w przeglądarce\nzamienia je na piksele. Doom renderuje świat metodą BSP (drzewa podziału przestrzeni) — w 1993 roku na\nprocesorze 386 było to objawienie, a tu działa na mikrokontrolerze za kilkanaście złotych."
+    }
+  ]
+}

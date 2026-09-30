@@ -1,0 +1,514 @@
+{
+  "format": "electro-notebook",
+  "version": 2,
+  "id": "c1335a249ee0fe91",
+  "title": "Czujnik parkowania",
+  "created": "2026-10-01T00:00:00Z",
+  "modified": "2026-10-01T00:00:00Z",
+  "settings": {
+    "codeInPdf": true
+  },
+  "cells": [
+    {
+      "id": "b209b726",
+      "type": "markdown",
+      "source": "# Czujnik parkowania\n\nJak w samochodzie: im bliżej przeszkody, tym szybciej pika i tym więcej diod się pali — dwie zielone,\ndwie żółte i czerwona. Poniżej 10 cm dźwięk jest ciągły.\n\nUruchom ⚡ i przesuwaj przeszkodę suwakiem czujnika. Tu buzzer jest **aktywny** — ma własny generator\ni piszczy, gdy tylko dostanie napięcie, więc szkic tylko go włącza i wyłącza."
+    },
+    {
+      "id": "15208ced",
+      "type": "schematic",
+      "name": "parkowanie",
+      "schematic": {
+        "version": 1,
+        "elements": [
+          {
+            "id": "ARD_1",
+            "kind": "arduino",
+            "at": [
+              18,
+              18
+            ],
+            "rotation": 0,
+            "value": null,
+            "text": "// CZUJNIK PARKOWANIA: im bliżej przeszkody, tym szybciej pika buzzer i tym więcej diod się pali\n// (zielone, żółte, czerwona). Poniżej 10 cm — ciągły dźwięk. Przesuń przeszkodę suwakiem czujnika.\n// HC-SR04: TRIG D9, ECHO D10; diody na D3–D7; buzzer aktywny na D8.\nconst byte TRIG = 9, ECHO = 10, BUZZER = 8;\nconst byte LEDS[5] = {3, 4, 5, 6, 7};\nconst int STEPS[5] = {100, 70, 45, 25, 10};  // cm: od tej odległości pali się kolejna dioda\n\nvoid setup() {\n  pinMode(TRIG, OUTPUT);\n  pinMode(ECHO, INPUT);\n  pinMode(BUZZER, OUTPUT);\n  for (byte p : LEDS) pinMode(p, OUTPUT);\n  Serial.begin(9600);\n}\n\nlong distanceCm() {\n  digitalWrite(TRIG, HIGH);\n  delayMicroseconds(10);\n  digitalWrite(TRIG, LOW);\n  long us = pulseIn(ECHO, HIGH, 30000UL);\n  return us ? us / 58 : 999;\n}\n\nvoid loop() {\n  long cm = distanceCm();\n  for (byte i = 0; i < 5; i++) digitalWrite(LEDS[i], cm <= STEPS[i]);\n  Serial.println(cm);\n  if (cm <= 10) {  // stop!\n    digitalWrite(BUZZER, HIGH);\n    delay(100);\n  } else if (cm <= 100) {\n    int pause = map(cm, 10, 100, 40, 500);\n    digitalWrite(BUZZER, HIGH);\n    delay(40);\n    digitalWrite(BUZZER, LOW);\n    delay(pause);\n  } else {\n    digitalWrite(BUZZER, LOW);\n    delay(100);\n  }\n}\n"
+          },
+          {
+            "id": "US_1",
+            "kind": "ultrasonic",
+            "at": [
+              38,
+              32
+            ],
+            "rotation": 0,
+            "value": null,
+            "text": "80"
+          },
+          {
+            "id": "R_1",
+            "kind": "resistor",
+            "at": [
+              16,
+              16
+            ],
+            "rotation": 270,
+            "value": "220",
+            "text": null
+          },
+          {
+            "id": "LED_1",
+            "kind": "led",
+            "at": [
+              16,
+              12
+            ],
+            "rotation": 270,
+            "value": null,
+            "text": "green"
+          },
+          {
+            "id": "R_2",
+            "kind": "resistor",
+            "at": [
+              13,
+              16
+            ],
+            "rotation": 270,
+            "value": "220",
+            "text": null
+          },
+          {
+            "id": "LED_2",
+            "kind": "led",
+            "at": [
+              13,
+              12
+            ],
+            "rotation": 270,
+            "value": null,
+            "text": "green"
+          },
+          {
+            "id": "R_3",
+            "kind": "resistor",
+            "at": [
+              10,
+              16
+            ],
+            "rotation": 270,
+            "value": "220",
+            "text": null
+          },
+          {
+            "id": "LED_3",
+            "kind": "led",
+            "at": [
+              10,
+              12
+            ],
+            "rotation": 270,
+            "value": null,
+            "text": "yellow"
+          },
+          {
+            "id": "R_4",
+            "kind": "resistor",
+            "at": [
+              7,
+              16
+            ],
+            "rotation": 270,
+            "value": "220",
+            "text": null
+          },
+          {
+            "id": "LED_4",
+            "kind": "led",
+            "at": [
+              7,
+              12
+            ],
+            "rotation": 270,
+            "value": null,
+            "text": "yellow"
+          },
+          {
+            "id": "R_5",
+            "kind": "resistor",
+            "at": [
+              4,
+              16
+            ],
+            "rotation": 270,
+            "value": "220",
+            "text": null
+          },
+          {
+            "id": "LED_5",
+            "kind": "led",
+            "at": [
+              4,
+              12
+            ],
+            "rotation": 270,
+            "value": null,
+            "text": "red"
+          },
+          {
+            "id": "BZ_1",
+            "kind": "buzzer",
+            "at": [
+              44,
+              8
+            ],
+            "rotation": 90,
+            "value": null,
+            "text": null
+          }
+        ],
+        "wires": [
+          {
+            "points": [
+              [
+                16,
+                16
+              ],
+              [
+                31,
+                16
+              ],
+              [
+                31,
+                18
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                13,
+                16
+              ],
+              [
+                13,
+                17
+              ],
+              [
+                30,
+                17
+              ],
+              [
+                30,
+                18
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                10,
+                16
+              ],
+              [
+                10,
+                18
+              ],
+              [
+                17,
+                18
+              ],
+              [
+                17,
+                15
+              ],
+              [
+                29,
+                15
+              ],
+              [
+                29,
+                18
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                7,
+                16
+              ],
+              [
+                7,
+                19
+              ],
+              [
+                18,
+                19
+              ],
+              [
+                18,
+                14
+              ],
+              [
+                28,
+                14
+              ],
+              [
+                28,
+                18
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                4,
+                16
+              ],
+              [
+                5,
+                16
+              ],
+              [
+                5,
+                7
+              ],
+              [
+                27,
+                7
+              ],
+              [
+                27,
+                18
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                44,
+                12
+              ],
+              [
+                25,
+                12
+              ],
+              [
+                25,
+                18
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                38,
+                36
+              ],
+              [
+                21,
+                36
+              ],
+              [
+                21,
+                26
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                39,
+                36
+              ],
+              [
+                39,
+                37
+              ],
+              [
+                35,
+                37
+              ],
+              [
+                35,
+                26
+              ],
+              [
+                36,
+                26
+              ],
+              [
+                36,
+                13
+              ],
+              [
+                24,
+                13
+              ],
+              [
+                24,
+                18
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                40,
+                36
+              ],
+              [
+                40,
+                38
+              ],
+              [
+                34,
+                38
+              ],
+              [
+                34,
+                27
+              ],
+              [
+                37,
+                27
+              ],
+              [
+                37,
+                11
+              ],
+              [
+                23,
+                11
+              ],
+              [
+                23,
+                18
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                23,
+                27
+              ],
+              [
+                23,
+                26
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                41,
+                36
+              ],
+              [
+                41,
+                39
+              ],
+              [
+                23,
+                39
+              ],
+              [
+                23,
+                27
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                16,
+                8
+              ],
+              [
+                15,
+                8
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                15,
+                8
+              ],
+              [
+                15,
+                27
+              ],
+              [
+                23,
+                27
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                13,
+                8
+              ],
+              [
+                15,
+                8
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                10,
+                8
+              ],
+              [
+                13,
+                8
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                7,
+                8
+              ],
+              [
+                10,
+                8
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                4,
+                8
+              ],
+              [
+                7,
+                8
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                44,
+                8
+              ],
+              [
+                16,
+                8
+              ]
+            ]
+          }
+        ]
+      },
+      "view": "schematic"
+    }
+  ]
+}

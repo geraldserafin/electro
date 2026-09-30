@@ -1,0 +1,333 @@
+{
+  "format": "electro-notebook",
+  "version": 2,
+  "id": "5b5026d943c7688a",
+  "title": "3. Połączenia szeregowe i równoległe",
+  "created": "2026-10-01T00:00:00Z",
+  "modified": "2026-10-01T00:00:00Z",
+  "settings": {
+    "codeInPdf": true
+  },
+  "cells": [
+    {
+      "id": "c5425a3e",
+      "type": "markdown",
+      "source": "# Szeregowo i równolegle\n\nElementy można połączyć na dwa podstawowe sposoby.\n\n**Szeregowo** — jeden za drugim, w jednej ścieżce. Przez każdy płynie **ten sam prąd**, a napięcie baterii\ndzieli się między nie. Opory się sumują:\n\n$$R = R_1 + R_2$$\n\n**Równolegle** — obok siebie, każdy podłączony wprost do baterii. Każdy dostaje **to samo napięcie**,\na prąd z baterii dzieli się między gałęzie. Opór zastępczy jest mniejszy od najmniejszego z nich:\n\n$$\\frac{1}{R} = \\frac{1}{R_1} + \\frac{1}{R_2}$$"
+    },
+    {
+      "id": "6dd17db0",
+      "type": "markdown",
+      "source": "## Dwie żarówki szeregowo\n\nKażda żarówka dostaje tylko połowę napięcia, 3 V, więc płynie przez nie połowa prądu i świecą słabo —\nkażda bierze tylko ćwierć swojej mocy. Uruchom ⚡ i porównaj z następnym schematem."
+    },
+    {
+      "id": "78bbce3b",
+      "type": "schematic",
+      "name": "szeregowo",
+      "schematic": {
+        "version": 1,
+        "elements": [
+          {
+            "id": "E_1",
+            "kind": "voltage_source",
+            "at": [
+              4,
+              13
+            ],
+            "rotation": 270,
+            "value": "6",
+            "text": null
+          },
+          {
+            "id": "H_1",
+            "kind": "lamp",
+            "at": [
+              8,
+              7
+            ],
+            "rotation": 0,
+            "value": "12",
+            "text": "3"
+          },
+          {
+            "id": "H_2",
+            "kind": "lamp",
+            "at": [
+              14,
+              7
+            ],
+            "rotation": 0,
+            "value": "12",
+            "text": "3"
+          },
+          {
+            "id": "gnd1",
+            "kind": "ground",
+            "at": [
+              4,
+              13
+            ],
+            "rotation": 0,
+            "value": null,
+            "text": null
+          }
+        ],
+        "wires": [
+          {
+            "points": [
+              [
+                4,
+                9
+              ],
+              [
+                4,
+                7
+              ],
+              [
+                8,
+                7
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                12,
+                7
+              ],
+              [
+                14,
+                7
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                18,
+                7
+              ],
+              [
+                20,
+                7
+              ],
+              [
+                20,
+                13
+              ],
+              [
+                4,
+                13
+              ]
+            ]
+          }
+        ]
+      },
+      "view": "schematic",
+      "results": {
+        "E_1": {
+          "value": "6 V",
+          "solved": false,
+          "U": "6 V",
+          "I": "250 mA",
+          "P": "1.5 W",
+          "reversed": false
+        },
+        "H_1": {
+          "value": "12 Ω",
+          "solved": false,
+          "U": "3 V",
+          "I": "250 mA",
+          "P": "750 mW",
+          "reversed": false
+        },
+        "H_2": {
+          "value": "12 Ω",
+          "solved": false,
+          "U": "3 V",
+          "I": "250 mA",
+          "P": "750 mW",
+          "reversed": false
+        }
+      },
+      "problems": []
+    },
+    {
+      "id": "e7aa29d3",
+      "type": "markdown",
+      "source": "## Dwie żarówki równolegle\n\nTu każda dostaje pełne 6 V i świeci jasno. Za to bateria oddaje dwa razy więcej prądu niż do jednej\nżarówki — i szybciej się rozładuje. Tak podłączone jest wszystko w domu: każde gniazdko ma pełne 230 V,\nbez względu na to, ile urządzeń już działa."
+    },
+    {
+      "id": "d5056904",
+      "type": "schematic",
+      "name": "rownolegle",
+      "schematic": {
+        "version": 1,
+        "elements": [
+          {
+            "id": "E_1",
+            "kind": "voltage_source",
+            "at": [
+              4,
+              13
+            ],
+            "rotation": 270,
+            "value": "6",
+            "text": null
+          },
+          {
+            "id": "H_1",
+            "kind": "lamp",
+            "at": [
+              10,
+              7
+            ],
+            "rotation": 90,
+            "value": "12",
+            "text": "3"
+          },
+          {
+            "id": "H_2",
+            "kind": "lamp",
+            "at": [
+              16,
+              7
+            ],
+            "rotation": 90,
+            "value": "12",
+            "text": "3"
+          },
+          {
+            "id": "gnd1",
+            "kind": "ground",
+            "at": [
+              4,
+              13
+            ],
+            "rotation": 0,
+            "value": null,
+            "text": null
+          }
+        ],
+        "wires": [
+          {
+            "points": [
+              [
+                4,
+                9
+              ],
+              [
+                4,
+                7
+              ],
+              [
+                10,
+                7
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                10,
+                7
+              ],
+              [
+                16,
+                7
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                10,
+                11
+              ],
+              [
+                10,
+                13
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                16,
+                11
+              ],
+              [
+                16,
+                13
+              ],
+              [
+                10,
+                13
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                10,
+                13
+              ],
+              [
+                4,
+                13
+              ]
+            ]
+          }
+        ]
+      },
+      "view": "schematic",
+      "results": {
+        "E_1": {
+          "value": "6 V",
+          "solved": false,
+          "U": "6 V",
+          "I": "1 A",
+          "P": "6 W",
+          "reversed": false
+        },
+        "H_1": {
+          "value": "12 Ω",
+          "solved": false,
+          "U": "6 V",
+          "I": "500 mA",
+          "P": "3 W",
+          "reversed": false
+        },
+        "H_2": {
+          "value": "12 Ω",
+          "solved": false,
+          "U": "6 V",
+          "I": "500 mA",
+          "P": "3 W",
+          "reversed": false
+        }
+      },
+      "problems": []
+    },
+    {
+      "id": "6cb41a70",
+      "type": "markdown",
+      "source": "## Opór zastępczy w kodzie\n\nW kodzie `+` łączy szeregowo, a `|` równolegle. `resistance()` liczy opór zastępczy całości:"
+    },
+    {
+      "id": "dca255f9",
+      "type": "code",
+      "source": "print(\"szeregowo: \", resistance(Resistor(100) + Resistor(200)), \"Ω\")\nprint(\"równolegle:\", resistance(Resistor(100) | Resistor(100)), \"Ω\")\nprint(\"mieszane:  \", resistance(Resistor(100) + (Resistor(300) | Resistor(600))), \"Ω\")",
+      "outputs": [
+        {
+          "type": "stream",
+          "data": "szeregowo:  300 Ω\nrównolegle: 50 Ω\nmieszane:   300 Ω\n"
+        }
+      ]
+    },
+    {
+      "id": "068b6dda",
+      "type": "markdown",
+      "source": "## Spróbuj sam\n\n1. Dodaj trzecią żarówkę równolegle (skopiuj $H_2$: zaznacz, ⌘C/Ctrl+C, ⌘V/Ctrl+V, i dołącz przewodami).\n   Jaki prąd oddaje teraz bateria?\n2. Choinkowe lampki bywały łączone szeregowo — dlaczego po przepaleniu jednej gasły wszystkie?\n3. Policz w kodzie opór trzech oporników 1 kΩ połączonych równolegle."
+    }
+  ]
+}

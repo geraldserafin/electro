@@ -1,0 +1,273 @@
+{
+  "format": "electro-notebook",
+  "version": 2,
+  "id": "3bdd72c4d01e97c5",
+  "title": "Tester refleksu",
+  "created": "2026-10-01T00:00:00Z",
+  "modified": "2026-10-01T00:00:00Z",
+  "settings": {
+    "codeInPdf": true
+  },
+  "cells": [
+    {
+      "id": "032bb15f",
+      "type": "markdown",
+      "source": "# Jak szybki jest Twój refleks?\n\nPo losowej chwili zapala się dioda — naciśnij przycisk najszybciej, jak umiesz. Arduino mierzy czas\nfunkcją `millis()` (milisekundy od startu) i pokazuje wynik na wyświetlaczu LCD, razem z rekordem.\nNaciśnięcie przed zapaleniem to falstart. Typowy czas reakcji człowieka na światło to 200–250 ms.\n\n**Jak grać:** uruchom ⚡, kliknij schemat i naciskaj **spację**."
+    },
+    {
+      "id": "09cd860f",
+      "type": "schematic",
+      "name": "refleks",
+      "schematic": {
+        "version": 1,
+        "elements": [
+          {
+            "id": "ARD_1",
+            "kind": "arduino",
+            "at": [
+              4,
+              17
+            ],
+            "rotation": 0,
+            "value": null,
+            "text": "// TESTER REFLEKSU: po losowej chwili zapala się dioda — naciśnij przycisk jak najszybciej.\n// Wynik w milisekundach na LCD 16×2 (I²C, 0x27), razem z najlepszym. Za wczesne naciśnięcie = falstart.\n// Dioda na D9, przycisk na D2 (klawisz spacja), buzzer na D8.\n#include <LiquidCrystal_I2C.h>\n\nLiquidCrystal_I2C lcd(0x27, 16, 2);\nconst byte LED = 9, KEY = 2, BUZZER = 8;\nunsigned long best = 0;\n\nbool pressed() { return digitalRead(KEY) == LOW; }\n\nvoid setup() {\n  pinMode(LED, OUTPUT);\n  pinMode(KEY, INPUT_PULLUP);\n  lcd.init();\n  lcd.backlight();\n  randomSeed(analogRead(A0));\n}\n\nvoid loop() {\n  lcd.clear();\n  lcd.print(\"Uwaga...\");\n  lcd.setCursor(0, 1);\n  lcd.print(\"Rekord: \");\n  if (best) {\n    lcd.print(best);\n    lcd.print(\" ms\");\n  } else lcd.print(\"-\");\n  unsigned long go = millis() + random(1500, 4000);\n  while (millis() < go)\n    if (pressed()) {  // falstart\n      lcd.clear();\n      lcd.print(\"FALSTART!\");\n      tone(BUZZER, 150, 400);\n      while (pressed()) delay(5);\n      delay(1500);\n      return;\n    }\n  digitalWrite(LED, HIGH);\n  tone(BUZZER, 2000, 50);\n  unsigned long start = millis();\n  while (!pressed()) delay(1);\n  unsigned long ms = millis() - start;\n  digitalWrite(LED, LOW);\n  if (!best || ms < best) best = ms;\n  lcd.clear();\n  lcd.print(\"Czas: \");\n  lcd.print(ms);\n  lcd.print(\" ms\");\n  lcd.setCursor(0, 1);\n  lcd.print(ms < 200 ? \"Blyskawica!\" : ms < 300 ? \"Niezle!\" : \"Spiacy? :)\");\n  while (pressed()) delay(5);\n  delay(2500);\n}\n"
+          },
+          {
+            "id": "R_1",
+            "kind": "resistor",
+            "at": [
+              10,
+              15
+            ],
+            "rotation": 270,
+            "value": "220",
+            "text": null
+          },
+          {
+            "id": "LED_1",
+            "kind": "led",
+            "at": [
+              10,
+              11
+            ],
+            "rotation": 270,
+            "value": null,
+            "text": "red"
+          },
+          {
+            "id": "B_1",
+            "kind": "button",
+            "at": [
+              18,
+              11
+            ],
+            "rotation": 90,
+            "value": null,
+            "text": "Space"
+          },
+          {
+            "id": "BZ_1",
+            "kind": "passive_buzzer",
+            "at": [
+              26,
+              13
+            ],
+            "rotation": 0,
+            "value": null,
+            "text": null
+          },
+          {
+            "id": "LCD_1",
+            "kind": "lcd1602_i2c",
+            "at": [
+              30,
+              27
+            ],
+            "rotation": 0,
+            "value": null,
+            "text": "0x27"
+          }
+        ],
+        "wires": [
+          {
+            "points": [
+              [
+                10,
+                15
+              ],
+              [
+                10,
+                17
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                18,
+                15
+              ],
+              [
+                18,
+                17
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                30,
+                29
+              ],
+              [
+                17,
+                29
+              ],
+              [
+                17,
+                25
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                30,
+                30
+              ],
+              [
+                18,
+                30
+              ],
+              [
+                18,
+                25
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                26,
+                13
+              ],
+              [
+                26,
+                16
+              ],
+              [
+                11,
+                16
+              ],
+              [
+                11,
+                17
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                30,
+                28
+              ],
+              [
+                7,
+                28
+              ],
+              [
+                7,
+                25
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                18,
+                11
+              ],
+              [
+                18,
+                7
+              ],
+              [
+                10,
+                7
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                10,
+                7
+              ],
+              [
+                4,
+                7
+              ],
+              [
+                4,
+                26
+              ],
+              [
+                9,
+                26
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                9,
+                26
+              ],
+              [
+                9,
+                25
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                30,
+                27
+              ],
+              [
+                30,
+                26
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                30,
+                26
+              ],
+              [
+                9,
+                26
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                30,
+                13
+              ],
+              [
+                30,
+                26
+              ]
+            ]
+          }
+        ]
+      },
+      "view": "schematic"
+    }
+  ]
+}

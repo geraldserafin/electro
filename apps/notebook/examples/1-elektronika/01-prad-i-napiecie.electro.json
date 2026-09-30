@@ -1,0 +1,172 @@
+{
+  "format": "electro-notebook",
+  "version": 2,
+  "id": "772c4c1b38030950",
+  "title": "1. Prąd, napięcie i obwód",
+  "created": "2026-10-01T00:00:00Z",
+  "modified": "2026-10-01T00:00:00Z",
+  "settings": {
+    "codeInPdf": true
+  },
+  "cells": [
+    {
+      "id": "30e28b00",
+      "type": "markdown",
+      "source": "# Prąd, napięcie i obwód\n\nWszystko wokół jest zbudowane z atomów, a w atomach są **elektrony** — maleńkie cząstki z ładunkiem\nelektrycznym. W metalach część elektronów nie siedzi na swoim miejscu, tylko swobodnie wędruje. Kiedy coś\nje popchnie w jedną stronę, płyną wszystkie naraz, jak woda w rurze. Ten przepływ to **prąd elektryczny**.\n\nCo je popycha? **Napięcie**. Bateria ma dwa bieguny: na jednym ma nadmiar elektronów, na drugim ich\nbrakuje. Ta różnica to napięcie — im większa, tym mocniej bateria pcha prąd. Napięcie mierzymy w\n**woltach** (V), prąd w **amperach** (A).\n\n| wielkość | co to jest | jak w wodzie | jednostka |\n|---|---|---|---|\n| napięcie $U$ | jak mocno coś pcha ładunki | ciśnienie wody | wolt, V |\n| prąd $I$ | ile ładunku przepływa w sekundę | ile litrów na sekundę płynie rurą | amper, A |\n| opór $R$ | jak bardzo coś utrudnia przepływ | wąska rura | om, Ω |"
+    },
+    {
+      "id": "9aa61341",
+      "type": "markdown",
+      "source": "## Obwód musi być zamknięty\n\nPrąd płynie tylko w **zamkniętej pętli**: z baterii, przez przewody i żarówkę, z powrotem do baterii.\nWystarczy jedna przerwa — i prąd nie płynie nigdzie. Tak działa każdy wyłącznik światła: rozcina pętlę.\n\nPoniżej jest latarka: bateria $E_1$ (6 V), łącznik $S_1$ i żarówka $H_1$. Kreska z trzema poziomymi\nliniami na dole to **masa** — umówiony punkt odniesienia, „zero” napięcia.\n\n**Spróbuj:** kliknij ⚡ **Symuluj w czasie** w rogu schematu, a potem kliknij łącznik $S_1$. Żarówka\ngaśnie i zapala się, a kolor przewodów pokazuje napięcie: zielony to plus, szary to zero."
+    },
+    {
+      "id": "015a0300",
+      "type": "schematic",
+      "name": "latarka",
+      "schematic": {
+        "version": 1,
+        "elements": [
+          {
+            "id": "E_1",
+            "kind": "voltage_source",
+            "at": [
+              4,
+              13
+            ],
+            "rotation": 270,
+            "value": "6",
+            "text": null
+          },
+          {
+            "id": "S_1",
+            "kind": "switch",
+            "at": [
+              6,
+              7
+            ],
+            "rotation": 0,
+            "value": null,
+            "text": "closed"
+          },
+          {
+            "id": "H_1",
+            "kind": "lamp",
+            "at": [
+              14,
+              7
+            ],
+            "rotation": 90,
+            "value": "12",
+            "text": "3"
+          },
+          {
+            "id": "gnd1",
+            "kind": "ground",
+            "at": [
+              4,
+              13
+            ],
+            "rotation": 0,
+            "value": null,
+            "text": null
+          }
+        ],
+        "wires": [
+          {
+            "points": [
+              [
+                4,
+                9
+              ],
+              [
+                4,
+                7
+              ],
+              [
+                6,
+                7
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                10,
+                7
+              ],
+              [
+                14,
+                7
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                14,
+                11
+              ],
+              [
+                14,
+                13
+              ],
+              [
+                4,
+                13
+              ]
+            ]
+          }
+        ]
+      },
+      "view": "schematic",
+      "results": {
+        "E_1": {
+          "value": "6 V",
+          "solved": false,
+          "U": "6 V",
+          "I": "500 mA",
+          "P": "3 W",
+          "reversed": false
+        },
+        "S_1": {
+          "value": "",
+          "solved": false,
+          "U": "0 V",
+          "I": "500 mA",
+          "P": "0 W",
+          "reversed": false
+        },
+        "H_1": {
+          "value": "12 Ω",
+          "solved": false,
+          "U": "6 V",
+          "I": "500 mA",
+          "P": "3 W",
+          "reversed": false
+        }
+      },
+      "problems": []
+    },
+    {
+      "id": "b3d5909a",
+      "type": "markdown",
+      "source": "Liczby przy elementach policzył przycisk ▶ (**Oblicz**): przez żarówkę płynie $0{,}5$ A, a napięcie na\nniej to całe 6 V baterii. Łącznik jest zamknięty, więc na nim napięcia nie ma wcale — jest jak kawałek\nprzewodu.\n\nTe same wyniki możesz dostać w komórce z kodem. Schemat ma nazwę `latarka` i pod tą nazwą jest widoczny\nw kodzie:"
+    },
+    {
+      "id": "aa24fee4",
+      "type": "code",
+      "source": "sol = latarka.solve()\nsol[\"H_1\"]",
+      "outputs": [
+        {
+          "type": "text",
+          "data": "H_1 = 12 Ω        U = 6 V   I = 500 mA   P = 3 W"
+        }
+      ]
+    },
+    {
+      "id": "9afac43b",
+      "type": "markdown",
+      "source": "## Przedrostki\n\nPrądy w elektronice bywają bardzo małe, a opory bardzo duże, dlatego używamy przedrostków — tak jak\nw „kilogramie” czy „milimetrze”:\n\n- **m** (mili) — tysięczna część: $20\\,\\mathrm{mA} = 0{,}02\\,\\mathrm{A}$,\n- **µ** (mikro) — milionowa: $100\\,\\mathrm{µF} = 0{,}0001\\,\\mathrm{F}$,\n- **k** (kilo) — tysiąc: $4{,}7\\,\\mathrm{kΩ} = 4700\\,Ω$,\n- **M** (mega) — milion: $1\\,\\mathrm{MΩ} = 1\\,000\\,000\\,Ω$.\n\nW aplikacji wpisujesz je tak samo: `20m`, `100u`, `4.7k` (albo `4k7`), `1M`.\n\n## Spróbuj sam\n\n1. Zaznacz baterię i zmień jej napięcie na 3 V, a potem kliknij ▶. Jaki prąd płynie teraz?\n2. Uruchom symulację po zmianie — żarówka świeci słabiej, bo dostaje mniej mocy.\n3. Usuń jeden przewód (zaznacz go i naciśnij Delete). Co się stało z prądem?"
+    }
+  ]
+}

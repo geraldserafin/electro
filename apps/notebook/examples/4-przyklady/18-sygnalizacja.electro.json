@@ -1,0 +1,430 @@
+{
+  "format": "electro-notebook",
+  "version": 2,
+  "id": "b17e426979364d3a",
+  "title": "Sygnalizacja świetlna",
+  "created": "2026-10-01T00:00:00Z",
+  "modified": "2026-10-01T00:00:00Z",
+  "settings": {
+    "codeInPdf": true
+  },
+  "cells": [
+    {
+      "id": "42948ba9",
+      "type": "markdown",
+      "source": "# Przejście dla pieszych\n\nSamochody mają zielone, dopóki pieszy nie naciśnie przycisku. Potem: żółte, czerwone, zielone dla\npieszych z tykaniem dla niewidomych, mruganie „kończ przechodzić” — i z powrotem, przez czerwone\nz żółtym. To prosta **maszyna stanów**: każdy stan to kombinacja świateł i czas, po którym przychodzi\nnastępny.\n\n**Jak grać:** uruchom ⚡, kliknij schemat i naciśnij **spację** (przycisk dla pieszych)."
+    },
+    {
+      "id": "06660860",
+      "type": "schematic",
+      "name": "sygnalizacja",
+      "schematic": {
+        "version": 1,
+        "elements": [
+          {
+            "id": "ARD_1",
+            "kind": "arduino",
+            "at": [
+              20,
+              18
+            ],
+            "rotation": 0,
+            "value": null,
+            "text": "// SYGNALIZACJA ŚWIETLNA na przejściu dla pieszych. Samochody mają zielone, dopóki pieszy nie naciśnie\n// przycisku (D2, spacja); wtedy: żółte, czerwone, zielone dla pieszych (z tykaniem buzzera dla\n// niewidomych), mruganie na koniec — i z powrotem. Samochody: D8 czerwone, D9 żółte, D10 zielone;\n// piesi: D11 czerwone, D12 zielone; buzzer aktywny na D7.\nconst byte CAR_R = 8, CAR_Y = 9, CAR_G = 10, WALK_R = 11, WALK_G = 12, KEY = 2, TICK = 7;\n\nvoid cars(bool r, bool y, bool g) {\n  digitalWrite(CAR_R, r);\n  digitalWrite(CAR_Y, y);\n  digitalWrite(CAR_G, g);\n}\n\nvoid walkers(bool r, bool g) {\n  digitalWrite(WALK_R, r);\n  digitalWrite(WALK_G, g);\n}\n\nvoid setup() {\n  for (byte p = 7; p <= 12; p++) pinMode(p, OUTPUT);\n  pinMode(KEY, INPUT_PULLUP);\n  Serial.begin(9600);\n}\n\nvoid loop() {\n  cars(0, 0, 1);\n  walkers(1, 0);\n  while (digitalRead(KEY) == HIGH) delay(10);\n  Serial.println(\"Pieszy czeka...\");\n  delay(1000);\n  cars(0, 1, 0);  // żółte\n  delay(1500);\n  cars(1, 0, 0);  // czerwone dla aut\n  delay(1000);\n  walkers(0, 1);  // zielone dla pieszych, z tykaniem\n  Serial.println(\"Piesi ida\");\n  for (int i = 0; i < 8; i++) {\n    digitalWrite(TICK, HIGH);\n    delay(80);\n    digitalWrite(TICK, LOW);\n    delay(420);\n  }\n  for (int i = 0; i < 6; i++) {  // mruga: kończ przechodzić\n    walkers(0, i % 2 == 0);\n    delay(300);\n  }\n  walkers(1, 0);\n  delay(1000);\n  cars(1, 1, 0);  // czerwone z żółtym: zaraz ruszamy\n  delay(1200);\n}\n"
+          },
+          {
+            "id": "R_1",
+            "kind": "resistor",
+            "at": [
+              18,
+              16
+            ],
+            "rotation": 270,
+            "value": "220",
+            "text": null
+          },
+          {
+            "id": "LED_1",
+            "kind": "led",
+            "at": [
+              18,
+              12
+            ],
+            "rotation": 270,
+            "value": null,
+            "text": "red"
+          },
+          {
+            "id": "R_2",
+            "kind": "resistor",
+            "at": [
+              15,
+              16
+            ],
+            "rotation": 270,
+            "value": "220",
+            "text": null
+          },
+          {
+            "id": "LED_2",
+            "kind": "led",
+            "at": [
+              15,
+              12
+            ],
+            "rotation": 270,
+            "value": null,
+            "text": "yellow"
+          },
+          {
+            "id": "R_3",
+            "kind": "resistor",
+            "at": [
+              12,
+              16
+            ],
+            "rotation": 270,
+            "value": "220",
+            "text": null
+          },
+          {
+            "id": "LED_3",
+            "kind": "led",
+            "at": [
+              12,
+              12
+            ],
+            "rotation": 270,
+            "value": null,
+            "text": "green"
+          },
+          {
+            "id": "R_4",
+            "kind": "resistor",
+            "at": [
+              7,
+              16
+            ],
+            "rotation": 270,
+            "value": "220",
+            "text": null
+          },
+          {
+            "id": "LED_4",
+            "kind": "led",
+            "at": [
+              7,
+              12
+            ],
+            "rotation": 270,
+            "value": null,
+            "text": "red"
+          },
+          {
+            "id": "R_5",
+            "kind": "resistor",
+            "at": [
+              4,
+              16
+            ],
+            "rotation": 270,
+            "value": "220",
+            "text": null
+          },
+          {
+            "id": "LED_5",
+            "kind": "led",
+            "at": [
+              4,
+              12
+            ],
+            "rotation": 270,
+            "value": null,
+            "text": "green"
+          },
+          {
+            "id": "B_1",
+            "kind": "button",
+            "at": [
+              40,
+              8
+            ],
+            "rotation": 90,
+            "value": null,
+            "text": "Space"
+          },
+          {
+            "id": "BZ_1",
+            "kind": "buzzer",
+            "at": [
+              44,
+              8
+            ],
+            "rotation": 90,
+            "value": null,
+            "text": null
+          }
+        ],
+        "wires": [
+          {
+            "points": [
+              [
+                18,
+                16
+              ],
+              [
+                27,
+                16
+              ],
+              [
+                27,
+                18
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                40,
+                12
+              ],
+              [
+                34,
+                12
+              ],
+              [
+                34,
+                18
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                15,
+                16
+              ],
+              [
+                15,
+                17
+              ],
+              [
+                26,
+                17
+              ],
+              [
+                26,
+                18
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                12,
+                16
+              ],
+              [
+                12,
+                18
+              ],
+              [
+                19,
+                18
+              ],
+              [
+                19,
+                15
+              ],
+              [
+                25,
+                15
+              ],
+              [
+                25,
+                18
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                7,
+                16
+              ],
+              [
+                7,
+                19
+              ],
+              [
+                20,
+                19
+              ],
+              [
+                20,
+                14
+              ],
+              [
+                24,
+                14
+              ],
+              [
+                24,
+                18
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                4,
+                16
+              ],
+              [
+                5,
+                16
+              ],
+              [
+                5,
+                7
+              ],
+              [
+                23,
+                7
+              ],
+              [
+                23,
+                18
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                44,
+                12
+              ],
+              [
+                44,
+                13
+              ],
+              [
+                29,
+                13
+              ],
+              [
+                29,
+                18
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                18,
+                8
+              ],
+              [
+                17,
+                8
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                17,
+                8
+              ],
+              [
+                17,
+                27
+              ],
+              [
+                25,
+                27
+              ],
+              [
+                25,
+                26
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                15,
+                8
+              ],
+              [
+                17,
+                8
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                12,
+                8
+              ],
+              [
+                15,
+                8
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                40,
+                8
+              ],
+              [
+                18,
+                8
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                7,
+                8
+              ],
+              [
+                12,
+                8
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                44,
+                8
+              ],
+              [
+                40,
+                8
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                4,
+                8
+              ],
+              [
+                7,
+                8
+              ]
+            ]
+          }
+        ]
+      },
+      "view": "schematic"
+    }
+  ]
+}

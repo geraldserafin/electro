@@ -1,0 +1,327 @@
+{
+  "format": "electro-notebook",
+  "version": 2,
+  "id": "c983bf244bc321ff",
+  "title": "Melodia z Tetrisa",
+  "created": "2026-10-01T00:00:00Z",
+  "modified": "2026-10-01T00:00:00Z",
+  "settings": {
+    "codeInPdf": true
+  },
+  "cells": [
+    {
+      "id": "78e58988",
+      "type": "markdown",
+      "source": "# Korobeiniki\n\nRosyjska piosenka ludowa z XIX wieku, którą cały świat zna z Tetrisa na Game Boya. Melodia to tablica\npar: częstotliwość nuty i jej długość w ósemkach. `tone()` gra dźwięk o danej częstotliwości na\nbuzzerze pasywnym, a dioda RGB zmienia kolor z wysokością nuty. Potencjometr ustawia tempo.\n\n**Skąd częstotliwości?** Nuta A4 to 440 Hz, a każdy półton wyżej mnoży częstotliwość przez\n$\\sqrt[12]{2} \\approx 1{,}0595$ — po dwunastu półtonach (oktawa) wychodzi dokładnie dwa razy więcej."
+    },
+    {
+      "id": "0ce52480",
+      "type": "schematic",
+      "name": "melodia",
+      "schematic": {
+        "version": 1,
+        "elements": [
+          {
+            "id": "ARD_1",
+            "kind": "arduino",
+            "at": [
+              5,
+              13
+            ],
+            "rotation": 0,
+            "value": null,
+            "text": "// MELODIA: „Korobeiniki” — rosyjska piosenka ludowa, którą cały świat zna z Tetrisa — na buzzerze\n// pasywnym (D8), a dioda RGB (D9, D10, D11) zmienia kolor z każdą nutą. Potencjometr na A0 ustawia tempo.\nconst byte BUZZER = 8, RED = 9, GREEN = 10, BLUE = 11;\n\n// częstotliwości nut (Hz)\nconst int NOTE_E5 = 659, NOTE_B4 = 494, NOTE_C5 = 523, NOTE_D5 = 587, NOTE_A4 = 440, NOTE_F5 = 698,\n          NOTE_A5 = 880, NOTE_G5 = 784, REST = 0;\n// nuta i długość (w ósemkach)\nconst int SONG[][2] = {\n  {NOTE_E5, 2}, {NOTE_B4, 1}, {NOTE_C5, 1}, {NOTE_D5, 2}, {NOTE_C5, 1}, {NOTE_B4, 1}, {NOTE_A4, 2}, {NOTE_A4, 1}, {NOTE_C5, 1}, {NOTE_E5, 2}, {NOTE_D5, 1}, {NOTE_C5, 1},\n  {NOTE_B4, 3}, {NOTE_C5, 1}, {NOTE_D5, 2}, {NOTE_E5, 2}, {NOTE_C5, 2}, {NOTE_A4, 2}, {NOTE_A4, 2}, {REST, 2},\n  {REST, 1}, {NOTE_D5, 2}, {NOTE_F5, 1}, {NOTE_A5, 2}, {NOTE_G5, 1}, {NOTE_F5, 1}, {NOTE_E5, 3}, {NOTE_C5, 1}, {NOTE_E5, 2}, {NOTE_D5, 1}, {NOTE_C5, 1},\n  {NOTE_B4, 2}, {NOTE_B4, 1}, {NOTE_C5, 1}, {NOTE_D5, 2}, {NOTE_E5, 2}, {NOTE_C5, 2}, {NOTE_A4, 2}, {NOTE_A4, 2}, {REST, 2},\n};\nconst int LENGTH = sizeof SONG / sizeof SONG[0];\n\nvoid color(int note) {  // kolor z wysokości nuty: niskie czerwone, wysokie niebieskie\n  if (!note) {\n    analogWrite(RED, 0);\n    analogWrite(GREEN, 0);\n    analogWrite(BLUE, 0);\n    return;\n  }\n  int h = map(note, 440, 880, 0, 255);\n  analogWrite(RED, 255 - h);\n  analogWrite(GREEN, h < 128 ? h * 2 : (255 - h) * 2);\n  analogWrite(BLUE, h);\n}\n\nvoid setup() {\n  pinMode(RED, OUTPUT);\n  pinMode(GREEN, OUTPUT);\n  pinMode(BLUE, OUTPUT);\n}\n\nvoid loop() {\n  for (int i = 0; i < LENGTH; i++) {\n    int eighth = map(analogRead(A0), 0, 1023, 90, 250);  // ms na ósemkę\n    int ms = SONG[i][1] * eighth;\n    color(SONG[i][0]);\n    if (SONG[i][0]) tone(BUZZER, SONG[i][0], ms * 9 / 10);\n    delay(ms);\n  }\n  color(0);\n  delay(1000);\n}\n"
+          },
+          {
+            "id": "BZ_1",
+            "kind": "passive_buzzer",
+            "at": [
+              5,
+              7
+            ],
+            "rotation": 0,
+            "value": null,
+            "text": null
+          },
+          {
+            "id": "R_1",
+            "kind": "resistor",
+            "at": [
+              25,
+              7
+            ],
+            "rotation": 0,
+            "value": "220",
+            "text": null
+          },
+          {
+            "id": "R_2",
+            "kind": "resistor",
+            "at": [
+              25,
+              9
+            ],
+            "rotation": 0,
+            "value": "220",
+            "text": null
+          },
+          {
+            "id": "R_3",
+            "kind": "resistor",
+            "at": [
+              25,
+              11
+            ],
+            "rotation": 0,
+            "value": "220",
+            "text": null
+          },
+          {
+            "id": "LED_1",
+            "kind": "rgb_led",
+            "at": [
+              32,
+              7
+            ],
+            "rotation": 0,
+            "value": null,
+            "text": null
+          },
+          {
+            "id": "P_1",
+            "kind": "potentiometer",
+            "at": [
+              13,
+              27
+            ],
+            "rotation": 0,
+            "value": "10k",
+            "text": "0.5"
+          }
+        ],
+        "wires": [
+          {
+            "points": [
+              [
+                32,
+                7
+              ],
+              [
+                29,
+                7
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                32,
+                9
+              ],
+              [
+                29,
+                9
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                32,
+                11
+              ],
+              [
+                29,
+                11
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                15,
+                25
+              ],
+              [
+                14,
+                25
+              ],
+              [
+                14,
+                21
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                5,
+                7
+              ],
+              [
+                5,
+                12
+              ],
+              [
+                12,
+                12
+              ],
+              [
+                12,
+                13
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                17,
+                27
+              ],
+              [
+                17,
+                24
+              ],
+              [
+                8,
+                24
+              ],
+              [
+                8,
+                21
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                25,
+                11
+              ],
+              [
+                9,
+                11
+              ],
+              [
+                9,
+                13
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                25,
+                9
+              ],
+              [
+                10,
+                9
+              ],
+              [
+                10,
+                13
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                25,
+                7
+              ],
+              [
+                11,
+                7
+              ],
+              [
+                11,
+                13
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                13,
+                27
+              ],
+              [
+                13,
+                22
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                13,
+                22
+              ],
+              [
+                13,
+                21
+              ],
+              [
+                10,
+                21
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                9,
+                7
+              ],
+              [
+                9,
+                8
+              ],
+              [
+                4,
+                8
+              ],
+              [
+                4,
+                22
+              ],
+              [
+                13,
+                22
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                36,
+                9
+              ],
+              [
+                36,
+                22
+              ],
+              [
+                13,
+                22
+              ]
+            ]
+          }
+        ]
+      },
+      "view": "schematic"
+    },
+    {
+      "id": "a1ed9c6a",
+      "type": "code",
+      "source": "# nuty z A4 = 440 Hz i dwunastego pierwiastka z dwóch\nnazwy = [\"A\", \"A#\", \"H\", \"C\", \"C#\", \"D\", \"D#\", \"E\", \"F\", \"F#\", \"G\", \"G#\"]\nfor polton in range(13):\n    print(f\"{nazwy[polton % 12]:<3} {440 * 2 ** (polton / 12):7.1f} Hz\")",
+      "outputs": [
+        {
+          "type": "stream",
+          "data": "A     440.0 Hz\nA#    466.2 Hz\nH     493.9 Hz\nC     523.3 Hz\nC#    554.4 Hz\nD     587.3 Hz\nD#    622.3 Hz\nE     659.3 Hz\nF     698.5 Hz\nF#    740.0 Hz\nG     784.0 Hz\nG#    830.6 Hz\nA     880.0 Hz\n"
+        }
+      ]
+    }
+  ]
+}

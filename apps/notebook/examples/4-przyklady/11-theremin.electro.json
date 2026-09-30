@@ -1,0 +1,180 @@
+{
+  "format": "electro-notebook",
+  "version": 2,
+  "id": "5b6640c81666a5dd",
+  "title": "Theremin",
+  "created": "2026-10-01T00:00:00Z",
+  "modified": "2026-10-01T00:00:00Z",
+  "settings": {
+    "codeInPdf": true
+  },
+  "cells": [
+    {
+      "id": "9737b031",
+      "type": "markdown",
+      "source": "# Theremin\n\nPierwszy elektroniczny instrument (Lew Termen, 1920) — gra się na nim, nie dotykając go: dłoń zbliżona\ndo anteny zmienia wysokość dźwięku. Tu antenę zastępuje ultradźwiękowy czujnik odległości HC-SR04,\na żeby łatwiej było trafić w melodię, dźwięk przeskakuje po nutach skali C-dur.\n\nUruchom ⚡ i przesuwaj suwak czujnika (odległość dłoni). Na **Konsoli** widać odległość i nutę.\n\n**Jak działa HC-SR04:** impuls 10 µs na TRIG wysyła paczkę ultradźwięków 40 kHz; ECHO jest w stanie\nwysokim tyle, ile dźwięk leciał tam i z powrotem — 58 µs na każdy centymetr odległości."
+    },
+    {
+      "id": "66ddf4e4",
+      "type": "schematic",
+      "name": "theremin",
+      "schematic": {
+        "version": 1,
+        "elements": [
+          {
+            "id": "ARD_1",
+            "kind": "arduino",
+            "at": [
+              16,
+              11
+            ],
+            "rotation": 0,
+            "value": null,
+            "text": "// THEREMIN: instrument, na którym gra się, nie dotykając go. HC-SR04 mierzy odległość dłoni,\n// a buzzer gra tym wyższy dźwięk, im bliżej jest dłoń — nuta po nucie, w skali C-dur.\n// Przesuwaj przeszkodę suwakiem czujnika. TRIG na D9, ECHO na D10, buzzer pasywny na D8.\nconst byte TRIG = 9, ECHO = 10, BUZZER = 8;\n// skala C-dur przez dwie oktawy (Hz)\nconst int SCALE[] = {262, 294, 330, 349, 392, 440, 494, 523, 587, 659, 698, 784, 880, 988, 1047};\nconst int NOTES = sizeof SCALE / sizeof SCALE[0];\n\nvoid setup() {\n  pinMode(TRIG, OUTPUT);\n  pinMode(ECHO, INPUT);\n  Serial.begin(9600);\n}\n\nlong distanceCm() {\n  digitalWrite(TRIG, HIGH);\n  delayMicroseconds(10);\n  digitalWrite(TRIG, LOW);\n  long us = pulseIn(ECHO, HIGH, 30000UL);\n  return us ? us / 58 : -1;  // 58 µs na centymetr (tam i z powrotem)\n}\n\nvoid loop() {\n  long cm = distanceCm();\n  if (cm > 0 && cm < 60) {\n    int note = map(cm, 5, 60, NOTES - 1, 0);  // bliżej = wyżej\n    note = constrain(note, 0, NOTES - 1);\n    tone(BUZZER, SCALE[note]);\n    Serial.print(cm);\n    Serial.print(\" cm -> \");\n    Serial.print(SCALE[note]);\n    Serial.println(\" Hz\");\n  } else {\n    noTone(BUZZER);  // dłoń za daleko: cisza\n  }\n  delay(60);\n}\n"
+          },
+          {
+            "id": "US_1",
+            "kind": "ultrasonic",
+            "at": [
+              4,
+              3
+            ],
+            "rotation": 0,
+            "value": null,
+            "text": "30"
+          },
+          {
+            "id": "BZ_1",
+            "kind": "passive_buzzer",
+            "at": [
+              36,
+              7
+            ],
+            "rotation": 0,
+            "value": null,
+            "text": null
+          }
+        ],
+        "wires": [
+          {
+            "points": [
+              [
+                36,
+                7
+              ],
+              [
+                23,
+                7
+              ],
+              [
+                23,
+                11
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                6,
+                7
+              ],
+              [
+                6,
+                10
+              ],
+              [
+                21,
+                10
+              ],
+              [
+                21,
+                11
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                5,
+                7
+              ],
+              [
+                5,
+                9
+              ],
+              [
+                22,
+                9
+              ],
+              [
+                22,
+                11
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                4,
+                7
+              ],
+              [
+                4,
+                19
+              ],
+              [
+                19,
+                19
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                7,
+                7
+              ],
+              [
+                7,
+                20
+              ],
+              [
+                21,
+                20
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                21,
+                20
+              ],
+              [
+                21,
+                19
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                40,
+                7
+              ],
+              [
+                40,
+                20
+              ],
+              [
+                21,
+                20
+              ]
+            ]
+          }
+        ]
+      },
+      "view": "schematic"
+    }
+  ]
+}

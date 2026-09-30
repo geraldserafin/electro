@@ -1,0 +1,399 @@
+{
+  "format": "electro-notebook",
+  "version": 2,
+  "id": "4148c403ead229ee",
+  "title": "Strzelanka 3D na OLED-zie",
+  "created": "2026-10-01T00:00:00Z",
+  "modified": "2026-10-01T00:00:00Z",
+  "settings": {
+    "codeInPdf": true
+  },
+  "cells": [
+    {
+      "id": "32e627c7",
+      "type": "markdown",
+      "source": "# Strzelanka 3D na ekranie 128×64\n\nZanim wgrasz prawdziwego Dooma — gra w jego duchu, napisana jako zwykły szkic: korytarze liczone\n**rzucaniem promieni** (jak w Wolfensteinie 3D z 1992 roku), ściany cieniowane ditheringiem, demony\njako sprite'y za ścianami. Wszystko na monochromatycznym OLED-zie przez I²C (GP4 SDA, GP5 SCL), z buzzerem\nna GP15.\n\n**Jak grać:** kliknij schemat, żeby miał fokus, i sterują **strzałki**; **spacja** strzela i zaczyna grę.\n\n**Rzucanie promieni:** dla każdej kolumny ekranu z oczu gracza wychodzi promień i kroczy po mapie\nkratka po kratce (algorytm DDA), aż trafi w ścianę. Im dalej ściana, tym niższy jej pasek na ekranie —\ni z samych takich pasków powstaje trójwymiarowy korytarz."
+    },
+    {
+      "id": "f8f8a587",
+      "type": "schematic",
+      "name": "strzelanka",
+      "schematic": {
+        "version": 1,
+        "elements": [
+          {
+            "id": "PICO_1",
+            "kind": "pico",
+            "at": [
+              20,
+              18
+            ],
+            "rotation": 0,
+            "value": null,
+            "text": "// HELL ON PICO — a first-person shooter in the spirit of the classics, on a Raspberry Pi Pico with a\n// 128×64 OLED (SSD1306 on I²C: GP4 SDA, GP5 SCL), five buttons to ground and a passive buzzer.\n// Walls by ray casting (DDA over a grid), shaded by distance with ordered dithering; demons drawn as\n// sprites behind the walls' depth; shoot them before they reach you.\n//   GP10 forward, GP11 back, GP12 turn left, GP13 turn right, GP14 fire; the buzzer on GP15.\n#include <Wire.h>\n#include <Adafruit_GFX.h>\n#include <Adafruit_SSD1306.h>\n\nconst int W = 128, H = 64, VIEW = 56;  // the screen; the 3D view above the status bar\nconst int FORWARD = 10, BACK = 11, LEFT = 12, RIGHT = 13, FIRE = 14, BUZZER = 15;\nconst uint32_t FRAME_MS = 33;  // 30 frames a second: the rest of the time the chip sleeps (the real I²C allows ~40)\nAdafruit_SSD1306 oled(W, H, &Wire, -1);\n\n// the level: 1–3 walls of three kinds (their dithering), 0 floor\nconst int MAP = 16;\nconst uint8_t level[MAP][MAP] = {\n  {1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1},\n  {1,0,0,0,0,0,1,0,0,0,0,0,0,0,0,1},\n  {1,0,2,2,0,0,1,0,0,3,3,3,0,0,0,1},\n  {1,0,2,0,0,0,0,0,0,0,0,3,0,0,0,1},\n  {1,0,0,0,0,1,1,1,0,0,0,3,0,2,0,1},\n  {1,0,0,0,0,0,0,1,0,0,0,0,0,2,0,1},\n  {1,1,1,0,0,0,0,1,1,1,0,0,0,2,0,1},\n  {1,0,0,0,3,0,0,0,0,0,0,0,0,0,0,1},\n  {1,0,0,0,3,0,0,0,0,0,0,1,1,0,0,1},\n  {1,0,2,2,3,0,0,2,2,0,0,0,1,0,0,1},\n  {1,0,0,0,0,0,0,2,0,0,0,0,1,0,0,1},\n  {1,0,0,0,0,0,0,0,0,3,0,0,0,0,0,1},\n  {1,0,3,3,0,1,0,0,0,3,0,0,2,2,0,1},\n  {1,0,0,0,0,1,0,0,0,0,0,0,0,0,0,1},\n  {1,0,0,0,0,1,0,0,0,0,0,0,0,0,0,1},\n  {1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1},\n};\n\n// a demon, 16×16 (bit 15 on the left); its mask: what of the square it covers\nconst uint16_t DEMON[16] = {\n  0x2004, 0x300C, 0x1FF8, 0x3FFC, 0x6DB6, 0x6DB6, 0x7FFE, 0x3FFC,\n  0x3BDC, 0x1FF8, 0x0FF0, 0x1FF8, 0x3E7C, 0x3C3C, 0x3C3C, 0x7C3E,\n};\nconst uint16_t DEMON_MASK[16] = {\n  0x300C, 0x381C, 0x3FFC, 0x7FFE, 0xFFFF, 0xFFFF, 0xFFFF, 0x7FFE,\n  0x7FFE, 0x3FFC, 0x1FF8, 0x3FFC, 0x7FFE, 0x7E7E, 0x7E7E, 0xFE7F,\n};\n// the shotgun, 24×12 at the bottom of the view, and its flash\nconst uint32_t GUN[12] = {\n  0x003C00, 0x003C00, 0x007E00, 0x007E00, 0x00FF00, 0x01FF80,\n  0x03E7C0, 0x07C3E0, 0x0FC3F0, 0x1FFFF8, 0x3FFFFC, 0x7FFFFE,\n};\nconst uint32_t FLASH[6] = { 0x081810, 0x04A420, 0x02DB40, 0x07FFE0, 0x02DB40, 0x04A420 };\n\n// ordered dithering (4×4 Bayer): a pixel is lit when its threshold is under the brightness\nconst uint8_t BAYER[4][4] = { {0, 8, 2, 10}, {12, 4, 14, 6}, {3, 11, 1, 9}, {15, 7, 13, 5} };\ninline bool dither(int x, int y, int bright) { return BAYER[y & 3][x & 3] < bright; }\n\nstruct Demon { float x, y; int health; bool alive; uint32_t hurt; };\nconst int DEMONS = 6;\nDemon demons[DEMONS];\nfloat px, py, angle;  // the player\nint health, ammo, kills;\nfloat depth[W];  // each column's wall distance: sprites hide behind nearer walls\nuint32_t firedAt = 0, hitAt = 0, lastFrame = 0;\nint frames = 0, fps = 0;\nuint32_t fpsSince = 0;\nbool dead = false;\n\nbool held(int pin) { return digitalRead(pin) == LOW; }\nbool solid(float x, float y) { return level[(int)y][(int)x] != 0; }\n\nvoid reset() {\n  px = 1.5; py = 1.5; angle = 0.8;\n  health = 100; ammo = 25; kills = 0; dead = false;\n  const float spots[DEMONS][2] = { {8.5, 3.5}, {13.5, 2.5}, {3.5, 7.5}, {9.5, 7.5}, {14.5, 10.5}, {7.5, 13.5} };\n  for (int i = 0; i < DEMONS; i++) demons[i] = { spots[i][0], spots[i][1], 3, true, 0 };\n}\n\nvoid setup() {\n  for (int pin : {FORWARD, BACK, LEFT, RIGHT, FIRE}) pinMode(pin, INPUT_PULLUP);\n  Serial.begin(115200);\n  oled.begin(SSD1306_SWITCHCAPVCC, 0x3C);\n  oled.setTextColor(SSD1306_WHITE);\n  oled.clearDisplay();\n  oled.setTextSize(2);\n  oled.setCursor(22, 10);\n  oled.print(\"HELL ON\");\n  oled.setCursor(40, 30);\n  oled.print(\"PICO\");\n  oled.setTextSize(1);\n  oled.setCursor(22, 54);\n  oled.print(\"press FIRE (GP14)\");\n  oled.display();\n  while (!held(FIRE)) delay(10);\n  tone(BUZZER, 880, 80);\n  while (held(FIRE)) delay(10);  // (that press starts the game, it is not a shot)\n  reset();\n  lastFrame = millis();\n}\n\n// ---------------------------------------------------------------- the world\n\nvoid move(float dt) {\n  float speed = 2.4 * dt, turn = 2.6 * dt;\n  if (held(LEFT)) angle -= turn;\n  if (held(RIGHT)) angle += turn;\n  float dx = cosf(angle) * speed, dy = sinf(angle) * speed;\n  if (held(BACK)) { dx = -dx; dy = -dy; }\n  if (held(FORWARD) || held(BACK)) {  // slide along walls: each axis on its own, a margin from them\n    if (!solid(px + dx * 2, py)) px += dx;\n    if (!solid(px, py + dy * 2)) py += dy;\n  }\n}\n\nvoid demonsAct(float dt) {\n  for (Demon &d : demons) {\n    if (!d.alive) continue;\n    float dx = px - d.x, dy = py - d.y, dist = sqrtf(dx * dx + dy * dy);\n    if (dist < 0.7) {  // at you: it claws\n      if (millis() - hitAt > 600) { health -= 12; hitAt = millis(); tone(BUZZER, 110, 120); }\n      continue;\n    }\n    if (dist > 7) continue;\n    float step = 0.9 * dt / dist;\n    if (!solid(d.x + dx * step * 2, d.y)) d.x += dx * step;\n    if (!solid(d.x, d.y + dy * step * 2)) d.y += dy * step;\n  }\n}\n\n// the wall distance straight ahead of ``angle`` (for shooting: nothing hits through a wall)\nfloat wallAt(float a) {\n  float rx = cosf(a), ry = sinf(a);\n  for (float t = 0; t < 16; t += 0.05) if (solid(px + rx * t, py + ry * t)) return t;\n  return 16;\n}\n\nvoid fire() {\n  if (ammo == 0) { tone(BUZZER, 60, 40); return; }\n  ammo--;\n  firedAt = millis();\n  tone(BUZZER, 180, 90);\n  float wall = wallAt(angle);\n  Demon *hit = nullptr;\n  float nearest = wall;\n  for (Demon &d : demons) {\n    if (!d.alive) continue;\n    float dx = d.x - px, dy = d.y - py, dist = sqrtf(dx * dx + dy * dy);\n    float off = atan2f(dy, dx) - angle;\n    while (off > PI) off -= 2 * PI;\n    while (off < -PI) off += 2 * PI;\n    if (fabsf(off) < 0.35 / dist + 0.03 && dist < nearest) { nearest = dist; hit = &d; }\n  }\n  if (hit) {\n    hit->hurt = millis();\n    if (--hit->health <= 0) { hit->alive = false; kills++; ammo += 4; tone(BUZZER, 330, 150); }\n  }\n}\n\n// ---------------------------------------------------------------- the view\n\nvoid walls() {\n  float dirX = cosf(angle), dirY = sinf(angle);\n  float planeX = -dirY * 0.66, planeY = dirX * 0.66;  // the camera plane: a 66° field of view\n  for (int x = 0; x < W; x++) {\n    float camera = 2.0 * x / W - 1;\n    float rx = dirX + planeX * camera, ry = dirY + planeY * camera;\n    int mx = (int)px, my = (int)py;\n    float ddx = fabsf(1 / rx), ddy = fabsf(1 / ry);\n    int sx = rx < 0 ? -1 : 1, sy = ry < 0 ? -1 : 1;\n    float sideX = (rx < 0 ? px - mx : mx + 1 - px) * ddx;\n    float sideY = (ry < 0 ? py - my : my + 1 - py) * ddy;\n    int side = 0, kind = 0;\n    for (int i = 0; i < 64 && !kind; i++) {  // DDA: square by square to the first wall\n      if (sideX < sideY) { sideX += ddx; mx += sx; side = 0; } else { sideY += ddy; my += sy; side = 1; }\n      kind = level[my][mx];\n    }\n    float dist = side == 0 ? sideX - ddx : sideY - ddy;\n    if (dist < 0.05) dist = 0.05;\n    float along = side == 0 ? py + dist * ry : px + dist * rx;  // where on the block the ray hit it: 0–1\n    along -= floorf(along);\n    bool edge = along < 0.05 || along > 0.95;  // the blocks' edges: dark seams\n    depth[x] = dist;\n    int height = (int)(VIEW / dist);\n    int top = max(0, VIEW / 2 - height / 2), bottom = min(VIEW - 1, VIEW / 2 + height / 2);\n    // nearer is brighter; the side walls a touch darker; the kinds their own pattern\n    int bright = constrain(14 - (int)(dist * 2.0) - side * 2, 1, 13);  // (never all lit: the pattern shows)\n    for (int y = top; y <= bottom; y++) {\n      bool lit = kind == 2 ? ((y & 3) != 0 && dither(x, y, bright))  // bricks: a gap every 4 rows\n               : kind == 3 ? ((x & 1) == 0 && dither(x, y, bright))  // panels: every other column\n               : dither(x, y, bright);\n      if (lit && !edge) oled.drawPixel(x, y, SSD1306_WHITE);\n    }\n    if (bottom + 1 < VIEW && (x & 3) == 0) oled.drawPixel(x, bottom + 1, SSD1306_WHITE);  // where the floor meets it\n  }\n}\n\nvoid sprites() {\n  float dirX = cosf(angle), dirY = sinf(angle);\n  float planeX = -dirY * 0.66, planeY = dirX * 0.66;\n  float inv = 1.0 / (planeX * dirY - dirX * planeY);\n  int order[DEMONS];\n  float far[DEMONS];\n  for (int i = 0; i < DEMONS; i++) { order[i] = i; far[i] = (demons[i].x - px) * (demons[i].x - px) + (demons[i].y - py) * (demons[i].y - py); }\n  for (int i = 0; i < DEMONS; i++)  // farthest first\n    for (int j = i + 1; j < DEMONS; j++) if (far[order[j]] > far[order[i]]) { int t = order[i]; order[i] = order[j]; order[j] = t; }\n  for (int k = 0; k < DEMONS; k++) {\n    Demon &d = demons[order[k]];\n    if (!d.alive) continue;\n    float sx = d.x - px, sy = d.y - py;\n    float tx = inv * (dirY * sx - dirX * sy), tz = inv * (-planeY * sx + planeX * sy);  // into the camera's space\n    if (tz < 0.2) continue;\n    int cx = (int)(W / 2 * (1 + tx / tz));\n    int size = (int)(VIEW / tz);\n    int left = cx - size / 2, top = VIEW / 2 - size / 2 + size / 8;\n    bool flashing = millis() - d.hurt < 120;\n    for (int x = max(0, left); x < min(W, left + size); x++) {\n      if (depth[x] < tz) continue;  // a wall in front\n      int u = (x - left) * 16 / size;\n      for (int y = max(0, top); y < min(VIEW, top + size); y++) {\n        int v = (y - top) * 16 / size;\n        uint16_t bit = 0x8000 >> u;\n        if (!(DEMON_MASK[v] & bit)) continue;\n        bool body = (DEMON[v] & bit) != 0;\n        oled.drawPixel(x, y, body != flashing ? SSD1306_WHITE : SSD1306_BLACK);\n      }\n    }\n  }\n}\n\nvoid hud(uint32_t now) {\n  // the gun, bobbing as you walk, and its flash for a moment after a shot\n  int bob = (held(FORWARD) || held(BACK)) ? (int)(2 * sinf(now / 90.0)) : 0;\n  for (int r = 0; r < 12; r++)\n    for (int c = 0; c < 24; c++)\n      if (GUN[r] & (0x800000UL >> c)) oled.drawPixel(52 + c, VIEW - 12 + r + bob, SSD1306_WHITE);\n  if (now - firedAt < 80)\n    for (int r = 0; r < 6; r++)\n      for (int c = 0; c < 24; c++)\n        if (FLASH[r] & (0x800000UL >> c)) oled.drawPixel(52 + c, VIEW - 19 + r, SSD1306_WHITE);\n  oled.drawPixel(W / 2, VIEW / 2, SSD1306_INVERSE);  // the crosshair\n  oled.fillRect(0, VIEW, W, H - VIEW, SSD1306_BLACK);\n  oled.drawFastHLine(0, VIEW, W, SSD1306_WHITE);\n  oled.setTextSize(1);\n  oled.setCursor(0, VIEW + 1);\n  oled.printf(\"HP%3d  AMMO%2d  K%d/%d\", max(health, 0), ammo, kills, DEMONS);\n  if (now - hitAt < 150) oled.drawRect(0, 0, W, VIEW, SSD1306_WHITE);  // hurt: the view flashes\n}\n\nvoid over(const char *line) {\n  oled.fillRect(20, 18, 88, 22, SSD1306_BLACK);\n  oled.drawRect(20, 18, 88, 22, SSD1306_WHITE);\n  oled.setCursor(26, 22);\n  oled.print(line);\n  oled.setCursor(26, 30);\n  oled.print(\"FIRE: again\");\n}\n\nvoid loop() {\n  uint32_t now = millis();\n  float dt = min((now - lastFrame) / 1000.0, 0.1);\n  lastFrame = now;\n  bool won = kills == DEMONS;\n  if (health <= 0 || won) {\n    if (!dead) { dead = true; tone(BUZZER, won ? 660 : 90, 400); }\n    over(won ? \"YOU WIN!\" : \"YOU DIED\");\n    oled.display();\n    if (held(FIRE)) { delay(300); reset(); }\n    return;\n  }\n  move(dt);\n  demonsAct(dt);\n  static bool wasFiring = false;\n  bool firing = held(FIRE);\n  if (firing && !wasFiring) fire();\n  wasFiring = firing;\n\n  oled.clearDisplay();\n  walls();\n  sprites();\n  hud(now);\n  oled.display();\n  frames++;\n  if (now - fpsSince >= 1000) { fps = frames; frames = 0; fpsSince = now; Serial.printf(\"fps %d\\n\", fps); }\n  while (millis() - now < FRAME_MS) delay(1);\n}\n"
+          },
+          {
+            "id": "OLED_1",
+            "kind": "ssd1306",
+            "at": [
+              6,
+              10
+            ],
+            "rotation": 0,
+            "value": null,
+            "text": "0x3C"
+          },
+          {
+            "id": "BZ_1",
+            "kind": "passive_buzzer",
+            "at": [
+              14,
+              27
+            ],
+            "rotation": 0,
+            "value": null,
+            "text": null
+          },
+          {
+            "id": "B_1",
+            "kind": "button",
+            "at": [
+              16,
+              37
+            ],
+            "rotation": 90,
+            "value": null,
+            "text": "ArrowUp"
+          },
+          {
+            "id": "B_2",
+            "kind": "button",
+            "at": [
+              13,
+              37
+            ],
+            "rotation": 90,
+            "value": null,
+            "text": "ArrowDown"
+          },
+          {
+            "id": "B_3",
+            "kind": "button",
+            "at": [
+              10,
+              37
+            ],
+            "rotation": 90,
+            "value": null,
+            "text": "ArrowLeft"
+          },
+          {
+            "id": "B_4",
+            "kind": "button",
+            "at": [
+              7,
+              37
+            ],
+            "rotation": 90,
+            "value": null,
+            "text": "ArrowRight"
+          },
+          {
+            "id": "B_5",
+            "kind": "button",
+            "at": [
+              4,
+              37
+            ],
+            "rotation": 90,
+            "value": null,
+            "text": "Space"
+          }
+        ],
+        "wires": [
+          {
+            "points": [
+              [
+                14,
+                27
+              ],
+              [
+                14,
+                33
+              ],
+              [
+                20,
+                33
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                16,
+                37
+              ],
+              [
+                16,
+                28
+              ],
+              [
+                20,
+                28
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                13,
+                37
+              ],
+              [
+                13,
+                29
+              ],
+              [
+                20,
+                29
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                10,
+                37
+              ],
+              [
+                10,
+                30
+              ],
+              [
+                20,
+                30
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                7,
+                37
+              ],
+              [
+                7,
+                31
+              ],
+              [
+                20,
+                31
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                4,
+                37
+              ],
+              [
+                4,
+                32
+              ],
+              [
+                20,
+                32
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                9,
+                10
+              ],
+              [
+                14,
+                10
+              ],
+              [
+                14,
+                22
+              ],
+              [
+                20,
+                22
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                8,
+                10
+              ],
+              [
+                8,
+                9
+              ],
+              [
+                15,
+                9
+              ],
+              [
+                15,
+                23
+              ],
+              [
+                20,
+                23
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                7,
+                10
+              ],
+              [
+                7,
+                8
+              ],
+              [
+                29,
+                8
+              ],
+              [
+                29,
+                19
+              ],
+              [
+                28,
+                19
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                18,
+                27
+              ],
+              [
+                18,
+                15
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                18,
+                15
+              ],
+              [
+                30,
+                15
+              ],
+              [
+                30,
+                20
+              ],
+              [
+                28,
+                20
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                6,
+                10
+              ],
+              [
+                6,
+                7
+              ],
+              [
+                18,
+                7
+              ],
+              [
+                18,
+                15
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                16,
+                41
+              ],
+              [
+                18,
+                41
+              ],
+              [
+                18,
+                27
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                13,
+                41
+              ],
+              [
+                16,
+                41
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                10,
+                41
+              ],
+              [
+                13,
+                41
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                7,
+                41
+              ],
+              [
+                10,
+                41
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                4,
+                41
+              ],
+              [
+                7,
+                41
+              ]
+            ]
+          }
+        ]
+      },
+      "view": "schematic"
+    }
+  ]
+}

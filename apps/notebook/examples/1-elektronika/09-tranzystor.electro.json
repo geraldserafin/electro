@@ -1,0 +1,472 @@
+{
+  "format": "electro-notebook",
+  "version": 2,
+  "id": "6f3104b7e3e1450f",
+  "title": "9. Tranzystor",
+  "created": "2026-10-01T00:00:00Z",
+  "modified": "2026-10-01T00:00:00Z",
+  "settings": {
+    "codeInPdf": true
+  },
+  "cells": [
+    {
+      "id": "70e6cd1c",
+      "type": "markdown",
+      "source": "# Tranzystor — mały prąd steruje dużym\n\n**Tranzystor** to najważniejszy wynalazek elektroniki XX wieku. Ma trzy nóżki: **bazę** (B),\n**kolektor** (C) i **emiter** (E). Mały prąd wpływający do bazy pozwala popłynąć nawet sto razy\nwiększemu prądowi z kolektora do emitera. Bez prądu bazy tranzystor jest zamknięty.\n\nMożna go używać na dwa sposoby:\n\n- jako **klucz** — włącza i wyłącza duży prąd małym (tak pracuje w tej lekcji),\n- jako **wzmacniacz** — słaby sygnał na bazie steruje proporcjonalnie silnym prądem (zobacz w przykładach).\n\nW procesorze komputera są miliardy tranzystorów pracujących jako klucze."
+    },
+    {
+      "id": "fa9ffb96",
+      "type": "markdown",
+      "source": "## Przycisk włącza żarówkę\n\nŻarówka bierze 0,75 A — dużo za dużo dla małego przycisku. Przycisk steruje więc tylko prądem bazy\n(ok. 8 mA przez $R_1$), a ciężką pracę wykonuje tranzystor. $R_2$ trzyma bazę przy masie, gdy przycisk\njest puszczony. Uruchom ⚡ i przytrzymaj $B_1$."
+    },
+    {
+      "id": "c1df5e3d",
+      "type": "schematic",
+      "name": "klucz",
+      "schematic": {
+        "version": 1,
+        "elements": [
+          {
+            "id": "E_1",
+            "kind": "voltage_source",
+            "at": [
+              4,
+              17
+            ],
+            "rotation": 270,
+            "value": "9",
+            "text": null
+          },
+          {
+            "id": "H_1",
+            "kind": "lamp",
+            "at": [
+              17,
+              7
+            ],
+            "rotation": 90,
+            "value": "12",
+            "text": "6.75"
+          },
+          {
+            "id": "B_1",
+            "kind": "button",
+            "at": [
+              6,
+              10
+            ],
+            "rotation": 90,
+            "value": null,
+            "text": null
+          },
+          {
+            "id": "R_1",
+            "kind": "resistor",
+            "at": [
+              6,
+              15
+            ],
+            "rotation": 0,
+            "value": "1k",
+            "text": null
+          },
+          {
+            "id": "Q_1",
+            "kind": "npn",
+            "at": [
+              14,
+              15
+            ],
+            "rotation": 0,
+            "value": null,
+            "text": null
+          },
+          {
+            "id": "R_2",
+            "kind": "resistor",
+            "at": [
+              12,
+              17
+            ],
+            "rotation": 90,
+            "value": "10k",
+            "text": null
+          },
+          {
+            "id": "gnd1",
+            "kind": "ground",
+            "at": [
+              4,
+              17
+            ],
+            "rotation": 0,
+            "value": null,
+            "text": null
+          }
+        ],
+        "wires": [
+          {
+            "points": [
+              [
+                4,
+                13
+              ],
+              [
+                4,
+                7
+              ],
+              [
+                17,
+                7
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                6,
+                7
+              ],
+              [
+                6,
+                10
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                6,
+                14
+              ],
+              [
+                6,
+                15
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                10,
+                15
+              ],
+              [
+                12,
+                15
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                12,
+                15
+              ],
+              [
+                14,
+                15
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                12,
+                15
+              ],
+              [
+                12,
+                17
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                17,
+                11
+              ],
+              [
+                17,
+                13
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                17,
+                17
+              ],
+              [
+                17,
+                21
+              ],
+              [
+                12,
+                21
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                12,
+                21
+              ],
+              [
+                4,
+                21
+              ],
+              [
+                4,
+                17
+              ]
+            ]
+          }
+        ]
+      },
+      "view": "schematic"
+    },
+    {
+      "id": "19b56ff7",
+      "type": "markdown",
+      "source": "## Lampka nocna\n\nPołącz dzielnik z fotorezystorem (lekcja 6) z tranzystorem, a dostaniesz lampkę, która sama zapala się\npo zmroku: w ciemności fotorezystor ma duży opór, napięcie na bazie rośnie i tranzystor włącza diodę.\nPotencjometrem ustawiasz, przy jakim świetle ma się zapalać. Uruchom ⚡ i zmieniaj światło na\nfotorezystorze."
+    },
+    {
+      "id": "92cb85b3",
+      "type": "schematic",
+      "name": "lampka_nocna",
+      "schematic": {
+        "version": 1,
+        "elements": [
+          {
+            "id": "E_1",
+            "kind": "voltage_source",
+            "at": [
+              4,
+              23
+            ],
+            "rotation": 270,
+            "value": "5",
+            "text": null
+          },
+          {
+            "id": "P_1",
+            "kind": "potentiometer",
+            "at": [
+              7,
+              11
+            ],
+            "rotation": 0,
+            "value": "100k",
+            "text": "0.3"
+          },
+          {
+            "id": "LDR_1",
+            "kind": "photoresistor",
+            "at": [
+              10,
+              19
+            ],
+            "rotation": 90,
+            "value": "10k",
+            "text": "300"
+          },
+          {
+            "id": "R_1",
+            "kind": "resistor",
+            "at": [
+              14,
+              17
+            ],
+            "rotation": 0,
+            "value": "10k",
+            "text": null
+          },
+          {
+            "id": "Q_1",
+            "kind": "npn",
+            "at": [
+              20,
+              17
+            ],
+            "rotation": 0,
+            "value": null,
+            "text": null
+          },
+          {
+            "id": "R_2",
+            "kind": "resistor",
+            "at": [
+              23,
+              7
+            ],
+            "rotation": 90,
+            "value": "220",
+            "text": null
+          },
+          {
+            "id": "LED_1",
+            "kind": "led",
+            "at": [
+              23,
+              11
+            ],
+            "rotation": 90,
+            "value": null,
+            "text": "white"
+          },
+          {
+            "id": "gnd1",
+            "kind": "ground",
+            "at": [
+              4,
+              23
+            ],
+            "rotation": 0,
+            "value": null,
+            "text": null
+          }
+        ],
+        "wires": [
+          {
+            "points": [
+              [
+                20,
+                17
+              ],
+              [
+                18,
+                17
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                10,
+                23
+              ],
+              [
+                4,
+                23
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                23,
+                19
+              ],
+              [
+                23,
+                23
+              ],
+              [
+                10,
+                23
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                9,
+                9
+              ],
+              [
+                11,
+                9
+              ],
+              [
+                11,
+                11
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                10,
+                19
+              ],
+              [
+                11,
+                19
+              ],
+              [
+                11,
+                17
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                11,
+                17
+              ],
+              [
+                11,
+                11
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                14,
+                17
+              ],
+              [
+                11,
+                17
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                7,
+                11
+              ],
+              [
+                7,
+                19
+              ],
+              [
+                4,
+                19
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                23,
+                7
+              ],
+              [
+                7,
+                7
+              ],
+              [
+                7,
+                11
+              ]
+            ]
+          }
+        ]
+      },
+      "view": "schematic"
+    },
+    {
+      "id": "1e5d74f6",
+      "type": "markdown",
+      "source": "## Spróbuj sam\n\n1. W `klucz` zwiększ $R_1$ do 100 kΩ. Prąd bazy spada do 80 µA — czy żarówka jeszcze świeci pełnym\n   blaskiem? (Tranzystor wzmacnia ok. 100 razy: 80 µA × 100 = 8 mA, a żarówka potrzebuje 750 mA.)\n2. W lampce nocnej przekręć potencjometr. Przy jakim świetle zapala się teraz?"
+    }
+  ]
+}

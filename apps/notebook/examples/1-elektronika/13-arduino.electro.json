@@ -1,0 +1,369 @@
+{
+  "format": "electro-notebook",
+  "version": 2,
+  "id": "bc286c71189a9152",
+  "title": "13. Arduino: pierwszy program",
+  "created": "2026-10-01T00:00:00Z",
+  "modified": "2026-10-01T00:00:00Z",
+  "settings": {
+    "codeInPdf": true
+  },
+  "cells": [
+    {
+      "id": "1c449e48",
+      "type": "markdown",
+      "source": "# Mikrokontroler\n\nDo tej pory o tym, co robi obwód, decydowały połączenia. **Mikrokontroler** to mały komputer w jednym\nukładzie scalonym: ma procesor, pamięć i piny, którymi może sterować — a o tym, co robi, decyduje\n**program**. Arduino Uno to płytka z mikrokontrolerem ATmega328P i wszystkim, czego potrzebuje, żeby\nruszyć.\n\nProgram dla Arduino (**szkic**) pisze się w języku C++. Ma dwie części: `setup()` wykonuje się raz,\na `loop()` w kółko. Szkic płytki otwierasz, zaznaczając ją i klikając **Szkic** w panelu po prawej —\nprzeglądarka sama go skompiluje, gdy uruchomisz symulację."
+    },
+    {
+      "id": "3ffcedc2",
+      "type": "markdown",
+      "source": "## Mruganie diodą\n\nKlasyczny pierwszy program. Pin 13 jest **wyjściem**: `digitalWrite(13, HIGH)` daje na nim 5 V, `LOW` —\n0 V. Opornik 220 Ω ogranicza prąd diody. Uruchom ⚡ i popatrz też na **monitor portu szeregowego** pod\nschematem — tam trafia to, co program pisze przez `Serial.println`."
+    },
+    {
+      "id": "7424347f",
+      "type": "schematic",
+      "name": "mruganie",
+      "schematic": {
+        "version": 1,
+        "elements": [
+          {
+            "id": "ARD_1",
+            "kind": "arduino",
+            "at": [
+              4,
+              17
+            ],
+            "rotation": 0,
+            "value": null,
+            "text": "// Mruganie: dioda na pinie 13 zapala się i gaśnie co pół sekundy.\n// setup() wykonuje się raz, na starcie; loop() — w kółko, bez końca.\n\nvoid setup() {\n  pinMode(13, OUTPUT);     // pin 13 będzie wyjściem\n  Serial.begin(9600);      // port szeregowy: napisy widać pod schematem\n}\n\nvoid loop() {\n  digitalWrite(13, HIGH);  // 5 V na pinie: dioda świeci\n  Serial.println(\"swieci\");\n  delay(500);              // czekaj 500 ms\n  digitalWrite(13, LOW);   // 0 V: gaśnie\n  Serial.println(\"zgaszona\");\n  delay(500);\n}\n"
+          },
+          {
+            "id": "R_1",
+            "kind": "resistor",
+            "at": [
+              6,
+              15
+            ],
+            "rotation": 270,
+            "value": "220",
+            "text": null
+          },
+          {
+            "id": "LED_1",
+            "kind": "led",
+            "at": [
+              6,
+              11
+            ],
+            "rotation": 270,
+            "value": null,
+            "text": "red"
+          }
+        ],
+        "wires": [
+          {
+            "points": [
+              [
+                6,
+                15
+              ],
+              [
+                6,
+                17
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                6,
+                7
+              ],
+              [
+                4,
+                7
+              ],
+              [
+                4,
+                26
+              ],
+              [
+                9,
+                26
+              ],
+              [
+                9,
+                25
+              ]
+            ]
+          }
+        ]
+      },
+      "view": "schematic"
+    },
+    {
+      "id": "49ac6f41",
+      "type": "markdown",
+      "source": "## Wejścia: przycisk i potencjometr\n\nPiny mogą też **czytać**. `digitalRead` mówi, czy na pinie jest 0, czy 5 V; `analogRead` mierzy napięcie\ndokładnie (0–1023). A `analogWrite` udaje napięcie pośrednie: bardzo szybko włącza i wyłącza pin\n(**PWM**), więc dioda świeci jaśniej lub ciemniej. Uruchom ⚡, przytrzymaj przycisk i przesuwaj suwak\npotencjometru."
+    },
+    {
+      "id": "6e5f2129",
+      "type": "schematic",
+      "name": "wejscia",
+      "schematic": {
+        "version": 1,
+        "elements": [
+          {
+            "id": "ARD_1",
+            "kind": "arduino",
+            "at": [
+              4,
+              18
+            ],
+            "rotation": 0,
+            "value": null,
+            "text": "// Przycisk na D2 zapala diodę na D13, a potencjometr na A0 ustawia jasność diody na D9.\n\nvoid setup() {\n  pinMode(2, INPUT_PULLUP);  // wejście z opornikiem do 5 V w środku: puszczony = HIGH\n  pinMode(13, OUTPUT);\n  pinMode(9, OUTPUT);\n  Serial.begin(9600);\n}\n\nvoid loop() {\n  bool wcisniety = digitalRead(2) == LOW;  // przycisk zwiera pin do masy\n  digitalWrite(13, wcisniety ? HIGH : LOW);\n\n  int odczyt = analogRead(A0);        // 0–1023, czyli 0–5 V\n  analogWrite(9, odczyt / 4);          // PWM: 0–255\n  Serial.print(\"A0 = \");\n  Serial.print(odczyt * 5.0 / 1023);\n  Serial.println(\" V\");\n  delay(100);\n}\n"
+          },
+          {
+            "id": "B_1",
+            "kind": "button",
+            "at": [
+              18,
+              16
+            ],
+            "rotation": 270,
+            "value": null,
+            "text": null
+          },
+          {
+            "id": "R_1",
+            "kind": "resistor",
+            "at": [
+              10,
+              16
+            ],
+            "rotation": 270,
+            "value": "220",
+            "text": null
+          },
+          {
+            "id": "LED_1",
+            "kind": "led",
+            "at": [
+              10,
+              12
+            ],
+            "rotation": 270,
+            "value": null,
+            "text": "green"
+          },
+          {
+            "id": "R_2",
+            "kind": "resistor",
+            "at": [
+              6,
+              16
+            ],
+            "rotation": 270,
+            "value": "220",
+            "text": null
+          },
+          {
+            "id": "LED_2",
+            "kind": "led",
+            "at": [
+              6,
+              12
+            ],
+            "rotation": 270,
+            "value": null,
+            "text": "red"
+          },
+          {
+            "id": "P_1",
+            "kind": "potentiometer",
+            "at": [
+              12,
+              32
+            ],
+            "rotation": 0,
+            "value": "10k",
+            "text": "0.5"
+          }
+        ],
+        "wires": [
+          {
+            "points": [
+              [
+                18,
+                16
+              ],
+              [
+                18,
+                18
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                10,
+                16
+              ],
+              [
+                10,
+                18
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                6,
+                16
+              ],
+              [
+                6,
+                18
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                14,
+                30
+              ],
+              [
+                13,
+                30
+              ],
+              [
+                13,
+                26
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                16,
+                32
+              ],
+              [
+                16,
+                29
+              ],
+              [
+                7,
+                29
+              ],
+              [
+                7,
+                26
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                12,
+                32
+              ],
+              [
+                12,
+                27
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                12,
+                27
+              ],
+              [
+                12,
+                26
+              ],
+              [
+                9,
+                26
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                10,
+                8
+              ],
+              [
+                10,
+                7
+              ],
+              [
+                6,
+                7
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                6,
+                7
+              ],
+              [
+                4,
+                7
+              ],
+              [
+                4,
+                27
+              ],
+              [
+                12,
+                27
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                6,
+                8
+              ],
+              [
+                6,
+                7
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                18,
+                12
+              ],
+              [
+                18,
+                8
+              ],
+              [
+                10,
+                8
+              ]
+            ]
+          }
+        ]
+      },
+      "view": "schematic"
+    },
+    {
+      "id": "d20f1658",
+      "type": "markdown",
+      "source": "## Co dalej?\n\nZnasz już podstawy: prąd, napięcie, opór, elementy i program. Kurs **Poznaj aplikację** pokazuje\nwszystko, co można tu robić, a w folderze **Przykłady** czekają gry, Doom na Raspberry Pi Pico, radar,\ntheremin i kilkanaście innych projektów do rozebrania na części."
+    }
+  ]
+}
