@@ -10,7 +10,12 @@ const listeners = new Set<() => void>();
 
 /** A worker's message about a file. */
 export function report(p: Progress) {
-  files = { ...files, [p.key]: p };
+  if (p.cached) {
+    // (it was told while it was read: taken back — it did not come over the network)
+    if (!(p.key in files)) return;
+    const { [p.key]: _, ...rest } = files;
+    files = rest;
+  } else files = { ...files, [p.key]: p };
   for (const l of listeners) l();
 }
 
