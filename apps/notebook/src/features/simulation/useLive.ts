@@ -286,9 +286,19 @@ export function useLive(schematic: SchematicData) {
 
   const watch = (scopeNames: string[], probe: string[]) => tell({ type: "watch", scope: scopeNames, probe });
 
+  /** A Pico's program given whole (a file the user dropped: its flash image), on the board now — ``text``:
+   *  the board's text as it will be (naming the file). Not running, it starts with the simulation (from the text). */
+  const runFile = useCallback((id: string, image: Uint8Array, text: string) => {
+    const w = worker.current;
+    if (!w) return;
+    w.postMessage({ type: "attach", id, firmware: { board: "pico", image } } satisfies Request);
+    setSketches((all) => ({ ...all, [id]: { kind: "running", sketch: text, where: "file" } }));
+  }, []);
+
   return {
     status, error, frame, speed, traces, scope, serial, sketches,
     start,
+    runFile,
     stop,
     setSpeed: (value: number) => { setSpeedState(value); tell({ type: "speed", speed: value }); },
     pause: () => { tell({ type: "run", running: false }); setStatus((s) => (s === "running" ? "paused" : s)); },

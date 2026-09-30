@@ -10,7 +10,7 @@ import { PgClient } from "@effect/sql-pg"
 import { describe, expect, it } from "@effect/vitest"
 import { NotesApi, type NotebookDocument } from "@electro/notes-api"
 import { Context, Effect, Either, Layer, Option, Redacted, TestClock } from "effect"
-import { randomUUID } from "node:crypto"
+import { createHash, randomUUID } from "node:crypto"
 import * as Database from "../src/Database.js"
 import { ApiLive } from "../src/Http.js"
 import { ProviderError, Providers, type OAuthProvider } from "../src/Providers.js"
@@ -522,5 +522,24 @@ describe("signing in", () => {
       const github = yield* signedIn("ala", "github")
       expect((yield* github.library.home()).map((n) => n.id)).toEqual(["n1"])
       expect((yield* github.auth.me()).id).toBe((yield* google.auth.me()).id)
+    }).pipe(Effect.provide(TestServer)))
+})
+
+describe("firmware files", () => {
+  it.effect("uploaded once by what is in them, fetched by anyone with the id; signed in to upload", () =>
+    Effect.gen(function* () {
+      const api = yield* signedIn("ala")
+      const bytes = new Uint8Array(4096).map((_, i) => i * 7)
+      const { id, size } = yield* api.firmware.upload({ payload: bytes })
+      expect(size).toBe(4096)
+      expect(id).toBe(createHash("sha256").update(bytes).digest("hex"))
+      expect(yield* (yield* signedIn("ola")).firmware.upload({ payload: bytes })).toEqual({ id, size }) // (kept once)
+      const anyone = yield* client
+      expect(yield* anyone.firmwareFiles.get({ path: { id, name: "doom.uf2" } })).toEqual(bytes)
+      const response = yield* (yield* HttpClient.HttpClient).get(`/api/firmware/${id}/x.bin`)
+      expect(response.headers["cache-control"]).toContain("immutable")
+      expect(yield* anyone.firmwareFiles.get({ path: { id: "0".repeat(64), name: "x" } }).pipe(Effect.flip)).toMatchObject({ _tag: "FirmwareNotFound" })
+      expect(yield* anyone.firmware.upload({ payload: bytes }).pipe(Effect.flip)).toMatchObject({ _tag: "Unauthorized" })
+      expect(yield* api.firmware.upload({ payload: new Uint8Array(0) }).pipe(Effect.flip)).toMatchObject({ _tag: "FirmwareSize" })
     }).pipe(Effect.provide(TestServer)))
 })

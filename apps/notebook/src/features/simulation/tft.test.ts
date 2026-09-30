@@ -1,8 +1,8 @@
 // The ILI9341 as Adafruit_ILI9341 and Doom drive it, a firmware file's flash, and Doom itself on a Pico
-// in a circuit (fixtures/tft.live.json; public/pico/doom.bin, built by make-pico-doom.sh).
+// in a circuit (fixtures/tft.live.json; fixtures/doom.bin, built by make-pico-doom.sh).
 import { readFileSync } from "node:fs";
 import { describe, expect, test } from "vitest";
-import { firmwareFile, uf2Flash } from "./firmware";
+import { firmwareFile, firmwareUrl, flashOf, uf2Flash, withFirmware } from "./firmware";
 import { Pico } from "./pico";
 import { Runner } from "./runner";
 import { HEIGHT, Ili9341, WIDTH } from "./tft";
@@ -77,6 +77,17 @@ describe("a firmware file", () => {
     expect(firmwareFile("void setup() {}\n// firmware: x.uf2")).toBeNull();
   });
 
+  test("a file uploaded: named on the first line, the sketch kept below; named again, replaced", () => {
+    const url = firmwareUrl("ab".repeat(32), "my doom.uf2");
+    expect(url).toBe(`/api/firmware/${"ab".repeat(32)}/my_doom.uf2`);
+    const text = withFirmware("void setup() {}\n", url);
+    expect(text).toBe(`// firmware: ${url}\nvoid setup() {}\n`);
+    expect(firmwareFile(text)).toBe(url);
+    expect(withFirmware(text, "/x.bin")).toBe("// firmware: /x.bin\nvoid setup() {}\n");
+    expect(withFirmware("", "/x.bin")).toBe("// firmware: /x.bin\n");
+    expect(flashOf(new Uint8Array([1, 2, 3]))).toEqual(new Uint8Array([1, 2, 3])); // (not a UF2: the image itself)
+  });
+
   test("a UF2's blocks make the flash they write", () => {
     const block = (address: number, bytes: number[], n: number) => {
       const b = new Uint8Array(512), v = new DataView(b.buffer);
@@ -97,7 +108,7 @@ describe("a firmware file", () => {
 
 test("Doom on a Pico, the TFT on its SPI0: the title screen comes up", () => {
   const circuit = JSON.parse(readFileSync(new URL("./fixtures/tft.live.json", import.meta.url), "utf8"));
-  const image = new Uint8Array(readFileSync(new URL("../../../public/pico/doom.bin", import.meta.url)));
+  const image = new Uint8Array(readFileSync(new URL("./fixtures/doom.bin", import.meta.url)));
   const runner = new Runner(circuit, []);
   runner.attach("PICO_1", { board: "pico", image });
   (runner.session.boards[0].chip as Pico).adaptive = false; // (a test's runs need not keep up)

@@ -1,10 +1,10 @@
-import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent, type ReactNode } from "react";
+import { useCallback, useEffect, useRef, useState, type PointerEvent as ReactPointerEvent, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { useLocation, useNavigate, useSearchParams } from "react-router";
 import { usePdf } from "@/features/pdf-export";
 import { kernel } from "@/features/python";
 import { canRunInTime, inTimeOnly, isBoard, PdfDrawing, SchematicEditor, updateElement, type Camera } from "@/features/schematic";
-import { LiveControls, ProbePanel, SimPanel, SketchEditor, UploadButton, useLive } from "@/features/simulation";
+import { carriesFiles, LiveControls, ProbePanel, SimPanel, SketchEditor, UploadButton, useFirmwareFile, useLive } from "@/features/simulation";
 import type { Cell, SchematicData, SymbolLibrary } from "@/shared/model/types";
 import type { Failure } from "@/shared/model/issues";
 import { FailureBox } from "@/features/solution";
@@ -120,6 +120,21 @@ export function SchematicCell({ cell, update, library, simulate, running: solvin
   const setSketchText = (id: string, text: string) => update({
     schematic: { ...cell.schematic, elements: cell.schematic.elements.map((x) => (x.id === id ? { ...x, text } : x)) },
   });
+  // a Pico's program from a file (FirmwareFile.tsx): its text as it is when the upload is done (the cell then)
+  const latest = useRef({ cell, update });
+  latest.current = { cell, update };
+  const loadFile = useFirmwareFile(
+    live,
+    useCallback((id: string) => latest.current.cell.schematic.elements.find((e) => e.id === id)?.text ?? "", []),
+    useCallback((id: string, text: string) => {
+      const { cell: now, update: change } = latest.current;
+      change({ schematic: { ...now.schematic, elements: now.schematic.elements.map((x) => (x.id === id ? { ...x, text } : x)) } });
+    }, []),
+    useCallback((message: string) => setError({ data: message }), []),
+  );
+  const picos = arduinos.filter((e) => e.kind === "pico");
+  // a file dropped on a group: onto the Pico whose sketch it shows, or the only one on the board
+  const dropTarget = (active: string) => (sketchOf(active)?.kind === "pico" ? active : picos.length === 1 ? picos[0].id : null);
 
   // ------------------------------------------------------------------ files and groups
 
@@ -387,6 +402,7 @@ export function SchematicCell({ cell, update, library, simulate, running: solvin
       full={full}
       onFull={setFull}
       // an Arduino's sketch from its inspector: beside the board
+      onFirmware={(id, file) => void loadFile(id, file)}
       onSketch={(id) => void go(shown(id) || !full ? open(layout, id, files) : split(layout, id, layout.groups.findIndex((g) => g.active === "board"), "right", files))}
     />
   );
@@ -456,7 +472,14 @@ export function SchematicCell({ cell, update, library, simulate, running: solvin
                     )}
                   </div>
                 </div>
-                <div data-group-body className="relative flex-1 min-h-0">
+                <div data-group-body className="relative flex-1 min-h-0"
+                     onDragOver={(e) => { if (carriesFiles(e) && dropTarget(g.active)) e.preventDefault(); }}
+                     onDrop={(e) => {
+                       const target = dropTarget(g.active), file = e.dataTransfer.files[0];
+                       if (!target || !file) return;
+                       e.preventDefault();
+                       void loadFile(target, file);
+                     }}>
                   {body(g.active)}
                 </div>
               </section>

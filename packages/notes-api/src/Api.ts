@@ -8,6 +8,7 @@ import { HttpApi, HttpApiEndpoint, HttpApiGroup } from "@effect/platform"
 import { Schema } from "effect"
 import { ArduinoGroup } from "./Arduino.js"
 import { AuthGroup } from "./Auth.js"
+import { FirmwareFilesGroup, FirmwareGroup } from "./Firmware.js"
 import { LibraryGroup } from "./Library.js"
 import { SharingGroup } from "./Sharing.js"
 
@@ -21,5 +22,7 @@ export class NotesApi extends HttpApi.make("notes")
   .add(AuthGroup)
   .add(SystemGroup)
   .add(ArduinoGroup)
+  .add(FirmwareGroup)
+  .add(FirmwareFilesGroup)
   .prefix("/api")
 {}

@@ -2,11 +2,11 @@
 // label, value (or a meter's reading), a node label's name. A panel like Excalidraw's: sections
 // under plain labels, tiles for choices and actions. (A wire or many things selected: no panel —
 // the keys do what there is to do.)
-import { useState, type ReactNode } from "react";
+import { useRef, useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import type { ElementData } from "@/shared/model/types";
 import { cn } from "@/shared/lib/cn";
-import { CodeIcon, Rotate, Trash } from "@/shared/ui/icons";
+import { CodeIcon, PageIcon, Rotate, Trash } from "@/shared/ui/icons";
 import { i2cParts, i2cText } from "@/shared/model/i2c";
 import { Adjusters, isAdjustable } from "./Adjusters";
 import { useKinds } from "./kinds";
@@ -22,7 +22,10 @@ export type Selection =
 const place = "top-15 right-3 w-66 max-h-[calc(100%-8rem)] overflow-y-auto text-[14px]";
 const hint = "m-0 text-[12px] leading-[1.4] text-faint";
 
-export function Inspector({ element, taken, onChange, onRename, onRotate, onRemove, icon, live, onSketch }: {
+// the board's buttons (a sketch to edit, a program file to load): the icon and the words together, centred
+const wide = "flex w-full h-9 gap-2 px-3 items-center justify-center text-[14px] font-medium";
+
+export function Inspector({ element, taken, onChange, onRename, onRotate, onRemove, icon, live, onSketch, onFirmware }: {
   element: ElementData | null;
   taken: string[];
   onChange: (patch: Partial<ElementData>) => void;
@@ -32,6 +35,7 @@ export function Inspector({ element, taken, onChange, onRename, onRotate, onRemo
   icon: ReactNode;
   live?: boolean; // running: only what works as an input (a potentiometer's position, a sensor's reading)
   onSketch?: () => void; // a board: open its sketch
+  onFirmware?: (file: File) => void; // a Pico: run a program file (.uf2, .bin) on it
 }) {
   const { t } = useTranslation("schematic");
   const { name } = useKinds();
@@ -151,11 +155,11 @@ export function Inspector({ element, taken, onChange, onRename, onRotate, onRemo
       {!live && element.kind === "servo" && <p className={hint}>{t("inspector.servoHint")}</p>}
       {!live && (element.kind === "buzzer" || element.kind === "passive_buzzer") && <p className={hint}>{t(`inspector.${element.kind === "buzzer" ? "buzzerHint" : "passiveBuzzerHint"}`)}</p>}
       {isBoard(element.kind) && onSketch && (
-        <Tile className="w-full h-9 gap-2 px-3 grid-flow-col text-[14px] font-medium" onClick={onSketch} title={t("inspector.sketchTitle")}>
+        <Tile className={wide} onClick={onSketch} title={t("inspector.sketchTitle")}>
           <CodeIcon /> {t("inspector.sketch")}
         </Tile>
       )}
-      {!live && element.kind === "pico" && <p className={hint}>{t("inspector.picoHint")}</p>}
+      {element.kind === "pico" && onFirmware && <FirmwareTile onFile={onFirmware} />}
       {!live && kindInfo(element.kind)?.live && !isBoard(element.kind) &&
         <p className={hint}>{t(isWaveSource(element.kind) ? "inspector.waveOnly" : "inspector.liveOnly")}</p>}
       {!live && element.kind === "label" && (
@@ -173,5 +177,20 @@ export function Inspector({ element, taken, onChange, onRename, onRotate, onRemo
         </Section>
       )}
     </Panel>
+  );
+}
+
+/** A Pico's program from a file: picked here (dropped on the board, it goes the same way). */
+function FirmwareTile({ onFile }: { onFile: (file: File) => void }) {
+  const { t } = useTranslation("schematic");
+  const input = useRef<HTMLInputElement>(null);
+  return (
+    <>
+      <Tile className={wide} onClick={() => input.current?.click()} title={t("inspector.firmwareTitle")}>
+        <PageIcon /> {t("inspector.firmware")}
+      </Tile>
+      <input ref={input} type="file" accept=".uf2,.bin" className="hidden"
+             onChange={(e) => { const file = e.target.files?.[0]; e.target.value = ""; if (file) onFile(file); }} />
+    </>
   );
 }

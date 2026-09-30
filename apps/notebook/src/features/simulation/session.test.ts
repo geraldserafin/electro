@@ -4,6 +4,7 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, test } from "vitest";
 import { Uno } from "./arduino";
+import type { Chip, Mode, PinChange } from "./chip";
 import { Backpack, modulesOn } from "./i2c";
 import { ping, sonar } from "./peripherals";
 import { Runner } from "./runner";
@@ -98,4 +99,31 @@ test("a Pico in a circuit: its LED lights the circuit's, the potentiometer is it
   const adc = [...serial.matchAll(/adc=(\d+)/g)].map((m) => Number(m[1])).slice(1);
   expect(adc.length).toBeGreaterThan(2);
   for (const a of adc) expect(Math.abs(a - 1023 * 0.75)).toBeLessThan(4); // the wiper a quarter from 3V3
+});
+
+// fixtures/sonar.live.json: the Uno's D9 wired to the sensor's TRIG, D2 to nothing
+test("a pin wired to nothing toggling: no steps of the circuit for it, only its last state; a wired one steps it", () => {
+  const uno = new Uno(fixture("sonar.hex"));
+  const run = (pin: string) => {
+    const session = new Session(JSON.parse(fixture("sonar.live.json")));
+    let time = 0, level: Mode = "low", changes: PinChange[] = [];
+    const chip: Chip = {
+      pins: uno.pins, modes: uno.modes, i2c: uno.i2c, sda: uno.sda, scl: uno.scl, time: 0, onSerial: null,
+      sense: () => {}, send: () => {},
+      initial: () => uno.pins.map((p) => [p, p === pin ? level : "low"]),
+      runUntil(t) { // (toggled every microsecond: a thousand changes a millisecond)
+        for (let at = time + 1e-6; at <= t; at += 1e-6) changes.push({ time: at, pin, mode: (level = level === "low" ? "high" : "low") });
+        time = t;
+      },
+      take() { const c = changes; changes = []; return c; },
+    };
+    session.attach("ARD_1", chip);
+    let steps = 0;
+    session.advanceTo(0.01, 1e-3, () => steps++);
+    return { steps, driven: session.sim.p[session.sim.program.inputs[`ARD_1_${pin}_E`]], level };
+  };
+  const free = run("D2"), wired = run("D9");
+  expect(free.steps).toBeLessThan(50); // (10 slices of 1 ms: a step or a few each)
+  expect(free.driven).toBe(uno.modes[free.level][1]); // (as it was at the slice's end)
+  expect(wired.steps).toBeGreaterThan(5000);
 });

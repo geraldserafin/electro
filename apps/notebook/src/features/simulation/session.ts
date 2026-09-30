@@ -2,6 +2,9 @@
 // each pin change reaches the circuit at the moment it happened, and after each slice the chips
 // read what the circuit puts on their pins. What a device in the page will do later (an HC-SR04's
 // echo) is scheduled: the circuit gets it exactly then, and the chips read their pins a moment after.
+// A pin on a node of its own (wired to nothing, and not on the scope) changes nothing else: its changes
+// reach the circuit once a slice, as the pin is then — a program toggling it millions of times a second
+// (Doom's sound, I²S by PIO) does not make the circuit step for each.
 import type { Chip, Mode } from "./chip";
 import { Simulation, type LiveCircuit } from "./engine";
 
@@ -19,10 +22,27 @@ export class Session {
   readonly sim: Simulation;
   readonly boards: Board[] = [];
   readonly circuit: LiveCircuit;
+  private terminals = new Map<string, number>(); // node → how many elements' terminals are on it
+  private watched = new Set<string>(); // the nodes the scope and the meter show
+  private lonely = new Map<Board, Set<string>>(); // each board's pins on a node of their own
 
   constructor(circuit: LiveCircuit) {
     this.circuit = circuit;
     this.sim = new Simulation(circuit.program);
+    for (const nodes of Object.values(circuit.pins)) for (const n of nodes) if (n) this.terminals.set(n, (this.terminals.get(n) ?? 0) + 1);
+  }
+
+  /** The quantities the scope and the meter show ("V_n3": a node's potential): a pin on such a node is followed. */
+  watch(names: readonly string[]) {
+    this.watched = new Set(names.filter((n) => n.startsWith("V_")).map((n) => n.slice(2)));
+    for (const board of this.boards) this.findLonely(board);
+  }
+
+  private findLonely(board: Board) {
+    const pins = new Set(Object.entries(board.pins).filter(([, node]) =>
+      !node || ((this.terminals.get(node) ?? 0) <= 1 && !this.watched.has(node))).map(([pin]) => pin));
+    this.lonely.set(board, pins);
+    board.chip.mute?.(pins);
   }
 
   /** A board in the circuit starts running, its chip just reset, at the circuit's present time. */
@@ -32,6 +52,7 @@ export class Session {
     const board = { label, chip, pins, ground: nodes[nodes.length - 1] ?? null }; // (GND: a board's last terminal)
     this.boards.push(board);
     this.offset.set(board, this.sim.t);
+    this.findLonely(board);
     for (const [pin, mode] of chip.initial()) this.drive(board, pin, mode);
     return board;
   }
@@ -73,13 +94,20 @@ export class Session {
       for (const board of this.boards) {
         const start = this.offset.get(board)!;
         board.chip.runUntil(end - start);
-        for (const e of board.chip.take()) events.push({ time: start + e.time, act: () => this.drive(board, e.pin, e.mode) });
+        const lonely = this.lonely.get(board)!;
+        for (const e of board.chip.take()) {
+          if (!lonely.has(e.pin)) events.push({ time: start + e.time, act: () => this.drive(board, e.pin, e.mode) });
+        }
       }
       while (this.queue.length && this.queue[0].time < end) events.push(this.queue.shift()!);
       events.sort((a, b) => a.time - b.time);
       for (const e of events) {
         if (e.time > sim.t) sim.advanceTo(Math.min(e.time, end), dtMax, null, onStep);
         e.act();
+      }
+      for (const board of this.boards) { // (the lonely pins as they are now)
+        const lonely = this.lonely.get(board)!;
+        if (lonely.size) for (const [pin, mode] of board.chip.initial()) if (lonely.has(pin)) this.drive(board, pin, mode);
       }
       sim.advanceTo(end, dtMax, null, onStep);
       for (const board of this.boards) this.sense(board);

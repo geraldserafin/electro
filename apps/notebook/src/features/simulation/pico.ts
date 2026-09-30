@@ -50,6 +50,7 @@ export class Pico implements Chip {
   private changes: PinChange[] = [];
   private read = new Map<number, boolean>(); // what each input reads now (for the hysteresis)
   private high = new Uint8Array(30); // each GPIO driven high now (kept by its listener: asked for every SPI byte)
+  private muted = new Uint8Array(30); // its changes not recorded (mute())
   private cdc: USBCDC;
   private decoder = new TextDecoder();
   private jits: [BlockJit, BlockJit];
@@ -64,7 +65,7 @@ export class Pico implements Chip {
       this.high[i] = mcu.gpio[i].value === GPIOPinState.High ? 1 : 0;
       mcu.gpio[i].addListener((state) => {
         this.high[i] = state === GPIOPinState.High ? 1 : 0;
-        this.changes.push({ time: this.time, pin: `GP${i}`, mode: MODE[state] });
+        if (!this.muted[i]) this.changes.push({ time: this.time, pin: `GP${i}`, mode: MODE[state] });
       });
     }
     mcu.gpio[LED].addListener((state) => (this.led = state === GPIOPinState.High));
@@ -105,6 +106,10 @@ export class Pico implements Chip {
     const changes = this.changes;
     this.changes = [];
     return changes;
+  }
+
+  mute(pins: ReadonlySet<string>) {
+    for (const i of PINS) this.muted[i] = pins.has(`GP${i}`) ? 1 : 0;
   }
 
   /** Whether the chip drives ``pin`` high, asked when wanted (for a device that samples a pin as each byte comes: SPI's DC). */

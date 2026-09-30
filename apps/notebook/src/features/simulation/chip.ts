@@ -27,4 +27,7 @@ export interface Chip {
   sense(pin: string, volts: number): void;
   send(text: string): void; // to its serial port
   readonly led?: boolean; // an LED on the board (the Pico's, on GP25)
+  // the pins nothing in the circuit follows (Session: on a node of their own): their changes may be left out
+  // of take() — the circuit gets them as they are (initial()) once a slice (an I²S clock on a free pin)
+  mute?(pins: ReadonlySet<string>): void;
 }

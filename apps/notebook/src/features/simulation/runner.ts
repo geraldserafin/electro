@@ -131,6 +131,7 @@ export class Runner {
   watch(scope: string[], probe: string[]) {
     this.shown = { scope, probe };
     this.recorded = [...new Set([...scope, ...probe])];
+    this.session.watch(this.recorded);
   }
 
   /** A board starts running its program (a new one: the chip starts over). */

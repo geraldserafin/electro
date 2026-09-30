@@ -1,7 +1,9 @@
 #!/usr/bin/env bash
-# Builds public/pico/doom.bin: Doom for a Raspberry Pi Pico with a 320×240 ILI9341 on SPI, as the
-# notebook's "Nowe elementy" example runs it — a whole flash image, the program and, at 0x46000, the
-# shareware DOOM1.WAD compressed for it (doom1.whx).
+# Builds doom.bin (or the file named: make-pico-doom.sh [out]): Doom for a Raspberry Pi Pico with a 320×240
+# ILI9341 on SPI, as the notebook's "Nowe elementy" example wires it — a whole flash image, the program and,
+# at 0x46000, the shareware DOOM1.WAD compressed for it (doom1.whx). Load it onto the Pico in the notebook
+# (its inspector: "Wgraj plik .uf2 / .bin", or dropped on the board). The tests' copy:
+# src/features/simulation/fixtures/doom.bin.
 #
 # The program is kilograham/rp2040-doom (Chocolate Doom made to fit an RP2040: GPLv2, its own code
 # BSD-3), with pondahai/rp2040-doom-ili9341's files over it (the LCD instead of VGA, eight buttons on
@@ -21,7 +23,8 @@
 # Needs git, nix (for arm-none-eabi-gcc 13, cmake, make, clang for the SDK's host tools). Run from anywhere.
 set -euo pipefail
 here=$(cd "$(dirname "$0")" && pwd)
-out="$here/../public/pico/doom.bin"
+out=${1:-doom.bin}
+case $out in /*) ;; *) out="$PWD/$out" ;; esac # (the work happens elsewhere)
 work=$(mktemp -d)
 [ -n "${KEEP:-}" ] && echo "keeping $work" || trap 'rm -rf "$work"' EXIT # (KEEP=1: to look into the build)
 

@@ -73,6 +73,14 @@ export const pl = {
     sendPlaceholder: "Tekst do Arduino (Serial.read)…",
     send: "Wyślij",
   },
+  firmware: {
+    size: "{{name}} ma {{size}} B, a program dla Pico to od 1 B do 16 MB (tyle ma najwyżej jego flash).",
+    invalid: "{{name}} to nie jest plik .uf2 ani obraz flasha Pico: {{error}}",
+    notSaved: "{{name}} działa, ale nie zapisał się w notatce ({{why}}) — po odświeżeniu go nie będzie.",
+    signedOut: "trzeba się zalogować",
+    quota: "twoje pliki zajmują już 256 MB",
+    unreachable: "nie ma połączenia z serwerem",
+  },
 };
 
 export const en: typeof pl = {
@@ -149,5 +157,13 @@ export const en: typeof pl = {
     serialEmpty: "Nothing yet (Serial.begin(9600) and Serial.println(…) in the sketch).",
     sendPlaceholder: "Text to the Arduino (Serial.read)…",
     send: "Send",
+  },
+  firmware: {
+    size: "{{name}} is {{size}} B; a Pico's program is 1 B to 16 MB (its flash at most).",
+    invalid: "{{name}} is not a .uf2 file nor a Pico flash image: {{error}}",
+    notSaved: "{{name}} runs, but was not saved in the note ({{why}}) — it will be gone after a reload.",
+    signedOut: "you need to sign in",
+    quota: "your files take 256 MB already",
+    unreachable: "the server cannot be reached",
   },
 };

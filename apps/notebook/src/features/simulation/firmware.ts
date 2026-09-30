@@ -1,6 +1,8 @@
 // A program for a board given whole instead of as a sketch to compile: its text's first line names the
-// file — "// firmware: /pico/doom.uf2" — a UF2 (as one drags onto a Pico in BOOTSEL mode) or a raw
-// flash image (.bin), fetched from the page's server. For programs no sketch makes: Doom.
+// file — "// firmware: /api/firmware/<id>/doom.uf2" — a UF2 (as one drags onto a Pico in BOOTSEL mode) or
+// a raw flash image (.bin), fetched from the page's server: one the user uploaded (the notes server keeps
+// it, @electro/notes-api's Firmware.ts), or any other address. For programs no sketch makes: Doom
+// (scripts/make-pico-doom.sh).
 
 const FLASH = 0x10000000; // where the RP2040's flash is mapped (a UF2's addresses)
 const UF2_MAGIC = [0x0a324655, 0x9e5d5157], UF2_END = 0x0ab16f30;
@@ -30,11 +32,30 @@ export function uf2Flash(bytes: Uint8Array): Uint8Array {
   return flash;
 }
 
+/** A file's bytes → the flash image: a UF2's blocks, or else the bytes as they are (a .bin). */
+export function flashOf(bytes: Uint8Array): Uint8Array {
+  const uf2 = bytes.length >= 512 && new DataView(bytes.buffer, bytes.byteOffset).getUint32(0, true) === UF2_MAGIC[0];
+  return uf2 ? uf2Flash(bytes) : bytes;
+}
+
 /** The flash image in the file at ``url`` (a UF2, or else taken as a raw image). */
 export async function fetchFirmware(url: string): Promise<Uint8Array> {
   const response = await fetch(url);
   if (!response.ok) throw new Error(`${url}: HTTP ${response.status}`);
-  const bytes = new Uint8Array(await response.arrayBuffer());
-  const uf2 = bytes.length >= 512 && new DataView(bytes.buffer).getUint32(0, true) === UF2_MAGIC[0];
-  return uf2 ? uf2Flash(bytes) : bytes;
+  return flashOf(new Uint8Array(await response.arrayBuffer()));
+}
+
+/** Where the notes server gives an uploaded file (its id), under its name (for the reader: no spaces in it). */
+export const firmwareUrl = (id: string, name: string) => `/api/firmware/${id}/${encodeURIComponent(name.replace(/\s+/g, "_"))}`;
+
+/**
+ * A board's text naming the file at ``url``: its first line (one naming a file before replaced); the rest
+ * kept below — a sketch, not compiled while the line is there, back when it is taken away.
+ */
+export function withFirmware(text: string, url: string): string {
+  const line = `// firmware: ${url}`;
+  if (!firmwareFile(text)) return text.trim() ? `${line}\n${text}` : `${line}\n`;
+  const lines = text.split("\n"), first = lines.findIndex((l) => l.trim());
+  lines[first] = line;
+  return lines.join("\n");
 }

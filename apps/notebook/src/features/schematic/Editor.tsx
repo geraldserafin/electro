@@ -68,6 +68,7 @@ interface Props {
   full: boolean; // full screen: the board fills the space its parent gives it
   onFull: (full: boolean) => void;
   onSketch?: (id: string) => void; // an Arduino's sketch, opened from its inspector
+  onFirmware?: (id: string, file: File) => void; // a Pico's program file, picked in its inspector
   bare?: boolean; // no frame of its own: it fills an editor group (the cell's)
   probe?: (target: ProbeTarget, onClose: () => void) => ReactNode; // running: the meter's panel for what it was put on
 }
@@ -104,7 +105,7 @@ function placedAt(kind: string, p: Point, lib: SymbolLibrary): Point {
 }
 
 export function SchematicEditor({
-  value, onChange, library, results, topLeft, topRight, status, camera, autoFocus, live, below, full, onFull, onSketch, bare, probe,
+  value, onChange, library, results, topLeft, topRight, status, camera, autoFocus, live, below, full, onFull, onSketch, onFirmware, bare, probe,
 }: Props) {
   const { t } = useTranslation("schematic");
   const G = library.grid;
@@ -720,6 +721,7 @@ export function SchematicEditor({
           element={selectedElement}
           live={!!live}
           onSketch={onSketch && selectedElement ? () => onSketch(selectedElement.id) : undefined}
+          onFirmware={onFirmware && selectedElement ? (file) => onFirmware(selectedElement.id, file) : undefined}
           taken={value.elements.map((e) => e.id)}
           onChange={(patch) => selectedElement && commit(updateElement(value, library, selectedElement.id, patch))}
           onRename={(id) => {

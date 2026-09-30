@@ -638,23 +638,31 @@ d.cell("pico_gra")
 
 md("""
 ## 11. Prawdziwy DOOM na Pico
-Tym razem **prawdziwy Doom** — shareware'owy DOOM1.WAD, epizod pierwszy — na emulowanym RP2040: oba rdzenie,
-obraz przez SPI na kolorowym wyświetlaczu **TFT 320×240** (ILI9341: SCK GP18, MOSI GP19, CS GP17, DC GP20,
-RESET GP21, podświetlenie GP22). To nie szkic, tylko gotowy obraz flasha, jak plik UF2 przeciągnięty na płytkę:
-pierwsza linia programu płytki, `// firmware: /pico/doom.bin`, mówi, skąd go wziąć (port
-[kilograham/rp2040-doom](https://github.com/kilograham/rp2040-doom), wyświetlacz z
-[pondahai/rp2040-doom-ili9341](https://github.com/pondahai/rp2040-doom-ili9341); bez dźwięku).
+Obwód jest gotowy: kolorowy wyświetlacz **TFT 320×240** na SPI (ILI9341: SCK GP18, MOSI GP19, CS GP17, DC GP20,
+RESET GP21, podświetlenie GP22) i osiem przycisków. Brakuje programu — i to już twoja robota: **prawdziwy Doom**
+(shareware'owy DOOM1.WAD, epizod pierwszy) to nie szkic, tylko gotowy obraz flasha, jak plik UF2 przeciągany
+na prawdziwe Pico.
 
-Emulator nie nadąża za prawdziwym Pico, więc rdzenie liczą wolniej — ile, widać przy płytce (**PICO_1 · 20 MHz**):
-gra toczy się w normalnym tempie, tylko klatek jest mniej, jak na bardzo słabym komputerze.
-Po chwili ekran tytułowy i demo; **kliknij schemat** i graj z klawiatury: **Enter** — menu i wybór
-(New Game), **strzałki** — ruch, **Ctrl** — strzał, **spacja** — otwieranie drzwi, **Esc** — menu.
+1. **Zbuduj go**: w repozytorium Electro `apps/notebook/scripts/make-pico-doom.sh doom.bin` (potrzebne git i
+   nix). Skrypt bierze port [kilograham/rp2040-doom](https://github.com/kilograham/rp2040-doom), wyświetlacz z
+   [pondahai/rp2040-doom-ili9341](https://github.com/pondahai/rp2040-doom-ili9341) i małą łatkę pod emulator
+   (bez dźwięku, klatki przez DMA).
+2. **Wgraj go**: zaznacz płytkę i kliknij **Wgraj plik .uf2 / .bin** — albo po prostu upuść plik na płytkę.
+   Plik zapisze się w notatce, a pierwsza linia programu płytki będzie na niego wskazywać.
+3. Uruchom symulację (⚡). Po chwili ekran tytułowy i demo; **kliknij schemat** i graj z klawiatury:
+   **Enter** — menu i wybór (New Game), **strzałki** — ruch, **Ctrl** — strzał, **spacja** — drzwi, **Esc** — menu.
+
+Doom zbudowany bez łatki też ruszy, tylko kilka razy za wolno: gra muzykę przez PIO, czego emulator nie liczy
+tanio. Gdy komputer nie nadąża, rdzenie zwalniają — o ile, widać przy płytce (np. **PICO_1 · 150 MHz**).
 """)
-DOOM = """// firmware: /pico/doom.bin
-// Prawdziwy DOOM (shareware, epizod 1) — gotowy obraz flasha zamiast szkicu: kilograham/rp2040-doom
-// z wyświetlaczem ILI9341 (pondahai/rp2040-doom-ili9341); jak powstaje: scripts/make-pico-doom.sh.
+DOOM = """// Tu przyjdzie Doom: zbuduj doom.bin (apps/notebook/scripts/make-pico-doom.sh) i wgraj go —
+// zaznacz płytkę → „Wgraj plik .uf2 / .bin” albo upuść plik na płytkę. Ten szkic zostanie pod linią z plikiem.
 // TFT: SCK GP18, MOSI GP19, CS GP17, DC GP20, RESET GP21, podświetlenie GP22.
 // Przyciski do GND: ↑ GP9, ↓ GP5, ← GP8, → GP6, strzał GP3, użyj GP2, Enter GP4, menu GP28.
+
+void setup() {}
+
+void loop() {}
 """
 d = Drawing()
 d.add("PICO_1", "pico", (0, 0), 0, None, DOOM)
