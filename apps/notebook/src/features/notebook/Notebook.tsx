@@ -262,6 +262,12 @@ export function Notebook({
               )}
             </CellFrame>
           ))}
+          {/* a touch screen: a cell added at the end, always there (none between the cells: see CellFrame) */}
+          {notebook.cells.length > 0 && (
+            <div className="hidden pointer-coarse:block mt-8">
+              <AddRow shown onAdd={(type) => insert(notebook.cells.length, type)} />
+            </div>
+          )}
           {!notebook.cells.length && <p className="my-4.5 text-muted text-center">{t("empty")}</p>}
         </main>
       </PdfContext.Provider>

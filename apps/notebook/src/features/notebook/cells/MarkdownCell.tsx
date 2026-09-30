@@ -25,6 +25,16 @@ export function MarkdownCell({
   const ref = useRef<HTMLDivElement>(null);
   const field = useRef<HTMLTextAreaElement>(null);
   const close = useCallback(() => setOpen(null), []);
+  // a finger: the first tap takes the cell up, the second opens it (a tap meant for something else does not).
+  // The tap that takes it up has it taken up by the time it reaches the text (the frame's, on the way
+  // down, drawn at once): when it was taken up tells
+  const takenAt = useRef(0);
+  const wasFocused = useRef(focused);
+  if (focused !== wasFocused.current) {
+    wasFocused.current = focused;
+    if (focused) takenAt.current = performance.now();
+  }
+  const firstTap = useRef(false);
   useClickOutside(ref, open !== null, close);
   useEffect(() => {
     if (!focused) close();
@@ -40,7 +50,14 @@ export function MarkdownCell({
   const text = (
     <div
       className="px-3 py-1 min-h-[1.6em] cursor-text [&_:is(h1,h2,h3)]:scroll-mt-18"
-      onClick={(e) => (e.target as HTMLElement).closest("a") || setOpen("edit")}
+      onPointerDown={(e) => {
+        firstTap.current = e.pointerType === "touch" && (!focused || performance.now() - takenAt.current < 100);
+      }}
+      onClick={(e) => {
+        if ((e.target as HTMLElement).closest("a")) return;
+        if (firstTap.current) return;
+        setOpen("edit");
+      }}
       title={t("markdown.clickToEdit")}
     >
       <Markdown source={cell.source || t("markdown.empty")} />
