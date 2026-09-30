@@ -55,6 +55,7 @@ export function SimPanel({
 }) {
   const { t } = useTranslation("simulation");
   const hasControls = elements.some(controlled);
+  const [spectral, setSpectral] = useState(false); // the scope by frequency (FFT)
   // on a touch screen (no keys to press): the controls first, where there are buttons or switches to hold
   const [tab, setTab] = useState<Tab>(() =>
     matchMedia("(pointer: coarse)").matches && elements.some((e) => e.kind === "button" || e.kind === "switch")
@@ -105,12 +106,23 @@ export function SimPanel({
           <div className="flex items-center gap-2">
             <ScopeChoice live={live} />
             <span className="flex-1" />
+            <button
+              className={cn(
+                "rounded px-1.5 py-0.5 font-mono text-[11px] hover:bg-hover",
+                spectral ? "bg-selected text-fg" : "text-muted",
+              )}
+              aria-pressed={spectral}
+              title={t("scope.spectrumTitle")}
+              onClick={() => setSpectral(!spectral)}
+            >
+              FFT
+            </button>
             <span className="font-mono text-[11px] text-faint">
               {t("scope.window", { time: si(Math.max(1e-4, live.speed * 2), "s") })}
             </span>
           </div>
           <div className={cn(full && "flex-1 min-h-0")}>
-            <Scope live={live} fill={full} />
+            <Scope live={live} fill={full} spectral={spectral} />
           </div>
         </div>
       ) : shown === "controls" ? (

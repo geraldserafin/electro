@@ -53,6 +53,7 @@ export const pl = {
     remove: "Usuń {{name}} z oscyloskopu",
     empty: "Wybierz, co pokazać: napięcie węzła, napięcie albo prąd elementu.",
     window: "ostatnie {{time}}",
+    spectrumTitle: "Widmo (FFT): z jakich częstotliwości składa się to okno",
   },
   arduino: {
     title: "Szkic {{id}}",
@@ -136,6 +137,7 @@ export const en: typeof pl = {
     remove: "Remove {{name}} from the scope",
     empty: "Choose what to show: a node's voltage, an element's voltage or current.",
     window: "last {{time}}",
+    spectrumTitle: "Spectrum (FFT): the frequencies this window is made of",
   },
   arduino: {
     title: "Sketch {{id}}",

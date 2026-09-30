@@ -6,6 +6,7 @@ import { useTranslation } from "react-i18next";
 import { cn } from "@/shared/lib/cn";
 import { Close, Plus } from "@/shared/ui/icons";
 import { si } from "./format";
+import { spectrum } from "./spectrum";
 import type { Live } from "./useLive";
 
 const LEFT = 52,
@@ -85,9 +86,11 @@ export function ScopeChoice({ live }: { live: Live }) {
 export function Scope({
   live,
   fill,
+  spectral,
 }: {
   live: Live;
   fill?: boolean; // as tall as its parent (full screen); else a lane per quantity
+  spectral?: boolean; // the last moments by frequency (FFT), not in time
 }) {
   const { t } = useTranslation("simulation");
   const box = useRef<HTMLDivElement>(null);
@@ -103,17 +106,24 @@ export function Scope({
     return () => observer.disconnect();
   }, []);
 
-  const traces = live.traces;
   const span = Math.max(1e-4, live.speed * 2);
-  const t1 = Math.max(span, ...traces.map((tr) => tr.t[tr.t.length - 1] ?? 0));
+  const t1 = Math.max(span, ...live.traces.map((tr) => tr.t[tr.t.length - 1] ?? 0));
   const t0 = t1 - span;
+  // by frequency: each trace's spectrum, on an axis from 0 Hz up (``t`` then holds frequencies)
+  const traces = spectral
+    ? live.traces.map((tr) => {
+        const { f, a } = spectrum(tr.t, tr.v, t0, t1);
+        return { ...tr, t: f, v: a };
+      })
+    : live.traces;
+  const fMax = spectral ? Math.max(1, ...traces.map((tr) => tr.t[tr.t.length - 1] ?? 0)) : 0;
   const w = Math.max(40, size.w - LEFT - RIGHT);
   const lane = fill ? Math.max(48, (size.h - AXIS) / Math.max(1, traces.length)) : LANE;
   const height = fill ? size.h : traces.length * LANE + AXIS;
-  const x = (s: number) => LEFT + ((s - t0) / span) * w;
-  const at = hover === null ? null : t0 + ((hover - LEFT) / w) * span;
-  // the time axis: 0 is now, the ticks go back from it
-  const back = ticks(0, span).filter((v) => v <= span);
+  const x = spectral ? (f: number) => LEFT + (f / fMax) * w : (s: number) => LEFT + ((s - t0) / span) * w;
+  const at = hover === null ? null : spectral ? ((hover - LEFT) / w) * fMax : t0 + ((hover - LEFT) / w) * span;
+  // the time axis: 0 is now, the ticks go back from it (by frequency: from 0 Hz up)
+  const back = spectral ? ticks(0, fMax).filter((v) => v <= fMax) : ticks(0, span).filter((v) => v <= span);
 
   return (
     <div
@@ -147,9 +157,16 @@ export function Scope({
             hi += pad;
             const y = (v: number) => top + h - ((v - lo) / (hi - lo)) * h;
             const points = tr.t.map((s, i) => `${x(s).toFixed(1)},${y(tr.v[i]).toFixed(1)}`).join(" ");
+            // not hovering: the latest value (by frequency: the highest peak past 0 Hz)
+            const peak = tr.v.reduce(
+              (best, v, k) => (k > 0 && v > tr.v[best] ? k : best),
+              Math.min(1, tr.v.length - 1),
+            );
             const i =
               at === null
-                ? tr.v.length - 1
+                ? spectral
+                  ? peak
+                  : tr.v.length - 1
                 : Math.max(
                     0,
                     tr.t.findIndex((s) => s >= at),
@@ -219,6 +236,11 @@ export function Scope({
                 >
                   {si(value, unit(tr.name))}
                 </text>
+                {spectral && tr.t[i] !== undefined && (
+                  <text x={LEFT + w + 12} y={top + h / 2 + 25} fontSize={10} fill="currentColor" opacity={0.55}>
+                    {si(tr.t[i], "Hz")}
+                  </text>
+                )}
               </g>
             );
           })}
@@ -234,15 +256,15 @@ export function Scope({
           {back.map((v) => (
             <text
               key={v}
-              x={x(t1 - v)}
+              x={spectral ? x(v) : x(t1 - v)}
               y={height - 7}
               fontSize={10}
-              textAnchor={v === 0 ? "end" : v === span ? "start" : "middle"}
+              textAnchor={spectral ? (v === 0 ? "start" : "middle") : v === 0 ? "end" : v === span ? "start" : "middle"}
               fill="currentColor"
               opacity={0.55}
               className="tabular-nums"
             >
-              {v === 0 ? t("scope.now") : `−${si(v, "s")}`}
+              {spectral ? si(v, "Hz") : v === 0 ? t("scope.now") : `−${si(v, "s")}`}
             </text>
           ))}
           {hover !== null && at !== null && (
@@ -268,7 +290,7 @@ export function Scope({
                 stroke="var(--code-bg)"
                 strokeWidth={4}
               >
-                {si(at, "s")}
+                {si(at, spectral ? "Hz" : "s")}
               </text>
             </g>
           )}
