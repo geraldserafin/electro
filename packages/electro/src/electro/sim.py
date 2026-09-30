@@ -59,6 +59,11 @@ class Program:
     nodes: dict[str, int | None]  # node name -> index of V_<node> in x (None: the reference, 0 V)
     parts: dict[str, dict[str, int]]  # element label -> its quantities ("U", "I", ...) -> index in x
     kinds: dict[str, str]  # element label -> its class name
+    # the current into each terminal of each element (for the page's moving dots): ``flow`` fills
+    # ``out`` from x and p, ``flows`` says where each one is (element label -> per terminal, in its
+    # order: index in out)
+    flow_body: dict[str, str] = field(default_factory=lambda: {"py": "    pass", "js": ""})
+    flows: dict[str, list[int]] = field(default_factory=dict)
     _kernel: object = field(default=None, repr=False)
     _update: object = field(default=None, repr=False)
 
@@ -100,6 +105,8 @@ class Program:
                 "nodes": self.nodes,
                 "parts": self.parts,
                 "kinds": self.kinds,
+                "flow": self.flow_body["js"],
+                "flows": self.flows,
             }
         )
 
@@ -201,6 +208,17 @@ def compile_sim(circuit: Circuit) -> Program:
         [(f"out[{k}]", expr.xreplace(known)) for k, (expr, _, _) in enumerate(states.values())], unknowns, params
     )
 
+    # each terminal's current, as the node's law has it (what flows from the node into the element)
+    flowing: list[tuple[str, sp.Expr]] = []
+    flows: dict[str, list[int]] = {}
+    for label, placed in system.parts.items():
+        currents = [sp.sympify(placed.model.inflow.get(t, 0)).xreplace(known) for t in placed.component.terminals]
+        if any(c.free_symbols - allowed for c in currents):
+            continue  # (not all of it is known here: no dots through it)
+        flows[label] = list(range(len(flowing), len(flowing) + len(currents)))
+        flowing += [(f"out[{len(flowing) + k}]", c) for k, c in enumerate(currents)]
+    flow = _code(flowing, unknowns, params)
+
     index = {u: i for i, u in enumerate(unknowns)}
     parts = {
         label: {name: index[v] for name, v in placed.model.variables.items() if v in index}
@@ -218,6 +236,8 @@ def compile_sim(circuit: Circuit) -> Program:
         nodes={name: index.get(v) for name, v in system.potentials.items()},
         parts=parts,
         kinds={label: type(placed.component).__name__ for label, placed in system.parts.items()},
+        flow_body=flow,
+        flows=flows,
     )
 
 

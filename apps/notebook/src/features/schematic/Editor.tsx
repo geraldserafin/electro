@@ -21,7 +21,9 @@ import type { ElementData, ElementResult, Point, SchematicData, SymbolLibrary } 
 import { Target } from "@/shared/ui/icons";
 import { isAdjustable } from "./Adjusters";
 import { BoardIsland, board, boardIsland } from "./Board";
+import { CurrentDots } from "./CurrentDots";
 import { ElementView, liveColor } from "./ElementView";
+import { flowGraph, type Segment, segmentCurrents } from "./flow";
 import { HelpPanel } from "./HelpPanel";
 import { Inspector, type Selection } from "./Inspector";
 import { LcdScreen, type LcdScreenData } from "./LcdScreen";
@@ -80,6 +82,9 @@ export interface LiveView {
   oleds: Record<string, OledScreenData>; // what each OLED shows
   tfts: Record<string, TftScreenData>; // what each colour TFT shows
   pressed: string[]; // buttons held down
+  currents?: Record<string, number[]>; // each element's terminals' currents (into it): the moving dots
+  nodes?: { wires: (string | null)[]; pins: Record<string, (string | null)[]> }; // which node each wire and pin is
+  paused?: boolean; // the dots stand still
   onPress: (id: string, down: boolean) => void;
 }
 
@@ -692,6 +697,29 @@ export function SchematicEditor({
     const i = value.wires.findIndex((w) => w.points.some((q) => same(q, p)));
     return i < 0 ? null : (live.wires[i] ?? null);
   };
+  // running: the wires' network, once for the drawing (the currents along it, each frame), and the
+  // two-pin elements the current goes through
+  const known = live?.currents;
+  const flow = useMemo(
+    () => (live?.nodes && known ? flowGraph(value, library, live.nodes, (id) => !!known[id]) : null),
+    // (the elements whose currents are known stay the same while it runs: not each frame's)
+    [value, library, live?.nodes, !!known],
+  );
+  const through = useMemo(
+    () =>
+      flow
+        ? value.elements.flatMap((e) => {
+            const ps = pins(e, library);
+            if (ps.length !== 2 || !known?.[e.id]) return [];
+            const [a, b] = ps.map(([x, y]) => [x * G, y * G] as Point);
+            return [{ id: e.id, a, b }];
+          })
+        : [],
+    [flow],
+  );
+  const dotted = useMemo<Segment[]>(() => (flow ? [...flow.segments, ...through] : []), [flow, through]);
+  const dottedCurrents =
+    flow && known ? [...segmentCurrents(flow, known), ...through.map((e) => known[e.id]?.[0] ?? 0)] : [];
   const selectedKind = selectedElement?.kind;
   // many selected: one dashed frame around all of it, besides each thing's own
   const groupFrame =
@@ -923,6 +951,7 @@ export function SchematicEditor({
               onPointerDown={onElementDownStable}
             />
           ))}
+          {live && flow && <CurrentDots segments={dotted} currents={dottedCurrents} moving={!live.paused} />}
           {live &&
             value.elements
               .filter((e) => (e.kind === "lcd1602" || e.kind === "lcd1602_i2c") && live.screens[e.id])

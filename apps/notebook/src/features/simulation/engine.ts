@@ -17,6 +17,8 @@ export interface ProgramData {
   nodes: Record<string, number | null>; // node -> index in x (null: the reference, 0 V)
   parts: Record<string, Record<string, number>>; // element -> "U", "I", ... -> index in x
   kinds: Record<string, string>; // element -> class name
+  flow?: string; // fills out with each terminal's current (from the node into the element)
+  flows?: Record<string, number[]>; // element -> per terminal, in its order: index in flow's out
 }
 
 /** electro_notebook.kernel.live(): the program, and which node each wire and pin is. */
@@ -107,6 +109,8 @@ export class Simulation {
   switched = false; // a flip-flop changed in the last step
   private kernel: Kernel;
   private update: Update;
+  private flow: Update;
+  readonly flowing: Float64Array; // each terminal's current, as flow() last found them
   private F: Float64Array;
   private J: Float64Array;
   private after: Float64Array;
@@ -135,6 +139,11 @@ export class Simulation {
       limexp,
       dlimexp,
     );
+    this.flow = new Function("limexp", "dlimexp", `return function (x, p, out) {\n${program.flow ?? ""}\n}`)(
+      limexp,
+      dlimexp,
+    );
+    this.flowing = new Float64Array(Object.values(program.flows ?? {}).reduce((n, f) => n + f.length, 0));
     this.F = new Float64Array(this.n);
     this.J = new Float64Array(this.n * this.n);
     this.after = new Float64Array(program.states.length);
@@ -166,6 +175,12 @@ export class Simulation {
   value(name: string): number {
     const i = this.program.unknowns.indexOf(name);
     return i < 0 ? 0 : this.x[i];
+  }
+
+  /** Each terminal's current now (into its element), in ``flowing``. */
+  flows(): Float64Array {
+    this.flow(this.x, this.p, this.flowing);
+    return this.flowing;
   }
 
   node(name: string): number {

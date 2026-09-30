@@ -64,6 +64,7 @@ export interface Frame {
   oleds: Record<string, OledData>;
   tfts: Record<string, TftData>; // each colour TFT, how lit (its pictures come apart: Runner.pictures)
   results: Record<string, ElementResult>; // readings next to the elements
+  currents: Record<string, number[]>; // each element's terminals' currents (into it), their mean since the last frame
   sounds: { id: string; frequency: number | null; volume: number }[]; // each buzzer, in the circuit's time
   traces: ScopeTrace[]; // the scope's, then the meter's
   serial: string; // what the chips wrote since the last frame
@@ -109,6 +110,7 @@ export class Runner {
   private tfts = new Map<string, Ili9341>(); // the SPI displays, by id (kept so too)
   // each LED channel's charge since the last frame (id:channel): its glow is the average current, so PWM dims it
   private glow = { since: 0, last: 0, charge: new Map<string, number>() };
+  private carried: Float64Array; // each terminal's charge since the last frame: its mean current (PWM: the mean)
   private history = new Map<string, ScopeTrace>();
   private recorded: string[] = []; // the scope's quantities and the meter's
   private shown: { scope: string[]; probe: string[] } = { scope: [], probe: [] };
@@ -155,6 +157,7 @@ export class Runner {
     );
     this.motors = having("Motor").flatMap(([id, q]) => (q?.w !== undefined ? [{ id, w: q.w, angle: 0 }] : []));
     this.relays = having("Relay").flatMap(([id, q]) => (q?.on !== undefined ? [{ id, on: q.on }] : []));
+    this.carried = new Float64Array(this.session.sim.flowing.length);
     this.sonars = having("Ultrasonic").flatMap(([id, q]) => (q?.U_trig !== undefined ? [sonar(id, q.U_trig)] : []));
     this.setParts(parts);
   }
@@ -230,6 +233,10 @@ export class Runner {
       for (const b of this.buzzers) listen(b, x[b.u], dt);
       for (const l of this.lamps) this.energy.set(l.id, (this.energy.get(l.id) ?? 0) + Math.abs(x[l.u] * x[l.i]) * dt);
       for (const m of this.motors) m.angle = (m.angle + x[m.w] * dt * SPIN * (180 / Math.PI)) % 360;
+      if (this.carried.length) {
+        const now = s.sim.flows();
+        for (let k = 0; k < now.length; k++) this.carried[k] += now[k] * dt;
+      }
       g.last = t;
     }
     for (const m of this.servos) watch(m, x[m.u], t);
@@ -347,6 +354,10 @@ export class Runner {
         reversed: false,
       };
     }
+    const now = span > 0 ? this.carried.map((q) => q / span) : this.carried.length ? sim.flows() : this.carried;
+    const currents: Record<string, number[]> = {};
+    for (const [id, at] of Object.entries(c.program.flows ?? {})) currents[id] = at.map((k) => now[k]);
+    this.carried.fill(0);
     this.glow = { since: sim.t, last: sim.t, charge: new Map() };
     const trace = (name: string) => this.history.get(name) ?? { name, t: [], v: [] };
     const serial = this.serial;
@@ -360,6 +371,7 @@ export class Runner {
       oleds,
       tfts,
       results,
+      currents,
       sounds,
       serial,
       traces: [...this.shown.scope, ...this.shown.probe].map(trace),

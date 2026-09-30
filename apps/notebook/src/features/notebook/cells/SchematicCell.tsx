@@ -622,6 +622,9 @@ export function SchematicCell({
               oleds: live.frame.oleds,
               tfts: live.frame.tfts,
               pressed: pressedIds,
+              currents: live.frame.currents,
+              nodes: live.frame.nodes,
+              paused: live.status === "paused",
               onPress: press,
             }
           : undefined

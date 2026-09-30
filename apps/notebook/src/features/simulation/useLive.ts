@@ -34,6 +34,8 @@ export interface LiveFrame {
   oleds: Record<string, OledData>; // each OLED
   tfts: Record<string, TftData & { pictures: Pictures }>; // each colour TFT, how lit, and where its pictures come from
   results: Record<string, ElementResult>; // readings next to the elements
+  currents: Record<string, number[]>; // each element's terminals' currents (into it), for the moving dots
+  nodes: { wires: (string | null)[]; pins: Record<string, (string | null)[]> }; // which node each wire and pin is (the same each frame)
   behind: boolean; // the simulation cannot keep up: time runs slower than asked
 }
 
@@ -150,6 +152,8 @@ export function useLive(schematic: SchematicData) {
       screens: f.screens,
       oleds: f.oleds,
       results: f.results,
+      currents: f.currents,
+      nodes: c,
       behind,
       tfts: Object.fromEntries(Object.entries(f.tfts).map(([id, d]) => [id, { ...d, pictures: pictures.current }])),
       scale: Math.max(1, ...Object.values(voltages).map(Math.abs)),

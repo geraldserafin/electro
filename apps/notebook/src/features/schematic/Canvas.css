@@ -155,6 +155,20 @@
     --live-neg: #e03131;
     --live-zero: var(--text);
   }
+  /* the current, moving (CurrentDots): amber dots, brighter on a dark board */
+  .canvas {
+    --current: #f08c00;
+  }
+  :where([data-theme="dark"]) .canvas {
+    --current: #ffd43b;
+  }
+  .canvas .current-dots path {
+    fill: none;
+    stroke: var(--current);
+    stroke-width: 4.5;
+    stroke-linecap: round;
+    pointer-events: none;
+  }
   .canvas .led-glow {
     filter: blur(7px);
     pointer-events: none;
