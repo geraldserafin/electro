@@ -12,7 +12,12 @@ export function libraryFor(standard: SymbolStandard = "iec"): SymbolLibrary {
   let lib = byStandard.get(standard);
   if (!lib) {
     const own = library.standards?.[standard] ?? {};
-    lib = { ...library, kinds: Object.fromEntries(Object.entries(library.kinds).map(([kind, k]) => [kind, own[kind] ? { ...k, svg: own[kind] } : k])) };
+    lib = {
+      ...library,
+      kinds: Object.fromEntries(
+        Object.entries(library.kinds).map(([kind, k]) => [kind, own[kind] ? { ...k, svg: own[kind] } : k]),
+      ),
+    };
     byStandard.set(standard, lib);
   }
   return lib;

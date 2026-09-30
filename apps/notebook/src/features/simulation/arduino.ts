@@ -3,15 +3,31 @@
 // circuit (electro.devices.PIN_MODES); what the circuit puts on the pins is what digitalRead() and
 // analogRead() see.
 import {
-  AVRADC, AVRIOPort, AVRTimer, AVRTWI, AVRUSART, CPU, PinState, adcConfig, avrInstruction, portBConfig, portCConfig,
-  portDConfig, timer0Config, timer1Config, timer2Config, twiConfig, usart0Config,
+  AVRADC,
+  AVRIOPort,
+  AVRTimer,
+  AVRTWI,
+  AVRUSART,
+  adcConfig,
+  avrInstruction,
+  CPU,
+  PinState,
+  portBConfig,
+  portCConfig,
+  portDConfig,
+  timer0Config,
+  timer1Config,
+  timer2Config,
+  twiConfig,
+  usart0Config,
 } from "avr8js";
 import type { Chip, Mode, PinChange } from "./chip";
 import { Bus } from "./i2c";
 
 export const CLOCK = 16e6; // Hz
 // an input reads LOW below 0.3·Vcc and HIGH above 0.6·Vcc; in between it keeps what it read (ATmega328P)
-const LOW_BELOW = 1.5, HIGH_ABOVE = 3.0;
+const LOW_BELOW = 1.5,
+  HIGH_ABOVE = 3.0;
 
 // Uno's pins: D0–D7 on port D, D8–D13 on port B, A0–A5 on port C
 const PINS: { name: string; port: "B" | "C" | "D"; bit: number }[] = [
@@ -41,7 +57,10 @@ export function loadHex(source: string): Uint16Array {
   let base = 0;
   for (const line of source.split(/\r?\n/)) {
     if (!line.startsWith(":")) continue;
-    const bytes = line.slice(1).match(/../g)!.map((h) => parseInt(h, 16));
+    const bytes = line
+      .slice(1)
+      .match(/../g)!
+      .map((h) => parseInt(h, 16));
     const [count, hi, lo, type] = bytes;
     if (type === 0) flash.set(bytes.slice(4, 4 + count), base + ((hi << 8) | lo));
     else if (type === 2) base = ((bytes[4] << 8) | bytes[5]) << 4;
@@ -51,13 +70,18 @@ export function loadHex(source: string): Uint16Array {
 }
 
 const MODE: Record<PinState, Mode> = {
-  [PinState.Input]: "input", [PinState.InputPullUp]: "pullup", [PinState.Low]: "low", [PinState.High]: "high",
+  [PinState.Input]: "input",
+  [PinState.InputPullUp]: "pullup",
+  [PinState.Low]: "low",
+  [PinState.High]: "high",
 };
 
 export class Uno implements Chip {
   readonly pins = PINS.map((p) => p.name);
-  readonly modes: Record<Mode, [number, number]> = { ...Object.fromEntries(Object.entries(MODE).map(([s, m]) => [m, PIN_MODES[Number(s) as PinState]])),
-    pulldown: PIN_MODES[PinState.Input] } as Record<Mode, [number, number]>; // (an AVR has no pull-downs)
+  readonly modes: Record<Mode, [number, number]> = {
+    ...Object.fromEntries(Object.entries(MODE).map(([s, m]) => [m, PIN_MODES[Number(s) as PinState]])),
+    pulldown: PIN_MODES[PinState.Input],
+  } as Record<Mode, [number, number]>; // (an AVR has no pull-downs)
   readonly sda = "A4";
   readonly scl = "A5";
   readonly cpu: CPU;

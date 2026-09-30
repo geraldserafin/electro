@@ -12,15 +12,32 @@ from dataclasses import dataclass, field
 
 import sympy as sp
 
-from .circuit import GROUND, Circuit, Netlist, Seq, Transpose, ground, open_end, wire
+from .circuit import Circuit, Netlist, Seq, Transpose, ground, open_end, wire
 from .reasons import (
-    AmmeterReading, CapacitorImpedance, CapacitorOpenDC, CapacitorStep, ControlCurrent, ControlledSource, ControlVoltage,
-    IdealAmmeter, IdealOpAmp, IdealVoltmeter, InductorImpedance, InductorShortDC, InductorStep, OhmsLaw, Reason,
-    SourceCurrent, SourceVoltage, UnknownElement, VoltageAcross, VoltmeterReading,
+    AmmeterReading,
+    CapacitorImpedance,
+    CapacitorOpenDC,
+    CapacitorStep,
+    ControlCurrent,
+    ControlledSource,
+    ControlVoltage,
+    IdealAmmeter,
+    IdealOpAmp,
+    IdealVoltmeter,
+    InductorImpedance,
+    InductorShortDC,
+    InductorStep,
+    OhmsLaw,
+    Reason,
+    SourceCurrent,
+    SourceVoltage,
+    UnknownElement,
+    VoltageAcross,
+    VoltmeterReading,
 )
 
 OPEN = open_end + open_end.transpose()  # 1 → 1 with nothing between: a break in the circuit
-from .values import UNKNOWN, fmt, parse
+from .values import UNKNOWN, fmt, parse  # noqa: E402
 
 
 @dataclass(frozen=True)

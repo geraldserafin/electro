@@ -8,15 +8,31 @@ import { BoardIsland } from "./Board";
 
 export function Panel({ className, children, ...props }: HTMLAttributes<HTMLDivElement>) {
   return (
-    <BoardIsland stays {...props} className={cn("flex-col items-stretch gap-4 p-3.5 rounded-xl overflow-hidden", className)}>
+    <BoardIsland
+      stays
+      {...props}
+      className={cn("flex-col items-stretch gap-4 p-3.5 rounded-xl overflow-hidden", className)}
+    >
       {children}
     </BoardIsland>
   );
 }
 
 /** A panel's head: an icon, a small caption over a name, what it can do (close, …). */
-export function PanelHead({ icon, caption, title, onClose, closeLabel, children }: {
-  icon?: ReactNode; caption: ReactNode; title?: ReactNode; onClose?: () => void; closeLabel?: string; children?: ReactNode;
+export function PanelHead({
+  icon,
+  caption,
+  title,
+  onClose,
+  closeLabel,
+  children,
+}: {
+  icon?: ReactNode;
+  caption: ReactNode;
+  title?: ReactNode;
+  onClose?: () => void;
+  closeLabel?: string;
+  children?: ReactNode;
 }) {
   return (
     <header className="flex items-center gap-2.5 min-w-0">
@@ -27,7 +43,9 @@ export function PanelHead({ icon, caption, title, onClose, closeLabel, children 
       </div>
       {children}
       {onClose && (
-        <Tile className="size-8 bg-transparent" onClick={onClose} title={closeLabel} aria-label={closeLabel}><Close /></Tile>
+        <Tile className="size-8 bg-transparent" onClick={onClose} title={closeLabel} aria-label={closeLabel}>
+          <Close />
+        </Tile>
       )}
     </header>
   );
@@ -46,11 +64,17 @@ export function Section({ label, children, className }: { label: ReactNode; chil
 /** A square tile: a choice (``on``: chosen, tinted) or an action. */
 export function Tile({ on, className, ...props }: ButtonHTMLAttributes<HTMLButtonElement> & { on?: boolean }) {
   return (
-    <button {...props}
-            className={cn("relative inline-grid place-items-center flex-none size-9 rounded-lg bg-hover text-fg hover:bg-selected disabled:opacity-40 [&_svg]:size-4",
-                          on && "bg-accent-soft text-accent hover:bg-accent-soft outline-1 outline-accent/40", className)} />
+    <button
+      {...props}
+      className={cn(
+        "relative inline-grid place-items-center flex-none size-9 rounded-lg bg-hover text-fg hover:bg-selected disabled:opacity-40 [&_svg]:size-4",
+        on && "bg-accent-soft text-accent hover:bg-accent-soft outline-1 outline-accent/40",
+        className,
+      )}
+    />
   );
 }
 
 /** A text field on a panel (and its unit inside, on the right). */
-export const field = "w-full h-9 px-2.5 rounded-lg border border-transparent bg-hover text-[14px] focus:bg-paper focus:outline-2 focus:outline-accent-soft";
+export const field =
+  "w-full h-9 px-2.5 rounded-lg border border-transparent bg-hover text-[14px] focus:bg-paper focus:outline-2 focus:outline-accent-soft";

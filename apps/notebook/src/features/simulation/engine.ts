@@ -29,7 +29,9 @@ export interface LiveCircuit {
 const EXP_LIMIT = 80;
 const limexp = (x: number) => (x <= EXP_LIMIT ? Math.exp(x) : Math.exp(EXP_LIMIT) * (1 + x - EXP_LIMIT));
 const dlimexp = (x: number) => Math.exp(Math.min(x, EXP_LIMIT));
-const RELTOL = 1e-6, VNTOL = 1e-6, MAX_NEWTON = 60;
+const RELTOL = 1e-6,
+  VNTOL = 1e-6,
+  MAX_NEWTON = 60;
 const GUESSES = 64; // input combinations remembered (the most recent)
 
 type Kernel = (x: Float64Array, p: Float64Array, F: Float64Array, J: Float64Array) => void;
@@ -58,9 +60,13 @@ function solveLinear(A: Float64Array, b: Float64Array, n: number): boolean {
     if (Math.abs(A[pivot * n + col]) < 1e-300) return false;
     if (pivot !== col) {
       for (let j = col; j < n; j++) {
-        const t = A[col * n + j]; A[col * n + j] = A[pivot * n + j]; A[pivot * n + j] = t;
+        const t = A[col * n + j];
+        A[col * n + j] = A[pivot * n + j];
+        A[pivot * n + j] = t;
       }
-      const t = b[col]; b[col] = b[pivot]; b[pivot] = t;
+      const t = b[col];
+      b[col] = b[pivot];
+      b[pivot] = t;
     }
     const inv = 1 / A[col * n + col];
     for (let r = col + 1; r < n; r++) {
@@ -121,8 +127,14 @@ export class Simulation {
     this.n = program.unknowns.length;
     this.x = new Float64Array(this.n);
     this.p = Float64Array.from(program.initial);
-    this.kernel = new Function("limexp", "dlimexp", `return function (x, p, F, J) {\n${program.kernel}\n}`)(limexp, dlimexp);
-    this.update = new Function("limexp", "dlimexp", `return function (x, p, out) {\n${program.update}\n}`)(limexp, dlimexp);
+    this.kernel = new Function("limexp", "dlimexp", `return function (x, p, F, J) {\n${program.kernel}\n}`)(
+      limexp,
+      dlimexp,
+    );
+    this.update = new Function("limexp", "dlimexp", `return function (x, p, out) {\n${program.update}\n}`)(
+      limexp,
+      dlimexp,
+    );
     this.F = new Float64Array(this.n);
     this.J = new Float64Array(this.n * this.n);
     this.after = new Float64Array(program.states.length);
@@ -134,7 +146,8 @@ export class Simulation {
   setInput(name: string, value: number) {
     const i = this.program.inputs[name];
     if (i === undefined || this.p[i] === value) return;
-    if (!this.changed) { // the inputs as they were: remember the circuit with them
+    if (!this.changed) {
+      // the inputs as they were: remember the circuit with them
       this.guesses.delete(this.inputsKey()); // (re-inserted: the map keeps the most recent last)
       this.guesses.set(this.inputsKey(), Float64Array.from(this.x));
       if (this.guesses.size > GUESSES) this.guesses.delete(this.guesses.keys().next().value!);
@@ -165,7 +178,7 @@ export class Simulation {
     let i = this.where.get(name);
     if (i === undefined) {
       const k = this.program.unknowns.indexOf(name);
-      i = k >= 0 ? k : name.startsWith("V_") ? this.program.nodes[name.slice(2)] ?? null : null;
+      i = k >= 0 ? k : name.startsWith("V_") ? (this.program.nodes[name.slice(2)] ?? null) : null;
       this.where.set(name, i);
     }
     return i === null ? 0 : this.x[i];
@@ -175,7 +188,8 @@ export class Simulation {
     const { n, p, F, J } = this;
     p[0] = dt;
     p[1] = this.t + dt;
-    let x = this.xa, next = this.xb;
+    let x = this.xa,
+      next = this.xb;
     x.set((this.changed && this.guesses.get(this.inputsKey())) || this.x);
     this.changed = false;
     for (let iteration = 1; iteration <= MAX_NEWTON; iteration++) {

@@ -6,10 +6,10 @@ piny i końce przewodów w tym samym punkcie siatki są połączone.
 ```python
 from electro_schematic import Schematic, Element, Wire, layout
 
-sch = layout(uklad)                      # kod → rysunek (auto-layout)
-sch.move("A_1", (6, 3))                  # przewody idą za elementem
-sch.rotate("E_1", 180)                   # odwrócenie źródła = obrót o 180°
-text = sch.to_json()                     # zapis (np. w komórce notatnika)
+sch = layout(uklad)  # kod → rysunek (auto-layout)
+sch.move("A_1", (6, 3))  # przewody idą za elementem
+sch.rotate("E_1", 180)  # odwrócenie źródła = obrót o 180°
+text = sch.to_json()  # zapis (np. w komórce notatnika)
 sol = Schematic.from_json(text).to_circuit().solve(I_A_1=0, find="R_2")
 ```
 

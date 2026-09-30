@@ -38,13 +38,17 @@ def test_warnings_are_shown():
 
 def test_schematic_cells_are_available_by_name():
     kernel.reset()
-    from electro import Resistor, loop, VoltageSource
+    from electro import Resistor, VoltageSource, loop
     from electro_schematic import layout
 
     drawing = layout(loop(VoltageSource(12), Resistor(4))).to_json()
     out = run('schemat("petla").to_circuit().solve()["R_1"].I', petla=drawing)
     assert out == [{"type": "markdown", "data": "$\\displaystyle 3$"}]
-    assert run('schemat("inny")', petla=drawing)[0]["issue"] == {"type": "NoSuchSchematic", "name": "inny", "available": ["petla"]}
+    assert run('schemat("inny")', petla=drawing)[0]["issue"] == {
+        "type": "NoSuchSchematic",
+        "name": "inny",
+        "available": ["petla"],
+    }
 
 
 def test_code_of_a_drawing():
@@ -110,7 +114,10 @@ def test_code_view_round_trip():
 def test_code_view_errors_name_the_line():
     error = json.loads(kernel.from_code("x = 1\nuklad = Resistr(1)", "uklad"))["error"]
     assert error["line"] == 2 and error["data"].startswith("NameError") and "issue" not in error  # Python's own words
-    assert json.loads(kernel.from_code("x = 1", "uklad"))["error"]["issue"] == {"type": "NoCircuitInCode", "variable": "uklad"}
+    assert json.loads(kernel.from_code("x = 1", "uklad"))["error"]["issue"] == {
+        "type": "NoCircuitInCode",
+        "variable": "uklad",
+    }
 
 
 def test_code_view_keeps_the_drawing_when_only_values_change():
@@ -135,11 +142,19 @@ def test_a_schematic_is_a_variable_named_after_it():
     from electro import Resistor, VoltageSource, loop
     from electro_schematic import layout
 
-    assert kernel.variable("Układ 1") == "układ1" and kernel.variable("1 test") == "_1test" and kernel.variable("") == "uklad"
+    assert (
+        kernel.variable("Układ 1") == "układ1"
+        and kernel.variable("1 test") == "_1test"
+        and kernel.variable("") == "uklad"
+    )
     drawing = layout(loop(VoltageSource(12), Resistor())).to_json()
     kernel.reset()
-    out = json.loads(kernel.run("sol = układ1.solve(I_R_1=2)\ndisplay(schematic(układ1, sol))\nsol['R_1'].value",
-                                json.dumps({"Układ 1": drawing})))
+    out = json.loads(
+        kernel.run(
+            "sol = układ1.solve(I_R_1=2)\ndisplay(schematic(układ1, sol))\nsol['R_1'].value",
+            json.dumps({"Układ 1": drawing}),
+        )
+    )
     assert out[0]["type"] == "svg" and "6" in out[1]["data"]
     assert json.loads(kernel.run("układ1", json.dumps({"Układ 1": drawing})))[0]["type"] == "svg"
     assert kernel.code(drawing, "Układ 1").startswith("układ1 = ")

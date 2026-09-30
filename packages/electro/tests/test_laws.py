@@ -1,7 +1,6 @@
 """The circuit category is a hypergraph category: its laws hold up to black-box equivalence."""
 
 import sympy as sp
-
 from electro import *
 
 a, b, c, d = Resistor(1), Resistor(2), Resistor(3), Resistor(5)

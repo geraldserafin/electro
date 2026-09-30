@@ -33,8 +33,12 @@ class Compiler {
 
   /** Fetch the compiler for ``board`` ahead of the first sketch (a note with one was opened). */
   load(board: Board): Promise<void> {
-    return (this.loading[board] ??= this.call("load", { board }).then(() => undefined)
-      .catch((e) => { delete this.loading[board]; throw e; }));
+    return (this.loading[board] ??= this.call("load", { board })
+      .then(() => undefined)
+      .catch((e) => {
+        delete this.loading[board];
+        throw e;
+      }));
   }
 
   /** A sketch → the board's program (an Uno's Intel HEX, a Pico's flash image), or what the compiler said. */

@@ -7,7 +7,8 @@ strip    — drop outputs and results (the document alone, e.g. for version cont
 
 import sys
 
-from .format import FormatError, load
+from .format import load
+from .issues import FormatError
 
 
 def main(argv: list[str]) -> int:

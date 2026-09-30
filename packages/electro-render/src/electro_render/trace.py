@@ -101,7 +101,7 @@ def steps(solution) -> Steps:
     shown: list[FormulaStep | SystemStep] = []
     for step in solution.shown_steps():
         if step.formula is not None:
-            (target, result), = step.targets.items()
+            ((target, result),) = step.targets.items()
             chain = [name(target.name)]
             for part in (expr(step.formula), "" if step.formula.is_Symbol else expr(step.formula, values)):
                 if part and part not in chain:
@@ -113,8 +113,12 @@ def steps(solution) -> Steps:
                 chain[-1] = final
             shown.append(FormulaStep(" = ".join(chain), step.laws[0].reason))
         else:
-            shown.append(SystemStep([f"{expr(law.expr)} = 0" for law in step.laws], _pairs(solution, step.targets.items())))
+            shown.append(
+                SystemStep([f"{expr(law.expr)} = 0" for law in step.laws], _pairs(solution, step.targets.items()))
+            )
         values.update(step.targets)
     answer = _pairs(solution, ((s, solution._value(s)) for s in solution.find)) if solution.find else None
     missing = Underdetermined(**solution.diagnose().fields()) if not solution.find and solution.missing else None
-    return Steps(_pairs(solution, solution.data.items()), _pairs(solution, solution.assumed.items()), shown, answer, missing)
+    return Steps(
+        _pairs(solution, solution.data.items()), _pairs(solution, solution.assumed.items()), shown, answer, missing
+    )

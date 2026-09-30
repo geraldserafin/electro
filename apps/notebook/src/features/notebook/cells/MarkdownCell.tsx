@@ -2,17 +2,23 @@
 // document). Clicked, it becomes a block like the code's: a bar with two tabs, its Markdown and the
 // preview, and the one chosen under it. Leaving the cell (a click elsewhere, Esc, Shift+Enter)
 // shows the text again.
-import { useCallback, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
+import { type ReactNode, useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import type { Cell } from "@/shared/model/types";
 import { useClickOutside } from "@/shared/hooks/useClickOutside";
+import type { Cell } from "@/shared/model/types";
 import { Eye, Pencil } from "@/shared/ui/icons";
 import { Markdown } from "@/shared/ui/Markdown";
 import { block, CellBar, tabLook, useCellFocused } from "./CellBar";
 
 type Mode = "edit" | "preview";
 
-export function MarkdownCell({ cell, update }: { cell: Extract<Cell, { type: "markdown" }>; update: (patch: Partial<Cell>) => void }) {
+export function MarkdownCell({
+  cell,
+  update,
+}: {
+  cell: Extract<Cell, { type: "markdown" }>;
+  update: (patch: Partial<Cell>) => void;
+}) {
   const { t } = useTranslation("notebook");
   const focused = useCellFocused();
   const [open, setOpen] = useState<Mode | null>(cell.source === "" ? "edit" : null);
@@ -20,7 +26,9 @@ export function MarkdownCell({ cell, update }: { cell: Extract<Cell, { type: "ma
   const field = useRef<HTMLTextAreaElement>(null);
   const close = useCallback(() => setOpen(null), []);
   useClickOutside(ref, open !== null, close);
-  useEffect(() => { if (!focused) close(); }, [focused, close]); // another cell taken up
+  useEffect(() => {
+    if (!focused) close();
+  }, [focused, close]); // another cell taken up
   // the field grows with the text, so the page scrolls, not the field
   useLayoutEffect(() => {
     const el = field.current;
@@ -30,8 +38,11 @@ export function MarkdownCell({ cell, update }: { cell: Extract<Cell, { type: "ma
   }, [open, cell.source]);
 
   const text = (
-    <div className="px-3 py-1 min-h-[1.6em] cursor-text [&_:is(h1,h2,h3)]:scroll-mt-18"
-         onClick={(e) => (e.target as HTMLElement).closest("a") || setOpen("edit")} title={t("markdown.clickToEdit")}>
+    <div
+      className="px-3 py-1 min-h-[1.6em] cursor-text [&_:is(h1,h2,h3)]:scroll-mt-18"
+      onClick={(e) => (e.target as HTMLElement).closest("a") || setOpen("edit")}
+      title={t("markdown.clickToEdit")}
+    >
       <Markdown source={cell.source || t("markdown.empty")} />
     </div>
   );
@@ -39,23 +50,38 @@ export function MarkdownCell({ cell, update }: { cell: Extract<Cell, { type: "ma
 
   const tab = (mode: Mode, label: string, name: string, icon: ReactNode) => (
     // mouse down would take the focus from the field before the click
-    <button role="tab" aria-selected={open === mode} aria-label={name} title={name} className={tabLook(open === mode)}
-            onMouseDown={(e) => e.preventDefault()} onClick={() => setOpen(mode)}>
+    <button
+      role="tab"
+      aria-selected={open === mode}
+      aria-label={name}
+      title={name}
+      className={tabLook(open === mode)}
+      onMouseDown={(e) => e.preventDefault()}
+      onClick={() => setOpen(mode)}
+    >
       {icon} {label}
     </button>
   );
   return (
-    <div ref={ref} className={block}
-         onKeyDown={(e) => {
-           if (e.key === "Escape" || (e.key === "Enter" && e.shiftKey)) {
-             e.preventDefault();
-             close();
-           }
-         }}>
-      <CellBar label={t("cell.tabs")} tabs={<>
-        {tab("edit", "Markdown", t("markdown.edit"), <Pencil />)}
-        {tab("preview", t("markdown.preview"), t("markdown.show"), <Eye />)}
-      </>} />
+    <div
+      ref={ref}
+      className={block}
+      onKeyDown={(e) => {
+        if (e.key === "Escape" || (e.key === "Enter" && e.shiftKey)) {
+          e.preventDefault();
+          close();
+        }
+      }}
+    >
+      <CellBar
+        label={t("cell.tabs")}
+        tabs={
+          <>
+            {tab("edit", "Markdown", t("markdown.edit"), <Pencil />)}
+            {tab("preview", t("markdown.preview"), t("markdown.show"), <Eye />)}
+          </>
+        }
+      />
       {open === "edit" ? (
         <textarea
           ref={field}

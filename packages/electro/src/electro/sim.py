@@ -26,7 +26,7 @@ from sympy.printing.pycode import PythonCodePrinter
 
 from . import components as comp
 from .circuit import GROUND, Circuit
-from .devices import BOARDS, EXP_LIMIT, dlimexp, limexp
+from .devices import BOARDS, EXP_LIMIT
 from .issues import NoConvergence, NoSuchInput, NotSimulated, ValueNeeded
 from .reasons import KirchhoffCurrent
 from .semantics import compile_circuit
@@ -68,8 +68,18 @@ class Program:
 
     def functions(self):
         if self._kernel is None:
-            scope = {"exp": math.exp, "log": math.log, "limexp": _limexp, "dlimexp": _dlimexp,
-                     "sqrt": math.sqrt, "sin": math.sin, "cos": math.cos, "floor": math.floor, "pi": math.pi, "math": math}
+            scope = {
+                "exp": math.exp,
+                "log": math.log,
+                "limexp": _limexp,
+                "dlimexp": _dlimexp,
+                "sqrt": math.sqrt,
+                "sin": math.sin,
+                "cos": math.cos,
+                "floor": math.floor,
+                "pi": math.pi,
+                "math": math,
+            }
             exec(f"def kernel(x, p, F, J):\n{self.kernel_body['py']}\n", scope)
             exec(f"def update(x, p, out):\n{self.update_body['py']}\n", scope)
             self._kernel, self._update = scope["kernel"], scope["update"]
@@ -77,12 +87,21 @@ class Program:
 
     def to_json(self) -> str:
         """For the notebook's live simulation (``simulation/engine.ts``): the same program in JavaScript."""
-        return json.dumps({
-            "unknowns": self.unknowns, "params": self.params, "initial": self.initial,
-            "states": self.states, "inputs": self.inputs, "junctions": self.junctions,
-            "kernel": self.kernel_body["js"], "update": self.update_body["js"],
-            "nodes": self.nodes, "parts": self.parts, "kinds": self.kinds,
-        })
+        return json.dumps(
+            {
+                "unknowns": self.unknowns,
+                "params": self.params,
+                "initial": self.initial,
+                "states": self.states,
+                "inputs": self.inputs,
+                "junctions": self.junctions,
+                "kernel": self.kernel_body["js"],
+                "update": self.update_body["js"],
+                "nodes": self.nodes,
+                "parts": self.parts,
+                "kinds": self.kinds,
+            }
+        )
 
 
 def _limexp(x: float) -> float:
@@ -104,8 +123,11 @@ def _code(targets: list[tuple[str, sp.Expr]], xs: list[sp.Symbol], ps: list[sp.S
     exprs = [sp.sympify(e).xreplace(rename) for _, e in targets]
     common, reduced = sp.cse(exprs, symbols=sp.numbered_symbols("t"))
     used = set().union(*(e.free_symbols for e in reduced), *(e.free_symbols for _, e in common)) if exprs else set()
-    loads = [(s.name, f"{s.name[0]}[{s.name[1:]}]") for s in sorted(used, key=lambda s: s.name)
-             if s.name[0] in "xp" and s.name[1:].isdigit()]
+    loads = [
+        (s.name, f"{s.name[0]}[{s.name[1:]}]")
+        for s in sorted(used, key=lambda s: s.name)
+        if s.name[0] in "xp" and s.name[1:].isdigit()
+    ]
     py, js = _Py(), JavascriptCodePrinter({"strict": False})
     out = {"py": [], "js": []}
     for name, source in loads:
@@ -175,8 +197,9 @@ def compile_sim(circuit: Circuit) -> Program:
     targets = [(f"F[{i}]", F[i]) for i in range(n)]
     targets += [(f"J[{i * n + j}]", J[i, j]) for i in range(n) for j in range(n) if J[i, j] != 0]
     kernel = _code(targets, unknowns, params)
-    update = _code([(f"out[{k}]", expr.xreplace(known)) for k, (expr, _, _) in enumerate(states.values())],
-                   unknowns, params)
+    update = _code(
+        [(f"out[{k}]", expr.xreplace(known)) for k, (expr, _, _) in enumerate(states.values())], unknowns, params
+    )
 
     index = {u: i for i, u in enumerate(unknowns)}
     parts = {
@@ -205,7 +228,7 @@ def _solve_linear(A: list[float], b: list[float], n: int) -> list[float] | None:
     """``A·x = b`` (``A`` flat, row by row) by Gaussian elimination with partial pivoting."""
     M = []
     for i in range(n):  # each row scaled to its largest entry: laws in volts and in amperes pivot alike
-        row = A[i * n:(i + 1) * n] + [b[i]]
+        row = A[i * n : (i + 1) * n] + [b[i]]
         big = max(abs(v) for v in row[:n]) or 1.0
         M.append([v / big for v in row])
     for col in range(n):
@@ -352,7 +375,7 @@ class Trace:
     program: Program
 
     def __getitem__(self, name: str) -> list[float]:
-        return self.data[self._column(name)::len(self.names)].tolist()
+        return self.data[self._column(name) :: len(self.names)].tolist()
 
     def _column(self, name: str) -> int:
         if name in self.names:
@@ -369,7 +392,7 @@ class Trace:
         """Every quantity at time ``t`` (the last step not after it)."""
         k = max((i for i, s in enumerate(self.t) if s <= t + 1e-15), default=0)
         n = len(self.names)
-        return dict(zip(self.names, self.data[k * n:(k + 1) * n]))
+        return dict(zip(self.names, self.data[k * n : (k + 1) * n]))
 
     def V(self, node: str) -> list[float]:
         return self[f"V_{node}"]
@@ -387,8 +410,11 @@ class Trace:
 
     def default_signals(self) -> list[str]:
         """Capacitors' voltages, LEDs' currents and named nodes (at most four); else every node."""
-        named = [f"V_{n}" for n, i in self.program.nodes.items()
-                 if i is not None and n != GROUND and not (n[0] == "n" and n[1:].isdigit())]
+        named = [
+            f"V_{n}"
+            for n, i in self.program.nodes.items()
+            if i is not None and n != GROUND and not (n[0] == "n" and n[1:].isdigit())
+        ]
         caps = [f"U_{label}" for label, kind in self.program.kinds.items() if kind == "Capacitor"]
         leds = [f"I_{label}" for label, kind in self.program.kinds.items() if kind == "LED"]
         chosen = caps + leds + named
@@ -416,11 +442,14 @@ def _input_values(program: Program, name: str):
             def pin_mode(mode):
                 g, e = modes[mode] if isinstance(mode, str) else (modes["high"][0], float(mode))
                 return [(program.inputs[G], g), (program.inputs[E], e)]
+
             return pin_mode
     for candidate in (name, *(f"{name}_{suffix}" for suffix in INPUTS)):
         if candidate in program.inputs:
             return lambda value, i=program.inputs[candidate]: [(i, float(value))]
-    available = [n.rsplit("_", 1)[0] if n.endswith(INPUTS) else n for n in program.inputs if not n.endswith(("_G", "_E"))]
+    available = [
+        n.rsplit("_", 1)[0] if n.endswith(INPUTS) else n for n in program.inputs if not n.endswith(("_G", "_E"))
+    ]
     available += sorted({f"{n.rsplit('_', 2)[0]}.{n.rsplit('_', 2)[1]}" for n in program.inputs if n.endswith("_G")})
     raise NoSuchInput(name, available)
 
@@ -430,7 +459,9 @@ def _schedule(program: Program, inputs: dict | None):
     if not inputs:
         return None
     parts = [(_input_values(program, name), value) for name, value in inputs.items()]
-    return lambda now: [pair for to_values, value in parts for pair in to_values(value(now) if callable(value) else value)]
+    return lambda now: [
+        pair for to_values, value in parts for pair in to_values(value(now) if callable(value) else value)
+    ]
 
 
 def _run_python(program: Program, t_end: float, dt_max: float, schedule) -> tuple[list[float], array]:
@@ -487,6 +518,9 @@ def simulate(circuit: Circuit, t: float = 1.0, *, dt: float | None = None, input
     schedule = _schedule(program, inputs)
     dt_max = dt or t / 500
     engine = _engine()
-    times, rows = (_run_javascript(engine, program, t, dt_max, schedule) if engine is not None
-                   else _run_python(program, t, dt_max, schedule))
+    times, rows = (
+        _run_javascript(engine, program, t, dt_max, schedule)
+        if engine is not None
+        else _run_python(program, t, dt_max, schedule)
+    )
     return Trace(program.unknowns, times, rows, program)

@@ -1,7 +1,7 @@
 // The PDF's theme, each shown by a sample of its type, and its accent colour.
 import { useTranslation } from "react-i18next";
-import type { PdfSettings, Theme } from "./settings";
 import { Labelled } from "./controls";
+import type { PdfSettings, Theme } from "./settings";
 
 const THEMES = ["classic", "modern", "elegant"] as const satisfies Theme[];
 
@@ -22,9 +22,14 @@ export function ThemeChoice({ pdf, onChange }: { pdf: PdfSettings; onChange: (pa
     <>
       <div className="grid grid-cols-[repeat(3,1fr)] gap-1.5" role="radiogroup" aria-label={t("label")}>
         {THEMES.map((theme) => (
-          <button key={theme} role="radio" aria-checked={pdf.theme === theme} onClick={() => onChange({ theme })}
-                  className="grid items-center justify-items-start gap-0 px-2.5 py-2 rounded-[10px] border border-line text-left text-[15px]
-                             not-aria-checked:hover:bg-hover aria-checked:border-fg aria-checked:bg-selected">
+          <button
+            key={theme}
+            role="radio"
+            aria-checked={pdf.theme === theme}
+            onClick={() => onChange({ theme })}
+            className="grid items-center justify-items-start gap-0 px-2.5 py-2 rounded-[10px] border border-line text-left text-[15px]
+                             not-aria-checked:hover:bg-hover aria-checked:border-fg aria-checked:bg-selected"
+          >
             <span className={`text-[22px] leading-[1.2] ${SAMPLE[theme]}`}>Aa</span>
             <span className="text-[13px] font-medium">{t(theme)}</span>
             <small className="text-[11px] leading-[1.3] text-muted">{t(`${theme}Hint`)}</small>
@@ -34,10 +39,16 @@ export function ThemeChoice({ pdf, onChange }: { pdf: PdfSettings; onChange: (pa
       <Labelled label={t("accent")}>
         <div className="flex flex-wrap gap-2" role="radiogroup" aria-label={t("accent")}>
           {[null, ...ACCENTS].map((color) => (
-            <button key={color ?? "theme"} role="radio" aria-checked={pdf.accent === color}
-                    title={color ?? t("accentTheme")} aria-label={color ?? t("accentTheme")}
-                    style={{ background: color ?? THEME_ACCENT[pdf.theme] }} onClick={() => onChange({ accent: color })}
-                    className="size-6 rounded-full border-2 border-surface shadow-[0_0_0_1px_var(--line)] aria-checked:shadow-[0_0_0_2px_var(--text)]" />
+            <button
+              key={color ?? "theme"}
+              role="radio"
+              aria-checked={pdf.accent === color}
+              title={color ?? t("accentTheme")}
+              aria-label={color ?? t("accentTheme")}
+              style={{ background: color ?? THEME_ACCENT[pdf.theme] }}
+              onClick={() => onChange({ accent: color })}
+              className="size-6 rounded-full border-2 border-surface shadow-[0_0_0_1px_var(--line)] aria-checked:shadow-[0_0_0_2px_var(--text)]"
+            />
           ))}
         </div>
       </Labelled>

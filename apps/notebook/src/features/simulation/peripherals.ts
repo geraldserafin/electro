@@ -2,8 +2,10 @@
 // circuit gives their voltages step by step, these follow them — listen()/watch() after every
 // step, heard()/turn() when the board is drawn.
 
-const BUZZER_ON = 2.5, BUZZER_TONE = 2300; // an active buzzer: above this (V) it sounds, at this (Hz)
-const SERVO_MIN = 544e-6, SERVO_MAX = 2400e-6; // s: 0° and 180° (Arduino's Servo library)
+const BUZZER_ON = 2.5,
+  BUZZER_TONE = 2300; // an active buzzer: above this (V) it sounds, at this (Hz)
+const SERVO_MIN = 544e-6,
+  SERVO_MAX = 2400e-6; // s: 0° and 180° (Arduino's Servo library)
 const SERVO_SPEED = 600; // °/s: 60° in 0.1 s, a small servo's
 const LOGIC = 2.5; // V: a servo's signal is high above this
 
@@ -13,11 +15,22 @@ export interface Buzzing {
   u: number; // its voltage's index in x
   active: boolean; // its own oscillator (electro's Buzzer), else it sounds as it is driven (PassiveBuzzer)
   on: number; // active: how long it was above BUZZER_ON (s)
-  edges: number; above: boolean; peak: number; lastPeak: number; // passive: the waveform's rising edges, its peak
+  edges: number;
+  above: boolean;
+  peak: number;
+  lastPeak: number; // passive: the waveform's rising edges, its peak
 }
 
-export const buzzing = (id: string, u: number, active: boolean): Buzzing =>
-  ({ id, u, active, on: 0, edges: 0, above: false, peak: 0, lastPeak: 0 });
+export const buzzing = (id: string, u: number, active: boolean): Buzzing => ({
+  id,
+  u,
+  active,
+  on: 0,
+  edges: 0,
+  above: false,
+  peak: 0,
+  lastPeak: 0,
+});
 
 /** One step of ``dt`` seconds ending at voltage ``u``. */
 export function listen(b: Buzzing, u: number, dt: number) {
@@ -43,12 +56,24 @@ export function heard(b: Buzzing, span: number): { frequency: number | null; vol
 export interface Servoing {
   id: string;
   u: number; // its signal's index in x
-  high: boolean; rose: number; last: number; // the signal now, when it went high, the time of the last sample
-  target: number; angle: number; shown: number; // degrees; when the arm was last moved
+  high: boolean;
+  rose: number;
+  last: number; // the signal now, when it went high, the time of the last sample
+  target: number;
+  angle: number;
+  shown: number; // degrees; when the arm was last moved
 }
 
-export const servoing = (id: string, u: number): Servoing =>
-  ({ id, u, high: false, rose: 0, last: 0, target: 90, angle: 90, shown: 0 });
+export const servoing = (id: string, u: number): Servoing => ({
+  id,
+  u,
+  high: false,
+  rose: 0,
+  last: 0,
+  target: 90,
+  angle: 90,
+  shown: 0,
+});
 
 /**
  * The signal ``u`` at time ``t``. A pulse lasts from the last sample before it rose to the last before
@@ -59,7 +84,8 @@ export function watch(m: Servoing, u: number, t: number) {
   if (high && !m.high) m.rose = m.last;
   else if (!high && m.high) {
     const width = m.last - m.rose;
-    if (width > 3e-4 && width < 3e-3) m.target = Math.max(0, Math.min(180, (width - SERVO_MIN) / (SERVO_MAX - SERVO_MIN) * 180));
+    if (width > 3e-4 && width < 3e-3)
+      m.target = Math.max(0, Math.min(180, ((width - SERVO_MIN) / (SERVO_MAX - SERVO_MIN)) * 180));
   }
   m.high = high;
   m.last = t;
@@ -77,7 +103,9 @@ export function turn(m: Servoing, t: number): number {
 export interface Sonar {
   id: string;
   trig: number; // its trigger's voltage's index in x
-  high: boolean; rose: number; last: number; // the trigger now, when it went high, the last sample's time
+  high: boolean;
+  rose: number;
+  last: number; // the trigger now, when it went high, the last sample's time
   until: number; // the echo it is sending lasts till then (a trigger meanwhile is not heard)
 }
 
@@ -99,7 +127,7 @@ export function ping(s: Sonar, u: number, t: number, distance: number): [number,
   let echo: [number, number] | null = null;
   if (high && !s.high) s.rose = s.last;
   else if (!high && s.high && s.last - s.rose >= 9e-6 && s.last >= s.until) {
-    const length = distance >= RANGE[0] && distance <= RANGE[1] ? 2 * distance / 100 / SOUND : TIMEOUT;
+    const length = distance >= RANGE[0] && distance <= RANGE[1] ? (2 * distance) / 100 / SOUND : TIMEOUT;
     echo = [s.last + ECHO_DELAY, length];
     s.until = s.last + ECHO_DELAY + length;
   }

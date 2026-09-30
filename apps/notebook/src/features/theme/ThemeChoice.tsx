@@ -9,11 +9,16 @@ export function ThemeChoice() {
   const [theme, choose] = useTheme();
   return (
     <MenuRow label={t("label")}>
-      <Segmented label={t("label")} value={theme} onChange={choose} options={[
-        { value: "light", label: t("light"), icon: <Sun /> },
-        { value: "dark", label: t("dark"), icon: <Moon /> },
-        { value: "system", label: t("system"), icon: <System /> },
-      ]} />
+      <Segmented
+        label={t("label")}
+        value={theme}
+        onChange={choose}
+        options={[
+          { value: "light", label: t("light"), icon: <Sun /> },
+          { value: "dark", label: t("dark"), icon: <Moon /> },
+          { value: "system", label: t("system"), icon: <System /> },
+        ]}
+      />
     </MenuRow>
   );
 }

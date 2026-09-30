@@ -6,7 +6,7 @@
 // reach the circuit once a slice, as the pin is then — a program toggling it millions of times a second
 // (Doom's sound, I²S by PIO) does not make the circuit step for each.
 import type { Chip, Mode } from "./chip";
-import { Simulation, type LiveCircuit } from "./engine";
+import { type LiveCircuit, Simulation } from "./engine";
 
 export const SLICE = 1e-3; // s: how often the chips look at their pins; they run this far ahead of the circuit
 const NUDGE = 1e-6; // s: after a scheduled change, the circuit one step on before the chips read it
@@ -29,7 +29,8 @@ export class Session {
   constructor(circuit: LiveCircuit) {
     this.circuit = circuit;
     this.sim = new Simulation(circuit.program);
-    for (const nodes of Object.values(circuit.pins)) for (const n of nodes) if (n) this.terminals.set(n, (this.terminals.get(n) ?? 0) + 1);
+    for (const nodes of Object.values(circuit.pins))
+      for (const n of nodes) if (n) this.terminals.set(n, (this.terminals.get(n) ?? 0) + 1);
   }
 
   /** The quantities the scope and the meter show ("V_n3": a node's potential): a pin on such a node is followed. */
@@ -39,8 +40,11 @@ export class Session {
   }
 
   private findLonely(board: Board) {
-    const pins = new Set(Object.entries(board.pins).filter(([, node]) =>
-      !node || ((this.terminals.get(node) ?? 0) <= 1 && !this.watched.has(node))).map(([pin]) => pin));
+    const pins = new Set(
+      Object.entries(board.pins)
+        .filter(([, node]) => !node || ((this.terminals.get(node) ?? 0) <= 1 && !this.watched.has(node)))
+        .map(([pin]) => pin),
+    );
     this.lonely.set(board, pins);
     board.chip.mute?.(pins);
   }
@@ -105,9 +109,11 @@ export class Session {
         if (e.time > sim.t) sim.advanceTo(Math.min(e.time, end), dtMax, null, onStep);
         e.act();
       }
-      for (const board of this.boards) { // (the lonely pins as they are now)
+      for (const board of this.boards) {
+        // (the lonely pins as they are now)
         const lonely = this.lonely.get(board)!;
-        if (lonely.size) for (const [pin, mode] of board.chip.initial()) if (lonely.has(pin)) this.drive(board, pin, mode);
+        if (lonely.size)
+          for (const [pin, mode] of board.chip.initial()) if (lonely.has(pin)) this.drive(board, pin, mode);
       }
       sim.advanceTo(end, dtMax, null, onStep);
       for (const board of this.boards) this.sense(board);

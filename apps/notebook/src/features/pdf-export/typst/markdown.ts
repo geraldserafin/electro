@@ -10,14 +10,20 @@ import { unified } from "unified";
 const parser = unified().use(remarkParse).use(remarkGfm).use(remarkMath);
 
 /** Typst markup for text: every character that means something in markup, escaped. */
-export const text = (s: string) => s.replace(/[\\#*_`$\[\]<>@~/=+\-^{}|&%!.,:;()]/g, (c) => `\\${c}`);
+export const text = (s: string) => s.replace(/[\\#*_`$[\]<>@~/=+\-^{}|&%!.,:;()]/g, (c) => `\\${c}`);
 // (escaping more than needed is harmless: `\.` is a plain dot — a list marker or "1." at the start
 // of a line stays text, and a "." right after a call is not read as a method. Quotes stay: Typst
 // makes them typographic, in the note's language)
 
 /** A Typst string literal. */
 export const str = (s: string) =>
-  `"${s.replace(/\\/g, "\\\\").replace(/"/g, '\\"').replace(/\n/g, "\\n").replace(/\r/g, "").replace(/\t/g, "\\t")
+  `"${s
+    .replace(/\\/g, "\\\\")
+    .replace(/"/g, '\\"')
+    .replace(/\n/g, "\\n")
+    .replace(/\r/g, "")
+    .replace(/\t/g, "\\t")
+    // biome-ignore lint/suspicious/noControlCharactersInRegex: the control characters Typst strings can't hold
     .replace(/[\u0000-\u001f]/g, "")}"`;
 
 /** How a formula shows: `block` — on its own line, centred. */
@@ -41,7 +47,10 @@ export function topHeading(source: string): number | null {
 }
 
 function blocks(nodes: Nodes[], math: MathHook): string {
-  return nodes.map((n) => block(n, math)).filter((s) => s.trim()).join("\n\n");
+  return nodes
+    .map((n) => block(n, math))
+    .filter((s) => s.trim())
+    .join("\n\n");
 }
 
 function inline(nodes: Nodes[], math: MathHook): string {
@@ -75,7 +84,9 @@ function block(n: Nodes, math: MathHook): string {
     }
     case "table": {
       const columns = n.children[0]?.children.length ?? 1;
-      const align = Array.from({ length: columns }, (_, i) => n.align?.[i] ?? "left").map((a) => (a === "center" ? "center" : a === "right" ? "right" : "left"));
+      const align = Array.from({ length: columns }, (_, i) => n.align?.[i] ?? "left").map((a) =>
+        a === "center" ? "center" : a === "right" ? "right" : "left",
+      );
       const [head, ...rows] = n.children;
       const cells = (row: typeof head) => row.children.map((c) => `[${children(c, math)}]`).join(", ");
       return `#table(columns: ${columns}, align: (${align.join(", ")},), table.header(${cells(head)}),${rows.map((r) => ` ${cells(r)},`).join("")})`;
@@ -119,6 +130,10 @@ function span(n: Nodes, math: MathHook): string {
     case "imageReference":
       return "";
     default:
-      return "children" in n ? inline((n as Parent).children as Nodes[], math) : "value" in n ? text(String(n.value)) : "";
+      return "children" in n
+        ? inline((n as Parent).children as Nodes[], math)
+        : "value" in n
+          ? text(String(n.value))
+          : "";
   }
 }

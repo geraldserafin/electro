@@ -6,14 +6,14 @@ w Pythonie i (docelowo) na serwerze z notatkami użytkowników.
 ```python
 from electro_notes import Notebook, load
 
-nb = load("sprawozdanie.electro.json")      # starsze wersje pliku są migrowane przy odczycie
-nb.schematic("Układ 1").solve(find="E")     # schemat po nazwie (albo zmiennej: "układ1") to obwód
+nb = load("sprawozdanie.electro.json")  # starsze wersje pliku są migrowane przy odczycie
+nb.schematic("Układ 1").solve(find="E")  # schemat po nazwie (albo zmiennej: "układ1") to obwód
 nb.add_code("układ1.solve()")
 nb.save("sprawozdanie.electro.json")
 
-nb = Notebook("Zadanie 4")                  # albo od zera
+nb = Notebook("Zadanie 4")  # albo od zera
 nb.add_markdown("# Zadanie 4")
-nb.add_schematic("Układ 1", loop(VoltageSource(), Resistor(3)))   # obwód układa się sam na siatce
+nb.add_schematic("Układ 1", loop(VoltageSource(), Resistor(3)))  # obwód układa się sam na siatce
 ```
 
 ```

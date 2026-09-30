@@ -6,16 +6,16 @@
 // sliders, sensors' readings).
 import { useCallback, useEffect, useRef, useState } from "react";
 import { kernel } from "@/features/python";
-import type { ElementResult, SchematicData } from "@/shared/model/types";
 import type { Failure } from "@/shared/model/issues";
+import type { ElementResult, SchematicData } from "@/shared/model/types";
 import { compiler } from "./compiler";
 import type { LiveCircuit } from "./engine";
-import type { Firmware, Frame, OledData, Part, ScopeTrace } from "./runner";
-import type { TftData } from "./tft";
 import { fetchFirmware, firmwareFile } from "./firmware";
+import type { Screen } from "./lcd";
+import type { Firmware, Frame, OledData, Part, ScopeTrace } from "./runner";
 import type { Reply, Request } from "./sim.worker";
 import { Sound, wake } from "./sound";
-import type { Screen } from "./lcd";
+import type { TftData } from "./tft";
 
 export type { ScopeTrace };
 export type LiveStatus = "off" | "starting" | "running" | "paused";
@@ -73,7 +73,17 @@ class Pictures {
 /** The drawing without what may change while it runs (switches, positions, readings, sketches): if
  *  that is the same, the circuit is too. */
 function structure(sch: SchematicData): string {
-  const inputs = new Set(["switch", "button", "potentiometer", "photoresistor", "thermistor", "ultrasonic", "lcd1602_i2c", "arduino", "pico"]);
+  const inputs = new Set([
+    "switch",
+    "button",
+    "potentiometer",
+    "photoresistor",
+    "thermistor",
+    "ultrasonic",
+    "lcd1602_i2c",
+    "arduino",
+    "pico",
+  ]);
   return JSON.stringify({ ...sch, elements: sch.elements.map((e) => (inputs.has(e.kind) ? { ...e, text: null } : e)) });
 }
 
@@ -82,8 +92,12 @@ const partsOf = (sch: SchematicData): Part[] => sch.elements.map(({ id, kind, te
 /** The scope's quantities to start with: LEDs' currents, capacitors' voltages (at most four). */
 function defaultScope(circuit: LiveCircuit): string[] {
   const { kinds, unknowns } = circuit.program;
-  const leds = Object.keys(kinds).filter((k) => kinds[k] === "LED").map((k) => `I_${k}`);
-  const caps = Object.keys(kinds).filter((k) => kinds[k] === "Capacitor").map((k) => `U_${k}`);
+  const leds = Object.keys(kinds)
+    .filter((k) => kinds[k] === "LED")
+    .map((k) => `I_${k}`);
+  const caps = Object.keys(kinds)
+    .filter((k) => kinds[k] === "Capacitor")
+    .map((k) => `U_${k}`);
   return [...caps, ...leds].filter((n) => unknowns.includes(n)).slice(0, 4);
 }
 
@@ -126,9 +140,16 @@ export function useLive(schematic: SchematicData) {
     const c = circuit.current;
     if (!c) return;
     const { voltages } = f;
-    const on = (node: string | null) => (node === null ? null : voltages[node] ?? null);
+    const on = (node: string | null) => (node === null ? null : (voltages[node] ?? null));
     setFrame({
-      t: f.t, voltages, leds: f.leds, looks: f.looks, screens: f.screens, oleds: f.oleds, results: f.results, behind,
+      t: f.t,
+      voltages,
+      leds: f.leds,
+      looks: f.looks,
+      screens: f.screens,
+      oleds: f.oleds,
+      results: f.results,
+      behind,
       tfts: Object.fromEntries(Object.entries(f.tfts).map(([id, d]) => [id, { ...d, pictures: pictures.current }])),
       scale: Math.max(1, ...Object.values(voltages).map(Math.abs)),
       wires: c.wires.map(on),
@@ -141,8 +162,10 @@ export function useLive(schematic: SchematicData) {
       serialText.current = (serialText.current + f.serial).slice(-4000);
       setSerial(serialText.current);
     }
-    if (statusRef.current === "running" && !mutedRef.current) // time running slower lowers the tone as much
-      for (const s of f.sounds) sound.current.set(s.id, s.frequency === null ? null : s.frequency * speedRef.current, s.volume);
+    if (statusRef.current === "running" && !mutedRef.current)
+      // time running slower lowers the tone as much
+      for (const s of f.sounds)
+        sound.current.set(s.id, s.frequency === null ? null : s.frequency * speedRef.current, s.volume);
   }, []);
 
   const upload = useCallback(async (id: string) => {
@@ -170,8 +193,11 @@ export function useLive(schematic: SchematicData) {
     if (worker.current !== w) return; // stopped meanwhile
     if (compiled && "hex" in compiled) return run({ board: "uno", hex: compiled.hex }, "page");
     if (compiled && "image" in compiled) return run({ board: "pico", image: compiled.image }, "page");
-    const state: SketchState = !compiled ? { kind: "unavailable" }
-      : "failed" in compiled ? { kind: "failed", output: compiled.failed } : { kind: "tooBig", size: compiled.tooBig, flash: compiled.flash };
+    const state: SketchState = !compiled
+      ? { kind: "unavailable" }
+      : "failed" in compiled
+        ? { kind: "failed", output: compiled.failed }
+        : { kind: "tooBig", size: compiled.tooBig, flash: compiled.flash };
     setSketches((all) => ({ ...all, [id]: state }));
   }, []);
 
@@ -182,56 +208,68 @@ export function useLive(schematic: SchematicData) {
   };
 
   /** Run the drawing (or `drawing`: one just made from the code view, not on the board yet). */
-  const start = useCallback(async (drawing?: SchematicData) => {
-    if (drawing) latest.current = drawing;
-    wake(); // (still the click that started it: the page may make sounds)
-    setStatus("starting");
-    setError(null);
-    try {
-      await kernel.ready;
-      const compiled = await kernel.live(latest.current);
-      if ("error" in compiled) {
-        setError(compiled.error);
-        setStatus("off");
-        return;
-      }
-      halt();
-      circuit.current = compiled;
-      built.current = structure(latest.current);
-      pictures.current.clear();
-      const w = new Worker(new URL("./sim.worker.ts", import.meta.url), { type: "module" });
-      worker.current = w;
-      w.onmessage = (event: MessageEvent<Reply>) => {
-        if (worker.current !== w) return;
-        const r = event.data;
-        if (r.type === "frame") received(r.frame, r.behind);
-        else if (r.type === "pictures") for (const [id, image] of Object.entries(r.pictures)) pictures.current.put(id, image);
-        else {
-          setError(r.message.includes("NoConvergence") && r.time !== null
-            ? { data: r.message, issue: { type: "NoConvergence", time: r.time } } : { data: r.message });
-          setStatus("paused");
+  const start = useCallback(
+    async (drawing?: SchematicData) => {
+      if (drawing) latest.current = drawing;
+      wake(); // (still the click that started it: the page may make sounds)
+      setStatus("starting");
+      setError(null);
+      try {
+        await kernel.ready;
+        const compiled = await kernel.live(latest.current);
+        if ("error" in compiled) {
+          setError(compiled.error);
+          setStatus("off");
+          return;
         }
-      };
-      const { kinds } = compiled.program;
-      setHasSound(Object.values(kinds).some((k) => k === "Buzzer" || k === "PassiveBuzzer"));
-      serialText.current = "";
-      setSerial("");
-      setSketches({});
-      const known = scopeRef.current.filter((n) => compiled.program.unknowns.includes(n) || n.startsWith("V_"));
-      const first = known.length ? known : defaultScope(compiled);
-      scopeRef.current = first;
-      setScopeState(first);
-      w.postMessage({
-        type: "start", circuit: compiled, parts: partsOf(latest.current), pressed: [...pressed.current],
-        speed: speedRef.current, scope: first, probe: probeRef.current,
-      } satisfies Request);
-      setStatus("running");
-      for (const e of latest.current.elements) if (e.kind === "arduino" || e.kind === "pico") void upload(e.id);
-    } catch (e) {
-      setError({ data: String(e) });
-      setStatus("off");
-    }
-  }, [received, upload]);
+        halt();
+        circuit.current = compiled;
+        built.current = structure(latest.current);
+        pictures.current.clear();
+        const w = new Worker(new URL("./sim.worker.ts", import.meta.url), { type: "module" });
+        worker.current = w;
+        w.onmessage = (event: MessageEvent<Reply>) => {
+          if (worker.current !== w) return;
+          const r = event.data;
+          if (r.type === "frame") received(r.frame, r.behind);
+          else if (r.type === "pictures")
+            for (const [id, image] of Object.entries(r.pictures)) pictures.current.put(id, image);
+          else {
+            setError(
+              r.message.includes("NoConvergence") && r.time !== null
+                ? { data: r.message, issue: { type: "NoConvergence", time: r.time } }
+                : { data: r.message },
+            );
+            setStatus("paused");
+          }
+        };
+        const { kinds } = compiled.program;
+        setHasSound(Object.values(kinds).some((k) => k === "Buzzer" || k === "PassiveBuzzer"));
+        serialText.current = "";
+        setSerial("");
+        setSketches({});
+        const known = scopeRef.current.filter((n) => compiled.program.unknowns.includes(n) || n.startsWith("V_"));
+        const first = known.length ? known : defaultScope(compiled);
+        scopeRef.current = first;
+        setScopeState(first);
+        w.postMessage({
+          type: "start",
+          circuit: compiled,
+          parts: partsOf(latest.current),
+          pressed: [...pressed.current],
+          speed: speedRef.current,
+          scope: first,
+          probe: probeRef.current,
+        } satisfies Request);
+        setStatus("running");
+        for (const e of latest.current.elements) if (e.kind === "arduino" || e.kind === "pico") void upload(e.id);
+      } catch (e) {
+        setError({ data: String(e) });
+        setStatus("off");
+      }
+    },
+    [received, upload],
+  );
 
   const stop = useCallback(() => {
     halt();
@@ -272,17 +310,38 @@ export function useLive(schematic: SchematicData) {
   }, []);
 
   return {
-    status, error, frame, speed, traces, scope, serial, sketches,
+    status,
+    error,
+    frame,
+    speed,
+    traces,
+    scope,
+    serial,
+    sketches,
     start,
     runFile,
     stop,
-    setSpeed: (value: number) => { setSpeedState(value); tell({ type: "speed", speed: value }); },
-    pause: () => { tell({ type: "run", running: false }); setStatus((s) => (s === "running" ? "paused" : s)); },
-    resume: () => { wake(); setError(null); tell({ type: "run", running: true }); setStatus((s) => (s === "paused" ? "running" : s)); },
+    setSpeed: (value: number) => {
+      setSpeedState(value);
+      tell({ type: "speed", speed: value });
+    },
+    pause: () => {
+      tell({ type: "run", running: false });
+      setStatus((s) => (s === "running" ? "paused" : s));
+    },
+    resume: () => {
+      wake();
+      setError(null);
+      tell({ type: "run", running: true });
+      setStatus((s) => (s === "paused" ? "running" : s));
+    },
     /** A buzzer in the circuit (the bar offers to mute it); muted, whether it is. */
     hasSound,
     muted,
-    setMuted: (quiet: boolean) => { if (!quiet) wake(); setMuted(quiet); },
+    setMuted: (quiet: boolean) => {
+      if (!quiet) wake();
+      setMuted(quiet);
+    },
     /** A button held down (or let go). */
     press: (id: string, down: boolean) => {
       if (down) pressed.current.add(id);
@@ -315,8 +374,12 @@ export function useLive(schematic: SchematicData) {
     quantities: (): string[] => {
       const c = circuit.current;
       if (!c) return [];
-      const nodes = Object.keys(c.program.nodes).filter((n) => n !== "GND").map((n) => `V_${n}`);
-      const parts = Object.entries(c.program.parts).flatMap(([, q]) => Object.values(q).map((i) => c.program.unknowns[i]));
+      const nodes = Object.keys(c.program.nodes)
+        .filter((n) => n !== "GND")
+        .map((n) => `V_${n}`);
+      const parts = Object.entries(c.program.parts).flatMap(([, q]) =>
+        Object.values(q).map((i) => c.program.unknowns[i]),
+      );
       return [...nodes, ...parts.filter((n) => !nodes.includes(n))];
     },
     upload,
@@ -324,7 +387,10 @@ export function useLive(schematic: SchematicData) {
     setOnScreen: useCallback((seen: boolean) => tell({ type: "visible", visible: seen }), []),
     /** The error shown under the board, away (it comes back if it happens again). */
     dismissError: () => setError(null),
-    clearSerial: () => { serialText.current = ""; setSerial(""); },
+    clearSerial: () => {
+      serialText.current = "";
+      setSerial("");
+    },
     /** Text typed into the serial monitor: to every Arduino's Serial.read(). */
     sendSerial: (text: string) => tell({ type: "send", text }),
   };

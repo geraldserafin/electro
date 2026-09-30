@@ -8,8 +8,8 @@ import { BrowserRouter, Navigate, Route, Routes } from "react-router";
 import { AuthGate } from "@/features/auth";
 import { ExamplePage } from "@/pages/ExamplePage";
 import { FolderPage } from "@/pages/FolderPage";
-import { JoinPage } from "@/pages/JoinPage";
 import { Home } from "@/pages/Home";
+import { JoinPage } from "@/pages/JoinPage";
 import { LegacyNotePage } from "@/pages/LegacyNotePage";
 import { NotePage } from "@/pages/NotePage";
 

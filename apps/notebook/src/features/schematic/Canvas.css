@@ -3,55 +3,210 @@
    The class names are the drawing's vocabulary: the e2e test and the export look for them too. */
 @layer components {
   /* the drawing for the PDF: laid out (so it can measure itself) but not seen on screen */
-  .pdf-drawing { position: absolute; visibility: hidden; width: 0; height: 0; overflow: hidden; pointer-events: none; }
+  .pdf-drawing {
+    position: absolute;
+    visibility: hidden;
+    width: 0;
+    height: 0;
+    overflow: hidden;
+    pointer-events: none;
+  }
 
-  .canvas { display: block; color: var(--text); touch-action: none; user-select: none; -webkit-user-select: none; }
-  .canvas:focus { outline: none; }
-  .canvas.panning { cursor: grab; }
-  .canvas.panning:active { cursor: grabbing; }
-  .canvas .grid-dot { fill: var(--faint); opacity: 0.5; }
-  .canvas .hit { fill: transparent; stroke: transparent; stroke-width: 10; }
-  .canvas .element { cursor: grab; }
-  .canvas.tool-select .segment-h { cursor: ns-resize; }
-  .canvas.tool-select .segment-v { cursor: ew-resize; }
+  .canvas {
+    display: block;
+    color: var(--text);
+    touch-action: none;
+    user-select: none;
+    -webkit-user-select: none;
+  }
+  .canvas:focus {
+    outline: none;
+  }
+  .canvas.panning {
+    cursor: grab;
+  }
+  .canvas.panning:active {
+    cursor: grabbing;
+  }
+  .canvas .grid-dot {
+    fill: var(--faint);
+    opacity: 0.5;
+  }
+  .canvas .hit {
+    fill: transparent;
+    stroke: transparent;
+    stroke-width: 10;
+  }
+  .canvas .element {
+    cursor: grab;
+  }
+  .canvas.tool-select .segment-h {
+    cursor: ns-resize;
+  }
+  .canvas.tool-select .segment-v {
+    cursor: ew-resize;
+  }
   /* the symbols' own style (unlayered, so it wins over this) strokes with currentColor: colour through it */
-  .canvas .element.selected .w, .canvas .wire.selected { color: var(--accent); }
-  .canvas .element.selected .letter { color: var(--accent); }
+  .canvas .element.selected .w,
+  .canvas .wire.selected {
+    color: var(--accent);
+  }
+  .canvas .element.selected .letter {
+    color: var(--accent);
+  }
   /* what is selected shows plainly: a tinted frame around an element, a glow along a wire, a dashed
      frame around many things at once */
-  .canvas .frame { fill: var(--tool-active); fill-opacity: 0.45; stroke: var(--accent); stroke-width: 1.2; pointer-events: none; }
-  .canvas .wire-glow { fill: none; stroke: var(--accent); stroke-opacity: 0.25; stroke-width: 8; stroke-linecap: round; stroke-linejoin: round; pointer-events: none; }
-  .canvas .group-frame { fill: none; stroke: var(--accent); stroke-width: 1; stroke-dasharray: 5 4; pointer-events: none; }
-  .canvas .draft { color: var(--accent); stroke-dasharray: 5 4; pointer-events: none; }
-  .canvas .open-pin { fill: var(--board); stroke: #e03131; stroke-width: 1.6; pointer-events: none; }
-  .canvas .pin-handle { fill: transparent; cursor: crosshair; }
-  .canvas.tool-select .pin-handle:hover { fill: var(--tool-active); stroke: var(--accent); stroke-width: 1.2; }
-  .canvas:not(.tool-select) .pin-handle { pointer-events: none; }
-  .canvas .snap { fill: none; stroke: #2f9e44; stroke-width: 2; pointer-events: none; }
-  .canvas .ghost { opacity: 0.4; pointer-events: none; }
-  .canvas .rubber-band { fill: var(--tool-active); fill-opacity: 0.35; stroke: var(--accent); stroke-width: 1; stroke-dasharray: 4 3; pointer-events: none; }
-  .canvas.tool-wire, .canvas.tool-place { cursor: crosshair; }
-  .canvas text { paint-order: stroke; stroke: var(--board); stroke-width: 4px; stroke-linejoin: round; }
-  .canvas .label { font-size: 13px; }
-  .canvas .label .sub { font-size: 10px; }
-  .canvas .label.solved { fill: var(--accent); font-weight: 600; }
-  .canvas .reading { font-size: 11px; fill: #2f9e44; }
+  .canvas .frame {
+    fill: var(--tool-active);
+    fill-opacity: 0.45;
+    stroke: var(--accent);
+    stroke-width: 1.2;
+    pointer-events: none;
+  }
+  .canvas .wire-glow {
+    fill: none;
+    stroke: var(--accent);
+    stroke-opacity: 0.25;
+    stroke-width: 8;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    pointer-events: none;
+  }
+  .canvas .group-frame {
+    fill: none;
+    stroke: var(--accent);
+    stroke-width: 1;
+    stroke-dasharray: 5 4;
+    pointer-events: none;
+  }
+  .canvas .draft {
+    color: var(--accent);
+    stroke-dasharray: 5 4;
+    pointer-events: none;
+  }
+  .canvas .open-pin {
+    fill: var(--board);
+    stroke: #e03131;
+    stroke-width: 1.6;
+    pointer-events: none;
+  }
+  .canvas .pin-handle {
+    fill: transparent;
+    cursor: crosshair;
+  }
+  .canvas.tool-select .pin-handle:hover {
+    fill: var(--tool-active);
+    stroke: var(--accent);
+    stroke-width: 1.2;
+  }
+  .canvas:not(.tool-select) .pin-handle {
+    pointer-events: none;
+  }
+  .canvas .snap {
+    fill: none;
+    stroke: #2f9e44;
+    stroke-width: 2;
+    pointer-events: none;
+  }
+  .canvas .ghost {
+    opacity: 0.4;
+    pointer-events: none;
+  }
+  .canvas .rubber-band {
+    fill: var(--tool-active);
+    fill-opacity: 0.35;
+    stroke: var(--accent);
+    stroke-width: 1;
+    stroke-dasharray: 4 3;
+    pointer-events: none;
+  }
+  .canvas.tool-wire,
+  .canvas.tool-place {
+    cursor: crosshair;
+  }
+  .canvas text {
+    paint-order: stroke;
+    stroke: var(--board);
+    stroke-width: 4px;
+    stroke-linejoin: round;
+  }
+  .canvas .label {
+    font-size: 13px;
+  }
+  .canvas .label .sub {
+    font-size: 10px;
+  }
+  .canvas .label.solved {
+    fill: var(--accent);
+    font-weight: 600;
+  }
+  .canvas .reading {
+    font-size: 11px;
+    fill: #2f9e44;
+  }
   /* running in time: wires coloured by voltage, LEDs glowing, switches and buttons work by clicking */
-  .canvas { --live-pos: #2f9e44; --live-neg: #e03131; --live-zero: var(--text); }
-  .canvas .led-glow { filter: blur(7px); pointer-events: none; }
-  .canvas .element[data-kind="switch"], .canvas .element[data-kind="button"] { cursor: pointer; }
+  .canvas {
+    --live-pos: #2f9e44;
+    --live-neg: #e03131;
+    --live-zero: var(--text);
+  }
+  .canvas .led-glow {
+    filter: blur(7px);
+    pointer-events: none;
+  }
+  .canvas .element[data-kind="switch"],
+  .canvas .element[data-kind="button"] {
+    cursor: pointer;
+  }
   /* running: nothing is dragged or wired; the switches, buttons and potentiometers answer */
-  .canvas.running .pin-handle, .canvas.running .segment-h, .canvas.running .segment-v { pointer-events: none; }
-  .canvas.running .element { cursor: inherit; }
-  .canvas.running .element:is([data-kind="switch"], [data-kind="button"], [data-kind="potentiometer"], [data-kind="photoresistor"],
-                              [data-kind="thermistor"], [data-kind="ultrasonic"], [data-kind="lcd1602_i2c"]) { cursor: pointer; }
-  .canvas .lcd-screen text { font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; font-size: 25px; pointer-events: none; }
-  .canvas .lcd-screen rect, .canvas .oled-screen { pointer-events: none; }
+  .canvas.running .pin-handle,
+  .canvas.running .segment-h,
+  .canvas.running .segment-v {
+    pointer-events: none;
+  }
+  .canvas.running .element {
+    cursor: inherit;
+  }
+  .canvas.running
+    .element:is(
+      [data-kind="switch"],
+      [data-kind="button"],
+      [data-kind="potentiometer"],
+      [data-kind="photoresistor"],
+      [data-kind="thermistor"],
+      [data-kind="ultrasonic"],
+      [data-kind="lcd1602_i2c"]
+    ) {
+    cursor: pointer;
+  }
+  .canvas .lcd-screen text {
+    font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    font-size: 25px;
+    pointer-events: none;
+  }
+  .canvas .lcd-screen rect,
+  .canvas .oled-screen {
+    pointer-events: none;
+  }
   /* a servo's arm follows its angle smoothly between drawings */
-  .canvas .element[data-kind="servo"] .horn { transition: transform 33ms linear; }
+  .canvas .element[data-kind="servo"] .horn {
+    transition: transform 33ms linear;
+  }
   /* the meter: every element and wire answers it */
-  .canvas.running.probing .element { cursor: crosshair; }
-  .canvas.running.probing :is(.segment-h, .segment-v) { pointer-events: stroke; cursor: crosshair; }
-  .canvas .wire { transition: stroke 60ms linear; }
-  .canvas .lead { fill: none; stroke-width: 1.6; stroke-linecap: round; pointer-events: none; }
+  .canvas.running.probing .element {
+    cursor: crosshair;
+  }
+  .canvas.running.probing :is(.segment-h, .segment-v) {
+    pointer-events: stroke;
+    cursor: crosshair;
+  }
+  .canvas .wire {
+    transition: stroke 60ms linear;
+  }
+  .canvas .lead {
+    fill: none;
+    stroke-width: 1.6;
+    stroke-linecap: round;
+    pointer-events: none;
+  }
 }

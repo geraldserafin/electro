@@ -1,12 +1,21 @@
 /// <reference lib="webworker" />
 // The simulation off the page's thread: a Runner stepped as the clock goes (times the speed), with
 // all of a core to itself — the page only draws what it is sent, about 30 times a second.
-import { NoConvergence } from "./engine";
-import { Runner, type Firmware, type Frame, type Part } from "./runner";
+
 import type { LiveCircuit } from "./engine";
+import { NoConvergence } from "./engine";
+import { type Firmware, type Frame, type Part, Runner } from "./runner";
 
 export type Request =
-  | { type: "start"; circuit: LiveCircuit; parts: Part[]; pressed: string[]; speed: number; scope: string[]; probe: string[] }
+  | {
+      type: "start";
+      circuit: LiveCircuit;
+      parts: Part[];
+      pressed: string[];
+      speed: number;
+      scope: string[];
+      probe: string[];
+    }
   | { type: "parts"; parts: Part[]; pressed: string[] } // a switch flipped, a slider moved, a button held
   | { type: "attach"; id: string; firmware: Firmware } // a board's program, compiled
   | { type: "speed"; speed: number }
@@ -29,11 +38,17 @@ const PICTURE = 14;
 const LAG = 0.05; // s (of the page's time) behind before it says so
 
 let runner: Runner | null = null;
-let running = false, visible = true, speed = 1;
-let last = 0, sent = 0, pictured = 0, behindSince: number | null = null;
+let running = false,
+  visible = true,
+  speed = 1;
+let last = 0,
+  sent = 0,
+  pictured = 0,
+  behindSince: number | null = null;
 let waiting = false; // a tick is scheduled
 const STEER = 250; // ms between telling the runner how busy it is
-let steered = 0, busyMs = 0; // since when, and how much of it computing
+let steered = 0,
+  busyMs = 0; // since when, and how much of it computing
 
 const post = (reply: Reply, transfer: Transferable[] = []) => self.postMessage(reply, transfer);
 const picture = (now: number, anyway = false) => {
@@ -41,7 +56,10 @@ const picture = (now: number, anyway = false) => {
   const pictures = runner.pictures(anyway);
   if (!pictures) return;
   pictured = now;
-  post({ type: "pictures", pictures }, Object.values(pictures).map((p) => p.buffer));
+  post(
+    { type: "pictures", pictures },
+    Object.values(pictures).map((p) => p.buffer),
+  );
 };
 const send = (now: number) => {
   if (!runner) return;

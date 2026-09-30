@@ -6,12 +6,35 @@
 export type Tex = string;
 
 /** A law in an issue: its equation (`… = 0`) and why it holds. */
-export interface LawData { equation: Tex; reason: Reason }
+export interface LawData {
+  equation: Tex;
+  reason: Reason;
+}
 
-type Labelled = "OhmsLaw" | "CapacitorOpenDC" | "CapacitorImpedance" | "InductorShortDC" | "InductorImpedance"
-  | "SourceVoltage" | "SourceCurrent" | "IdealAmmeter" | "AmmeterReading" | "IdealVoltmeter" | "VoltmeterReading"
-  | "IdealOpAmp" | "UnknownElement" | "VoltageAcross" | "ControlVoltage" | "ControlCurrent" | "ControlledSource"
-  | "CapacitorStep" | "InductorStep" | "SwitchClosed" | "SwitchOpen" | "PotentiometerDivider" | "DeviceModel";
+type Labelled =
+  | "OhmsLaw"
+  | "CapacitorOpenDC"
+  | "CapacitorImpedance"
+  | "InductorShortDC"
+  | "InductorImpedance"
+  | "SourceVoltage"
+  | "SourceCurrent"
+  | "IdealAmmeter"
+  | "AmmeterReading"
+  | "IdealVoltmeter"
+  | "VoltmeterReading"
+  | "IdealOpAmp"
+  | "UnknownElement"
+  | "VoltageAcross"
+  | "ControlVoltage"
+  | "ControlCurrent"
+  | "ControlledSource"
+  | "CapacitorStep"
+  | "InductorStep"
+  | "SwitchClosed"
+  | "SwitchOpen"
+  | "PotentiometerDivider"
+  | "DeviceModel";
 
 export type Reason =
   | { type: "Given" }
@@ -19,8 +42,16 @@ export type Reason =
   | { type: "Terminal"; side: "in" | "out"; index: number }
   | { type: "KirchhoffCurrent"; node: Tex };
 
-export interface FormulaStep { type: "FormulaStep"; chain: Tex; reason: Reason }
-export interface SystemStep { type: "SystemStep"; equations: Tex[]; results: Tex[] }
+export interface FormulaStep {
+  type: "FormulaStep";
+  chain: Tex;
+  reason: Reason;
+}
+export interface SystemStep {
+  type: "SystemStep";
+  equations: Tex[];
+  results: Tex[];
+}
 
 export type Diagnosis = { targets: Tex[]; needed: number | null; options: Tex[][] };
 
@@ -78,4 +109,8 @@ export type Issue =
 
 /** Something that went wrong, as outputs and the code view carry it: our issue (else Python's
  *  own words in `data`), and the cell's line it came from. Older notes have `data` alone. */
-export interface Failure { data: string; issue?: Issue; line?: number }
+export interface Failure {
+  data: string;
+  issue?: Issue;
+  line?: number;
+}

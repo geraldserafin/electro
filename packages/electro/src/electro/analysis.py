@@ -13,7 +13,7 @@ import sympy as sp
 
 from .circuit import Circuit, Close, Seq, ground
 from .components import Context, CurrentSource
-from .issues import NoThevenin, NotAPort, NotLinear
+from .issues import NotAPort, NoThevenin, NotLinear
 from .semantics import compile_circuit
 from .values import fmt, parse
 

@@ -17,7 +17,8 @@ function start() {
 
 /** A pin's changes between two times: [time, high?] each. */
 function edges(uno: Uno, pin: string, from: number, to: number): [number, boolean][] {
-  return uno.events.filter((e) => e.pin === pin && e.cycle / CLOCK >= from && e.cycle / CLOCK < to)
+  return uno.events
+    .filter((e) => e.pin === pin && e.cycle / CLOCK >= from && e.cycle / CLOCK < to)
     .map((e) => [e.cycle / CLOCK, e.state === PinState.High]);
 }
 
@@ -60,7 +61,8 @@ describe("an Uno running a sketch", () => {
   it("an interrupt on a falling edge of a pin the circuit drives", () => {
     const { uno, serial } = start();
     uno.runUntil(0.02);
-    for (let k = 0; k < 5; k++) { // five presses of a button to ground
+    for (let k = 0; k < 5; k++) {
+      // five presses of a button to ground
       uno.sense("D2", 0);
       uno.runUntil(0.03 + k * 0.02);
       uno.sense("D2", 5);

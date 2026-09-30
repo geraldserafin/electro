@@ -4,16 +4,16 @@
  * (Library.ts), seen by their owner and whoever they are shared with (Sharing.ts); without a session those
  * endpoints answer 401.
  */
-import { HttpApi, HttpApiEndpoint, HttpApiGroup } from "@effect/platform"
-import { Schema } from "effect"
-import { AuthGroup } from "./Auth.js"
-import { FirmwareFilesGroup, FirmwareGroup } from "./Firmware.js"
-import { LibraryGroup } from "./Library.js"
-import { SharingGroup } from "./Sharing.js"
+import { HttpApi, HttpApiEndpoint, HttpApiGroup } from "@effect/platform";
+import { Schema } from "effect";
+import { AuthGroup } from "./Auth.js";
+import { FirmwareFilesGroup, FirmwareGroup } from "./Firmware.js";
+import { LibraryGroup } from "./Library.js";
+import { SharingGroup } from "./Sharing.js";
 
-export class SystemGroup extends HttpApiGroup.make("system")
-  .add(HttpApiEndpoint.get("health", "/health").addSuccess(Schema.Struct({ ok: Schema.Literal(true) })))
-{}
+export class SystemGroup extends HttpApiGroup.make("system").add(
+  HttpApiEndpoint.get("health", "/health").addSuccess(Schema.Struct({ ok: Schema.Literal(true) })),
+) {}
 
 export class NotesApi extends HttpApi.make("notes")
   .add(LibraryGroup)
@@ -22,5 +22,4 @@ export class NotesApi extends HttpApi.make("notes")
   .add(SystemGroup)
   .add(FirmwareGroup)
   .add(FirmwareFilesGroup)
-  .prefix("/api")
-{}
+  .prefix("/api") {}

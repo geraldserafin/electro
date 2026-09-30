@@ -3,8 +3,8 @@
 // here, in the page, and the devices on it are emulated as the chips they are: a PCF8574 behind a
 // character LCD, an SSD1306 OLED, a DS1307 clock.
 import type { TWIEventHandler } from "avr8js";
-import { lcd, screen, watch, type Lcd, type Screen } from "./lcd";
-import { TRIMMER, i2cParts } from "@/shared/model/i2c";
+import { i2cParts, TRIMMER } from "@/shared/model/i2c";
+import { type Lcd, lcd, type Screen, screen, watch } from "./lcd";
 import type { Board, Session } from "./session";
 
 /** A chip on the bus: it answers to ``address`` while ``powered()``. */
@@ -73,7 +73,11 @@ export class Backpack implements Device {
   private pins = 0xff; // quasi-bidirectional: high after reset
   private x = new Float64Array(14); // lcd.ts's view: the supply, the contrast, RS, RW, E, D0–D7, the backlight's current
 
-  constructor(readonly id: string, readonly address: number, readonly powered: () => boolean) {
+  constructor(
+    readonly id: string,
+    readonly address: number,
+    readonly powered: () => boolean,
+  ) {
     this.lcd = lcd(id, { power: 0, contrast: 1, backlight: 13, rs: 2, rw: 3, e: 4, data: [5, 6, 7, 8, 9, 10, 11, 12] });
   }
 
@@ -92,7 +96,9 @@ export class Backpack implements Device {
 
   /** The LCD's pins as the backpack drives them (and without power, nothing). */
   sample() {
-    const x = this.x, p = this.pins, on = this.powered();
+    const x = this.x,
+      p = this.pins,
+      on = this.powered();
     x[0] = on ? 5 : 0;
     x[1] = 2.5 * (1 - this.trimmer); // V0: VDD − V0 from 2.5 V (nothing shown) to 5 V (boxes)
     x[2] = p & 0x01 ? 5 : 0;
@@ -113,8 +119,22 @@ export class Backpack implements Device {
 
 // commands that take parameters: how many bytes follow
 const PARAMETERS: Record<number, number> = {
-  0x81: 1, 0x20: 1, 0x21: 2, 0x22: 2, 0xa8: 1, 0xd3: 1, 0xd5: 1, 0xd9: 1, 0xda: 1, 0xdb: 1, 0x8d: 1,
-  0x26: 6, 0x27: 6, 0x29: 5, 0x2a: 5, 0xa3: 2,
+  129: 1,
+  32: 1,
+  33: 2,
+  34: 2,
+  168: 1,
+  211: 1,
+  213: 1,
+  217: 1,
+  218: 1,
+  219: 1,
+  141: 1,
+  38: 6,
+  39: 6,
+  41: 5,
+  42: 5,
+  163: 2,
 };
 
 /** What an OLED shows: 64 rows of 128 pixels (lit or not), and whether it is on. */
@@ -132,14 +152,26 @@ export interface Pixels {
  */
 export class Oled implements Device {
   ram = new Uint8Array(8 * 128);
-  on = false; invert = false; entire = false; contrast = 0x7f;
-  flipX = false; flipY = false; startLine = 0;
+  on = false;
+  invert = false;
+  entire = false;
+  contrast = 0x7f;
+  flipX = false;
+  flipY = false;
+  startLine = 0;
   mode = 2; // page addressing after reset
-  column = 0; page = 0; columns = [0, 127]; pages = [0, 7];
+  column = 0;
+  page = 0;
+  columns = [0, 127];
+  pages = [0, 7];
   private control: number | null = null; // the control byte in force; null: the next byte is one
   private command: number[] = []; // a command waiting for its parameters
 
-  constructor(readonly id: string, readonly address: number, readonly powered: () => boolean) {}
+  constructor(
+    readonly id: string,
+    readonly address: number,
+    readonly powered: () => boolean,
+  ) {}
 
   begin() {
     this.control = null;
@@ -185,13 +217,22 @@ export class Oled implements Device {
 
   private data(byte: number) {
     this.ram[this.page * 128 + this.column] = byte;
-    const [c0, c1] = this.columns, [p0, p1] = this.pages;
-    if (this.mode === 0) { // horizontal: along the page, then the next one
+    const [c0, c1] = this.columns,
+      [p0, p1] = this.pages;
+    if (this.mode === 0) {
+      // horizontal: along the page, then the next one
       if (this.column < c1) this.column++;
-      else { this.column = c0; this.page = this.page < p1 ? this.page + 1 : p0; }
-    } else if (this.mode === 1) { // vertical: down the column, then the next one
+      else {
+        this.column = c0;
+        this.page = this.page < p1 ? this.page + 1 : p0;
+      }
+    } else if (this.mode === 1) {
+      // vertical: down the column, then the next one
       if (this.page < p1) this.page++;
-      else { this.page = p0; this.column = this.column < c1 ? this.column + 1 : c0; }
+      else {
+        this.page = p0;
+        this.column = this.column < c1 ? this.column + 1 : c0;
+      }
     } else this.column = Math.min(127, this.column + 1); // page mode: along the page, and stay at its end
   }
 
@@ -199,14 +240,14 @@ export class Oled implements Device {
   pixels(): Pixels {
     const rows = Array.from({ length: 64 }, () => new Uint8Array(128));
     for (let y = 0; y < 64; y++) {
-      const row = (this.flipY ? y : 63 - y) + this.startLine & 63;
+      const row = ((this.flipY ? y : 63 - y) + this.startLine) & 63;
       for (let x = 0; x < 128; x++) {
         const col = this.flipX ? x : 127 - x;
         const lit = this.entire || ((this.ram[(row >> 3) * 128 + col] >> (row & 7)) & 1) === 1;
         rows[y][x] = lit !== this.invert ? 1 : 0;
       }
     }
-    return { rows, on: this.on && this.powered(), contrast: 0.35 + 0.65 * this.contrast / 255 };
+    return { rows, on: this.on && this.powered(), contrast: 0.35 + (0.65 * this.contrast) / 255 };
   }
 }
 
@@ -227,7 +268,7 @@ export function pixelPath(rows: ArrayLike<number>[]): string {
 
 // ------------------------------------------------------------------ DS1307
 
-const bcd = (n: number) => ((n / 10) | 0) << 4 | n % 10;
+const bcd = (n: number) => (((n / 10) | 0) << 4) | (n % 10);
 const unbcd = (b: number) => (b >> 4) * 10 + (b & 15);
 
 /**
@@ -242,8 +283,13 @@ export class Clock implements Device {
   private offset = 0; // ms the clock is ahead of the wall clock at the start
   private written = false; // the time was set in this transaction: taken at its stop
 
-  constructor(readonly id: string, readonly address: number, readonly powered: () => boolean,
-              private now: () => number, private start = Date.now()) {} // now(): the circuit's time, s
+  constructor(
+    readonly id: string,
+    readonly address: number,
+    readonly powered: () => boolean,
+    private now: () => number,
+    private start = Date.now(),
+  ) {} // now(): the circuit's time, s
 
   /** Its time now, as a Date read in UTC (the clock does not know time zones: the page's local time is put in as is). */
   private time() {
@@ -259,8 +305,18 @@ export class Clock implements Device {
   /** The time into registers 0–6, for a read. */
   private latch() {
     const t = this.time();
-    this.ram.set([bcd(t.getUTCSeconds()), bcd(t.getUTCMinutes()), bcd(t.getUTCHours()), t.getUTCDay() + 1,
-      bcd(t.getUTCDate()), bcd(t.getUTCMonth() + 1), bcd(t.getUTCFullYear() % 100)], 0);
+    this.ram.set(
+      [
+        bcd(t.getUTCSeconds()),
+        bcd(t.getUTCMinutes()),
+        bcd(t.getUTCHours()),
+        t.getUTCDay() + 1,
+        bcd(t.getUTCDate()),
+        bcd(t.getUTCMonth() + 1),
+        bcd(t.getUTCFullYear() % 100),
+      ],
+      0,
+    );
   }
 
   write(byte: number) {
@@ -287,14 +343,20 @@ export class Clock implements Device {
     this.written = false;
     const r = this.ram;
     const hours = r[2] & 0x40 ? (unbcd(r[2] & 0x1f) % 12) + (r[2] & 0x20 ? 12 : 0) : unbcd(r[2] & 0x3f); // 12- or 24-hour
-    const set = Date.UTC(2000 + unbcd(r[6]), unbcd(r[5] & 0x1f) - 1, unbcd(r[4] & 0x3f), hours, unbcd(r[1] & 0x7f), unbcd(r[0] & 0x7f));
+    const set = Date.UTC(
+      2000 + unbcd(r[6]),
+      unbcd(r[5] & 0x1f) - 1,
+      unbcd(r[4] & 0x3f),
+      hours,
+      unbcd(r[1] & 0x7f),
+      unbcd(r[0] & 0x7f),
+    );
     this.offset = 0;
     this.offset = set - this.time().getTime();
   }
 }
 
 // ------------------------------------------------------------------ on a board
-
 
 const MODULES: Record<string, number> = { LCD1602I2C: 0x27, SSD1306: 0x3c, DS1307: 0x68 }; // electro's kinds, the address they come set to
 
@@ -304,10 +366,16 @@ const MODULES: Record<string, number> = { LCD1602I2C: 0x27, SSD1306: 0x3c, DS130
  * answers while it has power. ``addresses``: each element's address as set (its text); ``kept``:
  * the modules made so far, by id — reused, so a display keeps what it showed across a new sketch.
  */
-export function modulesOn(s: Session, board: Board, addresses: Record<string, string | null>, kept: Map<string, Device>): Device[] {
+export function modulesOn(
+  s: Session,
+  board: Board,
+  addresses: Record<string, string | null>,
+  kept: Map<string, Device>,
+): Device[] {
   const { pins, program } = s.circuit;
   const at = (id: string, i: number) => pins[id]?.[i] ?? null;
-  const sda = board.pins[board.chip.sda], scl = board.pins[board.chip.scl];
+  const sda = board.pins[board.chip.sda],
+    scl = board.pins[board.chip.scl];
   if (!sda || !scl) return [];
   const devices: Device[] = [];
   for (const [id, kind] of Object.entries(program.kinds)) {
@@ -319,9 +387,12 @@ export function modulesOn(s: Session, board: Board, addresses: Record<string, st
     const address = Number(i2cParts(addresses[id]).address) || MODULES[kind];
     let m = kept.get(id);
     if (!m || m.address !== address) {
-      m = kind === "LCD1602I2C" ? new Backpack(id, address, powered)
-        : kind === "SSD1306" ? new Oled(id, address, powered)
-        : new Clock(id, address, powered, () => s.clock(board));
+      m =
+        kind === "LCD1602I2C"
+          ? new Backpack(id, address, powered)
+          : kind === "SSD1306"
+            ? new Oled(id, address, powered)
+            : new Clock(id, address, powered, () => s.clock(board));
       kept.set(id, m);
     }
     devices.push(m);

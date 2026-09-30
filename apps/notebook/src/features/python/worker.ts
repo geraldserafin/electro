@@ -28,12 +28,18 @@ interface Kernel {
 type PyList = { toJs(): [number, number][]; destroy?(): void };
 (self as unknown as { electroSim: unknown }).electroSim = {
   run: (json: string, tEnd: number, dtMax: number, schedule: ((t: number) => PyList) | null) =>
-    runProgram(json, tEnd, dtMax, schedule && ((t: number) => {
-      const list = schedule(t);
-      const pairs = list.toJs();
-      list.destroy?.();
-      return pairs;
-    })),
+    runProgram(
+      json,
+      tEnd,
+      dtMax,
+      schedule &&
+        ((t: number) => {
+          const list = schedule(t);
+          const pairs = list.toJs();
+          list.destroy?.();
+          return pairs;
+        }),
+    ),
 };
 
 let kernel: Promise<Kernel> | null = null;
@@ -65,12 +71,17 @@ self.onmessage = async (event: MessageEvent<Request>) => {
     if (!kernel) throw new Error("The kernel was not started (init first).");
     const k = await kernel;
     const result =
-      request.type === "run" ? k.run(request.code, request.schematics, request.standard)
-      : request.type === "code" ? k.code(request.schematic, request.name)
-      : request.type === "fromCode" ? k.from_code(request.source, request.name, request.old)
-      : request.type === "simulate" ? k.simulate(request.schematic)
-      : request.type === "live" ? k.live(request.schematic)
-      : (k.reset(), null);
+      request.type === "run"
+        ? k.run(request.code, request.schematics, request.standard)
+        : request.type === "code"
+          ? k.code(request.schematic, request.name)
+          : request.type === "fromCode"
+            ? k.from_code(request.source, request.name, request.old)
+            : request.type === "simulate"
+              ? k.simulate(request.schematic)
+              : request.type === "live"
+                ? k.live(request.schematic)
+                : (k.reset(), null);
     self.postMessage({ id: request.id, ok: true, result });
   } catch (error) {
     self.postMessage({ id: request.id, ok: false, error: String(error) });

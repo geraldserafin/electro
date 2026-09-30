@@ -27,6 +27,7 @@ def issue(cls):
 
 # ------------------------------------------------------------------ pieces of data in issues
 
+
 @dataclass(frozen=True)
 class Equals:
     """A quantity and its value: ``I_R_1 = 0.5 A``."""
@@ -44,6 +45,7 @@ class IsZero:
 
 
 # ------------------------------------------------------------------ solving
+
 
 class CircuitError(Issue):
     """The circuit cannot be solved as asked."""
@@ -138,6 +140,7 @@ class BadCondition(Issue, TypeError):
 
 # ------------------------------------------------------------------ finding things
 
+
 @issue
 class NotInCircuit(Issue, KeyError):
     """A component (object or label) that is not in the solved circuit."""
@@ -171,6 +174,7 @@ class DuplicateLabel(Issue, ValueError):
 
 # ------------------------------------------------------------------ values
 
+
 @issue
 class BadValue(Issue, ValueError):
     """Text that is not a value (examples of ones that are: 10, 4.7, '4.7k', '4k7', '0,5 A', 'R')."""
@@ -186,6 +190,7 @@ class NotAValue(Issue, TypeError):
 
 
 # ------------------------------------------------------------------ building circuits
+
 
 @issue
 class NotACircuit(Issue, TypeError):
@@ -234,6 +239,7 @@ class WrongNodeCount(Issue, TypeError):
 
 # ------------------------------------------------------------------ analysis
 
+
 @issue
 class NotLinear(Issue, ValueError):
     """blackbox() works for linear circuits only."""
@@ -252,6 +258,7 @@ class NoThevenin(Issue, ValueError):
 
 
 # ------------------------------------------------------------------ simulation in time
+
 
 @issue
 class NeedsSimulation(Issue, ValueError):

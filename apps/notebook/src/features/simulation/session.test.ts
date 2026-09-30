@@ -5,7 +5,7 @@ import { readFileSync } from "node:fs";
 import { describe, expect, test } from "vitest";
 import { Uno } from "./arduino";
 import type { Chip, Mode, PinChange } from "./chip";
-import { Backpack, modulesOn } from "./i2c";
+import { type Backpack, modulesOn } from "./i2c";
 import { ping, sonar } from "./peripherals";
 import { Runner } from "./runner";
 import { Session } from "./session";
@@ -32,7 +32,8 @@ function measure(distance: number) {
 // about 6 µs of it, so a long echo reads short by as much — on a real Uno too (0.6 %)
 test.each([10, 100, 250])("pulseIn() measures the echo of %i cm as a real Uno does", (cm) => {
   const lengths = measure(cm);
-  const echo = 2 * cm / 100 / 343 * 1e6, missed = 6.2 * Math.floor(echo / 1024);
+  const echo = ((2 * cm) / 100 / 343) * 1e6,
+    missed = 6.2 * Math.floor(echo / 1024);
   expect(lengths.length).toBeGreaterThan(2);
   for (const us of lengths.slice(1)) expect(Math.abs(us - (echo - missed))).toBeLessThan(10);
 });
@@ -51,7 +52,9 @@ test("I²C: the modules on A4/A5 are on the bus, powered by the circuit; one els
 // runner.ts, as the worker runs it: the same circuits, the devices wired up by it
 describe("Runner", () => {
   test("an HC-SR04 through the whole chain: its echo timed, the sketch's serial in the frames", () => {
-    const runner = new Runner(JSON.parse(fixture("sonar.live.json")), [{ id: "US_1", kind: "ultrasonic", text: "100" }]);
+    const runner = new Runner(JSON.parse(fixture("sonar.live.json")), [
+      { id: "US_1", kind: "ultrasonic", text: "100" },
+    ]);
     runner.attach("ARD_1", { board: "uno", hex: fixture("sonar.hex") });
     let serial = "";
     for (let t = 0.02; t <= 0.1; t += 0.02) {
@@ -79,7 +82,9 @@ describe("Runner", () => {
 // fixtures/pico.live.json: a Pico running blink.pico.ino, an LED on GP15, a potentiometer on GP26
 test("a Pico in a circuit: its LED lights the circuit's, the potentiometer is its analogRead()", () => {
   const image = new Uint8Array(readFileSync(new URL("./fixtures/blink.pico.bin", import.meta.url)));
-  const runner = new Runner(JSON.parse(fixture("pico.live.json")), [{ id: "P_1", kind: "potentiometer", text: "0.25" }]);
+  const runner = new Runner(JSON.parse(fixture("pico.live.json")), [
+    { id: "P_1", kind: "potentiometer", text: "0.25" },
+  ]);
   runner.attach("PICO_1", { board: "pico", image });
   const seen = { lit: false, dark: false, board: new Set<number>() };
   let serial = "";
@@ -106,23 +111,39 @@ test("a pin wired to nothing toggling: no steps of the circuit for it, only its 
   const uno = new Uno(fixture("sonar.hex"));
   const run = (pin: string) => {
     const session = new Session(JSON.parse(fixture("sonar.live.json")));
-    let time = 0, level: Mode = "low", changes: PinChange[] = [];
+    let time = 0,
+      level: Mode = "low",
+      changes: PinChange[] = [];
     const chip: Chip = {
-      pins: uno.pins, modes: uno.modes, i2c: uno.i2c, sda: uno.sda, scl: uno.scl, time: 0, onSerial: null,
-      sense: () => {}, send: () => {},
+      pins: uno.pins,
+      modes: uno.modes,
+      i2c: uno.i2c,
+      sda: uno.sda,
+      scl: uno.scl,
+      time: 0,
+      onSerial: null,
+      sense: () => {},
+      send: () => {},
       initial: () => uno.pins.map((p) => [p, p === pin ? level : "low"]),
-      runUntil(t) { // (toggled every microsecond: a thousand changes a millisecond)
-        for (let at = time + 1e-6; at <= t; at += 1e-6) changes.push({ time: at, pin, mode: (level = level === "low" ? "high" : "low") });
+      runUntil(t) {
+        // (toggled every microsecond: a thousand changes a millisecond)
+        for (let at = time + 1e-6; at <= t; at += 1e-6)
+          changes.push({ time: at, pin, mode: (level = level === "low" ? "high" : "low") });
         time = t;
       },
-      take() { const c = changes; changes = []; return c; },
+      take() {
+        const c = changes;
+        changes = [];
+        return c;
+      },
     };
     session.attach("ARD_1", chip);
     let steps = 0;
     session.advanceTo(0.01, 1e-3, () => steps++);
     return { steps, driven: session.sim.p[session.sim.program.inputs[`ARD_1_${pin}_E`]], level };
   };
-  const free = run("D2"), wired = run("D9");
+  const free = run("D2"),
+    wired = run("D9");
   expect(free.steps).toBeLessThan(50); // (10 slices of 1 ms: a step or a few each)
   expect(free.driven).toBe(uno.modes[free.level][1]); // (as it was at the slice's end)
   expect(wired.steps).toBeGreaterThan(5000);

@@ -25,7 +25,15 @@ export function ExamplePage() {
     void create(notebook, { replace: true }).then((ok) => ok || setProblem(t("unreachable")));
   }, [name, create, t]);
 
-  return problem
-    ? <PageMessage title={problem}><p><Link to="/">{tNote("allNotes")}</Link></p></PageMessage>
-    : <PageMessage><p className="text-muted">{t("creating")}</p></PageMessage>;
+  return problem ? (
+    <PageMessage title={problem}>
+      <p>
+        <Link to="/">{tNote("allNotes")}</Link>
+      </p>
+    </PageMessage>
+  ) : (
+    <PageMessage>
+      <p className="text-muted">{t("creating")}</p>
+    </PageMessage>
+  );
 }

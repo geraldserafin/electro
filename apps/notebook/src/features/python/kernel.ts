@@ -1,7 +1,8 @@
 // The page's handle on the Python worker: every call is a message and a promise.
-import type { ElementResult, Output, Problem, SchematicData } from "@/shared/model/types";
-import type { Failure } from "@/shared/model/issues";
+
 import type { LiveCircuit } from "@/features/simulation/engine";
+import type { Failure } from "@/shared/model/issues";
+import type { ElementResult, Output, Problem, SchematicData } from "@/shared/model/types";
 
 type Reply = { id: number; ok: true; result: unknown } | { id: number; ok: false; error: string };
 
@@ -35,9 +36,13 @@ class Kernel {
 
   /** A code cell; its schematics drawn with `standard`'s symbols (the note's). */
   async run(code: string, schematics: Record<string, SchematicData>, standard = "iec"): Promise<Output[]> {
-    const text = (await this.call("run", { code, standard, schematics: JSON.stringify(
-      Object.fromEntries(Object.entries(schematics).map(([name, s]) => [name, JSON.stringify(s)])),
-    ) })) as string;
+    const text = (await this.call("run", {
+      code,
+      standard,
+      schematics: JSON.stringify(
+        Object.fromEntries(Object.entries(schematics).map(([name, s]) => [name, JSON.stringify(s)])),
+      ),
+    })) as string;
     return JSON.parse(text);
   }
 
@@ -47,8 +52,11 @@ class Kernel {
   }
 
   /** Code edited in a schematic's code view, laid out back into a drawing (or the error in it). */
-  async fromCode(source: string, name: string, old: SchematicData):
-    Promise<{ schematic: SchematicData } | { error: Failure }> {
+  async fromCode(
+    source: string,
+    name: string,
+    old: SchematicData,
+  ): Promise<{ schematic: SchematicData } | { error: Failure }> {
     return JSON.parse((await this.call("fromCode", { source, name, old: JSON.stringify(old) })) as string);
   }
 

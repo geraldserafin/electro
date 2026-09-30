@@ -107,13 +107,16 @@ export function useNoteSync(notebook: Notebook, revision: number | null, reload:
   }, [notebook]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // leaving the page (another note, the list): send what is pending
-  useEffect(() => () => {
-    if (timer.current !== null) {
-      clearTimeout(timer.current);
-      timer.current = null;
-      void push();
-    }
-  }, [push]);
+  useEffect(
+    () => () => {
+      if (timer.current !== null) {
+        clearTimeout(timer.current);
+        timer.current = null;
+        void push();
+      }
+    },
+    [push],
+  );
 
   // closing the tab with changes not on the server yet: the browser asks first
   useEffect(() => {

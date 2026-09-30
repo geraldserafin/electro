@@ -4,12 +4,12 @@ import { execFileSync, spawn } from "node:child_process";
 import { createHash } from "node:crypto";
 import { writeFileSync } from "node:fs";
 import { readFile, writeFile } from "node:fs/promises";
-import { join } from "node:path";
 import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { webkit } from "playwright";
 
 const port = 4174;
-const shots = process.env.SHOTS ?? tmpdir();  // screenshots, for looking at by hand
+const shots = process.env.SHOTS ?? tmpdir(); // screenshots, for looking at by hand
 // the notes server with a schema of its own (in the database at DATABASE_URL: devenv's), and the
 // built notebook in front of it (/api proxied)
 const notesPort = 4175;
@@ -21,16 +21,21 @@ database.searchParams.set("options", `-c search_path=${schema}`);
 const psql = (url, command) => execFileSync("psql", [url, "-qc", command]);
 psql(postgres, `CREATE SCHEMA ${schema}`);
 const notes = spawn("pnpm", ["exec", "tsx", "src/main.ts"], {
-  cwd: new URL("../../server/", import.meta.url), stdio: "ignore", detached: true,
+  cwd: new URL("../../server/", import.meta.url),
+  stdio: "ignore",
+  detached: true,
   env: { ...process.env, PORT: String(notesPort), DATABASE_URL: String(database) },
 });
 // signed in: a user and a session made in the database (no provider in a test); the cookie on every call
 const session = "e2e-session";
 const otherSession = "e2e-session-2"; // someone else, for sharing
-const api = (path, init = {}) => fetch(`${notesUrl}${path}`, { ...init, headers: { ...init.headers, cookie: `session=${session}` } });
+const api = (path, init = {}) =>
+  fetch(`${notesUrl}${path}`, { ...init, headers: { ...init.headers, cookie: `session=${session}` } });
 const server = spawn("pnpm", ["exec", "vite", "preview", "--port", String(port), "--strictPort"], {
-  stdio: "ignore", detached: true, env: { ...process.env, NOTES_SERVER: notesUrl },
-});  // own process groups, see the end
+  stdio: "ignore",
+  detached: true,
+  env: { ...process.env, NOTES_SERVER: notesUrl },
+}); // own process groups, see the end
 let failed = false;
 const check = (name, ok) => {
   console.log(`${ok ? "ok  " : "FAIL"} ${name}`);
@@ -38,15 +43,25 @@ const check = (name, ok) => {
 };
 
 try {
-  for (let i = 0; i < 60; i++) {  // the notes server is up (and migrated)
-    if (await fetch(`${notesUrl}/api/health`).then((r) => r.ok, () => false)) break;
+  for (let i = 0; i < 60; i++) {
+    // the notes server is up (and migrated)
+    if (
+      await fetch(`${notesUrl}/api/health`).then(
+        (r) => r.ok,
+        () => false,
+      )
+    )
+      break;
     await new Promise((r) => setTimeout(r, 250));
   }
-  psql(postgres, `SET search_path TO ${schema};
+  psql(
+    postgres,
+    `SET search_path TO ${schema};
     INSERT INTO users (id, name) VALUES ('00000000-0000-0000-0000-00000000e2e0', 'E2E');
     INSERT INTO sessions VALUES ('${createHash("sha256").update(session).digest("hex")}', '00000000-0000-0000-0000-00000000e2e0', now() + interval '1 day');
     INSERT INTO users (id, name, email) VALUES ('00000000-0000-0000-0000-00000000e2e1', 'Ola', 'ola@example.com');
-    INSERT INTO sessions VALUES ('${createHash("sha256").update(otherSession).digest("hex")}', '00000000-0000-0000-0000-00000000e2e1', now() + interval '1 day')`);
+    INSERT INTO sessions VALUES ('${createHash("sha256").update(otherSession).digest("hex")}', '00000000-0000-0000-0000-00000000e2e1', now() + interval '1 day')`,
+  );
   const browser = await webkit.launch();
   const page = await browser.newPage({ viewport: { width: 1440, height: 900 }, locale: "pl-PL" }); // (the app speaks the browser's language)
   await page.context().addCookies([{ name: "session", value: session, url: `http://localhost:${port}` }]);
@@ -62,7 +77,8 @@ try {
   // the home page: the library's grid, then the examples (a card in each item: data-id, the note's id)
   const notesList = page.getByRole("list", { name: "Moje notatki" });
   const examplesList = page.getByRole("list", { name: "Przykłady" });
-  const home = async () => { // a note's way back: the folder it is in (here: the top, the home page)
+  const home = async () => {
+    // a note's way back: the folder it is in (here: the top, the home page)
     await page.getByRole("link", { name: "Moje notatki" }).first().click();
     await notesList.waitFor();
   };
@@ -73,12 +89,18 @@ try {
   await page.goto(`${app}/`);
   await page.getByRole("heading", { name: "Przykłady" }).waitFor();
   await notesList.waitFor();
-  check("home: nothing yet, the examples", (await notesList.locator("li[data-id]").count()) === 0
-    && (await examplesList.getByRole("listitem").count()) > 0);
+  check(
+    "home: nothing yet, the examples",
+    (await notesList.locator("li[data-id]").count()) === 0 && (await examplesList.getByRole("listitem").count()) > 0,
+  );
   await examplesList.getByRole("button", { name: /^Sprawozdanie: mostek Wheatstone'a/ }).click();
   await page.waitForURL(/\/n\/[0-9a-f]{32}\/sprawozdanie-mostek-wheatstonea$/);
-  check("an example becomes a note, its title in the address", (await noteOnServer()).document.title === "Sprawozdanie: mostek Wheatstone'a");
-  const pythonReady = (timeout) => page.locator('button[aria-label="Uruchom wszystko"]:not([disabled])').waitFor({ timeout });
+  check(
+    "an example becomes a note, its title in the address",
+    (await noteOnServer()).document.title === "Sprawozdanie: mostek Wheatstone'a",
+  );
+  const pythonReady = (timeout) =>
+    page.locator('button[aria-label="Uruchom wszystko"]:not([disabled])').waitFor({ timeout });
   await pythonReady(120_000);
   check("pyodide starts in the worker", true);
 
@@ -124,10 +146,12 @@ try {
   };
   await runBridge.click();
   await bridge.locator('table[aria-label="Wyniki"]:not([data-stale])').waitFor({ timeout: 30_000 });
-  check("run: table and values on the drawing, then the button rests",
-    (await bridge.getByRole("table", { name: "Wyniki" }).innerText()).includes("200 Ω")
-    && (await bridge.locator("[data-board] .canvas .label.solved").allTextContents()).join(" ").includes("200")
-    && await runBridge.isDisabled());
+  check(
+    "run: table and values on the drawing, then the button rests",
+    (await bridge.getByRole("table", { name: "Wyniki" }).innerText()).includes("200 Ω") &&
+      (await bridge.locator("[data-board] .canvas .label.solved").allTextContents()).join(" ").includes("200") &&
+      (await runBridge.isDisabled()),
+  );
 
   // left alone, a schematic keeps its board (grid, drawing, values); its tools come once the cell is taken up
   {
@@ -135,45 +159,68 @@ try {
     await page.mouse.move(4, 600); // over no cell
     await page.waitForTimeout(300);
     const tools = bridge.locator("[data-board]").getByRole("toolbar");
-    const hidden = (await bridge.locator("[data-board] .canvas .label.solved").count()) > 0
-      && await tools.evaluate((el) => getComputedStyle(el).opacity === "0");
+    const hidden =
+      (await bridge.locator("[data-board] .canvas .label.solved").count()) > 0 &&
+      (await tools.evaluate((el) => getComputedStyle(el).opacity === "0"));
     const box = await bridge.locator("[data-board] .canvas").boundingBox();
     await page.mouse.click(box.x + 20, box.y + box.height - 20); // empty space on the board
     await page.waitForTimeout(300);
-    check("a schematic: board always there, its tools once it is worked on", hidden
-      && await tools.evaluate((el) => getComputedStyle(el).opacity === "1"));
+    check(
+      "a schematic: board always there, its tools once it is worked on",
+      hidden && (await tools.evaluate((el) => getComputedStyle(el).opacity === "1")),
+    );
   }
 
   // no reading: not enough data — a warning sign on the board, unfolding into LaTeX
   await reading("");
-  check("a change turns the run button back on", !(await runBridge.isDisabled())
-    && (await bridge.locator('table[aria-label="Wyniki"][data-stale]').count()) === 1);
+  check(
+    "a change turns the run button back on",
+    !(await runBridge.isDisabled()) && (await bridge.locator('table[aria-label="Wyniki"][data-stale]').count()) === 1,
+  );
   await runBridge.click();
   await bridge.getByRole("button", { name: "Nie wszystko da się wyznaczyć" }).click();
-  check("missing data: a warning sign, names in LaTeX",
-    (await bridge.getByRole("dialog", { name: "Nie wszystko da się wyznaczyć" }).locator(".katex").count()) > 0
-    && (await bridge.getByRole("dialog", { name: "Nie wszystko da się wyznaczyć" }).innerText()).includes("brakuje"));
+  check(
+    "missing data: a warning sign, names in LaTeX",
+    (await bridge.getByRole("dialog", { name: "Nie wszystko da się wyznaczyć" }).locator(".katex").count()) > 0 &&
+      (await bridge.getByRole("dialog", { name: "Nie wszystko da się wyznaczyć" }).innerText()).includes("brakuje"),
+  );
   await reading("0");
   await runBridge.click();
-  await bridge.getByRole("button", { name: /Nie wszystko da się wyznaczyć|Błąd — nie da się policzyć/ }).waitFor({ state: "detached", timeout: 30_000 });
+  await bridge
+    .getByRole("button", { name: /Nie wszystko da się wyznaczyć|Błąd — nie da się policzyć/ })
+    .waitFor({ state: "detached", timeout: 30_000 });
 
   // moving part of the bridge as a group keeps every connection (edge wires stretch or follow)
   {
     const grid = bridge.locator("[data-board] .canvas");
-    const at = (gx, gy) => grid.evaluate((svg, [x, y]) => {
-      const p = new DOMPoint(x, y).matrixTransform(svg.getScreenCTM());
-      return [p.x, p.y];
-    }, [gx * 20, gy * 20]);
+    const at = (gx, gy) =>
+      grid.evaluate(
+        (svg, [x, y]) => {
+          const p = new DOMPoint(x, y).matrixTransform(svg.getScreenCTM());
+          return [p.x, p.y];
+        },
+        [gx * 20, gy * 20],
+      );
     const bridgeCode = () => codeOf(bridge);
     const before = await bridgeCode();
-    const [x0, y0] = await at(12, -1); const [x1, y1] = await at(21, 15);
+    const [x0, y0] = await at(12, -1);
+    const [x1, y1] = await at(21, 15);
     await page.keyboard.down("Shift");
-    await page.mouse.move(x0, y0); await page.mouse.down(); await page.mouse.move(x1, y1, { steps: 5 }); await page.mouse.up();
+    await page.mouse.move(x0, y0);
+    await page.mouse.down();
+    await page.mouse.move(x1, y1, { steps: 5 });
+    await page.mouse.up();
     await page.keyboard.up("Shift");
-    const [gx, gy] = await at(18, 2); const [hx, hy] = await at(22, 2);
-    await page.mouse.move(gx, gy); await page.mouse.down(); await page.mouse.move(hx, hy, { steps: 5 }); await page.mouse.up();
-    check("moving a group keeps the bridge connected", (await bridgeCode()) === before
-      && (await grid.locator(".open-pin").count()) === 0);
+    const [gx, gy] = await at(18, 2);
+    const [hx, hy] = await at(22, 2);
+    await page.mouse.move(gx, gy);
+    await page.mouse.down();
+    await page.mouse.move(hx, hy, { steps: 5 });
+    await page.mouse.up();
+    check(
+      "moving a group keeps the bridge connected",
+      (await bridgeCode()) === before && (await grid.locator(".open-pin").count()) === 0,
+    );
   }
 
   // Schemat | Kod: a value changed in the code comes back to the same drawing
@@ -184,7 +231,12 @@ try {
     await page.mouse.wheel(0, 120); // the board is active (clicked before): scrolling pans it
     await page.waitForTimeout(100);
     const viewBefore = await view();
-    const places = () => bridge.locator("[data-board] .canvas .element").evaluateAll((els) => els.map((e) => [e.querySelector(".hit").getAttribute("x"), e.querySelector(".hit").getAttribute("y")]));
+    const places = () =>
+      bridge
+        .locator("[data-board] .canvas .element")
+        .evaluateAll((els) =>
+          els.map((e) => [e.querySelector(".hit").getAttribute("x"), e.querySelector(".hit").getAttribute("y")]),
+        );
     const before = await places();
     await bridge.getByRole("tab", { name: "Kod" }).click();
     await bridge.locator(".cm-content").waitFor();
@@ -194,11 +246,18 @@ try {
     await page.keyboard.insertText(text.replace("Resistor(50)", "Resistor(60)"));
     await bridge.getByRole("tab", { name: "Schemat" }).click();
     await bridge.locator("[data-board] .canvas").waitFor();
-    check("back from the code view: same view, the board has the keyboard", viewBefore !== viewStart && (await view()) === viewBefore
-      && await bridge.locator("[data-board] .canvas").evaluate((svg) => document.activeElement === svg));
-    check("code view: a new value keeps the drawing", text.startsWith("mostek = net(")
-      && (await bridge.locator('[data-board] .element[data-id="R_3"]').textContent()).includes("60")
-      && JSON.stringify(await places()) === JSON.stringify(before));
+    check(
+      "back from the code view: same view, the board has the keyboard",
+      viewBefore !== viewStart &&
+        (await view()) === viewBefore &&
+        (await bridge.locator("[data-board] .canvas").evaluate((svg) => document.activeElement === svg)),
+    );
+    check(
+      "code view: a new value keeps the drawing",
+      text.startsWith("mostek = net(") &&
+        (await bridge.locator('[data-board] .element[data-id="R_3"]').textContent()).includes("60") &&
+        JSON.stringify(await places()) === JSON.stringify(before),
+    );
   }
 
   // running from the code view keeps the code as written (a comment, the layout of the lines)
@@ -214,8 +273,11 @@ try {
     await bridge.getByRole("tab", { name: "Schemat" }).click();
     await bridge.getByRole("tab", { name: "Kod" }).click();
     await bridge.locator(".cm-content").waitFor();
-    check("running the code does not reformat it", afterRun.startsWith("# mój komentarz")
-      && (await bridge.locator(".cm-content").innerText()).startsWith("# mój komentarz"));
+    check(
+      "running the code does not reformat it",
+      afterRun.startsWith("# mój komentarz") &&
+        (await bridge.locator(".cm-content").innerText()).startsWith("# mój komentarz"),
+    );
     await bridge.getByRole("tab", { name: "Schemat" }).click();
     await bridge.locator("[data-board] .canvas").waitFor();
   }
@@ -229,10 +291,14 @@ try {
     await back.waitFor({ timeout: 5_000 });
     await back.click();
     const inView = await bridge.locator('[data-board] .element[data-id="R_1"]').evaluate((el) => {
-      const r = el.getBoundingClientRect(), b = el.closest("[data-board]").getBoundingClientRect();
+      const r = el.getBoundingClientRect(),
+        b = el.closest("[data-board]").getBoundingClientRect();
       return r.top >= b.top && r.bottom <= b.bottom && r.left >= b.left && r.right <= b.right;
     });
-    check("scrolled away: a button brings the drawing back", shownAtFirst === 0 && inView && (await back.count()) === 0);
+    check(
+      "scrolled away: a button brings the drawing back",
+      shownAtFirst === 0 && inView && (await back.count()) === 0,
+    );
   }
 
   // export: the note set by Typst — its pages in the dialog, the PDF to download; the choices are the note's
@@ -249,34 +315,54 @@ try {
     const sheets = dialog.locator("[data-sheet]");
     await sheets.first().waitFor({ timeout: 90_000 });
     const firstPages = Date.now() - opened;
-    check(`Typst loads in the background: the first export shows its pages at once (${firstPages} ms)`,
-      before >= 2 && workers.length === before && firstPages < 3000);
+    check(
+      `Typst loads in the background: the first export shows its pages at once (${firstPages} ms)`,
+      before >= 2 && workers.length === before && firstPages < 3000,
+    );
     await dialog.locator("[data-preview]:not([data-busy])").waitFor();
     const firstPage = await sheets.first().getAttribute("src");
     const decoded = await sheets.first().evaluate((img) => img.decode().then(() => img.naturalWidth > 0));
     if (process.env.SHOTS) await dialog.screenshot({ path: `${process.env.SHOTS}/export-classic.png` });
     await dialog.getByRole("radio", { name: /Nowoczesny/ }).click();
     await dialog.getByRole("switch", { name: "Kod komórek" }).uncheck();
-    await page.waitForFunction((src) => {
-      const img = document.querySelector("[data-sheet]");
-      return img && img.getAttribute("src") !== src && !document.querySelector("[data-preview][data-busy]");
-    }, firstPage, { timeout: 30_000 });
+    await page.waitForFunction(
+      (src) => {
+        const img = document.querySelector("[data-sheet]");
+        return img && img.getAttribute("src") !== src && !document.querySelector("[data-preview][data-busy]");
+      },
+      firstPage,
+      { timeout: 30_000 },
+    );
     if (process.env.SHOTS) await dialog.screenshot({ path: `${process.env.SHOTS}/export-modern.png` });
-    const [download] = await Promise.all([page.waitForEvent("download"), dialog.getByRole("button", { name: "Pobierz PDF" }).click()]);
+    const [download] = await Promise.all([
+      page.waitForEvent("download"),
+      dialog.getByRole("button", { name: "Pobierz PDF" }).click(),
+    ]);
     const file = await readFile(await download.path());
     if (process.env.SHOTS) await writeFile(`${process.env.SHOTS}/export.pdf`, file);
-    const [typDownload] = await Promise.all([page.waitForEvent("download"), dialog.getByRole("button", { name: "Pobierz .typ" }).click()]);
+    const [typDownload] = await Promise.all([
+      page.waitForEvent("download"),
+      dialog.getByRole("button", { name: "Pobierz .typ" }).click(),
+    ]);
     const typ = (await readFile(await typDownload.path())).toString();
     if (process.env.SHOTS) await writeFile(`${process.env.SHOTS}/export.typ`, typ);
     await dialog.getByRole("button", { name: "Zamknij" }).click(); // the X in the corner
     await page.waitForTimeout(1500); // saved with the note
     const settings = (await noteOnServer()).document.settings;
-    check("export: Typst's pages in the dialog, the PDF and its .typ to download; the note keeps the choices",
-      decoded && file.subarray(0, 5).toString() === "%PDF-" && file.length > 10_000
-      && download.suggestedFilename().endsWith(".pdf") && typDownload.suggestedFilename().endsWith(".typ")
-      && typ.includes("#show: note") && typ.includes("@preview/mitex") && typ.includes("bytes(\"<svg")
-      && settings.codeInPdf === false && settings.pdf.theme === "modern"
-      && !(await dialog.isVisible()));
+    check(
+      "export: Typst's pages in the dialog, the PDF and its .typ to download; the note keeps the choices",
+      decoded &&
+        file.subarray(0, 5).toString() === "%PDF-" &&
+        file.length > 10_000 &&
+        download.suggestedFilename().endsWith(".pdf") &&
+        typDownload.suggestedFilename().endsWith(".typ") &&
+        typ.includes("#show: note") &&
+        typ.includes("@preview/mitex") &&
+        typ.includes('bytes("<svg') &&
+        settings.codeInPdf === false &&
+        settings.pdf.theme === "modern" &&
+        !(await dialog.isVisible()),
+    );
     // Ctrl+P (⌘P) opens the export, not the browser's print; more to choose: author, a title page, columns
     await page.keyboard.press("ControlOrMeta+KeyP");
     await dialog.locator("[data-preview]:not([data-busy]) [data-sheet]").first().waitFor({ timeout: 30_000 });
@@ -285,23 +371,33 @@ try {
     await dialog.getByRole("textbox", { name: "Autor" }).fill("Jan Kowalski");
     await dialog.getByRole("switch", { name: /Strona tytułowa/ }).check();
     await dialog.getByRole("radio", { name: "Dwie" }).click();
-    await page.waitForFunction((src) => !document.querySelector("[data-preview][data-busy]")
-      && document.querySelector("[data-sheet]")?.getAttribute("src") !== src, shownBefore, { timeout: 30_000 });
+    await page.waitForFunction(
+      (src) =>
+        !document.querySelector("[data-preview][data-busy]") &&
+        document.querySelector("[data-sheet]")?.getAttribute("src") !== src,
+      shownBefore,
+      { timeout: 30_000 },
+    );
     const titlePages = await sheets.count();
     if (process.env.SHOTS) await dialog.screenshot({ path: `${process.env.SHOTS}/export-title-page.png` });
     await page.keyboard.press("Escape");
     await page.waitForTimeout(1500);
     const more = (await noteOnServer()).document.settings.pdf;
-    check("Ctrl+P opens the export; a title page, an author, columns: kept with the note",
-      titlePages >= 2 && more.author === "Jan Kowalski" && more.titlePage === true && more.columns === 2);
+    check(
+      "Ctrl+P opens the export; a title page, an author, columns: kept with the note",
+      titlePages >= 2 && more.author === "Jan Kowalski" && more.titlePage === true && more.columns === 2,
+    );
   }
 
   // the PDF's drawing: cropped to what is drawn, without the editor's selection or the simulation
   await bridge.locator('[data-board] .element[data-id="R_1"]').click();
   const drawn = bridge.locator(".pdf-drawing svg");
-  check("the PDF's drawing: cropped, no selection, no values of the run",
-    (await drawn.locator(".selected").count()) === 0 && Number(await drawn.getAttribute("height")) < 500
-    && (await drawn.locator(".reading, .label.solved").count()) === 0);
+  check(
+    "the PDF's drawing: cropped, no selection, no values of the run",
+    (await drawn.locator(".selected").count()) === 0 &&
+      Number(await drawn.getAttribute("height")) < 500 &&
+      (await drawn.locator(".reading, .label.solved").count()) === 0,
+  );
 
   // editor: place a resistor on the bridge canvas
   const canvas = page.locator("[data-board] .canvas").first();
@@ -312,71 +408,124 @@ try {
   box = await canvas.boundingBox(); // where it is now
   await page.mouse.click(box.x + box.width * 0.8, box.y + box.height * 0.5);
   check("element placed", (await canvas.locator(".element").count()) === before + 1);
-  check("inspector shows the new label", (await page.getByRole("group", { name: "Właściwości" }).locator("input").first().inputValue()) === "R_5");
+  check(
+    "inspector shows the new label",
+    (await page.getByRole("group", { name: "Właściwości" }).locator("input").first().inputValue()) === "R_5",
+  );
   await canvas.screenshot({ path: `${shots}/editor.png` });
 
   // wiring by hand in a fresh schematic: drag from a pin, then the wire tool; rotation
   await addAtEnd("Schemat");
-  const cell = page.locator('[data-cell="schematic"]').last();  // added at the end of the notebook
+  const cell = page.locator('[data-cell="schematic"]').last(); // added at the end of the notebook
   await cell.scrollIntoViewIfNeeded();
   const grid = cell.locator("[data-board] .canvas");
   // grid point → screen point, through the board's camera
-  const at = (gx, gy) => grid.evaluate((svg, [x, y]) => {
-    const p = new DOMPoint(x, y).matrixTransform(svg.getScreenCTM());
-    return [p.x, p.y];
-  }, [gx * 20, gy * 20]);
-  const click = async (gx, gy) => { const [x, y] = await at(gx, gy); await page.mouse.click(x, y); };
+  const at = (gx, gy) =>
+    grid.evaluate(
+      (svg, [x, y]) => {
+        const p = new DOMPoint(x, y).matrixTransform(svg.getScreenCTM());
+        return [p.x, p.y];
+      },
+      [gx * 20, gy * 20],
+    );
+  const click = async (gx, gy) => {
+    const [x, y] = await at(gx, gy);
+    await page.mouse.click(x, y);
+  };
   const code = () => codeOf(cell);
-  await pick(cell, "Źródło napięcia"); await click(6, 6);  // a new element is placed by its middle: pins at (4, 6) and (8, 6)
-  await pick(cell, "Rezystor"); await click(14, 3);
+  await pick(cell, "Źródło napięcia");
+  await click(6, 6); // a new element is placed by its middle: pins at (4, 6) and (8, 6)
+  await pick(cell, "Rezystor");
+  await click(14, 3);
   check("new elements show open pins", (await grid.locator(".open-pin").count()) === 4);
 
   // the element panel: search, Enter, place; the panel stays open (like Excalidraw's)
   await cell.getByRole("button", { name: "Elementy" }).click();
   await page.keyboard.type("kond");
   await page.keyboard.press("Enter");
-  await click(22, 3);  // its middle; clear of R_1 and of the inspector on the right
-  check("library search places an element", (await grid.locator(".element").count()) === 3
-    && await cell.getByRole("complementary", { name: "Biblioteka elementów" }).isVisible());
-  await page.keyboard.press("Delete");  // keep the circuit a simple loop for what follows
-  await cell.getByRole("button", { name: "Elementy" }).click();  // close the panel
-  const [x1, y1] = await at(8, 6); const [x2, y2] = await at(12, 3);
-  await page.mouse.move(x1, y1); await page.mouse.down(); await page.mouse.move(x2, y2, { steps: 8 }); await page.mouse.up();
+  await click(22, 3); // its middle; clear of R_1 and of the inspector on the right
+  check(
+    "library search places an element",
+    (await grid.locator(".element").count()) === 3 &&
+      (await cell.getByRole("complementary", { name: "Biblioteka elementów" }).isVisible()),
+  );
+  await page.keyboard.press("Delete"); // keep the circuit a simple loop for what follows
+  await cell.getByRole("button", { name: "Elementy" }).click(); // close the panel
+  const [x1, y1] = await at(8, 6);
+  const [x2, y2] = await at(12, 3);
+  await page.mouse.move(x1, y1);
+  await page.mouse.down();
+  await page.mouse.move(x2, y2, { steps: 8 });
+  await page.mouse.up();
   await cell.getByRole("button", { name: "Przewód" }).click();
-  for (const p of [[16, 3], [20, 3], [20, 10], [4, 10], [4, 6]]) await click(...p);  // ends on a pin by itself
+  for (const p of [
+    [16, 3],
+    [20, 3],
+    [20, 10],
+    [4, 10],
+    [4, 6],
+  ])
+    await click(...p); // ends on a pin by itself
   await page.keyboard.press("Escape");
   check("wired into a loop", (await code()) === "układ1 = loop(VoltageSource(), Resistor())");
-  await click(14, 3); await page.keyboard.press("r");
+  await click(14, 3);
+  await page.keyboard.press("r");
   check("rotating 90° disconnects", (await grid.locator(".open-pin").count()) === 2);
-  await click(14, 3); await page.keyboard.press("r");
+  await click(14, 3);
+  await page.keyboard.press("r");
   check("rotating 180° reverses in place", (await code()) === "układ1 = loop(VoltageSource(), Resistor())");
   // drag the bottom segment of the loop's return wire two squares down: still the same circuit
-  const [sx, sy] = await at(12, 10); const [tx, ty] = await at(12, 12);
-  await page.mouse.move(sx, sy); await page.mouse.down(); await page.mouse.move(tx, ty, { steps: 6 }); await page.mouse.up();
+  const [sx, sy] = await at(12, 10);
+  const [tx, ty] = await at(12, 12);
+  await page.mouse.move(sx, sy);
+  await page.mouse.down();
+  await page.mouse.move(tx, ty, { steps: 6 });
+  await page.mouse.up();
   // the view pans by dragging empty space; the drawing itself does not move
   const pinBefore = await at(4, 6);
-  const [ex, ey] = await at(26, 8);  // empty space inside the view
-  await page.mouse.move(ex, ey); await page.mouse.down(); await page.mouse.move(ex - 120, ey - 60, { steps: 6 }); await page.mouse.up();
+  const [ex, ey] = await at(26, 8); // empty space inside the view
+  await page.mouse.move(ex, ey);
+  await page.mouse.down();
+  await page.mouse.move(ex - 120, ey - 60, { steps: 6 });
+  await page.mouse.up();
   const pinAfter = await at(4, 6);
-  check("dragging empty space pans the view", Math.round(pinBefore[0] - pinAfter[0]) === 120 && Math.round(pinBefore[1] - pinAfter[1]) === 60
-    && (await code()) === "układ1 = loop(VoltageSource(), Resistor())");
+  check(
+    "dragging empty space pans the view",
+    Math.round(pinBefore[0] - pinAfter[0]) === 120 &&
+      Math.round(pinBefore[1] - pinAfter[1]) === 60 &&
+      (await code()) === "układ1 = loop(VoltageSource(), Resistor())",
+  );
   await cell.getByRole("button", { name: "Dopasuj widok" }).click();
   check("fit shows the whole drawing", (await grid.locator(".element").count()) === 2);
 
   // shift + drag selects many; the group moves together and keeps its connections
-  const [bx0, by0] = await at(1, 0); const [bx1, by1] = await at(23, 14);
+  const [bx0, by0] = await at(1, 0);
+  const [bx1, by1] = await at(23, 14);
   await page.keyboard.down("Shift");
-  await page.mouse.move(bx0, by0); await page.mouse.down(); await page.mouse.move(bx1, by1, { steps: 6 }); await page.mouse.up();
+  await page.mouse.move(bx0, by0);
+  await page.mouse.down();
+  await page.mouse.move(bx1, by1, { steps: 6 });
+  await page.mouse.up();
   await page.keyboard.up("Shift");
   const selected = await grid.locator(".element.selected").count();
-  const [gx, gy] = await at(14, 3); const [hx, hy] = await at(16, 5);
-  await page.mouse.move(gx, gy); await page.mouse.down(); await page.mouse.move(hx, hy, { steps: 6 }); await page.mouse.up();
-  check("shift + drag selects many and moves them together", selected === 2
-    && (await code()) === "układ1 = loop(VoltageSource(), Resistor())" && (await grid.locator(".open-pin").count()) === 0);
-  await page.keyboard.press("Meta+z");  // back where it was, for the segment check below
+  const [gx, gy] = await at(14, 3);
+  const [hx, hy] = await at(16, 5);
+  await page.mouse.move(gx, gy);
+  await page.mouse.down();
+  await page.mouse.move(hx, hy, { steps: 6 });
+  await page.mouse.up();
+  check(
+    "shift + drag selects many and moves them together",
+    selected === 2 &&
+      (await code()) === "układ1 = loop(VoltageSource(), Resistor())" &&
+      (await grid.locator(".open-pin").count()) === 0,
+  );
+  await page.keyboard.press("Meta+z"); // back where it was, for the segment check below
 
-  check("moving a wire segment keeps connections", (await code()) === "układ1 = loop(VoltageSource(), Resistor())"
-    && (await grid.locator(".open-pin").count()) === 0);
+  check(
+    "moving a wire segment keeps connections",
+    (await code()) === "układ1 = loop(VoltageSource(), Resistor())" && (await grid.locator(".open-pin").count()) === 0,
+  );
 
   // the name in the corner is a variable in code: "Układ 1" → układ1; renaming renames it
   await cell.getByTitle(/^W kodzie:/).click();
@@ -389,7 +538,10 @@ try {
   await page.keyboard.insertText("mójobwód.solve(I_R_1=1)\ndisplay(schematic(mójobwód))");
   await user.getByRole("button", { name: /Uruchom/ }).click();
   await user.locator('[data-output="svg"] svg').waitFor({ timeout: 30_000 });
-  check("schematic name is a variable in code", hint === "mójobwód" && (await user.locator('[data-output="error"]').count()) === 0);
+  check(
+    "schematic name is a variable in code",
+    hint === "mójobwód" && (await user.locator('[data-output="error"]').count()) === 0,
+  );
 
   // the examples notebook from the menu runs without a single error
   await start();
@@ -398,8 +550,12 @@ try {
   await pythonReady(60_000);
   await page.getByRole("button", { name: "Uruchom wszystko" }).click();
   await page.locator('[data-cell="code"]').last().locator("[data-outputs]").waitFor({ timeout: 60_000 });
-  check("examples run without errors", (await page.locator('[data-output="error"]').count()) === 0
-    && (await page.locator('[data-cell="code"] [data-outputs]').count()) === (await page.locator('[data-cell="code"]').count()));
+  check(
+    "examples run without errors",
+    (await page.locator('[data-output="error"]').count()) === 0 &&
+      (await page.locator('[data-cell="code"] [data-outputs]').count()) ===
+        (await page.locator('[data-cell="code"]').count()),
+  );
 
   // the table of contents: on a wide screen, headings of the text cells; a click scrolls there
   {
@@ -411,10 +567,16 @@ try {
     const entries = await outline.locator("a").allInnerTexts();
     await outline.getByRole("link", { name: "5. Za mało danych" }).click();
     await page.waitForTimeout(800);
-    const top = await page.locator("h2", { hasText: "5. Za mało danych" }).evaluate((h) => h.getBoundingClientRect().top);
-    check("table of contents: headings, a click scrolls there, the section is marked",
-      entries.includes("1. Nieznany opór z pomiaru napięcia") && top > 40 && top < 140
-      && (await outline.locator('a[aria-current="location"]').innerText()) === "5. Za mało danych");
+    const top = await page
+      .locator("h2", { hasText: "5. Za mało danych" })
+      .evaluate((h) => h.getBoundingClientRect().top);
+    check(
+      "table of contents: headings, a click scrolls there, the section is marked",
+      entries.includes("1. Nieznany opór z pomiaru napięcia") &&
+        top > 40 &&
+        top < 140 &&
+        (await outline.locator('a[aria-current="location"]').innerText()) === "5. Za mało danych",
+    );
     await toggle.click();
     await page.waitForTimeout(400); // it slides away
     check("table of contents: its switch hides it", !(await outline.isVisible()));
@@ -422,11 +584,10 @@ try {
     await page.setViewportSize({ width: 1440, height: 900 });
   }
 
-
   // text cells: rendered; a click shows the plain Markdown; leaving it renders it again
   {
     const cell = page.locator('[data-cell="markdown"]').first();
-    const rendered = (await cell.getByTitle("Kliknij, żeby edytować").innerText());
+    const rendered = await cell.getByTitle("Kliknij, żeby edytować").innerText();
     await cell.getByTitle("Kliknij, żeby edytować").click();
     const field = cell.locator("textarea");
     const source = await field.inputValue();
@@ -434,16 +595,20 @@ try {
     await page.keyboard.insertText("\n\nNowe zdanie z **pogrubieniem** i wzorem $U = R I$");
     await page.mouse.click(4, 400); // leave the field: a click in the empty margin
     const view = cell.getByTitle("Kliknij, żeby edytować");
-    check("text cells: click edits the Markdown, leaving renders it",
-      source.includes("**▶ Uruchom wszystko**") && !rendered.includes("**")
-      && (await view.locator("strong").last().innerText()) === "pogrubieniem" && (await view.locator(".katex").count()) > 0);
+    check(
+      "text cells: click edits the Markdown, leaving renders it",
+      source.includes("**▶ Uruchom wszystko**") &&
+        !rendered.includes("**") &&
+        (await view.locator("strong").last().innerText()) === "pogrubieniem" &&
+        (await view.locator(".katex").count()) > 0,
+    );
     // taken up again, it is a block with two tabs: its Markdown and the preview
     await cell.getByTitle("Kliknij, żeby edytować").click();
     const editing = await field.isVisible();
     await cell.getByRole("tab", { name: /Pokaż tekst/ }).click();
-    const previewed = !(await field.isVisible()) && await cell.getByTitle("Kliknij, żeby edytować").isVisible();
+    const previewed = !(await field.isVisible()) && (await cell.getByTitle("Kliknij, żeby edytować").isVisible());
     await cell.getByRole("tab", { name: "Edytuj Markdown" }).click();
-    check("text cells: tabs switch the Markdown and its preview", editing && previewed && await field.isVisible());
+    check("text cells: tabs switch the Markdown and its preview", editing && previewed && (await field.isVisible()));
     await page.keyboard.press("Escape");
   }
 
@@ -455,7 +620,7 @@ try {
     const hiddenInside = !(await pill.isVisible());
     const box = await first.boundingBox();
     await page.mouse.move(box.x + 300, box.y + box.height + 4); // just below the cell's edge
-    check("add buttons show on the edge only", hiddenInside && await pill.isVisible());
+    check("add buttons show on the edge only", hiddenInside && (await pill.isVisible()));
   }
 
   // the file: the note as the server keeps it, read by Python (electro_notes) — and an old (v1) file
@@ -473,16 +638,39 @@ try {
     if (!python.includes("Notebook(")) console.log(python);
 
     const old = join(shots, "stary.electro.json");
-    writeFileSync(old, JSON.stringify({ version: 1, title: "Stary notatnik", codeInPdf: true, cells: [
-      { id: "a", type: "markdown", source: "Tekst z **wersji 1**" },
-      { id: "b", type: "schematic", name: "mostek", schematic: { elements: [], wires: [] }, data: "I_A_1 = 0", outputs: [] },
-    ] }));
+    writeFileSync(
+      old,
+      JSON.stringify({
+        version: 1,
+        title: "Stary notatnik",
+        codeInPdf: true,
+        cells: [
+          { id: "a", type: "markdown", source: "Tekst z **wersji 1**" },
+          {
+            id: "b",
+            type: "schematic",
+            name: "mostek",
+            schematic: { elements: [], wires: [] },
+            data: "I_A_1 = 0",
+            outputs: [],
+          },
+        ],
+      }),
+    );
     await start(); // opening a file: on the home page, the note at the top
     await page.locator('input[type="file"]').setInputFiles(old);
-    await page.getByTitle("Kliknij, żeby zmienić tytuł").filter({ hasText: "Stary notatnik" }).waitFor({ timeout: 10_000 });
+    await page
+      .getByTitle("Kliknij, żeby zmienić tytuł")
+      .filter({ hasText: "Stary notatnik" })
+      .waitFor({ timeout: 10_000 });
     const saved = (await noteOnServer()).document;
-    check("an old (v1) file becomes a note, migrated to the current format", saved.version === 2
-      && saved.format === "electro-notebook" && saved.title === "Stary notatnik" && !("data" in saved.cells[1]));
+    check(
+      "an old (v1) file becomes a note, migrated to the current format",
+      saved.version === 2 &&
+        saved.format === "electro-notebook" &&
+        saved.title === "Stary notatnik" &&
+        !("data" in saved.cells[1]),
+    );
   }
 
   // notes at their addresses: the list with thumbnails; a new note; back and forth; a conflict
@@ -495,15 +683,24 @@ try {
       await page.keyboard.press("Enter");
     };
     const titleIs = (t, timeout = 10_000) =>
-      page.waitForFunction((t) => document.querySelector('button[title="Kliknij, żeby zmienić tytuł"]')?.textContent === t, t, { timeout });
+      page.waitForFunction(
+        (t) => document.querySelector('button[title="Kliknij, żeby zmienić tytuł"]')?.textContent === t,
+        t,
+        { timeout },
+      );
     const notes = notesList.locator("li[data-id]");
-    const { document: { id } } = await noteOnServer();
+    const {
+      document: { id },
+    } = await noteOnServer();
     const firstTitle = await title.innerText();
     await home();
     const card = notesList.locator(`li[data-id="${id}"]`);
     await card.waitFor({ timeout: 10_000 });
-    check("home: the notes with their first pages as thumbnails",
-      (await card.getByText(firstTitle, { exact: true }).count()) === 1 && (await card.locator(".page").innerText()).includes("wersji 1"));
+    check(
+      "home: the notes with their first pages as thumbnails",
+      (await card.getByText(firstTitle, { exact: true }).count()) === 1 &&
+        (await card.locator(".page").innerText()).includes("wersji 1"),
+    );
 
     const before = await notes.count();
     await notesList.getByRole("button", { name: "Nowy", exact: true }).click();
@@ -513,13 +710,18 @@ try {
     await page.waitForURL(/\/n\/[0-9a-f]{32}\/druga-notatka$/, { timeout: 10_000 }); // the title is in the address
     const second = noteRef();
     let saved = "";
-    for (let i = 0; i < 40 && saved !== "Druga notatka"; i++) { // the address follows at once, the save a moment later
+    for (let i = 0; i < 40 && saved !== "Druga notatka"; i++) {
+      // the address follows at once, the save a moment later
       await page.waitForTimeout(250);
       saved = (await noteOnServer()).document.title;
     }
     check("renaming a note changes its address", saved === "Druga notatka");
     await page.goBack(); // the browser's back: the list again
-    await page.waitForFunction((n) => document.querySelectorAll('ul[aria-label="Moje notatki"] > li[data-id]').length === n, before + 1, { timeout: 10_000 });
+    await page.waitForFunction(
+      (n) => document.querySelectorAll('ul[aria-label="Moje notatki"] > li[data-id]').length === n,
+      before + 1,
+      { timeout: 10_000 },
+    );
     await card.getByRole("link").click();
     await titleIs(firstTitle);
     check("a new note; back to the list; the first note opens from its card", noteRef() === id);
@@ -527,8 +729,11 @@ try {
     await page.goto(`${app}/n/${second}`); // the id alone: the note, and its title joins the address
     await titleIs("Druga notatka", 60_000);
     await page.waitForURL(new RegExp(`/n/${second}/druga-notatka$`));
-    psql(postgres, `SET search_path TO ${schema};
-      INSERT INTO legacy_slugs VALUES ('00000000-0000-0000-0000-00000000e2e0', 'stara-notatka', '${second}')`);
+    psql(
+      postgres,
+      `SET search_path TO ${schema};
+      INSERT INTO legacy_slugs VALUES ('00000000-0000-0000-0000-00000000e2e0', 'stara-notatka', '${second}')`,
+    );
     await page.goto(`${app}/notes/stara-notatka`); // an address from before folders
     await page.waitForURL(new RegExp(`/n/${second}/druga-notatka$`), { timeout: 60_000 });
     await page.goto(`${app}/n/0000000000000000000000000000dead`);
@@ -539,13 +744,22 @@ try {
     await page.goto(`${app}/n/${id}`);
     await titleIs(firstTitle, 60_000);
     const note = await (await api(`/api/notes/${id}`)).json();
-    await api(`/api/notes/${id}`, { method: "PUT", headers: { "content-type": "application/json" },
-      body: JSON.stringify({ document: { ...note.document, title: "Zmienione gdzie indziej" }, baseRevision: note.revision }) });
+    await api(`/api/notes/${id}`, {
+      method: "PUT",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        document: { ...note.document, title: "Zmienione gdzie indziej" },
+        baseRevision: note.revision,
+      }),
+    });
     await setTitle(`${firstTitle} (tutaj)`);
     await page.getByRole("alert").waitFor({ timeout: 10_000 });
     await page.getByRole("alert").getByRole("button", { name: "Z serwera" }).click();
     await titleIs("Zmienione gdzie indziej");
-    check("a conflict is shown and resolved by taking the server's version", (await page.getByRole("alert").count()) === 0);
+    check(
+      "a conflict is shown and resolved by taking the server's version",
+      (await page.getByRole("alert").count()) === 0,
+    );
 
     await home();
     const drugi = notesList.locator(`li[data-id="${second}"]`);
@@ -561,7 +775,11 @@ try {
   {
     await start();
     page.once("dialog", (d) => d.accept("Laboratorium"));
-    if (process.env.SHOTS) { await notesList.getByRole("button", { name: "Nowy", exact: true }).click(); await page.screenshot({ path: `${process.env.SHOTS}/new-menu.png` }); await page.keyboard.press("Escape"); }
+    if (process.env.SHOTS) {
+      await notesList.getByRole("button", { name: "Nowy", exact: true }).click();
+      await page.screenshot({ path: `${process.env.SHOTS}/new-menu.png` });
+      await page.keyboard.press("Escape");
+    }
     await notesList.getByRole("button", { name: "Nowy", exact: true }).click();
     await notesList.getByRole("menuitem", { name: "Folder" }).click();
     const lab = notesList.locator("li[data-id]", { hasText: "Laboratorium" });
@@ -570,7 +788,10 @@ try {
     await card.hover();
     await card.getByRole("button", { name: "Więcej" }).click();
     await card.getByRole("menuitem", { name: "Przenieś do…" }).click();
-    await page.getByRole("dialog").getByRole("button", { name: /^Laboratorium/ }).click();
+    await page
+      .getByRole("dialog")
+      .getByRole("button", { name: /^Laboratorium/ })
+      .click();
     await card.waitFor({ state: "detached", timeout: 10_000 });
     await lab.locator(".page").first().waitFor({ timeout: 10_000 }); // the note's first page, small, in the folder's picture
     if (process.env.SHOTS) await page.screenshot({ path: `${process.env.SHOTS}/home-folder.png` });
@@ -601,8 +822,10 @@ try {
     if (process.env.SHOTS) await dialog.screenshot({ path: `${process.env.SHOTS}/share.png` });
     await page.keyboard.press("Escape");
     await lab.getByText(/udostępnione/).waitFor({ timeout: 10_000 });
-    check("sharing: an unknown email is said so; a link is made; the card says it is shared",
-      unknown.includes("nikt@example.com") && /\/join\/[\w-]{20,}$/.test(link));
+    check(
+      "sharing: an unknown email is said so; a link is made; the card says it is shared",
+      unknown.includes("nikt@example.com") && /\/join\/[\w-]{20,}$/.test(link),
+    );
 
     const other = await browser.newContext({ viewport: { width: 1440, height: 900 }, locale: "pl-PL" });
     await other.addCookies([{ name: "session", value: otherSession, url: `http://localhost:${port}` }]);
@@ -612,7 +835,10 @@ try {
     await guest.waitForURL(/\/f\/[0-9a-f]{32}\/laboratorium$/, { timeout: 10_000 });
     await guest.getByText("Tylko do odczytu").waitFor();
     const newButtons = await guest.getByRole("button", { name: "Nowy", exact: true }).count();
-    await guest.getByRole("list", { name: "Zawartość folderu" }).getByRole("link", { name: /Zmienione gdzie indziej/ }).click();
+    await guest
+      .getByRole("list", { name: "Zawartość folderu" })
+      .getByRole("link", { name: /Zmienione gdzie indziej/ })
+      .click();
     await guest.getByText("Tylko do odczytu — zmiany tutaj się nie zapiszą.").waitFor({ timeout: 10_000 });
     await guest.getByRole("button", { name: "Zrób kopię" }).click();
     await guest.waitForURL(/\/n\/[0-9a-f]{32}\/zmienione-gdzie-indziej-kopia$/, { timeout: 10_000 });
@@ -621,14 +847,19 @@ try {
     const theirs = guest.getByRole("list", { name: "Moje notatki" });
     await theirs.getByText("Zmienione gdzie indziej (kopia)").waitFor({ timeout: 10_000 });
     const shared = await theirs.locator("li[data-id]", { hasText: "Laboratorium" }).innerText();
-    check("sharing: the link opens the folder read only; a copy of a note is the other's own",
-      newButtons === 0 && shared.includes("od E2E") && shared.includes("tylko odczyt"));
+    check(
+      "sharing: the link opens the folder read only; a copy of a note is the other's own",
+      newButtons === 0 && shared.includes("od E2E") && shared.includes("tylko odczyt"),
+    );
 
     // the owner sees who joined
     await lab.hover();
     await lab.getByRole("button", { name: "Więcej" }).click();
     await lab.getByRole("menuitem", { name: "Udostępnij…" }).click();
-    await dialog.getByRole("list", { name: "Osoby z dostępem" }).getByText("Ola", { exact: true }).waitFor({ timeout: 10_000 });
+    await dialog
+      .getByRole("list", { name: "Osoby z dostępem" })
+      .getByText("Ola", { exact: true })
+      .waitFor({ timeout: 10_000 });
     const role = await dialog.getByRole("button", { name: "Dostęp: Ola: Może oglądać" }).count();
     if (process.env.SHOTS) {
       await page.waitForTimeout(400);
@@ -646,7 +877,7 @@ try {
   if (errors.length) console.log(errors);
   await browser.close();
 } finally {
-  process.kill(-server.pid);  // pnpm and the vite it started
+  process.kill(-server.pid); // pnpm and the vite it started
   process.kill(-notes.pid);
   psql(postgres, `DROP SCHEMA IF EXISTS ${schema} CASCADE`);
 }

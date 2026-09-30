@@ -1,7 +1,7 @@
 // /n/:id/:name — a note, read from the server and edited (or only read, if it was shared with the
 // user to read). The way back is the folder it is in; the name in the address follows its title.
 import { useAtomSet } from "@effect-atom/atom-react";
-import { previewOf, RANK, slugify, type Role } from "@electro/notes-api";
+import { previewOf, RANK, type Role, slugify } from "@electro/notes-api";
 import { Exit } from "effect";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -10,8 +10,8 @@ import { Notebook, NoteSkeleton } from "@/features/notebook";
 import { failure, folderUrl, fromDocument, getNote, noteUrl, toDocument } from "@/features/notes";
 import { ShareDialog } from "@/features/sharing";
 import type { Notebook as NotebookData } from "@/shared/model/types";
-import { Back } from "@/shared/ui/icons";
 import { IslandLink, Islands } from "@/shared/ui/Island";
+import { Back } from "@/shared/ui/icons";
 import { PageMessage } from "@/shared/ui/PageMessage";
 
 type Loaded =
@@ -43,7 +43,10 @@ export function NotePage() {
       const { document, revision, role, path } = exit.value;
       const up = path.at(-1);
       setLoaded({
-        kind: "ready", notebook: fromDocument(document), revision, role,
+        kind: "ready",
+        notebook: fromDocument(document),
+        revision,
+        role,
         back: up ? { to: folderUrl(up.id, up.name), label: up.name } : home,
       });
     });
@@ -63,33 +66,60 @@ export function NotePage() {
           readOnly={RANK[loaded.role] < RANK.editor}
           {...(loaded.role === "owner" ? { onShare: setSharing } : {})}
           back={loaded.back}
-          onTitle={(next) => { // the name in the address follows the title
+          onTitle={(next) => {
+            // the name in the address follows the title
             if (name !== slugify(next || "notatka")) navigate(noteUrl(id, next), { replace: true });
           }}
         />
         {sharing && (
-          <ShareDialog item={{ id, name: sharing.title, kind: "note", preview: previewOf(toDocument(sharing)), previews: [], count: 0 }}
-                       onClose={() => setSharing(null)} />
+          <ShareDialog
+            item={{
+              id,
+              name: sharing.title,
+              kind: "note",
+              preview: previewOf(toDocument(sharing)),
+              previews: [],
+              count: 0,
+            }}
+            onClose={() => setSharing(null)}
+          />
         )}
       </>
     );
   }
   const back = (
-    <Islands side="left"><IslandLink to={home.to} title={home.label} aria-label={home.label}><Back /></IslandLink></Islands>
+    <Islands side="left">
+      <IslandLink to={home.to} title={home.label} aria-label={home.label}>
+        <Back />
+      </IslandLink>
+    </Islands>
   );
-  if (loaded.kind === "loading") return <>{back}<NoteSkeleton /></>;
+  if (loaded.kind === "loading")
+    return (
+      <>
+        {back}
+        <NoteSkeleton />
+      </>
+    );
   return (
     <>
       {back}
       {loaded.kind === "missing" && (
         <PageMessage title={t("missing")}>
-          <p className="text-muted">{t("maybeDeleted")} <Link to="/">{home.label}</Link></p>
+          <p className="text-muted">
+            {t("maybeDeleted")} <Link to="/">{home.label}</Link>
+          </p>
         </PageMessage>
       )}
       {loaded.kind === "unreachable" && (
         <PageMessage title={t("unreachable")}>
           <p className="text-muted">{t("unreachableText")}</p>
-          <button className="inline-flex items-center px-2.5 py-1 rounded-md border border-transparent bg-accent text-[15px] text-white hover:brightness-108" onClick={() => setReads((n) => n + 1)}>{t("retry")}</button>
+          <button
+            className="inline-flex items-center px-2.5 py-1 rounded-md border border-transparent bg-accent text-[15px] text-white hover:brightness-108"
+            onClick={() => setReads((n) => n + 1)}
+          >
+            {t("retry")}
+          </button>
         </PageMessage>
       )}
     </>

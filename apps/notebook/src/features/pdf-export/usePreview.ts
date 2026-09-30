@@ -6,7 +6,11 @@ import type { PdfSettings } from "./settings";
 import { compile, warmUp } from "./typst/compile";
 import { toTypst, typstFile } from "./typst/document";
 
-export interface Page { url: string; width: number; height: number }
+export interface Page {
+  url: string;
+  width: number;
+  height: number;
+}
 
 export type Preview =
   | { kind: "loading" }
@@ -37,8 +41,13 @@ export function usePreview(notebook: Notebook, pdf: PdfSettings, lang: string) {
       shown.current.forEach((p) => URL.revokeObjectURL(p.url));
       shown.current = pagesOf(out.svg);
       if (!shown.current.length) return setPreview({ kind: "unshown" });
-      setPreview({ kind: "ready", pdf: out.pdf, pages: shown.current, unreadable: out.bad.length,
-                   typst: typstFile(document, out.bad) });
+      setPreview({
+        kind: "ready",
+        pdf: out.pdf,
+        pages: shown.current,
+        unreadable: out.bad.length,
+        typst: typstFile(document, out.bad),
+      });
     }, 150);
     return () => {
       alive = false;

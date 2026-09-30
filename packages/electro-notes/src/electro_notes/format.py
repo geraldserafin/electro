@@ -33,13 +33,26 @@ import uuid
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Union
+from typing import Any
 
 from electro_schematic import Schematic
 
 from .issues import (
-    BrokenDrawing, FormatError, NewerVersion, NoCellId, NoSuchSchematic, NotADrawing, NotAnObject, NotANotebook, NotJson,
-    NotText, NoVersion, OtherFormat, RepeatedCellId, RepeatedSchematicName, SchematicExists, UnknownCellType,
+    BrokenDrawing,
+    NewerVersion,
+    NoCellId,
+    NoSuchSchematic,
+    NotADrawing,
+    NotAnObject,
+    NotANotebook,
+    NotJson,
+    NotText,
+    NoVersion,
+    OtherFormat,
+    RepeatedCellId,
+    RepeatedSchematicName,
+    SchematicExists,
+    UnknownCellType,
     UnnamedSchematic,
 )
 
@@ -56,6 +69,7 @@ def new_id() -> str:
 
 
 # --------------------------------------------------------------------------- cells
+
 
 @dataclass
 class MarkdownCell:
@@ -96,7 +110,7 @@ class SchematicCell:
         return variable(self.name)
 
 
-Cell = Union[MarkdownCell, CodeCell, SchematicCell]
+Cell = MarkdownCell | CodeCell | SchematicCell
 
 
 def variable(name: str) -> str:
@@ -110,6 +124,7 @@ def variable(name: str) -> str:
 
 
 # --------------------------------------------------------------------------- the notebook
+
 
 @dataclass
 class Notebook:
@@ -216,6 +231,7 @@ def _cell_to_dict(c: Cell) -> dict[str, Any]:
 
 # --------------------------------------------------------------------------- reading files
 
+
 def load(path) -> Notebook:
     """Read a ``.electro.json`` file (any version this library knows)."""
     return loads(Path(path).read_text(encoding="utf-8"))
@@ -257,8 +273,12 @@ def migrate(data: Any) -> dict[str, Any]:
     if version == 1:  # before the file format had a name, an id and settings
         stamp = now()
         data = {
-            "format": FORMAT, "version": 2, "id": uuid.uuid4().hex,
-            "title": data.get("title", ""), "created": stamp, "modified": stamp,
+            "format": FORMAT,
+            "version": 2,
+            "id": uuid.uuid4().hex,
+            "title": data.get("title", ""),
+            "created": stamp,
+            "modified": stamp,
             "settings": {"codeInPdf": data.get("codeInPdf", True)},
             "cells": [_cell_v1(c) for c in data["cells"]],
         }
@@ -306,8 +326,11 @@ def _check(data: dict[str, Any]) -> None:
                 raise RepeatedSchematicName(f"{where}.name", c["name"])
             names.add(c["name"])
             drawing = c.get("schematic")
-            if not isinstance(drawing, dict) or not isinstance(drawing.get("elements"), list) \
-                    or not isinstance(drawing.get("wires"), list):
+            if (
+                not isinstance(drawing, dict)
+                or not isinstance(drawing.get("elements"), list)
+                or not isinstance(drawing.get("wires"), list)
+            ):
                 raise NotADrawing(f"{where}.schematic")
 
 
@@ -315,15 +338,27 @@ def _cell_from_dict(c: dict[str, Any], where: str) -> Cell:
     if c["type"] == "markdown":
         return MarkdownCell(c["source"], c["id"], _rest(c, "source"))
     if c["type"] == "code":
-        return CodeCell(c["source"], c["id"], list(c.get("outputs") or []), c.get("execution"),
-                        _rest(c, "source", "outputs", "execution"))
+        return CodeCell(
+            c["source"],
+            c["id"],
+            list(c.get("outputs") or []),
+            c.get("execution"),
+            _rest(c, "source", "outputs", "execution"),
+        )
     try:
         drawing = Schematic.from_json(json.dumps(c["schematic"]))
     except (TypeError, KeyError) as err:
         raise BrokenDrawing(f"{where}.schematic", repr(err)) from None
-    return SchematicCell(c["name"], drawing, c["id"], c.get("view", "schematic"), c.get("results"),
-                         c.get("problems"), bool(c.get("stale", False)),
-                         _rest(c, "name", "schematic", "view", "results", "problems", "stale"))
+    return SchematicCell(
+        c["name"],
+        drawing,
+        c["id"],
+        c.get("view", "schematic"),
+        c.get("results"),
+        c.get("problems"),
+        bool(c.get("stale", False)),
+        _rest(c, "name", "schematic", "view", "results", "problems", "stale"),
+    )
 
 
 def _rest(c: dict[str, Any], *known: str) -> dict[str, Any]:

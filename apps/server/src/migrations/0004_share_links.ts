@@ -1,5 +1,5 @@
-import { SqlClient } from "@effect/sql"
-import { Effect } from "effect"
+import { SqlClient } from "@effect/sql";
+import { Effect } from "effect";
 
 /**
  * Links, as sharing needs them: one per item, and its owner can copy it again whenever they like
@@ -8,8 +8,8 @@ import { Effect } from "effect"
  * any), so it is made anew.
  */
 export default Effect.gen(function* () {
-  const sql = yield* SqlClient.SqlClient
-  yield* sql`DROP TABLE share_links`
+  const sql = yield* SqlClient.SqlClient;
+  yield* sql`DROP TABLE share_links`;
   yield* sql`
     CREATE TABLE share_links (
       item_id     text PRIMARY KEY REFERENCES items ON DELETE CASCADE,
@@ -18,5 +18,5 @@ export default Effect.gen(function* () {
       created_by  uuid REFERENCES users ON DELETE SET NULL,
       created_at  timestamptz NOT NULL DEFAULT now()
     )
-  `
-})
+  `;
+});

@@ -22,9 +22,8 @@ PREFIXES = {
 }
 UNITS = ("Ω", "ohm", "V", "A", "F", "H", "W", "Hz", "S")
 
-_NUMBER = re.compile(
-    r"^\s*([+-]?\d+(?:[.,]\d+)?(?:e[+-]?\d+)?)\s*([pnuµmkMG]?)\s*(?:%s)?\s*$" % "|".join(UNITS)
-)
+_UNITS = "|".join(UNITS)
+_NUMBER = re.compile(rf"^\s*([+-]?\d+(?:[.,]\d+)?(?:e[+-]?\d+)?)\s*([pnuµmkMG]?)\s*(?:{_UNITS})?\s*$")
 _RKM = re.compile(r"^\s*(\d+)([pnuµmkMGR])(\d+)\s*$")  # "4k7" = 4.7k, "4R7" = 4.7
 _IDENT = re.compile(r"^[^\W\d]\w*$")
 _FRACTION = re.compile(r"^\s*([+-]?\d+)\s*/\s*(\d+)\s*$")
@@ -95,14 +94,22 @@ def to_text(value) -> str | None:
     return str(value)
 
 
-_ENG = [(10**9, "G"), (10**6, "M"), (10**3, "k"), (1, ""), (sp.Rational(1, 10**3), "m"),
-        (sp.Rational(1, 10**6), "µ"), (sp.Rational(1, 10**9), "n"), (sp.Rational(1, 10**12), "p")]
+_ENG = [
+    (10**9, "G"),
+    (10**6, "M"),
+    (10**3, "k"),
+    (1, ""),
+    (sp.Rational(1, 10**3), "m"),
+    (sp.Rational(1, 10**6), "µ"),
+    (sp.Rational(1, 10**9), "n"),
+    (sp.Rational(1, 10**12), "p"),
+]
 
 
 def _eng_real(x: float, unit: str) -> str:
     if x == 0:
         return f"0 {unit}".strip()
-    for scale, prefix in _ENG:
+    for scale, prefix in _ENG:  # noqa: B007 — prefix: the one the loop stops at
         if abs(x) >= float(scale) * 0.9995:
             break
     mantissa = x / float(scale)

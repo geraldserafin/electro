@@ -1,5 +1,5 @@
-import { SqlClient } from "@effect/sql"
-import { Effect } from "effect"
+import { SqlClient } from "@effect/sql";
+import { Effect } from "effect";
 
 /**
  * Who signs in. A user has one account per provider they signed in with (Google, GitHub,
@@ -7,7 +7,7 @@ import { Effect } from "effect"
  * cookie's token, stored hashed: a leaked table does not sign anyone in.
  */
 export default Effect.gen(function* () {
-  const sql = yield* SqlClient.SqlClient
+  const sql = yield* SqlClient.SqlClient;
   yield* sql`
     CREATE TABLE users (
       id          uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -16,7 +16,7 @@ export default Effect.gen(function* () {
       avatar_url  text,
       created_at  timestamptz NOT NULL DEFAULT now()
     )
-  `
+  `;
   yield* sql`
     CREATE TABLE accounts (
       provider          text NOT NULL,
@@ -24,13 +24,13 @@ export default Effect.gen(function* () {
       user_id           uuid NOT NULL REFERENCES users ON DELETE CASCADE,
       PRIMARY KEY (provider, provider_user_id)
     )
-  `
+  `;
   yield* sql`
     CREATE TABLE sessions (
       id          text PRIMARY KEY,  -- sha256 of the token in the cookie
       user_id     uuid NOT NULL REFERENCES users ON DELETE CASCADE,
       expires_at  timestamptz NOT NULL
     )
-  `
-  yield* sql`CREATE INDEX sessions_by_user ON sessions (user_id)`
-})
+  `;
+  yield* sql`CREATE INDEX sessions_by_user ON sessions (user_id)`;
+});

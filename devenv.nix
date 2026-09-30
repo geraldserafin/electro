@@ -21,7 +21,7 @@ let
   };
 in
 {
-  packages = [ pkgs.uv pkgs.arduino-cli pkgs.git-lfs ]; # git-lfs: the in-page Arduino compiler (public/arduino/*.wasm, pico.tar)
+  packages = [ pkgs.uv pkgs.arduino-cli pkgs.git-lfs pkgs.ruff ]; # git-lfs: the in-page Arduino compiler (public/arduino/*.wasm, pico.tar)
 
   env = pkgs.lib.optionalAttrs (pkgs.stdenv.isDarwin && pkgs.stdenv.isAarch64) {
     ARDUINO_COMPILER_PATH = "${avrToolchain}/bin/";
@@ -63,6 +63,21 @@ in
   };
 
   dotenv.enable = true;
+
+  # installed into .git/hooks on entering the shell: conventional commit messages, and the code formatted and
+  # linted as it is committed (Biome for JS/TS/JSON/CSS: biome.json, the version in package.json; ruff for
+  # Python: pyproject.toml)
+  git-hooks.hooks = {
+    convco.enable = true;
+    biome = {
+      enable = true;
+      name = "biome";
+      entry = "pnpm exec biome check --write --no-errors-on-unmatched --files-ignore-unknown=true";
+      types_or = [ "javascript" "jsx" "ts" "tsx" "json" "css" ];
+    };
+    ruff.enable = true;
+    ruff-format.enable = true;
+  };
 
   # the Arduino cores and the libraries the notebook offers (downloaded once), for the scripts above
   scripts.arduino-setup.exec = "(arduino-cli core list | grep -q arduino:avr || arduino-cli core install arduino:avr); (arduino-cli lib list | grep -q '^Servo ' || arduino-cli lib install Servo); (arduino-cli lib list | grep -q '^LiquidCrystal ' || arduino-cli lib install LiquidCrystal); (arduino-cli lib list | grep -q '^RTClib ' || arduino-cli lib install 'LiquidCrystal I2C' 'Adafruit SSD1306' RTClib); (arduino-cli lib list | grep -q '^Adafruit ILI9341 ' || arduino-cli lib install 'Adafruit ILI9341'); (arduino-cli core list | grep -q rp2040:rp2040 || (arduino-cli core update-index --additional-urls ${picoCore} && arduino-cli core install rp2040:rp2040 --additional-urls ${picoCore}))";

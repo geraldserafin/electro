@@ -1,6 +1,6 @@
-import { SqlClient } from "@effect/sql"
-import { Effect } from "effect"
-import { randomUUID } from "node:crypto"
+import { randomUUID } from "node:crypto";
+import { SqlClient } from "@effect/sql";
+import { Effect } from "effect";
 
 /**
  * Folders: each user's notes in folders, folders in folders; and shares — a note or a folder
@@ -13,7 +13,7 @@ import { randomUUID } from "node:crypto"
  * `share_links` is for sharing by link (a later step; 0004 gives it its final shape).
  */
 export default Effect.gen(function* () {
-  const sql = yield* SqlClient.SqlClient
+  const sql = yield* SqlClient.SqlClient;
   yield* sql`
     CREATE TABLE items (
       id          text PRIMARY KEY,
@@ -31,9 +31,9 @@ export default Effect.gen(function* () {
       preview     jsonb,
       CHECK ((kind = 'note') = (document IS NOT NULL))
     )
-  `
-  yield* sql`CREATE INDEX items_by_parent ON items (parent_id)`
-  yield* sql`CREATE INDEX items_at_top ON items (owner_id) WHERE parent_id IS NULL`
+  `;
+  yield* sql`CREATE INDEX items_by_parent ON items (parent_id)`;
+  yield* sql`CREATE INDEX items_at_top ON items (owner_id) WHERE parent_id IS NULL`;
   yield* sql`
     CREATE TABLE shares (
       item_id   text NOT NULL REFERENCES items ON DELETE CASCADE,
@@ -44,8 +44,8 @@ export default Effect.gen(function* () {
       hidden    boolean NOT NULL DEFAULT false,  -- taken off the user's home screen (still theirs to open)
       PRIMARY KEY (item_id, user_id)
     )
-  `
-  yield* sql`CREATE INDEX shares_by_user ON shares (user_id)`
+  `;
+  yield* sql`CREATE INDEX shares_by_user ON shares (user_id)`;
   yield* sql`
     CREATE TABLE share_links (
       token_hash  text PRIMARY KEY,  -- sha256 of the token in the link
@@ -54,7 +54,7 @@ export default Effect.gen(function* () {
       created_by  uuid REFERENCES users ON DELETE SET NULL,
       expires_at  timestamptz NOT NULL
     )
-  `
+  `;
   yield* sql`
     CREATE TABLE legacy_slugs (
       owner_id  uuid NOT NULL REFERENCES users ON DELETE CASCADE,
@@ -62,26 +62,29 @@ export default Effect.gen(function* () {
       item_id   text NOT NULL REFERENCES items ON DELETE CASCADE,
       PRIMARY KEY (owner_id, slug)
     )
-  `
+  `;
 
-  const notes = yield* sql<{ owner_id: string; id: string }>`SELECT owner_id, id FROM notes ORDER BY saved_at, owner_id`
+  const notes = yield* sql<{
+    owner_id: string;
+    id: string;
+  }>`SELECT owner_id, id FROM notes ORDER BY saved_at, owner_id`;
   for (const { owner_id, id } of notes) {
-    const [clash] = yield* sql<{ id: string }>`SELECT id FROM items WHERE id = ${id}`
-    const newId = clash ? randomUUID().replaceAll("-", "") : id
+    const [clash] = yield* sql<{ id: string }>`SELECT id FROM items WHERE id = ${id}`;
+    const newId = clash ? randomUUID().replaceAll("-", "") : id;
     yield* sql`
       INSERT INTO items (id, owner_id, parent_id, kind, name, document, revision, modified, saved_at, saved_by,
                          cells, schematics, preview)
       SELECT ${newId}, owner_id, NULL, 'note', title, jsonb_set(document, '{id}', to_jsonb(${newId}::text)),
              revision, modified, saved_at, owner_id, cells, schematics, preview
       FROM notes WHERE owner_id = ${owner_id} AND id = ${id}
-    `
+    `;
     yield* sql`
       INSERT INTO legacy_slugs (owner_id, slug, item_id)
       SELECT owner_id, slug, ${newId} FROM notes WHERE owner_id = ${owner_id} AND id = ${id}
       UNION
       SELECT owner_id, slug, ${newId} FROM note_slugs WHERE owner_id = ${owner_id} AND note_id = ${id}
-    `
+    `;
   }
-  yield* sql`DROP TABLE note_slugs`
-  yield* sql`DROP TABLE notes`
-})
+  yield* sql`DROP TABLE note_slugs`;
+  yield* sql`DROP TABLE notes`;
+});

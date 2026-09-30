@@ -64,8 +64,9 @@ describe("the cell's editor layout", () => {
   it("a tab closed in a split goes back to the first group; every file always has a tab", () => {
     const two = split(initial(files, false), "circuit", 0, "right", files);
     expect(tabs(close(two, "circuit", files))).toEqual(["board,ARD_1,circuit:board"]);
-    expect(tabs(clean({ groups: [{ tabs: ["circuit"], active: "circuit", size: 1 }], focus: 0 }, files)))
-      .toEqual(["circuit,board,ARD_1:circuit"]); // a new Arduino's sketch, and so on
+    expect(tabs(clean({ groups: [{ tabs: ["circuit"], active: "circuit", size: 1 }], focus: 0 }, files))).toEqual([
+      "circuit,board,ARD_1:circuit",
+    ]); // a new Arduino's sketch, and so on
     expect(tabs(clean(initial(files, false), ["board", "circuit"]))).toEqual(["board,circuit:board"]); // one gone
   });
 });

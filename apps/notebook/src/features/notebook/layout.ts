@@ -8,4 +8,5 @@ export const column = (withSidebar: boolean) =>
 
 export const sidebar = (open: boolean) =>
   `fixed top-17 left-3 bottom-3 z-20 w-75 flex flex-col p-1 overflow-hidden rounded-xl border border-line bg-surface ` +
-  `transition-[opacity,translate,visibility] ${ease} ` + (open ? "" : "invisible opacity-0 -translate-x-3");
+  `transition-[opacity,translate,visibility] ${ease} ` +
+  (open ? "" : "invisible opacity-0 -translate-x-3");

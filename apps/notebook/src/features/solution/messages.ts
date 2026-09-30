@@ -71,20 +71,25 @@ export const pl = {
     BadValue: "Nie rozumiem wartości {{value}}. Przykłady: `10`, `4.7`, `'4.7k'`, `'4k7'`, `'0,5 A'`, `'R'` (symbol).",
     NotAValue: "Niepoprawna wartość: {{value}}.",
     NotACircuit: "Oczekiwano obwodu, dostałem {{value}}.",
-    SeriesMismatch: "Nie mogę połączyć szeregowo {{left}} z {{right}}: {{outputs}} zacisk(ów) wyjściowych vs {{inputs}} wejściowych.",
-    ParallelMismatch: "Połączenie równoległe wymaga tych samych typów: {{first}} ({{firstShape}}) vs {{other}} ({{otherShape}}).",
+    SeriesMismatch:
+      "Nie mogę połączyć szeregowo {{left}} z {{right}}: {{outputs}} zacisk(ów) wyjściowych vs {{inputs}} wejściowych.",
+    ParallelMismatch:
+      "Połączenie równoległe wymaga tych samych typów: {{first}} ({{firstShape}}) vs {{other}} ({{otherShape}}).",
     ShuntNeedsOneToOne: "shunt wymaga elementu 1 → 1, dostałem {{part}} ({{shape}}).",
     CloseNeedsNToN: "close() wymaga typu n → n, dostałem {{shape}}.",
     WrongNodeCount: "{{part}} ma {{terminals}} zacisków, a podano węzły {{nodes}}.",
-    NeedsSimulation: "{{label}} nie jest elementem liniowym — takiego obwodu nie rozwiązuje się na papierze. Włącz symulację w czasie (⚡ przy schemacie) albo użyj `simulate(układ, t=…)`.",
+    NeedsSimulation:
+      "{{label}} nie jest elementem liniowym — takiego obwodu nie rozwiązuje się na papierze. Włącz symulację w czasie (⚡ przy schemacie) albo użyj `simulate(układ, t=…)`.",
     NotSimulated: "{{label}} nie ma modelu w czasie — do symulacji każdy element musi być znany.",
     ValueNeeded: "Do symulacji potrzebna jest wartość {{label}}.",
-    NoConvergence: "Symulacja utknęła w chwili t = {{time}} s: nawet w bardzo małych krokach nie da się znaleźć stanu obwodu.",
+    NoConvergence:
+      "Symulacja utknęła w chwili t = {{time}} s: nawet w bardzo małych krokach nie da się znaleźć stanu obwodu.",
     NoSuchInput: "Nic w obwodzie nie nazywa się {{name}}. Można ustawiać: {{available}}.",
     NotLinear: "blackbox działa tylko dla obwodów liniowych.",
     NotAPort: "equivalent() wymaga obwodu 1 → 1 albo 0 → 1 (względem masy), dostałem {{shape}}.",
     NoThevenin: "Obwód jest rozwarty między zaciskami ($R_{th} = \\infty$) — nie ma zastępczego Thévenina.",
-    CannotLayOut: "Nie umiem jeszcze ułożyć {{circuit}}. Obsługiwane są: elementy dwuzaciskowe, +, |, shunt, transpose, close/loop, node, ground, wire. Resztę narysuj na siatce.",
+    CannotLayOut:
+      "Nie umiem jeszcze ułożyć {{circuit}}. Obsługiwane są: elementy dwuzaciskowe, +, |, shunt, transpose, close/loop, node, ground, wire. Resztę narysuj na siatce.",
     CannotLayOutElement: "Nie umiem jeszcze ułożyć {{element}} ({{shape}}) — narysuj go na siatce.",
     CannotLayOutParallel: "Nie umiem jeszcze ułożyć połączenia równoległego typu {{shape}}.",
     CannotLayOutLoop: "Nie umiem jeszcze ułożyć pętli typu {{shape}}.",
@@ -170,23 +175,29 @@ export const en: typeof pl = {
     NoSuchQuantity: "There is no quantity {{name}} in this circuit. Available: {{available}}.",
     NoSuchElement: "There is no element {{label}}. Elements: {{available}}.",
     DuplicateLabel: "The label {{label}} is used more than once in the circuit.",
-    BadValue: "The value {{value}} is not understood. Examples: `10`, `4.7`, `'4.7k'`, `'4k7'`, `'0,5 A'`, `'R'` (a symbol).",
+    BadValue:
+      "The value {{value}} is not understood. Examples: `10`, `4.7`, `'4.7k'`, `'4k7'`, `'0,5 A'`, `'R'` (a symbol).",
     NotAValue: "Not a value: {{value}}.",
     NotACircuit: "Expected a circuit, got {{value}}.",
-    SeriesMismatch: "Cannot connect {{left}} in series with {{right}}: {{outputs}} output terminal(s) vs {{inputs}} input(s).",
-    ParallelMismatch: "A parallel connection needs parts of one type: {{first}} ({{firstShape}}) vs {{other}} ({{otherShape}}).",
+    SeriesMismatch:
+      "Cannot connect {{left}} in series with {{right}}: {{outputs}} output terminal(s) vs {{inputs}} input(s).",
+    ParallelMismatch:
+      "A parallel connection needs parts of one type: {{first}} ({{firstShape}}) vs {{other}} ({{otherShape}}).",
     ShuntNeedsOneToOne: "shunt needs a 1 → 1 element, got {{part}} ({{shape}}).",
     CloseNeedsNToN: "close() needs an n → n circuit, got {{shape}}.",
     WrongNodeCount: "{{part}} has {{terminals}} terminals, but the nodes given are {{nodes}}.",
-    NeedsSimulation: "{{label}} is not linear — such a circuit is not solved on paper. Run it in time (⚡ by the schematic) or use `simulate(circuit, t=…)`.",
+    NeedsSimulation:
+      "{{label}} is not linear — such a circuit is not solved on paper. Run it in time (⚡ by the schematic) or use `simulate(circuit, t=…)`.",
     NotSimulated: "{{label}} has no model in time — a simulation needs every element known.",
     ValueNeeded: "The simulation needs a value for {{label}}.",
-    NoConvergence: "The simulation got stuck at t = {{time}} s: even in tiny steps the circuit's state cannot be found.",
+    NoConvergence:
+      "The simulation got stuck at t = {{time}} s: even in tiny steps the circuit's state cannot be found.",
     NoSuchInput: "Nothing in the circuit is called {{name}}. What can be set: {{available}}.",
     NotLinear: "blackbox works for linear circuits only.",
     NotAPort: "equivalent() needs a 1 → 1 circuit, or 0 → 1 (against ground), got {{shape}}.",
     NoThevenin: "The circuit is open between its terminals ($R_{th} = \\infty$) — it has no Thévenin equivalent.",
-    CannotLayOut: "{{circuit}} cannot be laid out yet. Supported: two-terminal elements, +, |, shunt, transpose, close/loop, node, ground, wire. Draw the rest on the grid.",
+    CannotLayOut:
+      "{{circuit}} cannot be laid out yet. Supported: two-terminal elements, +, |, shunt, transpose, close/loop, node, ground, wire. Draw the rest on the grid.",
     CannotLayOutElement: "{{element}} ({{shape}}) cannot be laid out yet — draw it on the grid.",
     CannotLayOutParallel: "A parallel connection of type {{shape}} cannot be laid out yet.",
     CannotLayOutLoop: "A loop of type {{shape}} cannot be laid out yet.",

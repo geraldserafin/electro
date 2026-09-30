@@ -11,8 +11,14 @@ import math
 from html import escape
 
 # categorical slots (light, dark), in this order: blue, orange, aqua, yellow, magenta, green
-SERIES = [("#2a78d6", "#3987e5"), ("#eb6834", "#d95926"), ("#1baf7a", "#199e70"),
-          ("#eda100", "#c98500"), ("#e87ba4", "#d55181"), ("#008300", "#008300")]
+SERIES = [
+    ("#2a78d6", "#3987e5"),
+    ("#eb6834", "#d95926"),
+    ("#1baf7a", "#199e70"),
+    ("#eda100", "#c98500"),
+    ("#e87ba4", "#d55181"),
+    ("#008300", "#008300"),
+]
 WIDTH, PANEL, LEFT, RIGHT, TOP = 640, 150, 52, 76, 26
 MAX_POINTS = 1200
 
@@ -85,10 +91,14 @@ class TracePlot:
         w = WIDTH - LEFT - RIGHT
         uid = f"tp{id(self) % 100000}"
         colors = {n: k for k, n in enumerate(self.names)}
-        style = "".join(f".{uid} .s{k}{{stroke:{light}}}.{uid} .k{k}{{fill:{light}}}"
-                        for k, (light, _) in enumerate(SERIES))
-        style += "".join(f':root[data-theme="dark"] .{uid} .s{k}{{stroke:{dark}}}'
-                         f':root[data-theme="dark"] .{uid} .k{k}{{fill:{dark}}}' for k, (_, dark) in enumerate(SERIES))
+        style = "".join(
+            f".{uid} .s{k}{{stroke:{light}}}.{uid} .k{k}{{fill:{light}}}" for k, (light, _) in enumerate(SERIES)
+        )
+        style += "".join(
+            f':root[data-theme="dark"] .{uid} .s{k}{{stroke:{dark}}}'
+            f':root[data-theme="dark"] .{uid} .k{k}{{fill:{dark}}}'
+            for k, (_, dark) in enumerate(SERIES)
+        )
         parts = [
             f'<svg xmlns="http://www.w3.org/2000/svg" class="{uid}" width="{WIDTH}" height="{height}" '
             f'viewBox="0 0 {WIDTH} {height}" font-family="ui-sans-serif,system-ui,sans-serif" font-size="11">',
@@ -102,8 +112,10 @@ class TracePlot:
             x = LEFT
             for n in self.names:
                 k = colors[n] % len(SERIES)
-                parts.append(f'<rect class="k{k}" x="{x}" y="9" width="14" height="3" rx="1.5"/>'
-                             f'<text x="{x + 19}" y="14">{_label(n)}</text>')
+                parts.append(
+                    f'<rect class="k{k}" x="{x}" y="9" width="14" height="3" rx="1.5"/>'
+                    f'<text x="{x + 19}" y="14">{_label(n)}</text>'
+                )
                 x += 30 + 7 * len(n)
         y0 = TOP
         for group, unit in panels:
@@ -120,8 +132,10 @@ class TracePlot:
             sx = lambda s: LEFT + s / (t_end or 1) * w  # noqa: E731
             for v in ticks:
                 y = sy(v)
-                parts.append(f'<line class="grid" x1="{LEFT}" x2="{LEFT + w}" y1="{y:.1f}" y2="{y:.1f}"/>'
-                             f'<text class="muted" x="{LEFT - 6}" y="{y + 3.5:.1f}" text-anchor="end">{_num(v)}</text>')
+                parts.append(
+                    f'<line class="grid" x1="{LEFT}" x2="{LEFT + w}" y1="{y:.1f}" y2="{y:.1f}"/>'
+                    f'<text class="muted" x="{LEFT - 6}" y="{y + 3.5:.1f}" text-anchor="end">{_num(v)}</text>'
+                )
             parts.append(f'<text class="muted" x="{LEFT - 6}" y="{y0 - 8}" text-anchor="end">{prefix}{unit}</text>')
             ends = []
             for n, values in series.items():
@@ -141,7 +155,9 @@ class TracePlot:
                 if v * t_factor > t_end * 1.0001:
                     continue
                 x = sx(v * t_factor)
-                parts.append(f'<text class="muted" x="{x:.1f}" y="{y0 + PANEL + 15}" text-anchor="middle">{_num(v)}</text>')
+                parts.append(
+                    f'<text class="muted" x="{x:.1f}" y="{y0 + PANEL + 15}" text-anchor="middle">{_num(v)}</text>'
+                )
             parts.append(f'<text class="muted" x="{LEFT + w + 16}" y="{y0 + PANEL + 15}">t [{t_prefix}s]</text>')
             y0 += PANEL + 48
         parts.append("</svg>")

@@ -1,9 +1,10 @@
 // The notes server, as atoms: a typed client made from the contract (@electro/notes-api), the
 // home screen and each folder as queries, and everything that changes them as mutations. A
 // change refreshes the queries through the "library" reactivity key.
-import { AtomHttpApi } from "@effect-atom/atom-react";
+
 import { FetchHttpClient } from "@effect/platform";
-import { NotesApi, slugify, type NotebookDocument } from "@electro/notes-api";
+import { AtomHttpApi } from "@effect-atom/atom-react";
+import { type NotebookDocument, NotesApi, slugify } from "@electro/notes-api";
 import type { Notebook } from "@/shared/model/types";
 
 export class NotesClient extends AtomHttpApi.Tag<NotesClient>()("NotesClient", {

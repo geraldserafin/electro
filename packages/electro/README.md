@@ -6,10 +6,10 @@ zadania krok po kroku (z uzasadnieniem każdego kroku) i radzi sobie z niewiadom
 ```python
 from electro import *
 
-c = supply(12) + Resistor(10) + Resistor() + ground      # Resistor() = niewiadoma
+c = supply(12) + Resistor(10) + Resistor() + ground  # Resistor() = niewiadoma
 sol = c.solve(I_R1=0.5)
 
-sol["R2"]          # R2 = 14 Ω   U = 7 V   I = 500 mA   P = 3.5 W
+sol["R2"]  # R2 = 14 Ω   U = 7 V   I = 500 mA   P = 3.5 W
 sol.shown_steps()  # kroki: co wyliczono, z którego równania; każde prawo ma powód, np. OhmsLaw(R_2)
 ```
 
@@ -50,22 +50,22 @@ Wartości: `10`, `4.7`, `"4.7k"`, `"4k7"`, `"0,5 A"`, `"12V"`, `"R"` (symbol).
 ## Rozwiązywanie
 
 ```python
-sol = c.solve(I_R1=0.5)                    # dane jako kwargs
-sol = c.solve({I("R1"): "500m"})           # albo słownik
-sol = c.solve(Eq(U("R1"), 2 * U("R2")))    # albo dowolne równanie
-sol = c.solve(P_R1=8)                      # moc P = U·I
+sol = c.solve(I_R1=0.5)  # dane jako kwargs
+sol = c.solve({I("R1"): "500m"})  # albo słownik
+sol = c.solve(Eq(U("R1"), 2 * U("R2")))  # albo dowolne równanie
+sol = c.solve(P_R1=8)  # moc P = U·I
 
 sol["R1"].I, sol.V("A"), sol.U("A", "B"), sol(U("R1") / I("R1"))
-steps(sol)                                 # ślad rozwiązania (electro_render)
+steps(sol)  # ślad rozwiązania (electro_render)
 ```
 
 ### Zadanie typu „dane są…, oblicz X, Y, Z”
 
 ```python
 sol = uklad.solve(I_R_1=2, U_R_2=8, U_R_3=5, find=["R_1", "R_3", "E_2"])
-sol                  # R_1 = 2 Ω, R_3 = 5 Ω, E_2 = -3 V
-sol.answers          # {"R_1": 2, "R_3": 5, "E_2": -3}
-steps(sol)           # tylko kroki potrzebne do odpowiedzi, i odpowiedź
+sol  # R_1 = 2 Ω, R_3 = 5 Ω, E_2 = -3 V
+sol.answers  # {"R_1": 2, "R_3": 5, "E_2": -3}
+steps(sol)  # tylko kroki potrzebne do odpowiedzi, i odpowiedź
 ```
 
 Etykieta w `find` oznacza wartość elementu (`"R_1"` → rezystancja). Każda inna nazwa to wielkość
@@ -91,9 +91,9 @@ Analiza AC: `c.solve(omega=...)` używa wskazów, bo C i L dostają impedancje 1
 Bez `omega` liczony jest stan ustalony DC.
 
 ```python
-resistance(Resistor(10) + (Resistor(20) | Resistor(30)))      # 22
-equivalent(supply(12) + Resistor(10) + shunt(Resistor(10)))   # E_th = 6 V, R_th = 5 Ω
-blackbox(Resistor(10) | Resistor(10))                   # relacja na zaciskach
+resistance(Resistor(10) + (Resistor(20) | Resistor(30)))  # 22
+equivalent(supply(12) + Resistor(10) + shunt(Resistor(10)))  # E_th = 6 V, R_th = 5 Ω
+blackbox(Resistor(10) | Resistor(10))  # relacja na zaciskach
 ```
 
 ### Brakujący element: `Hole()`
@@ -101,8 +101,8 @@ blackbox(Resistor(10) | Resistor(10))                   # relacja na zaciskach
 ```python
 uklad = supply(12) + Resistor(10) + Hole() + ground
 sol = uklad.solve(I_R_1=0.5)
-sol["X_1"]           # X_1 → R = 14 Ω   U = 7 V   I = 500 mA
-uklad.fill(sol)      # ... + Resistor(10 Ω) + Resistor(14 Ω) + ground
+sol["X_1"]  # X_1 → R = 14 Ω   U = 7 V   I = 500 mA
+uklad.fill(sol)  # ... + Resistor(10 Ω) + Resistor(14 Ω) + ground
 ```
 
 Dziura to nieznany dwójnik. Każdy liniowy dwójnik to `VoltageSource(E) + Resistor(Z)` (Thévenin),
@@ -114,8 +114,8 @@ Z = 0 i E = 0 daje przewód. Rozwarcia (Z = ∞) ta postać nie wyraża.
 ### Obwód → kod: `code()`
 
 ```python
-code(uklad)          # czysty kod electro, który buduje ten sam obwód
-sch.to_code()        # to samo dla rysunku z electro-schematic
+code(uklad)  # czysty kod electro, który buduje ten sam obwód
+sch.to_code()  # to samo dla rysunku z electro-schematic
 ```
 
 Układy szeregowo-równoległe wracają jako `+` / `|`. Obwód z jednym źródłem wraca jako `loop(...)`,
@@ -161,10 +161,13 @@ Element jest od razu obwodem (morfizmem). Wystarczy dziedziczyć po `TwoTerminal
 import sympy as sp
 from electro import NoValue, TwoTerminal
 
-class Diode(NoValue, TwoTerminal):     # model ze stałym spadkiem napięcia
+
+class Diode(NoValue, TwoTerminal):  # model ze stałym spadkiem napięcia
     prefix = "D"
+
     def law(self, U, I, x, ctx):
         return [(U - sp.Rational(7, 10), "dioda przewodząca: U = 0.7 V ({label})")]
+
 
 (supply(5) + Resistor(430) + Diode() + ground).solve()
 ```

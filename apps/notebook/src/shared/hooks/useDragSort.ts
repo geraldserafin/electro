@@ -1,11 +1,18 @@
 // Dragging an item of a list to a new place, by a handle (the pointer, not HTML drag and drop:
 // it works the same with a mouse, a pen and a finger). While dragged, a line shows where it
 // would land: before one of the items, or after the last.
-import { useRef, useState, type PointerEvent } from "react";
+import { type PointerEvent, useRef, useState } from "react";
 
-export interface DropLine { top: number; left: number; width: number }
+export interface DropLine {
+  top: number;
+  left: number;
+  width: number;
+}
 
-export function useDragSort({ items, onDrop }: {
+export function useDragSort({
+  items,
+  onDrop,
+}: {
   items: () => HTMLElement[]; // the list's items as they are on screen, in order
   onDrop: (before: number) => void; // where it was let go: before items()[before] (length: after the last)
 }) {

@@ -3,6 +3,7 @@ sources in time, the Zener diode, MOSFETs, controlled sources, sensors, and what
 a servo, buzzers, an RGB LED, a seven-segment display, a character LCD, an HC-SR04, and I²C modules
 (run from the repo root with PYTHONPATH set, e.g. in devenv shell). Each drawing is checked: a
 circuit, runnable in time, and wired where it says."""
+
 import heapq
 import json
 import secrets
@@ -73,7 +74,9 @@ class Drawing:
         # a symbol may reach 5 squares above its pins, as an HC-SR04's)
         points = [p for e in self.elements for p in e.pins()] + [p for w in self.wires for p in w]
         dx, dy = 4 - min(x for x, _ in points), 7 - min(y for _, y in points)
-        self.elements = [Element(e.id, e.kind, (e.at[0] + dx, e.at[1] + dy), e.rotation, e.value, e.text) for e in self.elements]
+        self.elements = [
+            Element(e.id, e.kind, (e.at[0] + dx, e.at[1] + dy), e.rotation, e.value, e.text) for e in self.elements
+        ]
         self.wires = [[(x + dx, y + dy) for x, y in w] for w in self.wires]
         sch = Schematic(self.elements, [Wire(w) for w in self.wires])
         sch.to_circuit()  # it must be a circuit
@@ -89,16 +92,27 @@ class Drawing:
         for net, nodes in found.items():
             assert len(nodes) == 1 and None not in nodes, (name, net, nodes)
         assert len({next(iter(n)) for n in found.values()}) == len(found), (name, found)
-        cells.append({"id": secrets.token_hex(4), "type": "schematic", "name": name, "schematic": json.loads(sch.to_json())})
+        cells.append(
+            {"id": secrets.token_hex(4), "type": "schematic", "name": name, "schematic": json.loads(sch.to_json())}
+        )
 
 
 # ------------------------------------------------------------------ wires routed between pins
 
 # where a module's body is (rotation 0, grid squares from its first pin, both ends in): no wire goes there
 BODIES = {
-    "arduino": (1, 17, 1, 7), "servo": (1, 5, -1, 3), "seven_segment": (0, 4, 1, 5), "rgb_led": (1, 3, -1, 5),
-    "lcd1602": (0, 15, 1, 6), "ultrasonic": (-2, 5, -2, 3), "lcd1602_i2c": (1, 18, -2, 4), "ssd1306": (-4, 7, 1, 8),
-    "ds1307": (1, 6, -2, 4), "potentiometer": (1, 3, -1, 0), "passive_buzzer": (1, 3, -1, 0), "pico": (1, 7, -2, 16),
+    "arduino": (1, 17, 1, 7),
+    "servo": (1, 5, -1, 3),
+    "seven_segment": (0, 4, 1, 5),
+    "rgb_led": (1, 3, -1, 5),
+    "lcd1602": (0, 15, 1, 6),
+    "ultrasonic": (-2, 5, -2, 3),
+    "lcd1602_i2c": (1, 18, -2, 4),
+    "ssd1306": (-4, 7, 1, 8),
+    "ds1307": (1, 6, -2, 4),
+    "potentiometer": (1, 3, -1, 0),
+    "passive_buzzer": (1, 3, -1, 0),
+    "pico": (1, 7, -2, 16),
     "ili9341": (1, 21, -3, 12),
 }
 BEND = 4  # a bend costs as much as this many squares of wire
@@ -140,7 +154,9 @@ class Router:
         points = {name: [at[i][k] for i, k in pins] for name, pins in nets.items()}
         mine = {p: name for name, ps in points.items() for p in ps}
         # the short ones first: they have the fewest ways round
-        for name in sorted(points, key=lambda n: sum(abs(p[0] - q[0]) + abs(p[1] - q[1]) for p in points[n] for q in points[n])):
+        for name in sorted(
+            points, key=lambda n: sum(abs(p[0] - q[0]) + abs(p[1] - q[1]) for p in points[n] for q in points[n])
+        ):
             ps = points[name]
             reached = {ps[0]}
             wires: list[list] = []  # each a list of every grid point it passes
@@ -155,7 +171,7 @@ class Router:
                     if end in w[1:-1]:
                         k = w.index(end)
                         wires.remove(w)
-                        wires += [w[:k + 1], w[k:]]
+                        wires += [w[: k + 1], w[k:]]
                         self.corners.add(end)
                         self.through.pop(end, None)
                         break
@@ -189,7 +205,7 @@ class Router:
             self.edges.add(frozenset((a, b)))
         corners = set(wire)
         self.corners |= corners
-        for a, b, c in zip(cells, cells[1:], cells[2:]):
+        for a, b in zip(cells, cells[1:-1]):
             if b not in corners:
                 if b in self.through:
                     self.crossed.add(b)
@@ -435,10 +451,15 @@ uno(d, SERVO)
 d.add("M_1", "servo", (24, -6), 0)
 d.add("BZ_1", "passive_buzzer", (22, 4), 0)
 d.add("P_1", "potentiometer", (8, 13), 0, "10k", "0.5")
-d.connect({
-    "servo": [A("D9"), ("M_1", 0)], "buzzer": [A("D6"), ("BZ_1", 0)], "wiper": [A("A0"), ("P_1", 2)],
-    "5V": [A("5V"), ("M_1", 1), ("P_1", 0)], "GND": [A("GND"), ("M_1", 2), ("BZ_1", 1), ("P_1", 1)],
-})
+d.connect(
+    {
+        "servo": [A("D9"), ("M_1", 0)],
+        "buzzer": [A("D6"), ("BZ_1", 0)],
+        "wiper": [A("A0"), ("P_1", 2)],
+        "5V": [A("5V"), ("M_1", 1), ("P_1", 0)],
+        "GND": [A("GND"), ("M_1", 2), ("BZ_1", 1), ("P_1", 1)],
+    }
+)
 d.cell("serwo")
 
 # ------------------------------------------------------------------ 7. seven segments, RGB
@@ -480,12 +501,19 @@ for i in range(7):  # a resistor for each segment, a → g, standing between the
 for k, y in enumerate((4, 6, 8)):
     d.add(f"R_{k + 8}", "resistor", (22, y), 0, "220")
 d.add("LED_1", "rgb_led", (27, 4), 0)
-d.connect({f"to_{s}": [A(f"D{2 + i}"), (f"R_{i + 1}", 0)] for i, s in enumerate("abcdefg")}
-          | {f"seg_{s}": [(f"R_{i + 1}", 1), ("DS_1", i)] for i, s in enumerate("abcdefg")} | {
-    "red": [A("D9"), ("R_8", 0)], "green": [A("D10"), ("R_9", 0)], "blue": [A("D11"), ("R_10", 0)],
-    "r": [("R_8", 1), ("LED_1", 0)], "g": [("R_9", 1), ("LED_1", 1)], "b": [("R_10", 1), ("LED_1", 2)],
-    "GND": [A("GND"), ("DS_1", 8), ("LED_1", 3)],
-})
+d.connect(
+    {f"to_{s}": [A(f"D{2 + i}"), (f"R_{i + 1}", 0)] for i, s in enumerate("abcdefg")}
+    | {f"seg_{s}": [(f"R_{i + 1}", 1), ("DS_1", i)] for i, s in enumerate("abcdefg")}
+    | {
+        "red": [A("D9"), ("R_8", 0)],
+        "green": [A("D10"), ("R_9", 0)],
+        "blue": [A("D11"), ("R_10", 0)],
+        "r": [("R_8", 1), ("LED_1", 0)],
+        "g": [("R_9", 1), ("LED_1", 1)],
+        "b": [("R_10", 1), ("LED_1", 2)],
+        "GND": [A("GND"), ("DS_1", 8), ("LED_1", 3)],
+    }
+)
 d.cell("licznik")
 
 # ------------------------------------------------------------------ 8. LCD + HC-SR04
@@ -531,12 +559,21 @@ d.add("R_1", "resistor", (36, -18), 270, "220")  # the backlight's resistor, fro
 d.add("US_1", "ultrasonic", (-12, -8), 0, None, "80")
 d.add("P_1", "potentiometer", (14, -24), 0, "10k", "0.87")  # contrast: its wiper to V0 (about 0.65 V)
 L = lambda i: ("LCD_1", i)
-d.connect({
-    "rs": [A("D12"), L(3)], "e": [A("D11"), L(5)], "d4": [A("D5"), L(10)], "d5": [A("D4"), L(11)], "d6": [A("D3"), L(12)],
-    "d7": [A("D2"), L(13)], "trig": [A("D9"), ("US_1", 1)], "echo": [A("D7"), ("US_1", 2)],
-    "5V": [A("5V"), L(1), ("R_1", 1), ("US_1", 0), ("P_1", 0)], "GND": [A("GND"), L(0), L(4), L(15), ("US_1", 3), ("P_1", 1)],
-    "v0": [("P_1", 2), L(2)],
-})
+d.connect(
+    {
+        "rs": [A("D12"), L(3)],
+        "e": [A("D11"), L(5)],
+        "d4": [A("D5"), L(10)],
+        "d5": [A("D4"), L(11)],
+        "d6": [A("D3"), L(12)],
+        "d7": [A("D2"), L(13)],
+        "trig": [A("D9"), ("US_1", 1)],
+        "echo": [A("D7"), ("US_1", 2)],
+        "5V": [A("5V"), L(1), ("R_1", 1), ("US_1", 0), ("P_1", 0)],
+        "GND": [A("GND"), L(0), L(4), L(15), ("US_1", 3), ("P_1", 1)],
+        "v0": [("P_1", 2), L(2)],
+    }
+)
 d.cell("odleglosc")
 
 # ------------------------------------------------------------------ 9. I²C
@@ -599,10 +636,14 @@ uno(d, CLOCK)
 d.add("RTC_1", "ds1307", (26, 10), 0, None, "0x68")
 d.add("OLED_1", "ssd1306", (28, -14), 0, None, "0x3C")
 d.add("LCD_1", "lcd1602_i2c", (26, 18), 0, None, "0x27")
-d.connect({
-    "SDA": [A("A4"), ("RTC_1", 2), ("OLED_1", 3), ("LCD_1", 2)], "SCL": [A("A5"), ("RTC_1", 3), ("OLED_1", 2), ("LCD_1", 3)],
-    "5V": [A("5V"), ("RTC_1", 1), ("OLED_1", 1), ("LCD_1", 1)], "GND": [A("GND"), ("RTC_1", 0), ("OLED_1", 0), ("LCD_1", 0)],
-})
+d.connect(
+    {
+        "SDA": [A("A4"), ("RTC_1", 2), ("OLED_1", 3), ("LCD_1", 2)],
+        "SCL": [A("A5"), ("RTC_1", 3), ("OLED_1", 2), ("LCD_1", 3)],
+        "5V": [A("5V"), ("RTC_1", 1), ("OLED_1", 1), ("LCD_1", 1)],
+        "GND": [A("GND"), ("RTC_1", 0), ("OLED_1", 0), ("LCD_1", 0)],
+    }
+)
 d.cell("zegar")
 
 # ------------------------------------------------------------------ 10. Pico: a game
@@ -624,14 +665,18 @@ d.add("PICO_1", "pico", (0, 0), 0, None, GAME)
 d.add("OLED_1", "ssd1306", (-14, -8), 0, None, "0x3C")
 d.add("BZ_1", "passive_buzzer", (-6, 9), 0)
 keys = {"GP10": "ArrowUp", "GP11": "ArrowDown", "GP12": "ArrowLeft", "GP13": "ArrowRight", "GP14": "Space"}
-for k, (pin, key) in enumerate(keys.items()):
+for k, key in enumerate(keys.values()):
     d.add(f"B_{k + 1}", "button", (-4 - 3 * k, 19), 90, None, key)
-d.connect({
-    "sda": [PI("GP4"), ("OLED_1", 3)], "scl": [PI("GP5"), ("OLED_1", 2)], "buzz": [PI("GP15"), ("BZ_1", 0)],
-    **{f"key_{pin}": [PI(pin), (f"B_{k + 1}", 0)] for k, pin in enumerate(keys)},
-    "3V3": [PI("3V3"), ("OLED_1", 1)],
-    "GND": [PI("GND"), ("OLED_1", 0), ("BZ_1", 1), *[(f"B_{k + 1}", 1) for k in range(len(keys))]],
-})
+d.connect(
+    {
+        "sda": [PI("GP4"), ("OLED_1", 3)],
+        "scl": [PI("GP5"), ("OLED_1", 2)],
+        "buzz": [PI("GP15"), ("BZ_1", 0)],
+        **{f"key_{pin}": [PI(pin), (f"B_{k + 1}", 0)] for k, pin in enumerate(keys)},
+        "3V3": [PI("3V3"), ("OLED_1", 1)],
+        "GND": [PI("GND"), ("OLED_1", 0), ("BZ_1", 1), *[(f"B_{k + 1}", 1) for k in range(len(keys))]],
+    }
+)
 d.cell("pico_gra")
 
 # ------------------------------------------------------------------ 11. Pico: the real Doom
@@ -667,18 +712,32 @@ void loop() {}
 d = Drawing()
 d.add("PICO_1", "pico", (0, 0), 0, None, DOOM)
 d.add("TFT_1", "ili9341", (16, 6), 0)
-keys = {"GP9": "ArrowUp", "GP5": "ArrowDown", "GP8": "ArrowLeft", "GP6": "ArrowRight",
-        "GP3": "Control", "GP2": "Space", "GP4": "Enter", "GP28": "Escape"}
-for k, (pin, key) in enumerate(keys.items()):
+keys = {
+    "GP9": "ArrowUp",
+    "GP5": "ArrowDown",
+    "GP8": "ArrowLeft",
+    "GP6": "ArrowRight",
+    "GP3": "Control",
+    "GP2": "Space",
+    "GP4": "Enter",
+    "GP28": "Escape",
+}
+for k, key in enumerate(keys.values()):
     d.add(f"B_{k + 1}", "button", (-4 - 3 * k, 19), 90, None, key)
 tft = {"3V3": 0, "GND": 1, "cs": 2, "rst": 3, "dc": 4, "mosi": 5, "sck": 6, "bl": 7}
-d.connect({
-    "cs": [PI("GP17"), ("TFT_1", tft["cs"])], "rst": [PI("GP21"), ("TFT_1", tft["rst"])], "dc": [PI("GP20"), ("TFT_1", tft["dc"])],
-    "mosi": [PI("GP19"), ("TFT_1", tft["mosi"])], "sck": [PI("GP18"), ("TFT_1", tft["sck"])], "bl": [PI("GP22"), ("TFT_1", tft["bl"])],
-    **{f"key_{pin}": [PI(pin), (f"B_{k + 1}", 0)] for k, pin in enumerate(keys)},
-    "3V3": [PI("3V3"), ("TFT_1", tft["3V3"])],
-    "GND": [PI("GND"), ("TFT_1", tft["GND"]), *[(f"B_{k + 1}", 1) for k in range(len(keys))]],
-})
+d.connect(
+    {
+        "cs": [PI("GP17"), ("TFT_1", tft["cs"])],
+        "rst": [PI("GP21"), ("TFT_1", tft["rst"])],
+        "dc": [PI("GP20"), ("TFT_1", tft["dc"])],
+        "mosi": [PI("GP19"), ("TFT_1", tft["mosi"])],
+        "sck": [PI("GP18"), ("TFT_1", tft["sck"])],
+        "bl": [PI("GP22"), ("TFT_1", tft["bl"])],
+        **{f"key_{pin}": [PI(pin), (f"B_{k + 1}", 0)] for k, pin in enumerate(keys)},
+        "3V3": [PI("3V3"), ("TFT_1", tft["3V3"])],
+        "GND": [PI("GND"), ("TFT_1", tft["GND"]), *[(f"B_{k + 1}", 1) for k in range(len(keys))]],
+    }
+)
 d.cell("pico_doom")
 
 md("""
@@ -694,8 +753,14 @@ code(czujniki)
 
 now = datetime.now(timezone.utc).isoformat(timespec="seconds")
 notebook = {
-    "format": "electro-notebook", "version": 2, "id": secrets.token_hex(8), "title": "Nowe elementy",
-    "created": now, "modified": now, "settings": {"codeInPdf": True}, "cells": cells,
+    "format": "electro-notebook",
+    "version": 2,
+    "id": secrets.token_hex(8),
+    "title": "Nowe elementy",
+    "created": now,
+    "modified": now,
+    "settings": {"codeInPdf": True},
+    "cells": cells,
 }
 path = Path(__file__).parent.parent / "examples/nowe-elementy.electro.json"
 path.write_text(json.dumps(notebook, ensure_ascii=False, indent=1) + "\n", encoding="utf-8")

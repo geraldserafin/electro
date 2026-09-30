@@ -6,8 +6,15 @@
 
 export type Side = "left" | "right";
 export const MAX = 2; // groups side by side at most
-export interface Group { tabs: string[]; active: string; size: number } // size: its share of the width
-export interface Layout { groups: Group[]; focus: number } // focus: the group worked in (where files open)
+export interface Group {
+  tabs: string[];
+  active: string;
+  size: number;
+} // size: its share of the width
+export interface Layout {
+  groups: Group[];
+  focus: number;
+} // focus: the group worked in (where files open)
 
 /** Every file open in one group, the drawing (or the code) shown. */
 export function initial(files: string[], showCode: boolean): Layout {
@@ -45,19 +52,29 @@ const where = (layout: Layout, file: string) => layout.groups.findIndex((g) => g
 /** Show ``file``: where it is open already, else as a new tab in the focused group. */
 export function open(layout: Layout, file: string, files: string[]): Layout {
   const at = where(layout, file);
-  if (at >= 0) return clean({ groups: layout.groups.map((g, i) => (i === at ? { ...g, active: file } : g)), focus: at }, files);
+  if (at >= 0)
+    return clean({ groups: layout.groups.map((g, i) => (i === at ? { ...g, active: file } : g)), focus: at }, files);
   const g = layout.focus;
-  return clean({ groups: layout.groups.map((x, i) => (i === g ? { ...x, tabs: [...x.tabs, file], active: file } : x)), focus: g }, files);
+  return clean(
+    { groups: layout.groups.map((x, i) => (i === g ? { ...x, tabs: [...x.tabs, file], active: file } : x)), focus: g },
+    files,
+  );
 }
 
 /** Close ``file``'s tab in a split: it goes back to the first group (the split goes when it was its last). */
 export function close(layout: Layout, file: string, files: string[]): Layout {
-  return clean({ ...layout, groups: layout.groups.map((g) => {
-    const i = g.tabs.indexOf(file);
-    if (i < 0) return g;
-    const tabs = g.tabs.filter((f) => f !== file);
-    return { ...g, tabs, active: g.active === file ? tabs[Math.max(0, i - 1)] : g.active };
-  }) }, files);
+  return clean(
+    {
+      ...layout,
+      groups: layout.groups.map((g) => {
+        const i = g.tabs.indexOf(file);
+        if (i < 0) return g;
+        const tabs = g.tabs.filter((f) => f !== file);
+        return { ...g, tabs, active: g.active === file ? tabs[Math.max(0, i - 1)] : g.active };
+      }),
+    },
+    files,
+  );
 }
 
 /**
@@ -101,7 +118,11 @@ export function split(layout: Layout, file: string, to: number, side: Side, file
   const groups: Group[] = [];
   layout.groups.forEach((g, i) => {
     const own = g.tabs.includes(file)
-      ? { ...g, tabs: g.tabs.filter((f) => f !== file), active: g.active === file ? g.tabs.filter((f) => f !== file).at(-1)! : g.active }
+      ? {
+          ...g,
+          tabs: g.tabs.filter((f) => f !== file),
+          active: g.active === file ? g.tabs.filter((f) => f !== file).at(-1)! : g.active,
+        }
       : g;
     const fresh: Group = { tabs: [file], active: file, size };
     if (i === to && side === "left") groups.push(fresh);
@@ -109,7 +130,10 @@ export function split(layout: Layout, file: string, to: number, side: Side, file
     if (i === to && side === "right") groups.push(fresh);
   });
   const kept = groups.filter((g) => g.tabs.length > 0);
-  return clean({ groups: kept, focus: kept.findIndex((g) => g.tabs.length === 1 && g.tabs[0] === file && g.active === file) }, files);
+  return clean(
+    { groups: kept, focus: kept.findIndex((g) => g.tabs.length === 1 && g.tabs[0] === file && g.active === file) },
+    files,
+  );
 }
 
 /**
@@ -117,7 +141,10 @@ export function split(layout: Layout, file: string, to: number, side: Side, file
  * groups' order, the focused group's file shown. The split is kept for when it is full screen again.
  */
 export function flat(layout: Layout): Layout {
-  return { groups: [{ tabs: layout.groups.flatMap((g) => g.tabs), active: layout.groups[layout.focus].active, size: 1 }], focus: 0 };
+  return {
+    groups: [{ tabs: layout.groups.flatMap((g) => g.tabs), active: layout.groups[layout.focus].active, size: 1 }],
+    focus: 0,
+  };
 }
 
 /**

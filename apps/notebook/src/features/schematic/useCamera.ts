@@ -1,6 +1,6 @@
 // The board shows the drawing (an endless plane) through a camera: a viewBox that pans and zooms,
 // like Excalidraw. Nothing moves under the cursor unless you pan.
-import { useEffect, useLayoutEffect, useRef, useState, type RefObject } from "react";
+import { type RefObject, useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { SchematicData, SymbolLibrary } from "@/shared/model/types";
 import { bounds } from "./model";
 
@@ -15,7 +15,14 @@ function startCamera(sch: SchematicData, lib: SymbolLibrary): Camera {
   return { x: x0 * lib.grid - 80, y: y0 * lib.grid - 110, zoom: 1 };
 }
 
-export function useCamera({ value, library, viewRef, kept, inUse, inset = 0 }: {
+export function useCamera({
+  value,
+  library,
+  viewRef,
+  kept,
+  inUse,
+  inset = 0,
+}: {
   value: SchematicData;
   library: SymbolLibrary;
   viewRef: RefObject<HTMLDivElement | null>; // the board's view: its size, its wheel
@@ -25,12 +32,14 @@ export function useCamera({ value, library, viewRef, kept, inUse, inset = 0 }: {
 }) {
   const G = library.grid;
   const [cam, setCam] = useState<Camera>(() => kept?.current ?? startCamera(value, library));
-  useEffect(() => { if (kept) kept.current = cam; }, [cam, kept]);
+  useEffect(() => {
+    if (kept) kept.current = cam;
+  }, [cam, kept]);
 
   /** Screen px per CSS px of the board (not 1 when the page is scaled, e.g. CSS zoom). */
   const screenScale = () => {
     const el = viewRef.current;
-    return el && el.clientWidth ? el.getBoundingClientRect().width / el.clientWidth : 1;
+    return el?.clientWidth ? el.getBoundingClientRect().width / el.clientWidth : 1;
   };
 
   // the size of the board on screen: the camera shows view.w × view.h screen px
@@ -59,7 +68,7 @@ export function useCamera({ value, library, viewRef, kept, inUse, inset = 0 }: {
     const observer = new ResizeObserver(measure);
     observer.observe(el);
     return () => observer.disconnect();
-  // eslint-disable-next-line react-hooks/exhaustive-deps -- once, with the drawing as it opened
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- once, with the drawing as it opened
   }, [viewRef]);
 
   /** A camera that shows the whole drawing (on a board of ``size``). */
@@ -69,7 +78,11 @@ export function useCamera({ value, library, viewRef, kept, inUse, inset = 0 }: {
     const w = (x1 - x0) * G + 160;
     const h = (y1 - y0) * G + 140;
     const zoom = clampZoom(Math.min(1.5, size.w / w, (size.h - 120 - inset) / h));
-    return { x: ((x0 + x1) / 2) * G - size.w / 2 / zoom, y: ((y0 + y1) / 2) * G - (size.h + 40 + inset) / 2 / zoom, zoom };
+    return {
+      x: ((x0 + x1) / 2) * G - size.w / 2 / zoom,
+      y: ((y0 + y1) / 2) * G - (size.h + 40 + inset) / 2 / zoom,
+      zoom,
+    };
   }
 
   // the drawing is somewhere, but not in view (panned or zoomed away): offer the way back

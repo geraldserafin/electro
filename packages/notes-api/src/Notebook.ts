@@ -4,27 +4,27 @@
  * title and the shape of its cells; everything else (outputs, results, keys of newer versions)
  * passes through untouched, so no side loses data it does not understand.
  */
-import { Schema } from "effect"
+import { Schema } from "effect";
 
 /** Keys a schema does not name: kept as they are. */
-const Rest = Schema.Record({ key: Schema.String, value: Schema.Unknown })
+const Rest = Schema.Record({ key: Schema.String, value: Schema.Unknown });
 
 /** A notebook's identity: stable across saves; also its address on the server. */
 export const NoteId = Schema.String.pipe(
   Schema.pattern(/^[A-Za-z0-9_-]{1,64}$/),
   Schema.annotations({ identifier: "NoteId", description: "Identyfikator notatki (litery, cyfry, _ i -)" }),
-)
-export type NoteId = typeof NoteId.Type
+);
+export type NoteId = typeof NoteId.Type;
 
 export const MarkdownCell = Schema.Struct(
   { id: Schema.NonEmptyString, type: Schema.Literal("markdown"), source: Schema.String },
   Rest,
-)
+);
 
 export const CodeCell = Schema.Struct(
   { id: Schema.NonEmptyString, type: Schema.Literal("code"), source: Schema.String },
   Rest,
-)
+);
 
 export const SchematicCell = Schema.Struct(
   {
@@ -34,10 +34,10 @@ export const SchematicCell = Schema.Struct(
     schematic: Schema.Struct({ elements: Schema.Array(Schema.Unknown), wires: Schema.Array(Schema.Unknown) }, Rest),
   },
   Rest,
-)
+);
 
-export const Cell = Schema.Union(MarkdownCell, CodeCell, SchematicCell)
-export type Cell = typeof Cell.Type
+export const Cell = Schema.Union(MarkdownCell, CodeCell, SchematicCell);
+export type Cell = typeof Cell.Type;
 
 export const NotebookDocument = Schema.Struct(
   {
@@ -51,8 +51,8 @@ export const NotebookDocument = Schema.Struct(
     cells: Schema.Array(Cell),
   },
   Rest,
-).annotations({ identifier: "NotebookDocument" })
-export type NotebookDocument = typeof NotebookDocument.Type
+).annotations({ identifier: "NotebookDocument" });
+export type NotebookDocument = typeof NotebookDocument.Type;
 
 /**
  * The start of a note, enough to draw a thumbnail of its first page: the first few cells, cut
@@ -66,12 +66,11 @@ export const PreviewCell = Schema.Union(
     name: Schema.String,
     schematic: Schema.Struct({ elements: Schema.Array(Schema.Unknown), wires: Schema.Array(Schema.Unknown) }),
   }),
-)
-export type PreviewCell = typeof PreviewCell.Type
+);
+export type PreviewCell = typeof PreviewCell.Type;
 
 export const NotePreview = Schema.Struct({
   codeInPdf: Schema.Boolean, // the page shows code cells only when the PDF does
   cells: Schema.Array(PreviewCell),
-}).annotations({ identifier: "NotePreview" })
-export type NotePreview = typeof NotePreview.Type
-
+}).annotations({ identifier: "NotePreview" });
+export type NotePreview = typeof NotePreview.Type;

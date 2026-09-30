@@ -32,8 +32,16 @@ export const newNotebookId = () => crypto.randomUUID().replaceAll("-", "");
 /** A new, empty notebook. */
 export function blank(title = ""): Notebook {
   const stamp = now();
-  return { format: FORMAT, version: VERSION, id: newNotebookId(), title, created: stamp, modified: stamp,
-           settings: { codeInPdf: true }, cells: [] };
+  return {
+    format: FORMAT,
+    version: VERSION,
+    id: newNotebookId(),
+    title,
+    created: stamp,
+    modified: stamp,
+    settings: { codeInPdf: true },
+    cells: [],
+  };
 }
 
 /** The notebook as a file (stamped with the time it is written). */
@@ -82,7 +90,12 @@ export function migrate(input: unknown): Notebook {
     // and a Markdown table of results — both went away
     const stamp = now();
     data = {
-      format: FORMAT, version: 2, id: newNotebookId(), title: data.title ?? "", created: stamp, modified: stamp,
+      format: FORMAT,
+      version: 2,
+      id: newNotebookId(),
+      title: data.title ?? "",
+      created: stamp,
+      modified: stamp,
       settings: { codeInPdf: data.codeInPdf ?? true },
       cells: (data.cells as Obj[]).map((c) => {
         if (!isObj(c) || c.type !== "schematic") return c;
@@ -92,8 +105,7 @@ export function migrate(input: unknown): Notebook {
     };
   }
   if (typeof data.version !== "number") throw broken({ type: "NoVersion" });
-  if (data.version > VERSION)
-    throw broken({ type: "NewerVersion", version: data.version, known: VERSION });
+  if (data.version > VERSION) throw broken({ type: "NewerVersion", version: data.version, known: VERSION });
   return data as unknown as Notebook;
 }
 
@@ -111,10 +123,12 @@ function check(nb: Notebook) {
     ids.add(c.id);
     if (!["markdown", "code", "schematic"].includes(c.type))
       throw broken({ type: "UnknownCellType", where: `${where}.type`, found: String((c as { type: unknown }).type) });
-    if (c.type !== "schematic" && typeof c.source !== "string") throw broken({ type: "NotText", where: `${where}.source` });
+    if (c.type !== "schematic" && typeof c.source !== "string")
+      throw broken({ type: "NotText", where: `${where}.source` });
     if (c.type === "code" && !Array.isArray(c.outputs)) c.outputs = [];
     if (c.type === "schematic") {
-      if (typeof c.name !== "string" || !c.name.trim()) throw broken({ type: "UnnamedSchematic", where: `${where}.name` });
+      if (typeof c.name !== "string" || !c.name.trim())
+        throw broken({ type: "UnnamedSchematic", where: `${where}.name` });
       if (names.has(c.name)) throw broken({ type: "RepeatedSchematicName", where: `${where}.name`, name: c.name });
       names.add(c.name);
       if (!isObj(c.schematic) || !Array.isArray(c.schematic.elements) || !Array.isArray(c.schematic.wires))

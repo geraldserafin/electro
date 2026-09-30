@@ -4,8 +4,17 @@ import { sidebar } from "./layout";
 import { Outline } from "./Outline";
 import { TitleBox } from "./TitleBox";
 
-export function Sidebar({ open, title, onTitle, cells, onMove }: {
-  open: boolean; title: string; onTitle: (title: string) => void; cells: Cell[];
+export function Sidebar({
+  open,
+  title,
+  onTitle,
+  cells,
+  onMove,
+}: {
+  open: boolean;
+  title: string;
+  onTitle: (title: string) => void;
+  cells: Cell[];
   onMove: (from: number, count: number, before: number) => void; // a section dragged in the outline
 }) {
   return (

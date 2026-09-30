@@ -3,11 +3,11 @@
  * session, kept in an httpOnly cookie. Endpoints behind Authentication see the user as
  * CurrentUser; without a live session they answer 401.
  */
-import { HttpApiEndpoint, HttpApiGroup, HttpApiMiddleware, HttpApiSchema, HttpApiSecurity } from "@effect/platform"
-import { Context, Schema } from "effect"
+import { HttpApiEndpoint, HttpApiGroup, HttpApiMiddleware, HttpApiSchema, HttpApiSecurity } from "@effect/platform";
+import { Context, Schema } from "effect";
 
-export const UserId = Schema.String.pipe(Schema.brand("UserId"))
-export type UserId = typeof UserId.Type
+export const UserId = Schema.String.pipe(Schema.brand("UserId"));
+export type UserId = typeof UserId.Type;
 
 export class User extends Schema.Class<User>("User")({
   id: UserId,
@@ -16,8 +16,8 @@ export class User extends Schema.Class<User>("User")({
   avatarUrl: Schema.NullOr(Schema.String),
 }) {}
 
-export const Provider = Schema.Literal("google", "github", "microsoft")
-export type Provider = typeof Provider.Type
+export const Provider = Schema.Literal("google", "github", "microsoft");
+export type Provider = typeof Provider.Type;
 
 export class Unauthorized extends Schema.TaggedError<Unauthorized>()(
   "Unauthorized",
@@ -25,7 +25,7 @@ export class Unauthorized extends Schema.TaggedError<Unauthorized>()(
   HttpApiSchema.annotations({ status: 401 }),
 ) {
   get message() {
-    return "Not signed in (no session, or it expired)."
+    return "Not signed in (no session, or it expired).";
   }
 }
 
@@ -36,7 +36,7 @@ export class ProviderUnavailable extends Schema.TaggedError<ProviderUnavailable>
   HttpApiSchema.annotations({ status: 404 }),
 ) {
   get message() {
-    return `Signing in with ${this.provider} is not set up on this server.`
+    return `Signing in with ${this.provider} is not set up on this server.`;
   }
 }
 
@@ -44,7 +44,7 @@ export class ProviderUnavailable extends Schema.TaggedError<ProviderUnavailable>
 export class CurrentUser extends Context.Tag("CurrentUser")<CurrentUser, User>() {}
 
 /** The session cookie. */
-export const session = HttpApiSecurity.apiKey({ in: "cookie", key: "session" })
+export const session = HttpApiSecurity.apiKey({ in: "cookie", key: "session" });
 
 export class Authentication extends HttpApiMiddleware.Tag<Authentication>()("Authentication", {
   failure: Unauthorized,
@@ -52,23 +52,15 @@ export class Authentication extends HttpApiMiddleware.Tag<Authentication>()("Aut
   security: { session },
 }) {}
 
-const ByProvider = Schema.Struct({ provider: Provider })
+const ByProvider = Schema.Struct({ provider: Provider });
 
 export class AuthGroup extends HttpApiGroup.make("auth")
   .add(
     // the providers this server can sign in with (the sign-in page's buttons)
-    HttpApiEndpoint.get("providers", "/auth/providers")
-      .addSuccess(Schema.Array(Provider)),
+    HttpApiEndpoint.get("providers", "/auth/providers").addSuccess(Schema.Array(Provider)),
   )
-  .add(
-    HttpApiEndpoint.get("me", "/auth/me")
-      .addSuccess(User)
-      .middleware(Authentication),
-  )
-  .add(
-    HttpApiEndpoint.post("logout", "/auth/logout")
-      .addSuccess(Schema.Void),
-  )
+  .add(HttpApiEndpoint.get("me", "/auth/me").addSuccess(User).middleware(Authentication))
+  .add(HttpApiEndpoint.post("logout", "/auth/logout").addSuccess(Schema.Void))
   .add(
     // a link, not a call: off to the provider's consent screen; back to returnTo (a path here) after
     HttpApiEndpoint.get("login", "/auth/:provider")
@@ -81,12 +73,13 @@ export class AuthGroup extends HttpApiGroup.make("auth")
     // where the provider sends the browser back: a session, then returnTo (or /?signin=failed)
     HttpApiEndpoint.get("callback", "/auth/:provider/callback")
       .setPath(ByProvider)
-      .setUrlParams(Schema.Struct({
-        code: Schema.optional(Schema.String),
-        state: Schema.optional(Schema.String),
-        error: Schema.optional(Schema.String), // e.g. access_denied: the user said no
-      }))
+      .setUrlParams(
+        Schema.Struct({
+          code: Schema.optional(Schema.String),
+          state: Schema.optional(Schema.String),
+          error: Schema.optional(Schema.String), // e.g. access_denied: the user said no
+        }),
+      )
       .addSuccess(Schema.Void, { status: 302 })
       .addError(ProviderUnavailable),
-  )
-{}
+  ) {}

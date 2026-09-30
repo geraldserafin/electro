@@ -3,12 +3,19 @@ from pathlib import Path
 
 import pytest
 from electro import Ammeter, Resistor, VoltageSource, loop
-
 from electro_notes import FORMAT, VERSION, CodeCell, FormatError, Notebook, SchematicCell, load, loads, migrate
 from electro_notes.__main__ import main
 from electro_notes.issues import (
-    NewerVersion, NoSuchSchematic, NotADrawing, NotANotebook, NotJson, OtherFormat, RepeatedCellId, SchematicExists,
-    UnknownCellType, UnnamedSchematic,
+    NewerVersion,
+    NoSuchSchematic,
+    NotADrawing,
+    NotANotebook,
+    NotJson,
+    OtherFormat,
+    RepeatedCellId,
+    SchematicExists,
+    UnknownCellType,
+    UnnamedSchematic,
 )
 
 EXAMPLE = Path(__file__).parents[3] / "apps/notebook/examples/nieznane-i-dziury.electro.json"
@@ -17,7 +24,10 @@ EXAMPLE = Path(__file__).parents[3] / "apps/notebook/examples/nieznane-i-dziury.
 def zadanie() -> Notebook:
     nb = Notebook("Zadanie 4")
     nb.add_markdown("# Zadanie 4\nPrąd $I_2 = 2\\,\\mathrm{A}$.")
-    nb.add_schematic("Układ 1", loop(VoltageSource(label="E"), Resistor(3), (Resistor(18) + Ammeter(2)) | (Resistor(3) + Resistor(6))))
+    nb.add_schematic(
+        "Układ 1",
+        loop(VoltageSource(label="E"), Resistor(3), (Resistor(18) + Ammeter(2)) | (Resistor(3) + Resistor(6))),
+    )
     nb.add_code("układ1.solve(find='E')")
     return nb
 
@@ -43,11 +53,22 @@ def test_schematics_are_circuits_by_name_or_variable():
 
 
 def test_version_1_is_migrated():
-    v1 = {"version": 1, "title": "Stary", "codeInPdf": False, "cells": [
-        {"id": "a", "type": "markdown", "source": "tekst"},
-        {"id": "b", "type": "schematic", "name": "mostek", "schematic": {"elements": [], "wires": []},
-         "data": "I_A_1 = 0", "outputs": [{"type": "markdown", "data": "| tabela |"}]},
-    ]}
+    v1 = {
+        "version": 1,
+        "title": "Stary",
+        "codeInPdf": False,
+        "cells": [
+            {"id": "a", "type": "markdown", "source": "tekst"},
+            {
+                "id": "b",
+                "type": "schematic",
+                "name": "mostek",
+                "schematic": {"elements": [], "wires": []},
+                "data": "I_A_1 = 0",
+                "outputs": [{"type": "markdown", "data": "| tabela |"}],
+            },
+        ],
+    }
     nb = loads(json.dumps(v1))
     assert nb.title == "Stary" and nb.code_in_pdf is False and len(nb.id) == 32
     assert "data" not in nb.cells[1].extra and "outputs" not in nb.cells[1].extra  # gone with v2
@@ -64,15 +85,18 @@ def test_unknown_keys_survive():
     assert again["tags"] == ["lab"] and again["settings"]["theme"] == "dark" and again["cells"][0]["collapsed"]
 
 
-@pytest.mark.parametrize("mutate, expected", [
-    (lambda d: d.update(version=99), NewerVersion(99, VERSION)),
-    (lambda d: d.update(format="coś"), OtherFormat("coś")),
-    (lambda d: d.pop("cells"), NotANotebook()),
-    (lambda d: d["cells"][0].update(type="wideo"), UnknownCellType("cells[0].type", "'wideo'")),
-    (lambda d: d["cells"][2].update(id=d["cells"][0]["id"]), RepeatedCellId("cells[2].id", "?")),
-    (lambda d: d["cells"][1].update(schematic={"elements": []}), NotADrawing("cells[1].schematic")),
-    (lambda d: d["cells"][1].update(name=" "), UnnamedSchematic("cells[1].name")),
-])
+@pytest.mark.parametrize(
+    "mutate, expected",
+    [
+        (lambda d: d.update(version=99), NewerVersion(99, VERSION)),
+        (lambda d: d.update(format="coś"), OtherFormat("coś")),
+        (lambda d: d.pop("cells"), NotANotebook()),
+        (lambda d: d["cells"][0].update(type="wideo"), UnknownCellType("cells[0].type", "'wideo'")),
+        (lambda d: d["cells"][2].update(id=d["cells"][0]["id"]), RepeatedCellId("cells[2].id", "?")),
+        (lambda d: d["cells"][1].update(schematic={"elements": []}), NotADrawing("cells[1].schematic")),
+        (lambda d: d["cells"][1].update(name=" "), UnnamedSchematic("cells[1].name")),
+    ],
+)
 def test_broken_files_say_what_and_where(mutate, expected):
     data = zadanie().to_dict()
     mutate(data)

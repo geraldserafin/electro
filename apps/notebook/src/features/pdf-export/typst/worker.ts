@@ -1,19 +1,32 @@
 // Typst, compiled in the browser (typst.ts: the compiler and a renderer, as WebAssembly), off the
 // page's thread. One document in, the PDF and its pages as SVG out — the preview is the same
 // layout as the file. The fonts and mitex (LaTeX formulas) come with the app (public/typst).
-import initCompiler, { TypstCompilerBuilder, type TypstCompiler } from "@myriaddreamin/typst-ts-web-compiler";
-import compilerWasm from "@myriaddreamin/typst-ts-web-compiler/wasm?url";
-import initRenderer, { TypstRendererBuilder, type TypstRenderer } from "@myriaddreamin/typst-ts-renderer";
+
+import initRenderer, { type TypstRenderer, TypstRendererBuilder } from "@myriaddreamin/typst-ts-renderer";
 import rendererWasm from "@myriaddreamin/typst-ts-renderer/wasm?url";
+import initCompiler, { type TypstCompiler, TypstCompilerBuilder } from "@myriaddreamin/typst-ts-web-compiler";
+import compilerWasm from "@myriaddreamin/typst-ts-web-compiler/wasm?url";
 import template from "./electro.typ?raw";
 import type { Reply, Request } from "./protocol";
 
 const ASSETS = `${import.meta.env.BASE_URL}typst/`;
 const FONTS = [
-  "NewCM10-Regular.otf", "NewCM10-Bold.otf", "NewCM10-Italic.otf", "NewCM10-BoldItalic.otf", "NewCMMath-Regular.otf",
-  "Inter-Regular.ttf", "Inter-Italic.ttf", "Inter-SemiBold.ttf", "Inter-SemiBoldItalic.ttf", "Inter-Bold.ttf",
-  "LibertinusSerif-Regular.otf", "LibertinusSerif-Bold.otf", "LibertinusSerif-Italic.otf", "LibertinusSerif-BoldItalic.otf",
-  "DejaVuSansMono.ttf", "DejaVuSansMono-Bold.ttf",
+  "NewCM10-Regular.otf",
+  "NewCM10-Bold.otf",
+  "NewCM10-Italic.otf",
+  "NewCM10-BoldItalic.otf",
+  "NewCMMath-Regular.otf",
+  "Inter-Regular.ttf",
+  "Inter-Italic.ttf",
+  "Inter-SemiBold.ttf",
+  "Inter-SemiBoldItalic.ttf",
+  "Inter-Bold.ttf",
+  "LibertinusSerif-Regular.otf",
+  "LibertinusSerif-Bold.otf",
+  "LibertinusSerif-Italic.otf",
+  "LibertinusSerif-BoldItalic.otf",
+  "DejaVuSansMono.ttf",
+  "DejaVuSansMono-Bold.ttf",
 ];
 const MITEX = ["lib.typ", "mitex.typ", "mitex.wasm", "specs/mod.typ", "specs/prelude.typ", "specs/latex/standard.typ"];
 
@@ -40,7 +53,12 @@ const setup = () =>
     return { compiler, renderer, mitex };
   })());
 
-interface Diagnostic { path: string; range: string; severity: string; message: string }
+interface Diagnostic {
+  path: string;
+  range: string;
+  severity: string;
+  message: string;
+}
 
 /** The formulas a failed compile points at, in main.typ ("while calling m" at `m(3)`). */
 function formulasIn(diagnostics: Diagnostic[], main: string): number[] {
@@ -70,17 +88,25 @@ function prepare(compiler: TypstCompiler, mitex: Uint8Array[]) {
  */
 let warmed: Promise<void> | null = null;
 const warm = () =>
-  (warmed ??= setup().then(({ compiler, mitex }) => {
-    prepare(compiler, mitex);
-    compiler.add_source("/warm.typ", `#import "mitex/lib.typ": mi
+  (warmed ??= setup()
+    .then(({ compiler, mitex }) => {
+      prepare(compiler, mitex);
+      compiler.add_source(
+        "/warm.typ",
+        `#import "mitex/lib.typ": mi
 #text(font: "New Computer Modern")[Aa *Aa* _Aa_] #text(font: "Inter")[Aa *Aa* _Aa_]
-#text(font: "Libertinus Serif")[Aa *Aa* _Aa_ #smallcaps[Aa]] #raw("Aa") #mi("\\\\frac{x^2}{R_1}")`);
-    try {
-      compiler.compile("/warm.typ", null, "vector", 3);
-    } catch {
-      // only a warm-up
-    }
-  }).catch(() => { tools = null; warmed = null; }));
+#text(font: "Libertinus Serif")[Aa *Aa* _Aa_ #smallcaps[Aa]] #raw("Aa") #mi("\\\\frac{x^2}{R_1}")`,
+      );
+      try {
+        compiler.compile("/warm.typ", null, "vector", 3);
+      } catch {
+        // only a warm-up
+      }
+    })
+    .catch(() => {
+      tools = null;
+      warmed = null;
+    }));
 
 const post = (reply: Reply, transfer: Transferable[] = []) => (self as unknown as Worker).postMessage(reply, transfer);
 

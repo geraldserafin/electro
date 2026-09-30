@@ -8,7 +8,8 @@ import { cn } from "@/shared/lib/cn";
 export const board = "group/board relative overflow-hidden rounded-xl border border-line bg-board";
 
 // (written out in full: Tailwind finds its classes in the source, not in strings put together)
-const fades = "transition-[opacity,translate] duration-200 ease-out " +
+const fades =
+  "transition-[opacity,translate] duration-200 ease-out " +
   "[@media(hover:hover)]:opacity-0 [@media(hover:hover)]:translate-y-1 [@media(hover:hover)]:pointer-events-none " +
   "group-data-focused/cell:opacity-100 group-data-focused/cell:translate-y-0 group-data-focused/cell:pointer-events-auto " +
   "group-data-full/board:opacity-100 group-data-full/board:translate-y-0 group-data-full/board:pointer-events-auto " +
@@ -19,18 +20,32 @@ const fades = "transition-[opacity,translate] duration-200 ease-out " +
 export const boardIsland = (stays?: boolean) =>
   cn("absolute z-3 flex items-center gap-0.5 p-1 rounded-[10px] bg-island shadow-panel", !stays && fades);
 
-export function BoardIsland({ className, stays, ...props }: HTMLAttributes<HTMLDivElement> & {
+export function BoardIsland({
+  className,
+  stays,
+  ...props
+}: HTMLAttributes<HTMLDivElement> & {
   stays?: boolean; // always shown (what is wrong with the circuit)
 }) {
-  return (
-    <div {...props}
-         className={cn(boardIsland(stays), className)} />
-  );
+  return <div {...props} className={cn(boardIsland(stays), className)} />;
 }
 
 /** A button on an island; ``icon``: just an icon, square. One that is lit (bg-…) stays so under the pointer (hover:bg-…). */
-export function BoardButton({ className, icon, ...props }: ButtonHTMLAttributes<HTMLButtonElement> & { icon?: boolean }) {
-  return <button {...props} className={cn("inline-flex items-center gap-1.5 rounded-lg border border-transparent text-[15px] hover:bg-hover disabled:opacity-45", icon ? "p-1.5" : "px-2 py-1.5", className)} />;
+export function BoardButton({
+  className,
+  icon,
+  ...props
+}: ButtonHTMLAttributes<HTMLButtonElement> & { icon?: boolean }) {
+  return (
+    <button
+      {...props}
+      className={cn(
+        "inline-flex items-center gap-1.5 rounded-lg border border-transparent text-[15px] hover:bg-hover disabled:opacity-45",
+        icon ? "p-1.5" : "px-2 py-1.5",
+        className,
+      )}
+    />
+  );
 }
 
 /**

@@ -3,7 +3,9 @@ import xml.etree.ElementTree as ET
 from electro import *
 from electro_render import schematic, steps
 
-BOARD = (VoltageSource(12) + Resistor(2)) | Resistor(4) | ((Resistor(6) | CurrentSource(1)) + VoltageSource(6).transpose())
+BOARD = (
+    (VoltageSource(12) + Resistor(2)) | Resistor(4) | ((Resistor(6) | CurrentSource(1)) + VoltageSource(6).transpose())
+)
 
 
 def svg_text(svg) -> str:
@@ -38,15 +40,16 @@ def test_solved_unknowns_and_holes_are_shown():
 def test_hand_drawn_schematics_are_drawn_as_placed():
     from electro_schematic import Element, Schematic, Wire
 
-    sch = Schematic([Element("R_1", "resistor", (0, 0), 90, "10"), Element("g", "ground", (0, 4))],
-                    [Wire([(0, -2), (0, 0)])])
+    sch = Schematic(
+        [Element("R_1", "resistor", (0, 0), 90, "10"), Element("g", "ground", (0, 4))], [Wire([(0, -2), (0, 0)])]
+    )
     text = svg_text(schematic(sch))
     assert "R1 = 10 Ω" in text
 
 
 def test_symbol_library_matches_the_model():
-    from electro_schematic import KINDS
     from electro_render import symbol_library
+    from electro_schematic import KINDS
 
     lib = symbol_library()
     assert set(lib["kinds"]) == set(KINDS)

@@ -171,8 +171,9 @@ def _expr_code(e, labels: dict[int, str | None], top: bool = False) -> str:
         return f"node({e.name!r})"
     if isinstance(e, _Series):
         # + binds tighter than |, so a parallel group inside a chain needs parentheses
-        text = " + ".join(f"({_expr_code(p, labels)})" if isinstance(p, _Parallel) else _expr_code(p, labels)
-                          for p in e.parts)
+        text = " + ".join(
+            f"({_expr_code(p, labels)})" if isinstance(p, _Parallel) else _expr_code(p, labels) for p in e.parts
+        )
         return text if top else f"({text})"
     return " | ".join(_expr_code(p, labels) for p in e.parts)
 
@@ -208,8 +209,14 @@ def code(circuit: Circuit, name: str = "uklad") -> str:
                     expr, v = _Series([first, load.reversed()]), u
             expr = _nicest(expr)
             if u == v and isinstance(expr, _Series):  # a loop: start it at a source, like on paper
-                k = next((i for i, p in enumerate(expr.parts) if isinstance(p, _Leaf)
-                          and isinstance(p.component, (comp.VoltageSource, comp.CurrentSource))), 0)
+                k = next(
+                    (
+                        i
+                        for i, p in enumerate(expr.parts)
+                        if isinstance(p, _Leaf) and isinstance(p.component, (comp.VoltageSource, comp.CurrentSource))
+                    ),
+                    0,
+                )
                 expr = _Series(expr.parts[k:] + expr.parts[:k])
             order = expr.leaves()
             written = _labels_to_write([leaf.component for leaf in order], [wanted[leaf.index] for leaf in order])

@@ -10,7 +10,10 @@ export const plain = (text: string) => text.normalize("NFD").replace(/[̀-ͯ]/g,
 export function useKinds() {
   const { t } = useTranslation("schematic");
   const kinds: NamedKind[] = KINDS.map((k) => ({
-    ...k, name: t(`kinds.${k.kind}.name`), words: t(`kinds.${k.kind}.words`), groupName: t(`groups.${k.group as KindGroup}`),
+    ...k,
+    name: t(`kinds.${k.kind}.name`),
+    words: t(`kinds.${k.kind}.words`),
+    groupName: t(`groups.${k.group as KindGroup}`),
   }));
   return {
     kinds,

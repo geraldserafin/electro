@@ -1,11 +1,12 @@
 """code(circuit): readable electro code that rebuilds the same circuit."""
 
-import sympy as sp
-
 import electro
+import sympy as sp
 from electro import *
 
-BOARD = (VoltageSource(12) + Resistor(2)) | Resistor(4) | ((Resistor(6) | CurrentSource(1)) + VoltageSource(6).transpose())
+BOARD = (
+    (VoltageSource(12) + Resistor(2)) | Resistor(4) | ((Resistor(6) | CurrentSource(1)) + VoltageSource(6).transpose())
+)
 
 
 def rebuild(c):
@@ -25,8 +26,12 @@ def as_netlist(c):
     parts = c.netlist.parts
     names = electro.semantics._node_names(c.netlist)
     labels = electro.semantics._labels(parts)
-    return net(*[(type(p)(p.value, label=l) if p.has_value else type(p)(label=l), *[names[n] for n in nodes])
-                 for (p, nodes), l in zip(parts, labels)])
+    return net(
+        *[
+            (type(p)(p.value, label=l) if p.has_value else type(p)(label=l), *[names[n] for n in nodes])
+            for (p, nodes), l in zip(parts, labels)
+        ]
+    )
 
 
 def test_branches_come_back_as_written():
@@ -54,8 +59,10 @@ def test_open_circuits_and_values_round_trip():
 def test_non_series_parallel_falls_back_to_net():
     bridge = net(
         (VoltageSource(10), "0", "A"),
-        (Resistor(100), "A", "B"), (Resistor(), "B", "0"),
-        (Resistor(50), "A", "C"), (Resistor(100), "C", "0"),
+        (Resistor(100), "A", "B"),
+        (Resistor(), "B", "0"),
+        (Resistor(50), "A", "C"),
+        (Resistor(100), "C", "0"),
         (Ammeter(), "B", "C"),
     )
     text = code(bridge)

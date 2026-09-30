@@ -1,7 +1,7 @@
 // The example notebooks: each can be started as a new note (/examples/:name).
 import { copyOf } from "@/shared/model/format";
-import { example } from "./mostek";
 import type { Notebook } from "@/shared/model/types";
+import { example } from "./mostek";
 
 const files = import.meta.glob<Notebook>("../../../examples/*.electro.json", { eager: true, import: "default" });
 

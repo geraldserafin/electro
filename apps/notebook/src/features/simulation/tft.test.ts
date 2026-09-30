@@ -3,12 +3,18 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, test } from "vitest";
 import { firmwareFile, firmwareUrl, flashOf, uf2Flash, withFirmware } from "./firmware";
-import { Pico } from "./pico";
+import type { Pico } from "./pico";
 import { Runner } from "./runner";
 import { HEIGHT, Ili9341, WIDTH } from "./tft";
 
 function wired(tft: Ili9341, lines = { powered: true, selected: true, reset: false, data: true, backlight: 1 }) {
-  tft.wire({ powered: () => lines.powered, selected: () => lines.selected, reset: () => lines.reset, data: () => lines.data, backlight: () => lines.backlight });
+  tft.wire({
+    powered: () => lines.powered,
+    selected: () => lines.selected,
+    reset: () => lines.reset,
+    data: () => lines.data,
+    backlight: () => lines.backlight,
+  });
   const send = (command: number, ...params: number[]) => {
     lines.data = false;
     tft.transmit(command);
@@ -17,11 +23,13 @@ function wired(tft: Ili9341, lines = { powered: true, selected: true, reset: fal
   };
   return { lines, send };
 }
-const at = (image: Uint8ClampedArray, x: number, y: number) => Array.from(image.slice((y * WIDTH + x) * 4, (y * WIDTH + x) * 4 + 3));
+const at = (image: Uint8ClampedArray, x: number, y: number) =>
+  Array.from(image.slice((y * WIDTH + x) * 4, (y * WIDTH + x) * 4 + 3));
 
 describe("an ILI9341", () => {
   test("blank until it is woken and switched on; then what was written, landscape (MV) and BGR as Adafruit sets it", () => {
-    const tft = new Ili9341("TFT_1"), { send } = wired(tft);
+    const tft = new Ili9341("TFT_1"),
+      { send } = wired(tft);
     expect(tft.data().shown).toBe(false);
     send(0x11); // SLPOUT
     send(0x29); // DISPON
@@ -39,11 +47,19 @@ describe("an ILI9341", () => {
   });
 
   test("a frame written whole (Doom's 320 × 200 window): its picture as it was then, not the next half written", () => {
-    const tft = new Ili9341("TFT_1"), { send } = wired(tft);
-    send(0x11); send(0x29); send(0x36, 0x28);
+    const tft = new Ili9341("TFT_1"),
+      { send } = wired(tft);
+    send(0x11);
+    send(0x29);
+    send(0x36, 0x28);
     send(0x2a, 0, 0, 0x01, 0x3f); // columns 0–319
     send(0x2b, 0, 20, 0, 219); // pages 20–219
-    const pixels = (hi: number, count: number) => { for (let i = 0; i < count; i++) { tft.transmit(hi); tft.transmit(0); } };
+    const pixels = (hi: number, count: number) => {
+      for (let i = 0; i < count; i++) {
+        tft.transmit(hi);
+        tft.transmit(0);
+      }
+    };
     send(0x2c);
     pixels(0xf8, 320 * 200); // red, the whole frame
     send(0x2c);
@@ -55,8 +71,13 @@ describe("an ILI9341", () => {
   });
 
   test("RGB order (BGR clear) swaps red and blue; CS high: not its bytes; RESET: asleep again", () => {
-    const tft = new Ili9341("TFT_1"), { lines, send } = wired(tft);
-    send(0x11); send(0x29); send(0x36, 0x20); send(0x2a, 0, 0, 0, 0); send(0x2b, 0, 0, 0, 0);
+    const tft = new Ili9341("TFT_1"),
+      { lines, send } = wired(tft);
+    send(0x11);
+    send(0x29);
+    send(0x36, 0x20);
+    send(0x2a, 0, 0, 0, 0);
+    send(0x2b, 0, 0, 0, 0);
     send(0x2c, 0xf8, 0x00);
     expect(at(tft.picture(true)!, 0, 0)).toEqual([0, 0, 255]);
     lines.selected = false;
@@ -90,11 +111,18 @@ describe("a firmware file", () => {
 
   test("a UF2's blocks make the flash they write", () => {
     const block = (address: number, bytes: number[], n: number) => {
-      const b = new Uint8Array(512), v = new DataView(b.buffer);
-      v.setUint32(0, 0x0a324655, true); v.setUint32(4, 0x9e5d5157, true); v.setUint32(8, 0x2000, true);
-      v.setUint32(12, 0x10000000 + address, true); v.setUint32(16, bytes.length, true);
-      v.setUint32(20, n, true); v.setUint32(24, 2, true); v.setUint32(28, 0xe48bff56, true);
-      b.set(bytes, 32); v.setUint32(508, 0x0ab16f30, true);
+      const b = new Uint8Array(512),
+        v = new DataView(b.buffer);
+      v.setUint32(0, 0x0a324655, true);
+      v.setUint32(4, 0x9e5d5157, true);
+      v.setUint32(8, 0x2000, true);
+      v.setUint32(12, 0x10000000 + address, true);
+      v.setUint32(16, bytes.length, true);
+      v.setUint32(20, n, true);
+      v.setUint32(24, 2, true);
+      v.setUint32(28, 0xe48bff56, true);
+      b.set(bytes, 32);
+      v.setUint32(508, 0x0ab16f30, true);
       return b;
     };
     const file = new Uint8Array(1024);
@@ -115,7 +143,8 @@ test("Doom on a Pico, the TFT on its SPI0: the title screen comes up", () => {
   let picture: Uint8ClampedArray | null = null;
   for (let t = 0.1; t <= 2.0 && !picture; t += 0.1) {
     runner.advanceTo(t, 1e-3);
-    const tft = runner.frame().tfts.TFT_1, image = runner.pictures(false)?.TFT_1;
+    const tft = runner.frame().tfts.TFT_1,
+      image = runner.pictures(false)?.TFT_1;
     if (tft?.shown && tft.backlight > 0.9 && image) {
       // the title: mostly the red of its hellish sky (not the black it was cleared to)
       let red = 0;
@@ -129,7 +158,10 @@ test("Doom on a Pico, the TFT on its SPI0: the title screen comes up", () => {
 test("Adafruit_ILI9341 on a Pico (fixtures/tft.pico.ino): the screen filled, a rectangle, words", () => {
   const circuit = JSON.parse(readFileSync(new URL("./fixtures/tft.live.json", import.meta.url), "utf8"));
   const runner = new Runner(circuit, []);
-  runner.attach("PICO_1", { board: "pico", image: new Uint8Array(readFileSync(new URL("./fixtures/tft.pico.bin", import.meta.url))) });
+  runner.attach("PICO_1", {
+    board: "pico",
+    image: new Uint8Array(readFileSync(new URL("./fixtures/tft.pico.bin", import.meta.url))),
+  });
   (runner.session.boards[0].chip as Pico).adaptive = false;
   runner.advanceTo(1.0, 1e-3);
   // (the last picture: the first taken is the frame written whole — the red screen — the rest comes after, as the worker takes it)

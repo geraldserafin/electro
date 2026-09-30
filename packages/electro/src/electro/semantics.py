@@ -110,7 +110,11 @@ def _node_names(net: Netlist) -> list[str]:
 
 
 def compile_netlist(
-    net: Netlist, *, ctx: Context = Context(), open_boundary: bool = False, unknowns_as_symbols: bool = False
+    net: Netlist,
+    *,
+    ctx: Context = Context(),  # noqa: B008
+    open_boundary: bool = False,
+    unknowns_as_symbols: bool = False,
 ) -> System:
     names = _node_names(net)
     V = {name: sp.Symbol(f"V_{name}") for name in names}

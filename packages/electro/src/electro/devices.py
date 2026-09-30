@@ -204,7 +204,10 @@ def _leds(label: str, V, anodes: dict[str, float], common: str) -> Model:
     for pin, forward in anodes.items():
         U, I = sp.Symbol(f"U_{label}_{pin}"), sp.Symbol(f"I_{label}_{pin}")
         i_s = _led_is(forward)
-        model.laws += [Law(U - (V[pin] - V[common]), name, "kvl"), Law(I - (i_s * (limexp(U / nvt) - 1) + GMIN * U), name)]
+        model.laws += [
+            Law(U - (V[pin] - V[common]), name, "kvl"),
+            Law(I - (i_s * (limexp(U / nvt) - 1) + GMIN * U), name),
+        ]
         model.variables |= {f"U_{pin}": U, f"I_{pin}": I}
         model.junctions.append((U, nvt, i_s))
         inflow[pin] = I
@@ -521,7 +524,9 @@ class I2CModule(NoValue):
     @classmethod
     def from_schematic(cls, value, text, label):
         try:
-            return cls(int(text.split()[0], 0) if text and text.strip() else None, label=label)  # "0x27 70%": the address first
+            return cls(
+                int(text.split()[0], 0) if text and text.strip() else None, label=label
+            )  # "0x27 70%": the address first
         except ValueError:
             raise BadValue(text) from None
 
@@ -562,8 +567,10 @@ class ILI9341(NoValue):
     def build(self, label, V, param, ctx):
         U, I = sp.Symbol(f"U_{label}"), sp.Symbol(f"I_{label}")
         name = DeviceModel(sp.Symbol(label))
-        loads = {pin: (V[pin] - V["gnd"]) / (self.R_LED if pin == "led" else self.R_IN)
-                 for pin in ("cs", "reset", "dc", "mosi", "sck", "led", "miso")}
+        loads = {
+            pin: (V[pin] - V["gnd"]) / (self.R_LED if pin == "led" else self.R_IN)
+            for pin in ("cs", "reset", "dc", "mosi", "sck", "led", "miso")
+        }
         laws = [Law(U - (V["vcc"] - V["gnd"]), name, "kvl"), Law(U - self.R_LOAD * I, name)]
         inflow = loads | {"vcc": I, "gnd": -I - sum(loads.values())}
         return Model(inflow, laws, {"U": U, "I": I})
@@ -688,8 +695,18 @@ class NPN(NoValue):
             Law(Ube - s * (V["b"] - V["e"]), name, "kvl"),
             Law(Ubc - s * (V["b"] - V["c"]), name, "kvl"),
             Law(Ic - s * (self.IS * (forward - reverse) - self.IS / self.BR * reverse - GMIN * Ubc - charge_bc), name),
-            Law(Ib - s * (self.IS / self.BF * forward + self.IS / self.BR * reverse + GMIN * (Ube + Ubc)
-                          + charge_be + charge_bc), name),
+            Law(
+                Ib
+                - s
+                * (
+                    self.IS / self.BF * forward
+                    + self.IS / self.BR * reverse
+                    + GMIN * (Ube + Ubc)
+                    + charge_be
+                    + charge_bc
+                ),
+                name,
+            ),
         ]
         model = Model({"c": Ic, "b": Ib, "e": -(Ic + Ib)}, laws, {"U_BE": Ube, "U_BC": Ubc, "I_C": Ic, "I_B": Ib})
         model.junctions += [(Ube, VT, self.IS), (Ubc, VT, self.IS)]
@@ -745,8 +762,9 @@ class NMOS(NoValue):
             Law(Id - s * (channel - diode - cgd), name),
             Law(Ig - s * (cgs + cgd), name),
         ]
-        model = Model({"d": Id, "g": Ig, "s": -(Id + Ig)}, laws,
-                      {"U_GS": Ugs, "U_DS": Uds, "U_body": body, "I_D": Id, "I_G": Ig})
+        model = Model(
+            {"d": Id, "g": Ig, "s": -(Id + Ig)}, laws, {"U_GS": Ugs, "U_DS": Uds, "U_body": body, "I_D": Id, "I_G": Ig}
+        )
         model.junctions.append((body, VT, self.IS))
         model.states |= {Ugs0: (Ugs, 0.0, 0.5), Ugd0: (Ugd, 0.0, 0.5)}
         return model

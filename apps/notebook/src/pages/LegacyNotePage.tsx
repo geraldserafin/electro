@@ -31,7 +31,9 @@ export function LegacyNotePage() {
   if (!problem) return null;
   return (
     <PageMessage title={problem === "missing" ? t("missing") : t("unreachable")}>
-      <p><Link to="/">{tLibrary("home")}</Link></p>
+      <p>
+        <Link to="/">{tLibrary("home")}</Link>
+      </p>
     </PageMessage>
   );
 }

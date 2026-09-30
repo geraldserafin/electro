@@ -18,7 +18,7 @@ from electro.components import Ammeter, Component, Voltmeter
 from electro.semantics import compile_circuit
 from electro.values import UNKNOWN, fmt, to_text
 
-from .issues import CannotLayOut, CannotLayOutElement, CannotLayOutLoop, CannotLayOutParallel, Unsupported
+from .issues import CannotLayOut, CannotLayOutElement, CannotLayOutLoop, CannotLayOutParallel
 from .model import Element, Schematic, Wire, kind_of
 
 Vec = tuple[float, float]
@@ -53,8 +53,12 @@ class Frame:
     def box(self, x0, x1, y0, y1):
         """A screen-space box (relative to an anchor) in local coordinates."""
         corners = [self.to_local((x, y)) for x in (x0, x1) for y in (y0, y1)]
-        return (min(c[0] for c in corners), max(c[0] for c in corners),
-                min(c[1] for c in corners), max(c[1] for c in corners))
+        return (
+            min(c[0] for c in corners),
+            max(c[0] for c in corners),
+            min(c[1] for c in corners),
+            max(c[1] for c in corners),
+        )
 
 
 @dataclass(frozen=True)
@@ -85,8 +89,12 @@ class Item:
 
     def moved(self, t: Transform) -> Item:
         corners = [t.vector((u, v)) for u in self.box[:2] for v in self.box[2:]]
-        box = (min(c[0] for c in corners), max(c[0] for c in corners),
-               min(c[1] for c in corners), max(c[1] for c in corners))
+        box = (
+            min(c[0] for c in corners),
+            max(c[0] for c in corners),
+            min(c[1] for c in corners),
+            max(c[1] for c in corners),
+        )
         return Item(self.kind, [t.point(p) for p in self.points], box, self.data, t.vector(self.axis))
 
 
@@ -120,8 +128,10 @@ def text_box(side: Vec, width: float, lines: int):
     """Screen box of a text block of ``lines`` lines placed on ``side`` of an anchor."""
     h = LINE * lines
     return {
-        DOWN: (-width / 2, width / 2, 0.2, 0.2 + h), UP: (-width / 2, width / 2, -0.2 - h, -0.2),
-        RIGHT: (0.3, 0.3 + width, -h / 2, h / 2), LEFT: (-0.3 - width, -0.3, -h / 2, h / 2),
+        DOWN: (-width / 2, width / 2, 0.2, 0.2 + h),
+        UP: (-width / 2, width / 2, -0.2 - h, -0.2),
+        RIGHT: (0.3, 0.3 + width, -h / 2, h / 2),
+        LEFT: (-0.3 - width, -0.3, -h / 2, h / 2),
     }[side]
 
 
@@ -135,6 +145,7 @@ def text_width(text: str) -> float:
 
 
 # --------------------------------------------------------------------------- layout
+
 
 @dataclass
 class _Context:
@@ -183,8 +194,9 @@ def _layout(c: ct.Circuit, frame: Frame, ctx: _Context) -> Block:
         if c.name == ct.GROUND:
             block.items.append(Item("ground", [(0, 0)], frame.box(-0.6, 0.6, 0, 1)))
         elif c.name:
-            block.items.append(Item("label", [(0, 0)], frame.box(-0.2, text_width(c.name) + 0.4, -LINE - 0.4, 0),
-                                    {"text": c.name}))
+            block.items.append(
+                Item("label", [(0, 0)], frame.box(-0.2, text_width(c.name) + 0.4, -LINE - 0.4, 0), {"text": c.name})
+            )
         elif c.dom + c.cod == 1:
             block.items.append(Item("terminal", [(0, 0)], (-0.3, 0.3, -0.3, 0.3)))
         return block
@@ -209,9 +221,15 @@ def _component(comp: Component, frame: Frame, ctx: _Context, reversed_: bool) ->
     first, second = (half - PINS / 2, half + PINS / 2)[:: -1 if reversed_ else 1]
     block.wire((0, 0), (half - PINS / 2, 0))
     block.wire((half + PINS / 2, 0), (2 * half, 0))
-    block.items.append(Item("element", [(first, 0)], (0, 0, 0, 0),
-                            {"id": placed.label, "kind": kind_of(comp), "value": to_text(comp.value)
-                             if comp.has_value else None}, axis))
+    block.items.append(
+        Item(
+            "element",
+            [(first, 0)],
+            (0, 0, 0, 0),
+            {"id": placed.label, "kind": kind_of(comp), "value": to_text(comp.value) if comp.has_value else None},
+            axis,
+        )
+    )
     block.place(probe, Transform(du=half))
     return block
 
@@ -231,7 +249,6 @@ def _parallel(c: ct.Par, frame: Frame, ctx: _Context, outer: bool = True) -> Blo
         v += math.ceil(vmax)
         block.place(ch, Transform(du=STUB, dv=offsets[-1]))
         block.wire((STUB + ch.length, offsets[-1]), (STUB + inner, offsets[-1]))
-    last = offsets[-1]
     if outer:
         block.wire((0, 0), (STUB, 0))
         block.wire((STUB + inner, 0), (inner + 2 * STUB, 0))
@@ -267,6 +284,7 @@ def _close(c: ct.Close, frame: Frame, ctx: _Context) -> Block:
 
 
 # --------------------------------------------------------------------------- public
+
 
 def layout(circuit: ct.Circuit, *, orientation: str | None = None) -> Schematic:
     """Place ``circuit`` on the grid. ``orientation``: "horizontal" or "vertical"
@@ -307,8 +325,9 @@ def _to_schematic(block: Block, frame: Frame) -> Schematic:
             sch.wires.append(Wire([_grid(frame, p) for p in item.points]))
         elif item.kind == "element":
             rotation = _ROTATION[tuple(int(c) for c in frame.to_screen(item.axis))]
-            sch.elements.append(Element(item.data["id"], item.data["kind"], _grid(frame, item.points[0]),
-                                        rotation, item.data["value"]))
+            sch.elements.append(
+                Element(item.data["id"], item.data["kind"], _grid(frame, item.points[0]), rotation, item.data["value"])
+            )
         elif item.kind == "ground":
             sch.elements.append(Element(auto_id("gnd"), "ground", _grid(frame, item.points[0])))
         elif item.kind == "label":

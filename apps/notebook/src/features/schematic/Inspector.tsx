@@ -2,15 +2,28 @@
 // label, value (or a meter's reading), a node label's name. A panel like Excalidraw's: sections
 // under plain labels, tiles for choices and actions. (A wire or many things selected: no panel —
 // the keys do what there is to do.)
-import { useRef, useState, type ReactNode } from "react";
+import { type ReactNode, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import type { ElementData } from "@/shared/model/types";
 import { cn } from "@/shared/lib/cn";
-import { CodeIcon, PageIcon, Rotate, Trash } from "@/shared/ui/icons";
 import { i2cParts, i2cText } from "@/shared/model/i2c";
+import type { ElementData } from "@/shared/model/types";
+import { CodeIcon, PageIcon, Rotate, Trash } from "@/shared/ui/icons";
 import { Adjusters, isAdjustable } from "./Adjusters";
 import { useKinds } from "./kinds";
-import { I2C_ADDRESSES, LED_COLORS, hasValue, isBoard, keyLabel, keyName, isComponent, isControlled, isWaveSource, kindInfo, wave, waveText } from "./model";
+import {
+  hasValue,
+  I2C_ADDRESSES,
+  isBoard,
+  isComponent,
+  isControlled,
+  isWaveSource,
+  keyLabel,
+  keyName,
+  kindInfo,
+  LED_COLORS,
+  wave,
+  waveText,
+} from "./model";
 import { field, Panel, PanelHead, Section, Tile } from "./Panel";
 
 export type Selection =
@@ -25,7 +38,18 @@ const hint = "m-0 text-[12px] leading-[1.4] text-faint";
 // the board's buttons (a sketch to edit, a program file to load): the icon and the words together, centred
 const wide = "flex w-full h-9 gap-2 px-3 items-center justify-center text-[14px] font-medium";
 
-export function Inspector({ element, taken, onChange, onRename, onRotate, onRemove, icon, live, onSketch, onFirmware }: {
+export function Inspector({
+  element,
+  taken,
+  onChange,
+  onRename,
+  onRotate,
+  onRemove,
+  icon,
+  live,
+  onSketch,
+  onFirmware,
+}: {
   element: ElementData | null;
   taken: string[];
   onChange: (patch: Partial<ElementData>) => void;
@@ -41,13 +65,28 @@ export function Inspector({ element, taken, onChange, onRename, onRotate, onRemo
   const { name } = useKinds();
   const [id, setId] = useState(element?.id ?? "");
   const remove = (
-    <Tile className="hover:bg-err-bg hover:text-danger" onClick={onRemove} title={t("inspector.removeTitle")} aria-label={t("inspector.remove")}><Trash /></Tile>
+    <Tile
+      className="hover:bg-err-bg hover:text-danger"
+      onClick={onRemove}
+      title={t("inspector.removeTitle")}
+      aria-label={t("inspector.remove")}
+    >
+      <Trash />
+    </Tile>
   );
   if (!element) return null;
   const info = kindInfo(element.kind);
-  const valueName = info?.meter ? t("inspector.reading") : element.kind === "sine_source" ? t("inspector.amplitude")
-    : element.kind === "square_source" ? t("inspector.high") : element.kind === "zener" ? t("inspector.zenerValue")
-    : isControlled(element.kind) ? t("inspector.gain") : t("inspector.value");
+  const valueName = info?.meter
+    ? t("inspector.reading")
+    : element.kind === "sine_source"
+      ? t("inspector.amplitude")
+      : element.kind === "square_source"
+        ? t("inspector.high")
+        : element.kind === "zener"
+          ? t("inspector.zenerValue")
+          : isControlled(element.kind)
+            ? t("inspector.gain")
+            : t("inspector.value");
   const { frequency, duty } = wave(element.text);
   const commitId = () => {
     const clean = id.trim();
@@ -59,18 +98,33 @@ export function Inspector({ element, taken, onChange, onRename, onRotate, onRemo
       <PanelHead icon={icon} caption={name(element.kind)} title={isComponent(element.kind) && element.id} />
       {!live && isComponent(element.kind) && (
         <Section label={t("inspector.id")}>
-          <input className={field} value={id} spellCheck={false} aria-label={t("inspector.id")} onChange={(e) => setId(e.target.value)}
-                 onBlur={commitId} onKeyDown={(e) => e.key === "Enter" && commitId()} />
+          <input
+            className={field}
+            value={id}
+            spellCheck={false}
+            aria-label={t("inspector.id")}
+            onChange={(e) => setId(e.target.value)}
+            onBlur={commitId}
+            onKeyDown={(e) => e.key === "Enter" && commitId()}
+          />
         </Section>
       )}
       {!live && hasValue(element.kind) && (
         <Section label={valueName}>
           <span className="relative block">
-            <input className={cn(field, "pr-8.5")} value={element.value ?? ""} spellCheck={false}
-                   aria-label={valueName}
-                   placeholder={info?.meter ? t("inspector.noReading") : "?"}
-                   onChange={(e) => onChange({ value: e.target.value.trim() === "" ? null : e.target.value })} />
-            {info?.unit && <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted pointer-events-none">{info.unit}</span>}
+            <input
+              className={cn(field, "pr-8.5")}
+              value={element.value ?? ""}
+              spellCheck={false}
+              aria-label={valueName}
+              placeholder={info?.meter ? t("inspector.noReading") : "?"}
+              onChange={(e) => onChange({ value: e.target.value.trim() === "" ? null : e.target.value })}
+            />
+            {info?.unit && (
+              <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted pointer-events-none">
+                {info.unit}
+              </span>
+            )}
           </span>
           <p className={hint}>{info?.meter ? t("inspector.readingHint") : t("inspector.valueHint")}</p>
         </Section>
@@ -78,29 +132,51 @@ export function Inspector({ element, taken, onChange, onRename, onRotate, onRemo
       {!live && isWaveSource(element.kind) && (
         <Section label={t("inspector.frequency")}>
           <span className="relative block">
-            <input className={cn(field, "pr-8.5")} value={frequency} spellCheck={false} aria-label={t("inspector.frequency")}
-                   onChange={(e) => onChange({ text: waveText(e.target.value, duty) })} />
-            {/\d$/.test(frequency) && <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted pointer-events-none">Hz</span>}
+            <input
+              className={cn(field, "pr-8.5")}
+              value={frequency}
+              spellCheck={false}
+              aria-label={t("inspector.frequency")}
+              onChange={(e) => onChange({ text: waveText(e.target.value, duty) })}
+            />
+            {/\d$/.test(frequency) && (
+              <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted pointer-events-none">Hz</span>
+            )}
           </span>
           <p className={hint}>{t("inspector.frequencyHint")}</p>
         </Section>
       )}
       {!live && element.kind === "square_source" && (
         <Section label={t("inspector.duty", { percent: duty })}>
-          <input type="range" min={1} max={99} step={1} value={duty} className="w-full accent-[var(--accent)]"
-                 aria-label={t("inspector.duty", { percent: duty })}
-                 onChange={(e) => onChange({ text: waveText(frequency, Number(e.target.value)) })} />
+          <input
+            type="range"
+            min={1}
+            max={99}
+            step={1}
+            value={duty}
+            className="w-full accent-[var(--accent)]"
+            aria-label={t("inspector.duty", { percent: duty })}
+            onChange={(e) => onChange({ text: waveText(frequency, Number(e.target.value)) })}
+          />
         </Section>
       )}
       {!live && element.kind === "led" && (
         <Section label={t("inspector.color")}>
           <div className="flex gap-1.5" role="radiogroup" aria-label={t("inspector.color")}>
             {(Object.entries(LED_COLORS) as [keyof typeof LED_COLORS, string][]).map(([color, css]) => (
-              <button key={color} role="radio" aria-checked={(element.text ?? "red") === color} title={t(`inspector.colors.${color}`)}
-                      aria-label={t(`inspector.colors.${color}`)} onClick={() => onChange({ text: color })}
-                      className={cn("size-7 rounded-md border border-black/10",
-                                    (element.text ?? "red") === color && "outline-2 outline-offset-2 outline-accent")}
-                      style={{ background: css }} />
+              <button
+                key={color}
+                role="radio"
+                aria-checked={(element.text ?? "red") === color}
+                title={t(`inspector.colors.${color}`)}
+                aria-label={t(`inspector.colors.${color}`)}
+                onClick={() => onChange({ text: color })}
+                className={cn(
+                  "size-7 rounded-md border border-black/10",
+                  (element.text ?? "red") === color && "outline-2 outline-offset-2 outline-accent",
+                )}
+                style={{ background: css }}
+              />
             ))}
           </div>
         </Section>
@@ -109,8 +185,14 @@ export function Inspector({ element, taken, onChange, onRename, onRotate, onRemo
         <Section label={t("inspector.state")}>
           <div className="flex gap-1.5" role="radiogroup" aria-label={t("inspector.state")}>
             {([null, "closed"] as const).map((state) => (
-              <Tile key={state ?? "open"} role="radio" aria-checked={element.text === state} on={element.text === state}
-                    className="w-auto px-3 text-[13px]" onClick={() => onChange({ text: state })}>
+              <Tile
+                key={state ?? "open"}
+                role="radio"
+                aria-checked={element.text === state}
+                on={element.text === state}
+                className="w-auto px-3 text-[13px]"
+                onClick={() => onChange({ text: state })}
+              >
                 {state ? t("inspector.closed") : t("inspector.opened")}
               </Tile>
             ))}
@@ -121,13 +203,18 @@ export function Inspector({ element, taken, onChange, onRename, onRotate, onRemo
       {!live && element.kind === "button" && (
         <Section label={t("inspector.key")}>
           {/* press the key to give it; Backspace takes it away */}
-          <input className={field} readOnly value={element.text ? keyLabel(element.text) : ""} placeholder={t("inspector.noKey")}
-                 aria-label={t("inspector.key")}
-                 onKeyDown={(e) => {
-                   if (e.key === "Tab") return;
-                   e.preventDefault();
-                   onChange({ text: e.key === "Backspace" || e.key === "Delete" ? null : keyName(e.key) });
-                 }} />
+          <input
+            className={field}
+            readOnly
+            value={element.text ? keyLabel(element.text) : ""}
+            placeholder={t("inspector.noKey")}
+            aria-label={t("inspector.key")}
+            onKeyDown={(e) => {
+              if (e.key === "Tab") return;
+              e.preventDefault();
+              onChange({ text: e.key === "Backspace" || e.key === "Delete" ? null : keyName(e.key) });
+            }}
+          />
           <p className={hint}>{t("inspector.buttonHint")}</p>
         </Section>
       )}
@@ -142,36 +229,57 @@ export function Inspector({ element, taken, onChange, onRename, onRotate, onRemo
         <Section label={t("inspector.address")}>
           <div className="flex gap-1.5" role="radiogroup" aria-label={t("inspector.address")}>
             {I2C_ADDRESSES[element.kind].map((a) => (
-              <Tile key={a} role="radio" aria-checked={(i2cParts(element.text).address || I2C_ADDRESSES[element.kind][0]) === a}
-                    on={(i2cParts(element.text).address || I2C_ADDRESSES[element.kind][0]) === a} className="w-auto px-3 font-mono text-[13px]"
-                    onClick={() => onChange({ text: element.kind === "lcd1602_i2c" ? i2cText(a, i2cParts(element.text).trimmer) : a })}>{a}</Tile>
+              <Tile
+                key={a}
+                role="radio"
+                aria-checked={(i2cParts(element.text).address || I2C_ADDRESSES[element.kind][0]) === a}
+                on={(i2cParts(element.text).address || I2C_ADDRESSES[element.kind][0]) === a}
+                className="w-auto px-3 font-mono text-[13px]"
+                onClick={() =>
+                  onChange({ text: element.kind === "lcd1602_i2c" ? i2cText(a, i2cParts(element.text).trimmer) : a })
+                }
+              >
+                {a}
+              </Tile>
             ))}
           </div>
         </Section>
       )}
-      {!live && ["lcd1602_i2c", "ssd1306", "ds1307"].includes(element.kind) && <p className={hint}>{t("inspector.i2cHint")}</p>}
+      {!live && ["lcd1602_i2c", "ssd1306", "ds1307"].includes(element.kind) && (
+        <p className={hint}>{t("inspector.i2cHint")}</p>
+      )}
       {!live && element.kind === "ili9341" && <p className={hint}>{t("inspector.spiHint")}</p>}
       {!live && element.kind === "ds1307" && <p className={hint}>{t("inspector.clockHint")}</p>}
       {!live && element.kind === "servo" && <p className={hint}>{t("inspector.servoHint")}</p>}
-      {!live && (element.kind === "buzzer" || element.kind === "passive_buzzer") && <p className={hint}>{t(`inspector.${element.kind === "buzzer" ? "buzzerHint" : "passiveBuzzerHint"}`)}</p>}
+      {!live && (element.kind === "buzzer" || element.kind === "passive_buzzer") && (
+        <p className={hint}>{t(`inspector.${element.kind === "buzzer" ? "buzzerHint" : "passiveBuzzerHint"}`)}</p>
+      )}
       {isBoard(element.kind) && onSketch && (
         <Tile className={wide} onClick={onSketch} title={t("inspector.sketchTitle")}>
           <CodeIcon /> {t("inspector.sketch")}
         </Tile>
       )}
       {element.kind === "pico" && onFirmware && <FirmwareTile onFile={onFirmware} />}
-      {!live && kindInfo(element.kind)?.live && !isBoard(element.kind) &&
-        <p className={hint}>{t(isWaveSource(element.kind) ? "inspector.waveOnly" : "inspector.liveOnly")}</p>}
+      {!live && kindInfo(element.kind)?.live && !isBoard(element.kind) && (
+        <p className={hint}>{t(isWaveSource(element.kind) ? "inspector.waveOnly" : "inspector.liveOnly")}</p>
+      )}
       {!live && element.kind === "label" && (
         <Section label={t("inspector.node")}>
-          <input className={field} value={element.text ?? ""} spellCheck={false} aria-label={t("inspector.node")}
-                 onChange={(e) => onChange({ text: e.target.value })} />
+          <input
+            className={field}
+            value={element.text ?? ""}
+            spellCheck={false}
+            aria-label={t("inspector.node")}
+            onChange={(e) => onChange({ text: e.target.value })}
+          />
         </Section>
       )}
       {!live && (
         <Section label={t("inspector.actions")}>
           <div className="flex gap-1.5">
-            <Tile onClick={onRotate} title={t("inspector.rotateTitle")} aria-label={t("inspector.rotate")}><Rotate /></Tile>
+            <Tile onClick={onRotate} title={t("inspector.rotateTitle")} aria-label={t("inspector.rotate")}>
+              <Rotate />
+            </Tile>
             {remove}
           </div>
         </Section>
@@ -189,8 +297,17 @@ function FirmwareTile({ onFile }: { onFile: (file: File) => void }) {
       <Tile className={wide} onClick={() => input.current?.click()} title={t("inspector.firmwareTitle")}>
         <PageIcon /> {t("inspector.firmware")}
       </Tile>
-      <input ref={input} type="file" accept=".uf2,.bin" className="hidden"
-             onChange={(e) => { const file = e.target.files?.[0]; e.target.value = ""; if (file) onFile(file); }} />
+      <input
+        ref={input}
+        type="file"
+        accept=".uf2,.bin"
+        className="hidden"
+        onChange={(e) => {
+          const file = e.target.files?.[0];
+          e.target.value = "";
+          if (file) onFile(file);
+        }}
+      />
     </>
   );
 }

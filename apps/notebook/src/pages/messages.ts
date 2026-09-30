@@ -38,7 +38,7 @@ export const pl = {
     UnknownCellType: "{{where}}: nieznany rodzaj komórki „{{found}}”.",
     UnnamedSchematic: "{{where}}: schemat bez nazwy.",
     RepeatedSchematicName: "{{where}}: dwa schematy nazywają się „{{name}}”.",
-    NotADrawing: "{{where}}: oczekiwano {\"elements\": [...], \"wires\": [...]}.",
+    NotADrawing: '{{where}}: oczekiwano {"elements": [...], "wires": [...]}.',
   },
 };
 
@@ -81,6 +81,6 @@ export const en: typeof pl = {
     UnknownCellType: "{{where}}: an unknown kind of cell “{{found}}”.",
     UnnamedSchematic: "{{where}}: a schematic without a name.",
     RepeatedSchematicName: "{{where}}: two schematics are called “{{name}}”.",
-    NotADrawing: "{{where}}: {\"elements\": [...], \"wires\": [...]} expected.",
+    NotADrawing: '{{where}}: {"elements": [...], "wires": [...]} expected.',
   },
 };

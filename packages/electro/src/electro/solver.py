@@ -15,15 +15,29 @@ import sympy as sp
 from .circuit import Circuit
 from .components import OPEN, Component, Context, Hole, Law, notation
 from .issues import (
-    Ambiguous, BadCondition, CircuitError, ComponentRepeated, ConflictingData, Contradiction, Equals, HoleUndetermined,
-    IsZero, LawBroken, MissingData, NoSolutionFor, NoSystemSolution, NotInCircuit, Underdetermined, Undetermined,
+    Ambiguous,
+    BadCondition,
+    CircuitError,
+    ComponentRepeated,
+    ConflictingData,
+    Contradiction,
+    Equals,
+    HoleUndetermined,
+    IsZero,
+    LawBroken,
+    MissingData,
+    NoSolutionFor,
+    NoSystemSolution,
+    NotInCircuit,
+    Underdetermined,
+    Undetermined,
 )
 from .reasons import Given
 from .semantics import KIND_ORDER, Placed, System, compile_circuit
 from .values import fmt, parse
 
-
 # --------------------------------------------------------------------------- references
+
 
 def I(label: str) -> sp.Symbol:
     """Current through a component, e.g. ``I("R_1")``."""
@@ -47,6 +61,7 @@ def P(label: str) -> sp.Symbol:
 
 # --------------------------------------------------------------------------- trace
 
+
 @dataclass
 class Step:
     targets: dict[sp.Symbol, sp.Expr]
@@ -55,6 +70,7 @@ class Step:
 
 
 # --------------------------------------------------------------------------- missing data
+
 
 @dataclass
 class Diagnosis:
@@ -99,6 +115,7 @@ def _diagnose(targets, param_map, free, candidates, max_size=3, max_options=6) -
 
 
 # --------------------------------------------------------------------------- results
+
 
 @dataclass
 class PartResult:
@@ -232,8 +249,11 @@ class Solution:
         for step in reversed(self.steps):
             if needed & set(step.targets):
                 kept.append(step)
-                deps = step.formula.free_symbols if step.formula is not None else set().union(
-                    *(law.expr.free_symbols for law in step.laws))
+                deps = (
+                    step.formula.free_symbols
+                    if step.formula is not None
+                    else set().union(*(law.expr.free_symbols for law in step.laws))
+                )
                 needed |= deps
         return kept[::-1]
 
@@ -250,6 +270,7 @@ class Solution:
 
 
 # --------------------------------------------------------------------------- solving
+
 
 def _resolve(expr: sp.Expr, system: System) -> sp.Expr:
     """Map user references (plain symbols) onto the system's variables by name."""
@@ -315,8 +336,11 @@ def _unit(system: System, s: sp.Symbol) -> str:
 
 def _data_items(system: System, laws: list[Law]) -> list[tuple[tuple, Equals | IsZero]]:
     """Every single piece of data, as (key for _solve's ``drop``, the datum)."""
-    items = [(("param", s.name), Equals(s, v, _unit(system, s)))
-             for s, v in system.known.items() if not s.name.startswith("V_")]
+    items = [
+        (("param", s.name), Equals(s, v, _unit(system, s)))
+        for s, v in system.known.items()
+        if not s.name.startswith("V_")
+    ]
     for i, law in enumerate(laws):
         free = list(law.expr.free_symbols)
         if len(free) == 1 and sp.diff(law.expr, free[0]) == 1:
@@ -373,7 +397,9 @@ def solve(circuit: Circuit, *equations, omega=None, find=None, **given) -> Solut
             except CircuitError:
                 continue
             # a break only pins down E (= −U); its Z does not matter
-            needed = {p.model.variables[v] for p, k in zip(open_holes, choice) for v in (("E",) if k == "I" else ("E", "Z"))}
+            needed = {
+                p.model.variables[v] for p, k in zip(open_holes, choice) for v in (("E",) if k == "I" else ("E", "Z"))
+            }
             if not needed & set(attempt.missing):
                 ignored = {p.model.variables["Z"] for p, k in zip(open_holes, choice) if k == "I"}
                 attempt.missing = [s for s in attempt.missing if s not in ignored]

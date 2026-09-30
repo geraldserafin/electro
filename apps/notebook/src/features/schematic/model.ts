@@ -3,8 +3,17 @@
 // to Python; connectivity and solving stay on the Python side.
 import type { ElementData, Point, SchematicData, SymbolLibrary, WireData } from "@/shared/model/types";
 
-export type KindGroup = "passive" | "sources" | "meters" | "connections" | "other" | "controls" | "sensors" | "semiconductors"
-  | "chips" | "peripherals";
+export type KindGroup =
+  | "passive"
+  | "sources"
+  | "meters"
+  | "connections"
+  | "other"
+  | "controls"
+  | "sensors"
+  | "semiconductors"
+  | "chips"
+  | "peripherals";
 
 /** What an element is, apart from its name (that is in messages.ts: kinds.<kind>). */
 export interface KindInfo {
@@ -64,25 +73,54 @@ export const KINDS = [
 
 /** An LED's colours (electro.devices.LED_COLORS), for its glow while simulating. */
 export const LED_COLORS = {
-  red: "#ff3b30", orange: "#ff9500", yellow: "#ffd60a", green: "#34c759", blue: "#0a84ff", white: "#f5f5f7",
+  red: "#ff3b30",
+  orange: "#ff9500",
+  yellow: "#ffd60a",
+  green: "#34c759",
+  blue: "#0a84ff",
+  white: "#f5f5f7",
 } as const;
-export const ledColor = (text: string | null) => LED_COLORS[(text ?? "red") as keyof typeof LED_COLORS] ?? LED_COLORS.red;
+export const ledColor = (text: string | null) =>
+  LED_COLORS[(text ?? "red") as keyof typeof LED_COLORS] ?? LED_COLORS.red;
 
 /** What a new element of a kind starts with in ``text``. */
 export const defaultText = (kind: string): string | null =>
-  kind === "label" ? "A" : kind === "led" ? "red" : kind === "arduino" ? BLINK : kind === "pico" ? PICO_BLINK
-    : kind === "sine_source" ? "50" : kind === "square_source" ? "1k"
-    : kind === "photoresistor" ? "100" : kind === "thermistor" ? "25" : kind === "ultrasonic" ? "100"
-    : kind === "lcd1602_i2c" ? "0x27" : kind === "ssd1306" ? "0x3C" : kind === "ds1307" ? "0x68" : null;
+  kind === "label"
+    ? "A"
+    : kind === "led"
+      ? "red"
+      : kind === "arduino"
+        ? BLINK
+        : kind === "pico"
+          ? PICO_BLINK
+          : kind === "sine_source"
+            ? "50"
+            : kind === "square_source"
+              ? "1k"
+              : kind === "photoresistor"
+                ? "100"
+                : kind === "thermistor"
+                  ? "25"
+                  : kind === "ultrasonic"
+                    ? "100"
+                    : kind === "lcd1602_i2c"
+                      ? "0x27"
+                      : kind === "ssd1306"
+                        ? "0x3C"
+                        : kind === "ds1307"
+                          ? "0x68"
+                          : null;
 /** The addresses an I²C module can be set to (the first: as it comes). */
 export const I2C_ADDRESSES: Record<string, string[]> = { lcd1602_i2c: ["0x27", "0x3F"], ssd1306: ["0x3C", "0x3D"] };
 /** What a new element of a kind starts with in ``value``: a part that comes in one usual value. */
-export const defaultValue = (kind: string): string | null => (kind === "photoresistor" || kind === "thermistor" ? "10k" : null);
+export const defaultValue = (kind: string): string | null =>
+  kind === "photoresistor" || kind === "thermistor" ? "10k" : null;
 
 /** A source in time's ``text`` (electro.devices.SquareSource.from_schematic): its frequency as typed, the duty in %. */
 export function wave(text: string | null): { frequency: string; duty: number } {
   const words = (text ?? "").trim().split(/\s+/).filter(Boolean);
-  const duty = words.length > 1 && words.at(-1)!.endsWith("%") ? Number(words.pop()!.slice(0, -1).replace(",", ".")) : 50;
+  const duty =
+    words.length > 1 && words.at(-1)!.endsWith("%") ? Number(words.pop()!.slice(0, -1).replace(",", ".")) : 50;
   return { frequency: words.join(" "), duty: Number.isFinite(duty) ? duty : 50 };
 }
 export const waveText = (frequency: string, duty: number) => `${frequency.trim()}${duty === 50 ? "" : ` ${duty}%`}`;
@@ -147,14 +185,16 @@ export const inTimeOnly = (sch: SchematicData) => sch.elements.some((e) => kindI
  * meter's reading apart, the simulation measures that.
  */
 export const canRunInTime = (sch: SchematicData) =>
-  sch.elements.every((e) => e.kind !== "hole" && (!hasValue(e.kind) || kindInfo(e.kind)?.meter || (e.value ?? "").trim() !== ""));
+  sch.elements.every(
+    (e) => e.kind !== "hole" && (!hasValue(e.kind) || kindInfo(e.kind)?.meter || (e.value ?? "").trim() !== ""),
+  );
 export const isComponent = (kind: string) => !["ground", "label", "terminal"].includes(kind);
 
 export const key = ([x, y]: Point) => `${x},${y}`;
 export const same = (a: Point, b: Point) => a[0] === b[0] && a[1] === b[1];
 
 export function rotate([x, y]: Point, rotation: number): Point {
-  for (let i = 0; i < ((rotation / 90) % 4 + 4) % 4; i++) [x, y] = [-y, x];
+  for (let i = 0; i < (((rotation / 90) % 4) + 4) % 4; i++) [x, y] = [-y, x];
   return [x, y];
 }
 
@@ -227,7 +267,11 @@ function drag(wires: WireData[], moved: Map<string, Point>): WireData[] {
  * other wires attached to the group's pins follow like when one element moves.
  */
 export function moveGroup(
-  sch: SchematicData, lib: SymbolLibrary, ids: string[], wireIndexes: number[], d: Point,
+  sch: SchematicData,
+  lib: SymbolLibrary,
+  ids: string[],
+  wireIndexes: number[],
+  d: Point,
 ): SchematicData {
   const inGroup = new Set(ids);
   const shift = ([x, y]: Point): Point => [x + d[0], y + d[1]];
@@ -239,14 +283,19 @@ export function moveGroup(
   });
   const own = new Set(wireIndexes);
   // wires hanging on the group's own wires follow them too, not only those on its pins
-  sch.wires.forEach((w, i) => { if (own.has(i)) w.points.forEach((p) => moved.set(key(p), shift(p))); });
+  sch.wires.forEach((w, i) => {
+    if (own.has(i)) w.points.forEach((p) => moved.set(key(p), shift(p)));
+  });
   // …including ends that sit in the middle of one of them (T-junctions)
   const groupWires = sch.wires.filter((_, i) => own.has(i));
   for (const w of sch.wires.filter((_, i) => !own.has(i)))
     for (const end of [w.points[0], w.points[w.points.length - 1]])
       if (groupWires.some((g) => g.points.slice(1).some((q, j) => onSegment(end, g.points[j], q))))
         moved.set(key(end), shift(end));
-  const others = drag(sch.wires.filter((_, i) => !own.has(i)), moved);
+  const others = drag(
+    sch.wires.filter((_, i) => !own.has(i)),
+    moved,
+  );
   let next = 0;
   const wires = sch.wires.map((w, i) => (own.has(i) ? { points: w.points.map(shift) } : others[next++]));
   return { elements, wires };
@@ -262,7 +311,12 @@ export function inBox(sch: SchematicData, lib: SymbolLibrary, a: Point, b: Point
   const inside = ([x, y]: Point) => x >= x0 && x <= x1 && y >= y0 && y <= y1;
   const ids = sch.elements.filter((e) => pins(e, lib).every(inside)).map((e) => e.id);
   const chosen = new Set(ids);
-  const outsidePins = new Set(sch.elements.filter((e) => !chosen.has(e.id)).flatMap((e) => pins(e, lib)).map(key));
+  const outsidePins = new Set(
+    sch.elements
+      .filter((e) => !chosen.has(e.id))
+      .flatMap((e) => pins(e, lib))
+      .map(key),
+  );
   const wires = sch.wires.flatMap((w, i) => {
     const ends = [w.points[0], w.points[w.points.length - 1]];
     return w.points.every(inside) && !ends.some((p) => outsidePins.has(key(p))) ? [i] : [];
@@ -271,7 +325,10 @@ export function inBox(sch: SchematicData, lib: SymbolLibrary, a: Point, b: Point
 }
 
 export function updateElement(
-  sch: SchematicData, lib: SymbolLibrary, id: string, change: Partial<ElementData>,
+  sch: SchematicData,
+  lib: SymbolLibrary,
+  id: string,
+  change: Partial<ElementData>,
 ): SchematicData {
   const old = sch.elements.find((e) => e.id === id);
   if (!old) return sch;
@@ -291,7 +348,12 @@ export function updateElement(
  * A wire passing over a pin, or crossing another wire, does not connect.
  */
 function freeEnds(sch: SchematicData, lib: SymbolLibrary): Point[] {
-  const pinKeys = new Set(sch.elements.filter((e) => e.kind !== "label").flatMap((e) => pins(e, lib)).map(key));
+  const pinKeys = new Set(
+    sch.elements
+      .filter((e) => e.kind !== "label")
+      .flatMap((e) => pins(e, lib))
+      .map(key),
+  );
   return sch.wires.flatMap((w) => [w.points[0], w.points[w.points.length - 1]]).filter((p) => !pinKeys.has(key(p)));
 }
 
@@ -302,7 +364,10 @@ const touchesWire = (p: Point, w: WireData) =>
 export function connections(sch: SchematicData, lib: SymbolLibrary): Map<string, number> {
   const count = new Map<string, number>();
   const bump = (p: Point, n: number) => count.set(key(p), (count.get(key(p)) ?? 0) + n);
-  sch.elements.filter((e) => e.kind !== "label").flatMap((e) => pins(e, lib)).forEach((p) => bump(p, 1));
+  sch.elements
+    .filter((e) => e.kind !== "label")
+    .flatMap((e) => pins(e, lib))
+    .forEach((p) => bump(p, 1));
   sch.wires.forEach((w) => [w.points[0], w.points[w.points.length - 1]].forEach((p) => bump(p, 1)));
   for (const p of new Map(freeEnds(sch, lib).map((q) => [key(q), q])).values())
     for (const w of sch.wires) if (touchesWire(p, w)) bump(p, 2);
@@ -349,8 +414,9 @@ export function attach(sch: SchematicData, lib: SymbolLibrary, id: string): Sche
 /** Is there something to connect to at p (a pin, a wire corner or end, or a wire body)? */
 export function isConnectionPoint(sch: SchematicData, lib: SymbolLibrary, p: Point): boolean {
   if (sch.elements.some((e) => pins(e, lib).some((q) => same(q, p)))) return true;
-  return sch.wires.some((w) => w.points.some((q) => same(q, p))
-    || w.points.slice(1).some((q, i) => onSegment(p, w.points[i], q)));
+  return sch.wires.some(
+    (w) => w.points.some((q) => same(q, p)) || w.points.slice(1).some((q, i) => onSegment(p, w.points[i], q)),
+  );
 }
 
 /**

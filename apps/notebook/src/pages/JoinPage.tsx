@@ -25,13 +25,17 @@ export function JoinPage() {
         navigate(kind === "folder" ? folderUrl(id, name) : noteUrl(id, name), { replace: true });
       } else setState(failure(exit.cause)?._tag === "NotFound" ? "missing" : "unreachable");
     });
-    return () => { alive = false; };
+    return () => {
+      alive = false;
+    };
   }, [token, call, navigate]);
 
   if (state === "joining") return <PageMessage title={t("joining")} />;
   return (
     <PageMessage title={state === "missing" ? t("missing") : t("unreachable")}>
-      <p className="text-muted">{state === "missing" && t("missingText")} <Link to="/">{t("home")}</Link></p>
+      <p className="text-muted">
+        {state === "missing" && t("missingText")} <Link to="/">{t("home")}</Link>
+      </p>
     </PageMessage>
   );
 }

@@ -18,23 +18,48 @@ export interface TftScreenData {
 }
 
 const GLASS = { x: 66, y: -30 };
-const WIDTH = 320, HEIGHT = 240;
+const WIDTH = 320,
+  HEIGHT = 240;
 
-export function TftScreen({ id, screen, at, rotation }: { id: string; screen: TftScreenData; at: [number, number]; rotation: number }) {
+export function TftScreen({
+  id,
+  screen,
+  at,
+  rotation,
+}: {
+  id: string;
+  screen: TftScreenData;
+  at: [number, number];
+  rotation: number;
+}) {
   const canvas = useRef<HTMLCanvasElement>(null);
   const { pictures } = screen;
   useEffect(() => {
     const c = canvas.current?.getContext("2d");
     if (!c) return;
-    return pictures.watch(id, (image) => c.putImageData(new ImageData(image as Uint8ClampedArray<ArrayBuffer>, WIDTH, HEIGHT), 0, 0));
+    return pictures.watch(id, (image) =>
+      c.putImageData(new ImageData(image as Uint8ClampedArray<ArrayBuffer>, WIDTH, HEIGHT), 0, 0),
+    );
   }, [id, pictures]);
   const light = screen.backlight;
   return (
-    <g className="tft-screen" transform={`translate(${at[0]} ${at[1]}) rotate(${rotation}) translate(${GLASS.x} ${GLASS.y})`}>
+    <g
+      className="tft-screen"
+      transform={`translate(${at[0]} ${at[1]}) rotate(${rotation}) translate(${GLASS.x} ${GLASS.y})`}
+    >
       <rect width={WIDTH} height={HEIGHT} style={{ fill: "#07090b" }} />
       {!screen.shown && light > 0 && <rect width={WIDTH} height={HEIGHT} style={{ fill: "#eef1f4", opacity: light }} />}
-      <foreignObject width={WIDTH} height={HEIGHT} style={{ display: screen.shown ? undefined : "none", opacity: 0.08 + 0.92 * light }}>
-        <canvas ref={canvas} width={WIDTH} height={HEIGHT} style={{ display: "block", width: WIDTH, height: HEIGHT, imageRendering: "pixelated" }} />
+      <foreignObject
+        width={WIDTH}
+        height={HEIGHT}
+        style={{ display: screen.shown ? undefined : "none", opacity: 0.08 + 0.92 * light }}
+      >
+        <canvas
+          ref={canvas}
+          width={WIDTH}
+          height={HEIGHT}
+          style={{ display: "block", width: WIDTH, height: HEIGHT, imageRendering: "pixelated" }}
+        />
       </foreignObject>
     </g>
   );

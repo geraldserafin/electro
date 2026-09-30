@@ -5,7 +5,8 @@
 // (scripts/make-pico-doom.sh).
 
 const FLASH = 0x10000000; // where the RP2040's flash is mapped (a UF2's addresses)
-const UF2_MAGIC = [0x0a324655, 0x9e5d5157], UF2_END = 0x0ab16f30;
+const UF2_MAGIC = [0x0a324655, 0x9e5d5157],
+  UF2_END = 0x0ab16f30;
 
 /** The file a board's text names, if it names one. */
 export function firmwareFile(text: string): string | null {
@@ -19,10 +20,15 @@ export function uf2Flash(bytes: Uint8Array): Uint8Array {
   const blocks: [number, Uint8Array][] = [];
   let end = 0;
   for (let at = 0; at + 512 <= bytes.length; at += 512) {
-    if (view.getUint32(at, true) !== UF2_MAGIC[0] || view.getUint32(at + 4, true) !== UF2_MAGIC[1]
-        || view.getUint32(at + 508, true) !== UF2_END) throw new Error(`not a UF2 block at byte ${at}`);
+    if (
+      view.getUint32(at, true) !== UF2_MAGIC[0] ||
+      view.getUint32(at + 4, true) !== UF2_MAGIC[1] ||
+      view.getUint32(at + 508, true) !== UF2_END
+    )
+      throw new Error(`not a UF2 block at byte ${at}`);
     if (view.getUint32(at + 8, true) & 1) continue; // "not main flash"
-    const address = view.getUint32(at + 12, true) - FLASH, size = view.getUint32(at + 16, true);
+    const address = view.getUint32(at + 12, true) - FLASH,
+      size = view.getUint32(at + 16, true);
     if (address < 0 || size > 476) throw new Error(`a UF2 block outside the flash at byte ${at}`);
     blocks.push([address, bytes.subarray(at + 32, at + 32 + size)]);
     end = Math.max(end, address + size);
@@ -46,7 +52,8 @@ export async function fetchFirmware(url: string): Promise<Uint8Array> {
 }
 
 /** Where the notes server gives an uploaded file (its id), under its name (for the reader: no spaces in it). */
-export const firmwareUrl = (id: string, name: string) => `/api/firmware/${id}/${encodeURIComponent(name.replace(/\s+/g, "_"))}`;
+export const firmwareUrl = (id: string, name: string) =>
+  `/api/firmware/${id}/${encodeURIComponent(name.replace(/\s+/g, "_"))}`;
 
 /**
  * A board's text naming the file at ``url``: its first line (one naming a file before replaced); the rest
@@ -55,7 +62,8 @@ export const firmwareUrl = (id: string, name: string) => `/api/firmware/${id}/${
 export function withFirmware(text: string, url: string): string {
   const line = `// firmware: ${url}`;
   if (!firmwareFile(text)) return text.trim() ? `${line}\n${text}` : `${line}\n`;
-  const lines = text.split("\n"), first = lines.findIndex((l) => l.trim());
+  const lines = text.split("\n"),
+    first = lines.findIndex((l) => l.trim());
   lines[first] = line;
   return lines.join("\n");
 }

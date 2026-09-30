@@ -18,23 +18,34 @@ import { Spi } from "./spi";
 const PINS = [...Array.from({ length: 23 }, (_, i) => i), 26, 27, 28];
 const LED = 25; // on the board, not a pin
 // an input reads LOW below 0.8 V and HIGH above 2.0 V; in between it keeps what it read (Schmitt trigger)
-const LOW_BELOW = 0.8, HIGH_ABOVE = 2.0, VDD = 3.3;
+const LOW_BELOW = 0.8,
+  HIGH_ABOVE = 2.0,
+  VDD = 3.3;
 // steer(): the worker busier than BUSY, or behind, the cores slow down; less busy than IDLE, they speed up
-const BUSY = 0.92, IDLE = 0.8, SLOWEST = 0.01;
+const BUSY = 0.92,
+  IDLE = 0.8,
+  SLOWEST = 0.01;
 // runUntil(): the most cycles a core runs before the other catches up and the clock goes on (1 µs or so:
 // a core waiting on the other, spinning, spins that long at most)
 const QUANTUM = 256;
 
 const MODE: Record<GPIOPinState, Mode> = {
-  [GPIOPinState.Low]: "low", [GPIOPinState.High]: "high", [GPIOPinState.Input]: "input",
-  [GPIOPinState.InputPullUp]: "pullup", [GPIOPinState.InputPullDown]: "pulldown",
+  [GPIOPinState.Low]: "low",
+  [GPIOPinState.High]: "high",
+  [GPIOPinState.Input]: "input",
+  [GPIOPinState.InputPullUp]: "pullup",
+  [GPIOPinState.InputPullDown]: "pulldown",
 };
 
 export class Pico implements Chip {
   readonly pins = PINS.map((i) => `GP${i}`);
   /** electro.devices.PICO_MODES */
   readonly modes: Record<Mode, [number, number]> = {
-    input: [1e-8, 0], pullup: [1 / 50000, VDD], pulldown: [1 / 50000, 0], low: [1 / 40, 0], high: [1 / 40, VDD],
+    input: [1e-8, 0],
+    pullup: [1 / 50000, VDD],
+    pulldown: [1 / 50000, 0],
+    low: [1 / 40, 0],
+    high: [1 / 40, VDD],
   };
   readonly sda = "GP4";
   readonly scl = "GP5";
@@ -70,9 +81,11 @@ export class Pico implements Chip {
     }
     mcu.gpio[LED].addListener((state) => (this.led = state === GPIOPinState.High));
     this.cdc = new USBCDC(mcu.usbCtrl);
-    this.cdc.onSerialData = (bytes, length) => this.onSerial?.(this.decoder.decode(bytes.subarray(0, length), { stream: true })); // (a scratch buffer)
+    this.cdc.onSerialData = (bytes, length) =>
+      this.onSerial?.(this.decoder.decode(bytes.subarray(0, length), { stream: true })); // (a scratch buffer)
     mcu.uart[0].onByte = (byte) => this.onSerial?.(String.fromCharCode(byte));
-    const i2c = mcu.i2c[0], bus = (this.i2c = new Bus(i2c));
+    const i2c = mcu.i2c[0],
+      bus = (this.i2c = new Bus(i2c));
     i2c.onStart = () => bus.start();
     i2c.onConnect = (address, mode) => bus.connectToSlave(address, mode === I2CMode.Write);
     i2c.onWriteByte = (value) => bus.writeByte(value);
@@ -83,9 +96,11 @@ export class Pico implements Chip {
       new Spi(["GP2", "GP6", "GP18", "GP22"], ["GP3", "GP7", "GP19"]),
       new Spi(["GP10", "GP14", "GP26"], ["GP11", "GP15", "GP27"]),
     ];
-    mcu.spi.forEach((port, n) => { // (at once: nothing drives MISO back)
+    mcu.spi.forEach((port, n) => {
+      // (at once: nothing drives MISO back)
       port.sink = (value) => this.spi[n].transmit(value);
-      port.sinkMany = (memory, offset, count, size, mask) => this.spi[n].transmitMany(memory, offset, count, size, mask);
+      port.sinkMany = (memory, offset, count, size, mask) =>
+        this.spi[n].transmitMany(memory, offset, count, size, mask);
     });
   }
 
@@ -114,7 +129,8 @@ export class Pico implements Chip {
 
   /** Whether the chip drives ``pin`` high, asked when wanted (for a device that samples a pin as each byte comes: SPI's DC). */
   level(pin: string): () => boolean {
-    const i = Number(pin.slice(2)), high = this.high;
+    const i = Number(pin.slice(2)),
+      high = this.high;
     return () => high[i] === 1;
   }
 
@@ -124,7 +140,10 @@ export class Pico implements Chip {
    * clock; both asleep (WFE, WFI), the clock jumps to what wakes them.
    */
   runUntil(time: number) {
-    const mcu = this.mcu, clock = mcu.clock, [core0, core1] = mcu.core, [jit0, jit1] = this.jits;
+    const mcu = this.mcu,
+      clock = mcu.clock,
+      [core0, core1] = mcu.core,
+      [jit0, jit1] = this.jits;
     const end = time * 1e9;
     const nanosPerCycle = 1e9 / (mcu.clkSys * this.pace);
     while (clock.nanos < end) {
@@ -133,7 +152,8 @@ export class Pico implements Chip {
         clock.tick(alarm > 0 ? Math.min(alarm, end - clock.nanos) : end - clock.nanos);
         continue;
       }
-      const start = core0.cycles, alarm = clock.nanosToNextAlarm;
+      const start = core0.cycles,
+        alarm = clock.nanosToNextAlarm;
       const until = Math.min(end - clock.nanos, alarm > 0 ? alarm : Infinity);
       const limit = start + Math.max(1, Math.min(QUANTUM, Math.ceil(until / nanosPerCycle)));
       mcu.currentCore = 0; // (the SIO, the PPB: each core its own)

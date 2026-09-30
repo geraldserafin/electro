@@ -1,14 +1,23 @@
 """Builds apps/notebook/examples/nieznane-i-dziury.electro.json (format: electro_notes) (run from the repo root with PYTHONPATH set, e.g. in devenv shell)."""
-import json, secrets
+
+import json
+import secrets
+
 from electro import Ammeter, Hole, Resistor, VoltageSource, loop
 from electro_schematic import layout
 
 cells = []
 md = lambda text: cells.append({"id": secrets.token_hex(4), "type": "markdown", "source": text.strip()})
 code = lambda text: cells.append({"id": secrets.token_hex(4), "type": "code", "source": text.strip(), "outputs": []})
-drawing = lambda name, circuit, simulate=False: cells.append({
-    "id": secrets.token_hex(4), "type": "schematic", "name": name,
-    "schematic": json.loads(layout(circuit).to_json()), "simulate": simulate})
+drawing = lambda name, circuit, simulate=False: cells.append(
+    {
+        "id": secrets.token_hex(4),
+        "type": "schematic",
+        "name": name,
+        "schematic": json.loads(layout(circuit).to_json()),
+        "simulate": simulate,
+    }
+)
 
 md("""
 Każdy przykład to osobna komórka — uruchom wszystko przyciskiem **▶ Uruchom wszystko** albo pojedynczo (`Shift+Enter`).
@@ -165,7 +174,9 @@ display(schematic(zarowka, sol))
 steps(sol)
 """)
 
-md("## 13. Dziura → źródło\nPrąd płynie „pod prąd” akumulatora (−1 A) — żaden opornik tego nie zrobi, to musi być ładowarka.")
+md(
+    "## 13. Dziura → źródło\nPrąd płynie „pod prąd” akumulatora (−1 A) — żaden opornik tego nie zrobi, to musi być ładowarka."
+)
 code("""
 ladowanie = loop(VoltageSource(12), Resistor(2), Hole())
 sol = ladowanie.solve(I_R_1=-1)
@@ -213,8 +224,11 @@ zasilające i rezystancja zastępcza? Znany prąd to **amperomierz z odczytem** 
 prądu (`CurrentSource(2)` wymusza prąd, ale jego napięcie byłoby kolejną niewiadomą). Amperomierz bez odczytu
 (`Ammeter()`) solver sam „odczyta”. W edytorze odczyt wpisujesz w polu **Odczyt** amperomierza.
 """)
-drawing("zadanie4", loop(VoltageSource(label="E"), Resistor(3),
-                         (Resistor(18) + Ammeter(2)) | (Resistor(3) + Resistor(6))), simulate=True)
+drawing(
+    "zadanie4",
+    loop(VoltageSource(label="E"), Resistor(3), (Resistor(18) + Ammeter(2)) | (Resistor(3) + Resistor(6))),
+    simulate=True,
+)
 code("""
 obciazenie = Resistor(3) + ((Resistor(18) + Ammeter(2)) | (Resistor(3) + Resistor(6)))
 zadanie = loop(VoltageSource(label="E"), obciazenie)
@@ -223,7 +237,7 @@ zadanie.solve(find="E")
 """)
 
 # run every cell (like "Uruchom wszystko") and keep the outputs, so the example opens with its results
-from electro_notebook import kernel
+from electro_notebook import kernel  # noqa: E402 — after the cells are built
 
 kernel.reset()
 schematics = {c["name"]: json.dumps(c["schematic"]) for c in cells if c["type"] == "schematic"}
@@ -235,13 +249,20 @@ for cell in cells:
 
 # through electro_notes: the file is checked, and in the current format; a fixed id and dates,
 # so regenerating it changes the file only where the content changed
-from electro_notes import FORMAT, VERSION, from_dict
+from electro_notes import FORMAT, VERSION, from_dict  # noqa: E402
 
-notebook = from_dict({
-    "format": FORMAT, "version": VERSION, "id": "przyklad-nieznane-i-dziury", "title": "Przykłady: niewiadome i dziury",
-    "created": "2026-09-27T00:00:00Z", "modified": "2026-09-27T00:00:00Z", "settings": {"codeInPdf": True},
-    "cells": cells,
-})
+notebook = from_dict(
+    {
+        "format": FORMAT,
+        "version": VERSION,
+        "id": "przyklad-nieznane-i-dziury",
+        "title": "Przykłady: niewiadome i dziury",
+        "created": "2026-09-27T00:00:00Z",
+        "modified": "2026-09-27T00:00:00Z",
+        "settings": {"codeInPdf": True},
+        "cells": cells,
+    }
+)
 path = "apps/notebook/examples/nieznane-i-dziury.electro.json"
 with open(path, "w", encoding="utf-8") as f:
     f.write(notebook.dumps() + "\n")

@@ -2,14 +2,27 @@
 // the LEDs' glow, the buzzers, servos, LCDs, HC-SR04s, I²C modules and SPI displays (peripherals.ts,
 // lcd.ts, i2c.ts, spi.ts), the scope's samples. No React and no DOM: it runs in a worker (sim.worker.ts), off the
 // page's thread, and hands over what the board shows as plain data (frame()).
-import type { ElementResult } from "@/shared/model/types";
+
 import { i2cParts } from "@/shared/model/i2c";
+import type { ElementResult } from "@/shared/model/types";
+import { Uno } from "./arduino";
 import type { LiveCircuit } from "./engine";
 import { si } from "./format";
-import { Backpack, Oled, modulesOn, pixelPath, type Device } from "./i2c";
-import { lcd, screen, watch as read, type Lcd, type Screen } from "./lcd";
-import { buzzing, heard, listen, ping, servoing, sonar, turn, watch, type Buzzing, type Servoing, type Sonar } from "./peripherals";
-import { Uno } from "./arduino";
+import { Backpack, type Device, modulesOn, Oled, pixelPath } from "./i2c";
+import { type Lcd, lcd, watch as read, type Screen, screen } from "./lcd";
+import {
+  type Buzzing,
+  buzzing,
+  heard,
+  listen,
+  ping,
+  type Servoing,
+  type Sonar,
+  servoing,
+  sonar,
+  turn,
+  watch,
+} from "./peripherals";
 import { Pico } from "./pico";
 import { Session } from "./session";
 import { spiDevicesOn } from "./spi";
@@ -59,7 +72,9 @@ export interface Frame {
 const SCOPE_POINTS = 600;
 // electro.devices: what glows (each LED's channels: its current's name, "" for I)
 const LIGHTS: Record<string, string[]> = {
-  LED: [""], RGBLED: ["r", "g", "b"], SevenSegment: ["a", "b", "c", "d", "e", "f", "g", "dp"],
+  LED: [""],
+  RGBLED: ["r", "g", "b"],
+  SevenSegment: ["a", "b", "c", "d", "e", "f", "g", "dp"],
 };
 const LCD_DATA = ["d0", "d1", "d2", "d3", "d4", "d5", "d6", "d7"];
 const LED_RATED = 0.02; // A: full brightness
@@ -94,20 +109,41 @@ export class Runner {
   private serial = "";
   speed = 1; // the scope's window follows it
 
-  constructor(readonly circuit: LiveCircuit, parts: Part[]) {
+  constructor(
+    readonly circuit: LiveCircuit,
+    parts: Part[],
+  ) {
     this.session = new Session(circuit);
     const { kinds, parts: quantities } = circuit.program;
-    const having = (kind: string) => Object.entries(kinds).filter(([, k]) => k === kind).map(([id]) => [id, quantities[id]] as const);
-    this.lights = Object.entries(kinds).flatMap(([id, kind]) => (LIGHTS[kind] ?? []).flatMap((channel) => {
-      const i = quantities[id]?.[channel ? `I_${channel}` : "I"];
-      return i === undefined ? [] : [[id, channel, i] as [string, string, number]];
-    }));
+    const having = (kind: string) =>
+      Object.entries(kinds)
+        .filter(([, k]) => k === kind)
+        .map(([id]) => [id, quantities[id]] as const);
+    this.lights = Object.entries(kinds).flatMap(([id, kind]) =>
+      (LIGHTS[kind] ?? []).flatMap((channel) => {
+        const i = quantities[id]?.[channel ? `I_${channel}` : "I"];
+        return i === undefined ? [] : [[id, channel, i] as [string, string, number]];
+      }),
+    );
     this.buzzers = [...having("Buzzer"), ...having("PassiveBuzzer")].flatMap(([id, q]) =>
-      q?.U !== undefined ? [buzzing(id, q.U, kinds[id] === "Buzzer")] : []);
+      q?.U !== undefined ? [buzzing(id, q.U, kinds[id] === "Buzzer")] : [],
+    );
     this.servos = having("Servo").flatMap(([id, q]) => (q?.U_sig !== undefined ? [servoing(id, q.U_sig)] : []));
-    this.lcds = having("LCD1602").flatMap(([id, q]) => (q ? [lcd(id, {
-      power: q.U, contrast: q.U_v0, backlight: q.I_a, rs: q.U_rs, rw: q.U_rw, e: q.U_e, data: LCD_DATA.map((d) => q[`U_${d}`]),
-    })] : []));
+    this.lcds = having("LCD1602").flatMap(([id, q]) =>
+      q
+        ? [
+            lcd(id, {
+              power: q.U,
+              contrast: q.U_v0,
+              backlight: q.I_a,
+              rs: q.U_rs,
+              rw: q.U_rw,
+              e: q.U_e,
+              data: LCD_DATA.map((d) => q[`U_${d}`]),
+            }),
+          ]
+        : [],
+    );
     this.sonars = having("Ultrasonic").flatMap(([id, q]) => (q?.U_trig !== undefined ? [sonar(id, q.U_trig)] : []));
     this.setParts(parts);
   }
@@ -143,7 +179,12 @@ export class Runner {
     board.chip.onSerial = (c) => {
       this.serial = (this.serial + c).slice(-4000);
     };
-    board.chip.i2c.devices = modulesOn(s, board, Object.fromEntries(this.parts.map((e) => [e.id, e.text])), this.modules);
+    board.chip.i2c.devices = modulesOn(
+      s,
+      board,
+      Object.fromEntries(this.parts.map((e) => [e.id, e.text])),
+      this.modules,
+    );
     spiDevicesOn(s, board, this.tfts);
     this.setParts(this.parts); // (a new LCD takes its trimmer)
   }
@@ -165,8 +206,11 @@ export class Runner {
 
   /** After every step: what glows, sounds, turns and is sampled. */
   private record() {
-    const s = this.session, x = s.sim.x, t = s.sim.t;
-    const g = this.glow, dt = t - g.last;
+    const s = this.session,
+      x = s.sim.x,
+      t = s.sim.t;
+    const g = this.glow,
+      dt = t - g.last;
     if (dt > 0) {
       for (const [id, channel, i] of this.lights) {
         const key = `${id}:${channel}`;
@@ -182,7 +226,8 @@ export class Runner {
       const distance = u.high ? Number(this.parts.find((e) => e.id === u.id)?.text ?? 100) || 100 : 0;
       const echo = ping(u, x[u.trig], t, distance);
       if (!echo) continue;
-      const [at, length] = echo, input = `${u.id}_echo`;
+      const [at, length] = echo,
+        input = `${u.id}_echo`;
       s.schedule(at, () => s.sim.setInput(input, 1));
       s.schedule(at + length, () => s.sim.setInput(input, 0));
     }
@@ -216,10 +261,12 @@ export class Runner {
 
   /** What the board shows now; the averages (glow, sound) are over the time since the last frame. */
   frame(): Frame {
-    const { sim } = this.session, c = this.circuit;
+    const { sim } = this.session,
+      c = this.circuit;
     const voltages: Record<string, number> = {};
     for (const node of Object.keys(c.program.nodes)) voltages[node] = sim.node(node);
-    const leds: Record<string, number> = {}, looks: Record<string, Record<string, number>> = {};
+    const leds: Record<string, number> = {},
+      looks: Record<string, Record<string, number>> = {};
     const span = sim.t - this.glow.since;
     for (const [id, channel, i] of this.lights) {
       const key = `${id}:${channel}`;
@@ -258,7 +305,8 @@ export class Runner {
       const voltage = q.U ?? q.U_BE ?? q.U_GS;
       const I = current === undefined ? null : sim.x[current];
       results[id] = {
-        value: "", solved: false,
+        value: "",
+        solved: false,
         U: voltage === undefined ? null : si(Math.abs(sim.x[voltage]), "V"),
         I: I === null ? null : si(Math.abs(I), "A"),
         P: null,
@@ -268,14 +316,30 @@ export class Runner {
     // a Pico the emulator cannot keep up with: its cores' clock as they run now, by its label
     for (const b of this.session.boards) {
       if (!(b.chip instanceof Pico) || b.chip.pace > 0.98) continue;
-      results[b.label] = { value: `${Math.round(b.chip.frequency / 1e6)} MHz`, solved: true, U: null, I: null, P: null, reversed: false };
+      results[b.label] = {
+        value: `${Math.round(b.chip.frequency / 1e6)} MHz`,
+        solved: true,
+        U: null,
+        I: null,
+        P: null,
+        reversed: false,
+      };
     }
     this.glow = { since: sim.t, last: sim.t, charge: new Map() };
     const trace = (name: string) => this.history.get(name) ?? { name, t: [], v: [] };
     const serial = this.serial;
     this.serial = "";
     return {
-      t: sim.t, voltages, leds, looks, screens, oleds, tfts, results, sounds, serial,
+      t: sim.t,
+      voltages,
+      leds,
+      looks,
+      screens,
+      oleds,
+      tfts,
+      results,
+      sounds,
+      serial,
       traces: [...this.shown.scope, ...this.shown.probe].map(trace),
     };
   }

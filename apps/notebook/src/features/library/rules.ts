@@ -1,6 +1,6 @@
 // What the user may do with a card, as the server decides it (LibraryRepo): the page only hides
 // what would be refused.
-import { RANK, type ItemCard, type Role } from "@electro/notes-api";
+import { type ItemCard, RANK, type Role } from "@electro/notes-api";
 
 /** Change it: rename it, write in it, put things into it (a folder). */
 export const canEdit = (card: ItemCard) => RANK[card.role] >= RANK.editor;

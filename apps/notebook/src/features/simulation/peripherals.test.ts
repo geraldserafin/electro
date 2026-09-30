@@ -2,20 +2,27 @@ import { readFileSync } from "node:fs";
 import { PinState } from "avr8js";
 import { describe, expect, test } from "vitest";
 import { CLOCK, Uno } from "./arduino";
-import { ECHO_DELAY, buzzing, heard, listen, ping, servoing, sonar, turn, watch } from "./peripherals";
+import { buzzing, ECHO_DELAY, heard, listen, ping, servoing, sonar, turn, watch } from "./peripherals";
 
 /** A pin's square wave as the circuit gives it: a step lands on every edge, then steps of ``dt``. */
 function pinWave(period: number, high: number, until: number, dt = 20e-6): [number, number][] {
   const samples: [number, number][] = [];
   for (let start = 0; start < until; start += period)
-    for (const [from, to, v] of [[start, start + high, 5], [start + high, start + period, 0]] as const)
+    for (const [from, to, v] of [
+      [start, start + high, 5],
+      [start + high, start + period, 0],
+    ] as const)
       for (let t = from; t < to - 1e-12; t = Math.min(to, t + dt)) samples.push([Math.min(to, t + dt), v]);
   return samples;
 }
 
 describe("servo", () => {
   test("its angle is the pulse's length, 544 µs to 2400 µs over 0° to 180°", () => {
-    for (const [width, angle] of [[1.5e-3, 92.7], [544e-6, 0], [2.4e-3, 180]]) {
+    for (const [width, angle] of [
+      [1.5e-3, 92.7],
+      [544e-6, 0],
+      [2.4e-3, 180],
+    ]) {
       const m = servoing("M_1", 0);
       for (const [t, v] of pinWave(20e-3, width, 0.1)) watch(m, v, t);
       expect(m.target).toBeCloseTo(angle, 0);
@@ -41,9 +48,15 @@ describe("buzzer", () => {
     const b = buzzing("BZ_1", 0, false);
     let last = 0;
     const samples = pinWave(1 / 440, 1 / 880, 0.5);
-    for (const [t, v] of samples.filter(([t]) => t <= 0.25)) { listen(b, v, t - last); last = t; }
+    for (const [t, v] of samples.filter(([t]) => t <= 0.25)) {
+      listen(b, v, t - last);
+      last = t;
+    }
     heard(b, 0.25); // the first drawing: now it knows how far the wave swings
-    for (const [t, v] of samples.filter(([t]) => t > 0.25)) { listen(b, v, t - last); last = t; }
+    for (const [t, v] of samples.filter(([t]) => t > 0.25)) {
+      listen(b, v, t - last);
+      last = t;
+    }
     const { frequency, volume } = heard(b, 0.25);
     expect(frequency).toBeGreaterThan(430);
     expect(frequency).toBeLessThan(450);
@@ -63,10 +76,17 @@ describe("driven by a real sketch (fixtures/peripherals.ino: Servo.write(45) on 
   // the pins' changes as the circuit sees them: a step lands on each (session.ts), then one step on
   const uno = new Uno(readFileSync(new URL("./fixtures/peripherals.hex", import.meta.url), "utf8"));
   uno.runUntil(0.3);
-  const samples = (pin: string): [number, number][] => uno.events.filter((e) => e.pin === pin).flatMap((e, i, all) => {
-    const t = e.cycle / CLOCK, before = i > 0 && all[i - 1].state === PinState.High ? 5 : 0;
-    return [[t, before], [t + 1e-6, e.state === PinState.High ? 5 : 0]] as [number, number][];
-  });
+  const samples = (pin: string): [number, number][] =>
+    uno.events
+      .filter((e) => e.pin === pin)
+      .flatMap((e, i, all) => {
+        const t = e.cycle / CLOCK,
+          before = i > 0 && all[i - 1].state === PinState.High ? 5 : 0;
+        return [
+          [t, before],
+          [t + 1e-6, e.state === PinState.High ? 5 : 0],
+        ] as [number, number][];
+      });
 
   test("the servo turns to 45°", () => {
     const m = servoing("M_1", 0);
@@ -78,17 +98,27 @@ describe("driven by a real sketch (fixtures/peripherals.ino: Servo.write(45) on 
     const b = buzzing("BZ_1", 0, false);
     let last = 0;
     const wave = samples("D8");
-    for (const [t, v] of wave.filter(([t]) => t <= 0.1)) { listen(b, v, t - last); last = t; }
+    for (const [t, v] of wave.filter(([t]) => t <= 0.1)) {
+      listen(b, v, t - last);
+      last = t;
+    }
     heard(b, 0.1);
-    for (const [t, v] of wave.filter(([t]) => t > 0.1 && t <= 0.3)) { listen(b, v, t - last); last = t; }
+    for (const [t, v] of wave.filter(([t]) => t > 0.1 && t <= 0.3)) {
+      listen(b, v, t - last);
+      last = t;
+    }
     expect(heard(b, 0.2).frequency).toBeCloseTo(440, -1);
   });
 });
 
 describe("HC-SR04", () => {
   const trigger = (s: ReturnType<typeof sonar>, at: number, width: number, distance: number) =>
-    [ping(s, 0, at, distance), ping(s, 5, at + 1e-7, distance), ping(s, 5, at + width, distance), ping(s, 0, at + width + 1e-7, distance)]
-      .find((e) => e !== null) ?? null;
+    [
+      ping(s, 0, at, distance),
+      ping(s, 5, at + 1e-7, distance),
+      ping(s, 5, at + width, distance),
+      ping(s, 0, at + width + 1e-7, distance),
+    ].find((e) => e !== null) ?? null;
 
   test("a 10 µs trigger: the echo 58 µs a centimetre, after the burst", () => {
     const echo = trigger(sonar("US_1", 0), 0.01, 10e-6, 100);

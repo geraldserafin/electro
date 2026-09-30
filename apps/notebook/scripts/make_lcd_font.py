@@ -6,11 +6,14 @@ few Greek letters and symbols where A00 has them too; the codes where A00 differ
 (¥, →, ←, °, █) drawn here. A00's katakana are not in it: those codes stay blank. Run from the repo
 root with arduino-cli's user libraries installed (Adafruit GFX Library: devenv installs it).
 """
+
 import re
 import subprocess
 from pathlib import Path
 
-user = subprocess.run(["arduino-cli", "config", "get", "directories.user"], capture_output=True, text=True, check=True).stdout.strip()
+user = subprocess.run(
+    ["arduino-cli", "config", "get", "directories.user"], capture_output=True, text=True, check=True
+).stdout.strip()
 source = (Path(user) / "libraries/Adafruit_GFX_Library/glcdfont.c").read_text()
 table = [int(h, 16) for h in re.findall(r"0x([0-9A-Fa-f]{2})", source.split("font[] PROGMEM = {")[1].split("};")[0])]
 assert len(table) == 256 * 5
@@ -18,7 +21,7 @@ assert len(table) == 256 * 5
 
 def glyph(code: int) -> list[int]:
     """The font's glyph (columns, bit 0 on top) as 8 rows of 5 dots (bit 4 on the left, as CGRAM has them)."""
-    cols = table[code * 5:code * 5 + 5]
+    cols = table[code * 5 : code * 5 + 5]
     return [sum(1 << (4 - c) for c in range(5) if cols[c] >> r & 1) for r in range(8)]
 
 
@@ -32,8 +35,19 @@ rom[0x7F] = rows("00000", "00100", "01000", "11111", "01000", "00100")  # ←
 rom[0xDF] = rows("11100", "10100", "11100")  # ° (lcd.print((char)223))
 rom[0xFF] = [0b11111] * 8  # █
 # A00's Greek letters and symbols, from the font's CP437 ones that look alike
-for a00, cp437 in {0xE0: 0xE0, 0xE2: 0xE1, 0xE3: 0xEE, 0xE4: 0xE6, 0xE5: 0xE5, 0xF2: 0xE9, 0xF3: 0xEC, 0xF4: 0xEA,
-                   0xF6: 0xE4, 0xF7: 0xE3, 0xFD: 0xF6}.items():
+for a00, cp437 in {
+    0xE0: 0xE0,
+    0xE2: 0xE1,
+    0xE3: 0xEE,
+    0xE4: 0xE6,
+    0xE5: 0xE5,
+    0xF2: 0xE9,
+    0xF3: 0xEC,
+    0xF4: 0xEA,
+    0xF6: 0xE4,
+    0xF7: 0xE3,
+    0xFD: 0xF6,
+}.items():
     rom[a00] = glyph(cp437)
 
 hex_rows = "".join(f"{r:02x}" for g in rom for r in g)

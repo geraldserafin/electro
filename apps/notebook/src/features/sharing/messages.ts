@@ -74,7 +74,8 @@ export const en: typeof pl = {
   copied: "Copied",
   loading: "Loading…",
   leave: "Remove from my notes",
-  confirmLeave: "Remove “{{name}}” from your notes? You will get back only by the link, or when someone shares it with you again.",
+  confirmLeave:
+    "Remove “{{name}}” from your notes? You will get back only by the link, or when someone shares it with you again.",
   problem: {
     NoSuchPerson: "No one with {{email}} has signed in here yet. Send them the link.",
     RoleTooLow: "Only the owner can share.",

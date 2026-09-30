@@ -6,6 +6,10 @@ let current: ItemCard | null = null;
 
 export const dragging = {
   get: () => current,
-  start: (card: ItemCard) => { current = card; },
-  end: () => { current = null; },
+  start: (card: ItemCard) => {
+    current = card;
+  },
+  end: () => {
+    current = null;
+  },
 };

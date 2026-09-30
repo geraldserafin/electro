@@ -4,6 +4,7 @@ The editor draws schematics before Python has loaded, so it gets the symbols as 
 static file; python/test_kernel.py checks the file is up to date. Run from the repo
 root with PYTHONPATH set (e.g. in devenv shell) after changing electro_render/symbols.py.
 """
+
 import json
 from pathlib import Path
 

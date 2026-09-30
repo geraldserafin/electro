@@ -2,8 +2,9 @@
 // (not SCK's and MOSI's levels, some tens of MHz), so the bus is here, in the page, like I²C's
 // (i2c.ts). A device knows by the chip's own pins wired to its CS and D/C whether a byte is its own
 // and whether it is a command: it asks the chip (Chip.level) as the byte comes.
-import { Ili9341 } from "./tft";
+
 import type { Board, Session } from "./session";
+import { Ili9341 } from "./tft";
 
 export interface SpiDevice {
   transmit(byte: number): void;
@@ -15,7 +16,10 @@ export interface SpiDevice {
 export class Spi {
   devices: SpiDevice[] = [];
 
-  constructor(readonly sck: readonly string[], readonly tx: readonly string[]) {}
+  constructor(
+    readonly sck: readonly string[],
+    readonly tx: readonly string[],
+  ) {}
 
   transmit(byte: number) {
     for (const d of this.devices) d.transmit(byte);
@@ -35,7 +39,14 @@ export interface SpiChip {
 export const hasSpi = (chip: object): chip is SpiChip => "spi" in chip && "level" in chip;
 
 // electro.devices.ILI9341's pins, in order
-const VCC = 0, GND = 1, CS = 2, RESET = 3, DC = 4, MOSI = 5, SCK = 6, LED = 7;
+const VCC = 0,
+  GND = 1,
+  CS = 2,
+  RESET = 3,
+  DC = 4,
+  MOSI = 5,
+  SCK = 6,
+  LED = 7;
 
 /**
  * Hands each SPI of ``board``'s chip the displays on it: those whose SCK and MOSI are wired to pins the
@@ -55,14 +66,16 @@ export function spiDevicesOn(s: Session, board: Board, kept: Map<string, Ili9341
     const at = (i: number) => pins[id]?.[i] ?? null;
     const on = (i: number) => {
       const node = at(i);
-      return node ? pinOf.get(node) ?? null : null;
+      return node ? (pinOf.get(node) ?? null) : null;
     };
-    const sck = on(SCK), mosi = on(MOSI);
+    const sck = on(SCK),
+      mosi = on(MOSI);
     const spi = chip.spi.find((p) => sck && mosi && p.sck.includes(sck) && p.tx.includes(mosi));
     if (!spi) continue;
     const volts = (i: number) => s.sim.node(at(i) ?? "") - s.sim.node(at(GND) ?? "");
     const [cs, reset, dc] = [on(CS), on(RESET), on(DC)].map((pin) => (pin ? chip.level(pin) : null));
-    let checked = -1, powered = false; // (the supply looked at once a step of the circuit's, not for every byte)
+    let checked = -1,
+      powered = false; // (the supply looked at once a step of the circuit's, not for every byte)
     let tft = kept.get(id);
     if (!tft) kept.set(id, (tft = new Ili9341(id)));
     tft.wire({

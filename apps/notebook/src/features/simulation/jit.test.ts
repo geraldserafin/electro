@@ -1,8 +1,8 @@
 // The block JIT (@electro/rp2040js's jit.ts) against the interpreter it stands in for: real programs run with
 // every block checked — run, undone, run again by the interpreter, the two compared (BlockJit.verifying).
 import { readFileSync } from "node:fs";
-import { expect, test } from "vitest";
 import { BlockJit, RP2040 } from "@electro/rp2040js";
+import { expect, test } from "vitest";
 
 function run(file: string, seconds: number) {
   const mcu = new RP2040();
@@ -16,16 +16,19 @@ function run(file: string, seconds: number) {
   i2c.onWriteByte = () => i2c.completeWrite(true);
   i2c.onReadByte = () => i2c.completeRead(0xff);
   i2c.onStop = () => i2c.completeStop();
-  const set = (pin: number, at: number, high: boolean) => mcu.clock.createAlarm({ fire: () => mcu.gpio[pin].setInputValue(high) }).schedule(at * 1e9);
+  const set = (pin: number, at: number, high: boolean) =>
+    mcu.clock.createAlarm({ fire: () => mcu.gpio[pin].setInputValue(high) }).schedule(at * 1e9);
   if (file.startsWith("hell")) {
     set(14, 0.3, false); // FIRE pressed and let go: the game starts
     set(14, 0.5, true);
     set(10, 0.6, false); // walking on
   }
-  const [core0, core1] = mcu.core, jits = [new BlockJit(core0), new BlockJit(core1)];
+  const [core0, core1] = mcu.core,
+    jits = [new BlockJit(core0), new BlockJit(core1)];
   for (const j of jits) j.verifying = true;
   const clock = mcu.clock;
-  while (clock.nanos < seconds * 1e9) { // (as Pico.runUntil steps them)
+  while (clock.nanos < seconds * 1e9) {
+    // (as Pico.runUntil steps them)
     if (core0.waiting && core1.waiting) {
       const alarm = clock.nanosToNextAlarm;
       clock.tick(alarm > 0 ? alarm : seconds * 1e9 - clock.nanos);
@@ -43,7 +46,7 @@ function run(file: string, seconds: number) {
       }
       jits[1].step();
     }
-    clock.tick((core0.cycles - start) * 1e9 / mcu.clkSys);
+    clock.tick(((core0.cycles - start) * 1e9) / mcu.clkSys);
     for (const j of jits) if (j.mismatch) return { mismatch: j.mismatch, jits };
   }
   return { mismatch: null, jits };

@@ -29,14 +29,34 @@ export interface PdfSettings {
 }
 
 export const DEFAULTS: PdfSettings = {
-  theme: "classic", accent: null, title: true, author: "", date: false, titlePage: false, outline: false, numbering: false,
-  sectionBreaks: false, outputs: true, codeLines: false, results: false,
-  paper: "A4", orientation: "portrait", margins: "normal", columns: 1, text: "normal", spacing: "normal", align: "theme",
-  header: false, pageNumbers: false,
+  theme: "classic",
+  accent: null,
+  title: true,
+  author: "",
+  date: false,
+  titlePage: false,
+  outline: false,
+  numbering: false,
+  sectionBreaks: false,
+  outputs: true,
+  codeLines: false,
+  results: false,
+  paper: "A4",
+  orientation: "portrait",
+  margins: "normal",
+  columns: 1,
+  text: "normal",
+  spacing: "normal",
+  align: "theme",
+  header: false,
+  pageNumbers: false,
 };
 
 /** The note's settings, completed with the defaults (older notes have none). */
-export const pdfOf = (settings: Record<string, unknown>): PdfSettings => ({ ...DEFAULTS, ...(settings.pdf as Partial<PdfSettings>) });
+export const pdfOf = (settings: Record<string, unknown>): PdfSettings => ({
+  ...DEFAULTS,
+  ...(settings.pdf as Partial<PdfSettings>),
+});
 
 /** For the drawings: show the values a run found (settings.pdf.results). */
 export const PdfContext = createContext<PdfSettings>(DEFAULTS);

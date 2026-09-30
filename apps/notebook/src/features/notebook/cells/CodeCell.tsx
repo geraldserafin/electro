@@ -17,8 +17,16 @@ export const runOnShiftEnter = (run: () => void) => (e: KeyboardEvent) => {
   }
 };
 
-export function CodeCell({ cell, update, run, running }: {
-  cell: Extract<Cell, { type: "code" }>; update: (patch: Partial<Cell>) => void; run: () => void; running: boolean;
+export function CodeCell({
+  cell,
+  update,
+  run,
+  running,
+}: {
+  cell: Extract<Cell, { type: "code" }>;
+  update: (patch: Partial<Cell>) => void;
+  run: () => void;
+  running: boolean;
 }) {
   const { t } = useTranslation("notebook");
   return (

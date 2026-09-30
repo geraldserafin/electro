@@ -8,23 +8,23 @@
  * link never breaks, whatever is renamed or moved. A folder's contents come folders first (by
  * name), then notes (the newest first).
  */
-import { HttpApiEndpoint, HttpApiGroup, HttpApiSchema } from "@effect/platform"
-import { Schema } from "effect"
-import { Authentication } from "./Auth.js"
-import { NoteIdMismatch, RevisionConflict } from "./Errors.js"
-import { NotebookDocument, NoteId, NotePreview } from "./Notebook.js"
+import { HttpApiEndpoint, HttpApiGroup, HttpApiSchema } from "@effect/platform";
+import { Schema } from "effect";
+import { Authentication } from "./Auth.js";
+import { NoteIdMismatch, RevisionConflict } from "./Errors.js";
+import { NotebookDocument, NoteId, NotePreview } from "./Notebook.js";
 
-export const Role = Schema.Literal("owner", "editor", "viewer")
-export type Role = typeof Role.Type
+export const Role = Schema.Literal("owner", "editor", "viewer");
+export type Role = typeof Role.Type;
 
 /** What a role may do, from the least: viewer reads, editor also writes, owner also shares and deletes. */
-export const RANK: Record<Role, number> = { viewer: 0, editor: 1, owner: 2 }
+export const RANK: Record<Role, number> = { viewer: 0, editor: 1, owner: 2 };
 
-export const ItemKind = Schema.Literal("folder", "note")
-export type ItemKind = typeof ItemKind.Type
+export const ItemKind = Schema.Literal("folder", "note");
+export type ItemKind = typeof ItemKind.Type;
 
 /** Someone, as others see them. */
-export const Person = Schema.Struct({ name: Schema.String, avatarUrl: Schema.NullOr(Schema.String) })
+export const Person = Schema.Struct({ name: Schema.String, avatarUrl: Schema.NullOr(Schema.String) });
 
 /** A card in a grid: a folder (a few of its notes' first pages, for its picture) or a note. */
 export const ItemCard = Schema.Struct({
@@ -40,23 +40,23 @@ export const ItemCard = Schema.Struct({
   previews: Schema.Array(NotePreview), // a folder's: up to four of its notes, the newest first
   count: Schema.Int, // a folder's: what is in it
   shared: Schema.Boolean, // the user's own, shared with someone (or by a link)
-}).annotations({ identifier: "ItemCard" })
-export type ItemCard = typeof ItemCard.Type
+}).annotations({ identifier: "ItemCard" });
+export type ItemCard = typeof ItemCard.Type;
 
 /** A folder above an item, as far up as the user can see (a link in the breadcrumbs). */
-export const Crumb = Schema.Struct({ id: NoteId, name: Schema.String })
-export type Crumb = typeof Crumb.Type
+export const Crumb = Schema.Struct({ id: NoteId, name: Schema.String });
+export type Crumb = typeof Crumb.Type;
 
 export const Folder = Schema.Struct({
   folder: ItemCard,
   path: Schema.Array(Crumb), // from the top down, without the folder itself
   items: Schema.Array(ItemCard),
-}).annotations({ identifier: "Folder" })
-export type Folder = typeof Folder.Type
+}).annotations({ identifier: "Folder" });
+export type Folder = typeof Folder.Type;
 
 /** A folder the user may put things into: for "Move to…". */
-export const Destination = Schema.Struct({ id: NoteId, name: Schema.String, parentId: Schema.NullOr(NoteId) })
-export type Destination = typeof Destination.Type
+export const Destination = Schema.Struct({ id: NoteId, name: Schema.String, parentId: Schema.NullOr(NoteId) });
+export type Destination = typeof Destination.Type;
 
 /** A stored note: the document, its revision (for saving without overwriting newer work), where it is. */
 export const Note = Schema.Struct({
@@ -65,8 +65,8 @@ export const Note = Schema.Struct({
   savedAt: Schema.String,
   role: Role,
   path: Schema.Array(Crumb),
-}).annotations({ identifier: "Note" })
-export type Note = typeof Note.Type
+}).annotations({ identifier: "Note" });
+export type Note = typeof Note.Type;
 
 /** Saving a note: the revision the client started from (null for a new note; anything else than
  *  the stored one is a conflict); a new note also says which folder it goes into (null: the top). */
@@ -74,22 +74,22 @@ export const SaveNote = Schema.Struct({
   document: NotebookDocument,
   baseRevision: Schema.NullOr(Schema.Int),
   parentId: Schema.optional(Schema.NullOr(NoteId)),
-}).annotations({ identifier: "SaveNote" })
-export type SaveNote = typeof SaveNote.Type
+}).annotations({ identifier: "SaveNote" });
+export type SaveNote = typeof SaveNote.Type;
 
-export const Saved = Schema.Struct({ revision: Schema.Int, savedAt: Schema.String })
-export type Saved = typeof Saved.Type
+export const Saved = Schema.Struct({ revision: Schema.Int, savedAt: Schema.String });
+export type Saved = typeof Saved.Type;
 
-const Name = Schema.NonEmptyTrimmedString.pipe(Schema.maxLength(200))
+const Name = Schema.NonEmptyTrimmedString.pipe(Schema.maxLength(200));
 
-export const NewFolder = Schema.Struct({ name: Name, parentId: Schema.NullOr(NoteId) })
+export const NewFolder = Schema.Struct({ name: Name, parentId: Schema.NullOr(NoteId) });
 
 /** Renaming and moving: what is given changes. A note's name is its document's title (renamed: a
  *  new revision). */
 export const ItemPatch = Schema.Struct({
   name: Schema.optional(Name),
   parentId: Schema.optional(Schema.NullOr(NoteId)),
-})
+});
 
 // ------------------------------------------------------------------ errors
 
@@ -100,7 +100,7 @@ export class NotFound extends Schema.TaggedError<NotFound>()(
   HttpApiSchema.annotations({ status: 404 }),
 ) {
   get message() {
-    return `No ${this.id} (or not yours to see).`
+    return `No ${this.id} (or not yours to see).`;
   }
 }
 
@@ -111,7 +111,7 @@ export class RoleTooLow extends Schema.TaggedError<RoleTooLow>()(
   HttpApiSchema.annotations({ status: 403 }),
 ) {
   get message() {
-    return `This needs the role ${this.needed}; you are ${this.role}.`
+    return `This needs the role ${this.needed}; you are ${this.role}.`;
   }
 }
 
@@ -122,7 +122,7 @@ export class MoveIntoItself extends Schema.TaggedError<MoveIntoItself>()(
   HttpApiSchema.annotations({ status: 400 }),
 ) {
   get message() {
-    return `Folder ${this.id} cannot go into itself.`
+    return `Folder ${this.id} cannot go into itself.`;
   }
 }
 
@@ -133,7 +133,7 @@ export class NotAFolder extends Schema.TaggedError<NotAFolder>()(
   HttpApiSchema.annotations({ status: 400 }),
 ) {
   get message() {
-    return `${this.id} is not a folder.`
+    return `${this.id} is not a folder.`;
   }
 }
 
@@ -144,13 +144,13 @@ export class OtherOwner extends Schema.TaggedError<OtherOwner>()(
   HttpApiSchema.annotations({ status: 400 }),
 ) {
   get message() {
-    return `${this.id} cannot move into someone else's folder.`
+    return `${this.id} cannot move into someone else's folder.`;
   }
 }
 
 // ------------------------------------------------------------------ endpoints
 
-const ById = Schema.Struct({ id: NoteId })
+const ById = Schema.Struct({ id: NoteId });
 
 export class LibraryGroup extends HttpApiGroup.make("library")
   // the top: the user's own folders and notes, and what others shared with them
@@ -161,32 +161,48 @@ export class LibraryGroup extends HttpApiGroup.make("library")
   .add(
     HttpApiEndpoint.post("createFolder", "/folders")
       .setPayload(NewFolder)
-      .addSuccess(ItemCard).addError(NotFound).addError(RoleTooLow).addError(NotAFolder),
+      .addSuccess(ItemCard)
+      .addError(NotFound)
+      .addError(RoleTooLow)
+      .addError(NotAFolder),
   )
   .add(HttpApiEndpoint.get("note", "/notes/:id").setPath(ById).addSuccess(Note).addError(NotFound))
   .add(
     // create (baseRevision: null) or update (baseRevision: the revision it was read at)
     HttpApiEndpoint.put("save", "/notes/:id")
-      .setPath(ById).setPayload(SaveNote)
+      .setPath(ById)
+      .setPayload(SaveNote)
       .addSuccess(Saved)
-      .addError(NotFound).addError(RoleTooLow).addError(RevisionConflict).addError(NoteIdMismatch).addError(NotAFolder),
+      .addError(NotFound)
+      .addError(RoleTooLow)
+      .addError(RevisionConflict)
+      .addError(NoteIdMismatch)
+      .addError(NotAFolder),
   )
   .add(
     HttpApiEndpoint.patch("patch", "/items/:id")
-      .setPath(ById).setPayload(ItemPatch)
+      .setPath(ById)
+      .setPayload(ItemPatch)
       .addSuccess(ItemCard)
-      .addError(NotFound).addError(RoleTooLow).addError(MoveIntoItself).addError(NotAFolder).addError(OtherOwner),
+      .addError(NotFound)
+      .addError(RoleTooLow)
+      .addError(MoveIntoItself)
+      .addError(NotAFolder)
+      .addError(OtherOwner),
   )
   .add(
     // a folder goes with everything in it
     HttpApiEndpoint.del("remove", "/items/:id")
-      .setPath(ById).addSuccess(Schema.Void).addError(NotFound).addError(RoleTooLow),
+      .setPath(ById)
+      .addSuccess(Schema.Void)
+      .addError(NotFound)
+      .addError(RoleTooLow),
   )
   // a note's address from before folders (``/notes/<slug>``): its id
   .add(
     HttpApiEndpoint.get("legacy", "/legacy/:ref")
       .setPath(Schema.Struct({ ref: Schema.String }))
-      .addSuccess(Schema.Struct({ id: NoteId })).addError(NotFound),
+      .addSuccess(Schema.Struct({ id: NoteId }))
+      .addError(NotFound),
   )
-  .middleware(Authentication)
-{}
+  .middleware(Authentication) {}

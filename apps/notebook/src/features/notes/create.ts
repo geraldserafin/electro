@@ -11,7 +11,10 @@ export function useCreateNote() {
   const navigate = useNavigate();
   /** Stores ``notebook`` as a new note (in the folder ``parentId``) and goes there; false if the
    *  server could not take it. */
-  return async (notebook: Notebook, { parentId = null, replace = false }: { parentId?: string | null; replace?: boolean } = {}) => {
+  return async (
+    notebook: Notebook,
+    { parentId = null, replace = false }: { parentId?: string | null; replace?: boolean } = {},
+  ) => {
     const exit = await save({
       path: { id: notebook.id },
       payload: { document: toDocument(notebook), baseRevision: null, parentId },

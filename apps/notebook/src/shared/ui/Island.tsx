@@ -2,29 +2,43 @@
 // a row each. data-keep-focus: a click on them does not leave the cell being worked on.
 import type { ButtonHTMLAttributes, ReactNode } from "react";
 import { Link, type LinkProps } from "react-router";
-import { Bolt } from "./icons";
 import { cn } from "@/shared/lib/cn";
+import { Bolt } from "./icons";
 
 const corner = { left: "left-3", right: "right-3" };
 
 /** A row of islands in a top corner of the page. */
 export function Islands({ side, children }: { side: "left" | "right"; children: ReactNode }) {
-  return <div data-keep-focus className={cn("fixed top-3 z-20 flex gap-2", corner[side])}>{children}</div>;
+  return (
+    <div data-keep-focus className={cn("fixed top-3 z-20 flex gap-2", corner[side])}>
+      {children}
+    </div>
+  );
 }
 
 /** An island: a flat tile one step off the page, holding a few things in a row. */
 export function Island({ children, className = "" }: { children: ReactNode; className?: string }) {
   return (
-    <div className={cn("flex items-center gap-0.5 p-1 rounded-xl border border-line bg-surface", className)}>{children}</div>
+    <div className={cn("flex items-center gap-0.5 p-1 rounded-xl border border-line bg-surface", className)}>
+      {children}
+    </div>
   );
 }
 
 // an island that is one button (or link); `on`: its panel is open
 const button = (on?: boolean) =>
-  cn("inline-flex flex-none items-center justify-center size-11.5 rounded-xl border border-line bg-surface text-fg no-underline",
-     "hover:bg-selected", on && "bg-selected");
+  cn(
+    "inline-flex flex-none items-center justify-center size-11.5 rounded-xl border border-line bg-surface text-fg no-underline",
+    "hover:bg-selected",
+    on && "bg-selected",
+  );
 
-export function IslandButton({ on, waiting, className = "", ...props }: ButtonHTMLAttributes<HTMLButtonElement> & {
+export function IslandButton({
+  on,
+  waiting,
+  className = "",
+  ...props
+}: ButtonHTMLAttributes<HTMLButtonElement> & {
   on?: boolean;
   waiting?: boolean; // what it does is not ready yet (Python is starting): it blinks
 }) {
@@ -39,7 +53,9 @@ export function IslandLink(props: LinkProps) {
 export function Brand({ title }: { title?: string }) {
   return (
     <Island>
-      <span className="grid place-items-center size-8 flex-none rounded-lg text-[#f9ab00]" title={title}><Bolt /></span>
+      <span className="grid place-items-center size-8 flex-none rounded-lg text-[#f9ab00]" title={title}>
+        <Bolt />
+      </span>
       <span className="pr-2.5 pl-0.5 text-[17px] font-medium">electro</span>
     </Island>
   );

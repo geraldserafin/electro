@@ -7,9 +7,18 @@
 @import "tailwindcss/utilities.css" layer(utilities);
 
 @layer base {
-  body { background: var(--bg); color: var(--text); font: 18px/1.6 var(--sans); }
-  button:not(:disabled), [role="button"]:not(:disabled) { cursor: pointer; }
-  ::placeholder { color: var(--faint); }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font: 18px / 1.6 var(--sans);
+  }
+  button:not(:disabled),
+  [role="button"]:not(:disabled) {
+    cursor: pointer;
+  }
+  ::placeholder {
+    color: var(--faint);
+  }
 }
 
 @custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
@@ -55,35 +64,66 @@
 @utility appear {
   animation: appear 0.35s cubic-bezier(0.2, 0.8, 0.2, 1) backwards;
   animation-delay: calc(var(--i, 0) * 40ms);
-  @media (prefers-reduced-motion: reduce) { animation: none; }
+  @media (prefers-reduced-motion: reduce) {
+    animation: none;
+  }
 }
-@keyframes appear { from { opacity: 0; transform: translateY(6px); } }
+@keyframes appear {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}
 
 /* a placeholder in the shape of what is coming, shimmering */
 @utility skeleton {
-  display: block; border-radius: 6px;
+  display: block;
+  border-radius: 6px;
   background: linear-gradient(90deg, var(--selected) 25%, var(--hover) 45%, var(--selected) 65%);
-  background-size: 300% 100%; animation: shimmer 1.4s ease-in-out infinite;
-  @media (prefers-reduced-motion: reduce) { animation: none; }
+  background-size: 300% 100%;
+  animation: shimmer 1.4s ease-in-out infinite;
+  @media (prefers-reduced-motion: reduce) {
+    animation: none;
+  }
 }
-@keyframes shimmer { from { background-position: 100% 0; } to { background-position: 0 0; } }
+@keyframes shimmer {
+  from {
+    background-position: 100% 0;
+  }
+  to {
+    background-position: 0 0;
+  }
+}
 
 /* coming up from below: a notice at the bottom */
 @theme {
   --animate-rise: rise 0.2s ease both;
-  @keyframes rise { from { opacity: 0; transform: translateY(8px); } }
+  @keyframes rise {
+    from {
+      opacity: 0;
+      transform: translateY(8px);
+    }
+  }
 }
 
 /* in front of everything: a dialog's backdrop */
 @theme {
   --animate-fade-in: fade-in 0.15s ease both;
-  @keyframes fade-in { from { opacity: 0; } }
+  @keyframes fade-in {
+    from {
+      opacity: 0;
+    }
+  }
 }
 
 /* something is working (Python starting, a cell running): fading in and out */
 @theme {
   --animate-blink: blink 0.9s ease-in-out infinite alternate;
-  @keyframes blink { to { opacity: 0.3; } }
+  @keyframes blink {
+    to {
+      opacity: 0.3;
+    }
+  }
 }
 
 /* raised off the page: a cell being worked on, the tools on its edge */

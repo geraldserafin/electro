@@ -13,3 +13,4 @@ dist/
 
 .env
 /.llvm-wasm/
+.pre-commit-config.yaml

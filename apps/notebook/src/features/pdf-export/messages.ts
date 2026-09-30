@@ -12,7 +12,8 @@ export const pl = {
   pages_few: "{{count}} strony",
   pages_many: "{{count}} stron",
   pages_other: "{{count}} strony",
-  unreadable: "Nie każdy wzór dało się złożyć ({{count}}): Typst nie zna któregoś z poleceń LaTeX, więc w PDF jest sam zapis.",
+  unreadable:
+    "Nie każdy wzór dało się złożyć ({{count}}): Typst nie zna któregoś z poleceń LaTeX, więc w PDF jest sam zapis.",
   downloadPdf: "Pobierz PDF",
   downloadTyp: "Pobierz .typ",
   typHint: "Źródło w Typst: jeden plik .typ",
@@ -97,7 +98,8 @@ export const en: typeof pl = {
   pages_few: "{{count}} pages",
   pages_many: "{{count}} pages",
   pages_other: "{{count}} pages",
-  unreadable: "Not every formula could be typeset ({{count}}): Typst does not know one of their LaTeX commands, so the PDF shows them as written.",
+  unreadable:
+    "Not every formula could be typeset ({{count}}): Typst does not know one of their LaTeX commands, so the PDF shows them as written.",
   downloadPdf: "Save PDF",
   downloadTyp: "Save .typ",
   typHint: "The Typst source: one .typ file",

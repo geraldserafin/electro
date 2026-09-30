@@ -1,11 +1,12 @@
 // A note as a Typst document: main.typ (the cells, in order), config.typ (the settings and the
 // formulas) and the drawings as SVG files. electro.typ (the theme) gives the pieces their look.
-import type { Notebook, Output } from "@/shared/model/types";
-import type { Failure } from "@/shared/model/issues";
+
 import { sayIn } from "@/features/solution";
+import type { Failure } from "@/shared/model/issues";
+import type { Notebook, Output } from "@/shared/model/types";
 import type { PdfSettings } from "../settings";
-import { markdownToTypst, str, text, topHeading } from "./markdown";
 import template from "./electro.typ?raw";
+import { markdownToTypst, str, text, topHeading } from "./markdown";
 
 export interface TypstDocument {
   main: string;
@@ -17,8 +18,11 @@ export interface TypstDocument {
 const PAPER = { A4: "a4", Letter: "us-letter" } as const;
 const MARGINS = { narrow: "(x: 14mm, y: 14mm)", normal: "(x: 20mm, y: 22mm)", wide: "(x: 28mm, y: 28mm)" } as const;
 const SIZE = { small: "10pt", normal: "11pt", large: "12pt" } as const;
-const SPACING = { // par's leading (between lines) and spacing (between paragraphs)
-  tight: "(leading: 0.5em, spacing: 1em)", normal: "(leading: 0.65em, spacing: 1.2em)", loose: "(leading: 0.95em, spacing: 1.5em)",
+const SPACING = {
+  // par's leading (between lines) and spacing (between paragraphs)
+  tight: "(leading: 0.5em, spacing: 1em)",
+  normal: "(leading: 0.65em, spacing: 1.2em)",
+  loose: "(leading: 0.95em, spacing: 1.5em)",
 } as const;
 const ALIGN = { theme: "auto", left: "false", justify: "true" } as const; // justified text (auto: as the theme has it)
 const PX = 0.75; // an SVG's px in pt
@@ -29,8 +33,12 @@ const MITEX = "0.2.5"; // mitex from Typst Universe, for the .typ file (the app 
  * with the values of the last run, when the settings want them); none when it is empty. ``lang``: the
  * app's language, the document's too (hyphenation, the contents' title, the date).
  */
-export function toTypst(notebook: Notebook, pdf: PdfSettings, drawingOf: (cellId: string) => SVGSVGElement | null,
-                        lang: string): TypstDocument {
+export function toTypst(
+  notebook: Notebook,
+  pdf: PdfSettings,
+  drawingOf: (cellId: string) => SVGSVGElement | null,
+  lang: string,
+): TypstDocument {
   const formulas: string[] = [];
   const files: Record<string, string> = {};
   const math = (latex: string, block: boolean) => {
@@ -38,7 +46,9 @@ export function toTypst(notebook: Notebook, pdf: PdfSettings, drawingOf: (cellId
     return `#${block ? "M" : "m"}(${formulas.length - 1})`;
   };
   // the note's top heading level is the document's first (a note may start its sections at ##)
-  const tops = notebook.cells.flatMap((c) => (c.type === "markdown" ? [topHeading(c.source)] : [])).filter((d) => d !== null);
+  const tops = notebook.cells
+    .flatMap((c) => (c.type === "markdown" ? [topHeading(c.source)] : []))
+    .filter((d) => d !== null);
   const shift = tops.length ? Math.min(...tops) - 1 : 0;
   const md = (source: string) => markdownToTypst(source, math, shift);
   const image = (svg: SVGSVGElement, halo: boolean) => {
@@ -50,21 +60,29 @@ export function toTypst(notebook: Notebook, pdf: PdfSettings, drawingOf: (cellId
   const say = sayIn(lang);
   // what went wrong: an issue in the document's language (its math set by Typst), else Python's words
   const failure = (f: Failure, kind: "error" | "warning"): string => {
-    if (f.issue) return kind === "error" ? `#failed[${md(say.line(f.line) + say.issue(f.issue))}]` : `#warning[${md(say.issue(f.issue))}]`;
+    if (f.issue)
+      return kind === "error"
+        ? `#failed[${md(say.line(f.line) + say.issue(f.issue))}]`
+        : `#warning[${md(say.issue(f.issue))}]`;
     return kind === "error" ? `#error(${str((say.line(f.line) + f.data).trimEnd())})` : `#warning[${text(f.data)}]`;
   };
   const output = (o: Output): string => {
     switch (o.type) {
-      case "markdown": return md(o.data);
-      case "solution": return md(say.steps(o.data));
+      case "markdown":
+        return md(o.data);
+      case "solution":
+        return md(say.steps(o.data));
       case "error":
-      case "warning": return failure(o, o.type);
-      case "issue": return failure(o, o.kind);
+      case "warning":
+        return failure(o, o.type);
+      case "issue":
+        return failure(o, o.kind);
       case "svg": {
         const svg = parseSvg(o.data);
         return svg ? image(svg, false) : "";
       }
-      default: return o.data.trim() ? `#output(${str(o.data.trimEnd())})` : "";
+      default:
+        return o.data.trim() ? `#output(${str(o.data.trimEnd())})` : "";
     }
   };
 
@@ -133,7 +151,9 @@ function forTypst(svg: SVGSVGElement, halo: boolean): { source: string; width: n
   // class scopes the <style> inside it (its lines' colours, fill: none) and has to stay
   if (halo) copy.removeAttribute("class");
   // what the board needs and its page styles hide (areas to click): Typst would fill them black
-  copy.querySelectorAll(".hit, .pin-handle, .open-pin, .snap, .ghost, .draft, .rubber-band").forEach((el) => el.remove());
+  copy
+    .querySelectorAll(".hit, .pin-handle, .open-pin, .snap, .ghost, .draft, .rubber-band")
+    .forEach((el) => el.remove());
   copy.querySelectorAll("style").forEach((style) => {
     style.textContent = (style.textContent ?? "")
       .replace(/:root\[data-theme="dark"\][^{}]*\{[^}]*\}/g, "") // paper is light; Typst's SVG reader has no :root
@@ -142,10 +162,11 @@ function forTypst(svg: SVGSVGElement, halo: boolean): { source: string; width: n
       .replace(/font:\s*([\d.]+px)[^;}]*/g, "font-size:$1;font-family:sans-serif");
   });
   const extra = document.createElementNS("http://www.w3.org/2000/svg", "style");
-  extra.textContent = "text{font-family:sans-serif}"
-    + (halo
-      ? ".solved{fill:#000}text{paint-order:stroke;stroke:#fff;stroke-width:4px;stroke-linejoin:round}"
-        + ".letter{stroke:none}.label{font-size:13px}.label .sub{font-size:10px}.reading{font-size:11px;fill:#2f9e44}"
+  extra.textContent =
+    "text{font-family:sans-serif}" +
+    (halo
+      ? ".solved{fill:#000}text{paint-order:stroke;stroke:#fff;stroke-width:4px;stroke-linejoin:round}" +
+        ".letter{stroke:none}.label{font-size:13px}.label .sub{font-size:10px}.reading{font-size:11px;fill:#2f9e44}"
       : "");
   copy.appendChild(extra);
   const width = Number.parseFloat(copy.getAttribute("width") ?? "") || copy.viewBox.baseVal?.width || 400;

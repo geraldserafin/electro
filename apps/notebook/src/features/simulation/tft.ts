@@ -5,8 +5,10 @@
 // Adafruit_ILI9341's landscape; MX, MY: mirrored) and in which order a pixel's colours are (BGR).
 // The glass is drawn landscape: 320 wide, 240 high.
 
-export const WIDTH = 320, HEIGHT = 240; // the glass, landscape
-const COLUMNS = 240, ROWS = 320; // the frame memory
+export const WIDTH = 320,
+  HEIGHT = 240; // the glass, landscape
+const COLUMNS = 240,
+  ROWS = 320; // the frame memory
 
 /** What the display is wired to, asked as each byte comes (spi.ts). */
 export interface Wiring {
@@ -63,7 +65,8 @@ export class Ili9341 {
   /** Bytes one after another (the pins as they are: nothing runs between them), as many transmit()s. */
   transmitMany(memory: DataView, offset: number, count: number, size: number, mask: number) {
     if (!this.listening()) return;
-    const byte = (i: number) => (size === 2 ? memory.getUint16(offset + 2 * i, true) : memory.getUint8(offset + i)) & mask;
+    const byte = (i: number) =>
+      (size === 2 ? memory.getUint16(offset + 2 * i, true) : memory.getUint8(offset + i)) & mask;
     if (!this.wiring!.data()) for (let i = 0; i < count; i++) this.begin(byte(i));
     else if (this.command === 0x2c || this.command === 0x3c) {
       if (size === 1) for (let i = 0; i < count; i++) this.write(memory.getUint8(offset + i) & mask);
@@ -74,7 +77,7 @@ export class Ili9341 {
   // powered, not held in reset (just held: reset), selected
   private listening(): boolean {
     const w = this.wiring;
-    if (!w || !w.powered()) return false;
+    if (!w?.powered()) return false;
     const held = w.reset();
     if (held !== this.wasReset) {
       this.wasReset = held;
@@ -100,23 +103,51 @@ export class Ili9341 {
     this.params = [];
     this.have = 0;
     switch (command) {
-      case 0x01: this.hardwareReset(); break; // SWRESET
-      case 0x10: this.sleeping = true; this.dirty = this.since = true; break; // SLPIN
-      case 0x11: this.sleeping = false; this.dirty = this.since = true; break; // SLPOUT
-      case 0x20: this.inverted = false; this.dirty = this.since = true; break; // INVOFF
-      case 0x21: this.inverted = true; this.dirty = this.since = true; break; // INVON
-      case 0x28: this.on = false; this.dirty = this.since = true; break; // DISPOFF
-      case 0x29: this.on = true; this.dirty = this.since = true; break; // DISPON
-      case 0x2c: this.column = this.columns[0]; this.page = this.pages[0]; break; // RAMWR (RAMWRC 0x3c goes on)
+      case 0x01:
+        this.hardwareReset();
+        break; // SWRESET
+      case 0x10:
+        this.sleeping = true;
+        this.dirty = this.since = true;
+        break; // SLPIN
+      case 0x11:
+        this.sleeping = false;
+        this.dirty = this.since = true;
+        break; // SLPOUT
+      case 0x20:
+        this.inverted = false;
+        this.dirty = this.since = true;
+        break; // INVOFF
+      case 0x21:
+        this.inverted = true;
+        this.dirty = this.since = true;
+        break; // INVON
+      case 0x28:
+        this.on = false;
+        this.dirty = this.since = true;
+        break; // DISPOFF
+      case 0x29:
+        this.on = true;
+        this.dirty = this.since = true;
+        break; // DISPON
+      case 0x2c:
+        this.column = this.columns[0];
+        this.page = this.pages[0];
+        break; // RAMWR (RAMWRC 0x3c goes on)
     }
   }
 
   private parameter(byte: number) {
     const p = this.params;
     p.push(byte);
-    if (this.command === 0x2a && p.length === 4) this.columns = [(p[0] << 8) | p[1], (p[2] << 8) | p[3]]; // CASET
-    else if (this.command === 0x2b && p.length === 4) this.pages = [(p[0] << 8) | p[1], (p[2] << 8) | p[3]]; // PASET
-    else if (this.command === 0x36 && p.length === 1) { this.madctl = byte; this.dirty = this.since = true; } // MADCTL
+    if (this.command === 0x2a && p.length === 4)
+      this.columns = [(p[0] << 8) | p[1], (p[2] << 8) | p[3]]; // CASET
+    else if (this.command === 0x2b && p.length === 4)
+      this.pages = [(p[0] << 8) | p[1], (p[2] << 8) | p[3]]; // PASET
+    else if (this.command === 0x36 && p.length === 1) {
+      this.madctl = byte;
+      this.dirty = this.since = true;
+    } // MADCTL
     else if (this.command === 0x3a && p.length === 1) this.bits = (byte & 0x07) === 0x06 ? 18 : 16; // COLMOD
   }
 
@@ -124,12 +155,13 @@ export class Ili9341 {
     this.pixel = (this.pixel << 8) | byte;
     if (++this.have < (this.bits === 16 ? 2 : 3)) return;
     const px = this.pixel;
-    const value = this.bits === 16 ? px & 0xffff
-      : (((px >> 19) & 31) << 11) | (((px >> 10) & 63) << 5) | ((px >> 3) & 31); // 6-6-6: the top bits of each byte
+    const value =
+      this.bits === 16 ? px & 0xffff : (((px >> 19) & 31) << 11) | (((px >> 10) & 63) << 5) | ((px >> 3) & 31); // 6-6-6: the top bits of each byte
     this.pixel = 0;
     this.have = 0;
     const exchanged = (this.madctl & 0x20) !== 0;
-    let col = exchanged ? this.page : this.column, row = exchanged ? this.column : this.page;
+    let col = exchanged ? this.page : this.column,
+      row = exchanged ? this.column : this.page;
     if (this.madctl & 0x40) col = COLUMNS - 1 - col; // MX
     if (this.madctl & 0x80) row = ROWS - 1 - row; // MY
     const i = row * COLUMNS + col;
@@ -152,7 +184,8 @@ export class Ili9341 {
 
   // a window of half the frame memory or more: a program writing whole frames (Doom: 320 × 200)
   private large(): boolean {
-    const [c0, c1] = this.columns, [p0, p1] = this.pages;
+    const [c0, c1] = this.columns,
+      [p0, p1] = this.pages;
     return (c1 - c0 + 1) * (p1 - p0 + 1) >= (COLUMNS * ROWS) / 2;
   }
 
@@ -176,11 +209,16 @@ export class Ili9341 {
     if (memory === this.ram) this.since = false;
     // the frame memory's row r, column c lies at (r, c) on the landscape glass; the colours as the panel
     // takes them: BGR set, the high 5 bits are red (Adafruit_ILI9341); clear, they are blue
-    const bgr = (this.madctl & 0x08) !== 0, invert = this.inverted ? 0xffff : 0, out = new Uint8ClampedArray(WIDTH * HEIGHT * 4);
+    const bgr = (this.madctl & 0x08) !== 0,
+      invert = this.inverted ? 0xffff : 0,
+      out = new Uint8ClampedArray(WIDTH * HEIGHT * 4);
     for (let r = 0; r < ROWS; r++) {
       for (let c = 0; c < COLUMNS; c++) {
-        const v = memory[r * COLUMNS + c] ^ invert, o = (c * WIDTH + r) * 4;
-        const hi = (v >> 11) & 31, g = (v >> 5) & 63, lo = v & 31;
+        const v = memory[r * COLUMNS + c] ^ invert,
+          o = (c * WIDTH + r) * 4;
+        const hi = (v >> 11) & 31,
+          g = (v >> 5) & 63,
+          lo = v & 31;
         out[o] = ((bgr ? hi : lo) * 527 + 23) >> 6;
         out[o + 1] = (g * 259 + 33) >> 6;
         out[o + 2] = ((bgr ? lo : hi) * 527 + 23) >> 6;

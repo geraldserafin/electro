@@ -11,7 +11,6 @@ import re
 from collections import Counter
 from xml.sax.saxutils import escape
 
-from electro import circuit as ct
 from electro.components import Ammeter, Hole, Voltmeter, notation
 from electro.values import UNKNOWN, fmt
 from electro_schematic import GRID, KINDS, Schematic, layout
@@ -46,6 +45,7 @@ def schematic(what, solution=None, *, orientation: str | None = None) -> Svg:
 
 
 # --------------------------------------------------------------------------- texts
+
 
 def _neg(v: Vec) -> Vec:
     return (-v[0], -v[1])
@@ -92,7 +92,7 @@ def _tspans(text: str) -> str:
     """``R_1 = 10 Ω`` → R with a lowered 1; text after a subscript is raised back."""
     out, pos, lowered = [], 0, False
     for m in _SUB.finditer(text):
-        before = escape(text[pos:m.start()] + m.group(1))
+        before = escape(text[pos : m.start()] + m.group(1))
         out.append(f'<tspan dy="-4">{before}</tspan>' if lowered else before)
         out.append(f'<tspan class="sub" dy="4">{escape(m.group(2))}</tspan>')
         lowered, pos = True, m.end()
@@ -103,6 +103,7 @@ def _tspans(text: str) -> str:
 
 
 # --------------------------------------------------------------------------- drawing
+
 
 def _junctions(sch: Schematic) -> list[tuple[int, int]]:
     """Grid points where three or more connected wires/pins meet (same rules as Schematic.nodes)."""
@@ -130,8 +131,10 @@ def _text_box(side: Vec, lines) -> tuple[float, float, float, float]:
     w = max(CHAR * len(t.replace("_", "")) + 4 for t, _ in lines)
     h = LINE * len(lines)
     return {
-        DOWN: (-w / 2, w / 2, 4, 4 + h), UP: (-w / 2, w / 2, -4 - h, -4),
-        RIGHT: (6, 6 + w, -h / 2, h / 2), LEFT: (-6 - w, -6, -h / 2, h / 2),
+        DOWN: (-w / 2, w / 2, 4, 4 + h),
+        UP: (-w / 2, w / 2, -4 - h, -4),
+        RIGHT: (6, 6 + w, -h / 2, h / 2),
+        LEFT: (-6 - w, -6, -h / 2, h / 2),
     }[side]
 
 
@@ -166,12 +169,16 @@ class _Canvas:
         x0, x1, y0, y1 = _text_box(side, lines)
         anchor, tx = {DOWN: ("middle", x), UP: ("middle", x), RIGHT: ("start", x + x0), LEFT: ("end", x + x1)}[side]
         # a background-coloured card under the text keeps it readable where a wire runs behind it
-        self.cards.append(f'<rect class="halo" x="{x + x0:g}" y="{y + y0 + 1:g}" width="{x1 - x0:g}" '
-                          f'height="{y1 - y0 - 1:g}" rx="2"/>')
+        self.cards.append(
+            f'<rect class="halo" x="{x + x0:g}" y="{y + y0 + 1:g}" width="{x1 - x0:g}" '
+            f'height="{y1 - y0 - 1:g}" rx="2"/>'
+        )
         for i, (text, cls) in enumerate(lines):
             ty = y + y0 + 12 + i * LINE
-            self.texts.append(f'<text class="{cls}" x="{tx:g}" y="{ty:g}" text-anchor="{anchor}" '
-                              f'xml:space="preserve">{_tspans(text)}</text>')
+            self.texts.append(
+                f'<text class="{cls}" x="{tx:g}" y="{ty:g}" text-anchor="{anchor}" '
+                f'xml:space="preserve">{_tspans(text)}</text>'
+            )
         self.grow(x + x0, y + y0)
         self.grow(x + x1, y + y1)
 
@@ -198,7 +205,9 @@ def _draw(sch: Schematic, solution) -> Svg:
         x, y = e.at[0] * GRID, e.at[1] * GRID
         rotation = 0 if e.kind in UPRIGHT else e.rotation
         state = " closed" if e.kind in ("switch", "button") and e.text == "closed" else ""
-        canvas.items.append(f'<g class="w{state}" transform="translate({x:g} {y:g}) rotate({rotation})">{symbol(e.kind)}</g>')
+        canvas.items.append(
+            f'<g class="w{state}" transform="translate({x:g} {y:g}) rotate({rotation})">{symbol(e.kind)}</g>'
+        )
         pins = [(px * GRID, py * GRID) for px, py in e.pins()]
         for px, py in pins:
             canvas.grow(px - 12, py - 12)
@@ -218,15 +227,16 @@ def _draw(sch: Schematic, solution) -> Svg:
         own = list(zip(pins, pins[1:]))  # the element's own body is not in the way of its texts
         others = [s for s in obstacles if s not in own]
 
+        # (called right away, in this turn of the loop)
         def boxes(label_at: Vec, results_at: Vec):
-            for side, lines in ((label_at, label), (results_at, results)):
+            for side, lines in ((label_at, label), (results_at, results)):  # noqa: B023
                 if lines:
-                    ax, ay = cx + side[0] * BODY, cy + side[1] * BODY
+                    ax, ay = cx + side[0] * BODY, cy + side[1] * BODY  # noqa: B023
                     x0, x1, y0, y1 = _text_box(side, lines)
                     yield (ax + x0, ax + x1, ay + y0, ay + y1)
 
         def clashes(label_at: Vec, results_at: Vec) -> int:
-            return sum(_hits(b, others, placed) for b in boxes(label_at, results_at))
+            return sum(_hits(b, others, placed) for b in boxes(label_at, results_at))  # noqa: B023
 
         if clashes(result_side, label_side) < clashes(label_side, result_side):  # swap sides if that is clearer
             label_side, result_side = result_side, label_side

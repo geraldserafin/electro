@@ -1,0 +1,30 @@
+{
+  "$schema": "./node_modules/@biomejs/biome/configuration_schema.json",
+  "vcs": { "enabled": true, "clientKind": "git", "useIgnoreFile": true },
+  "files": {
+    "includes": [
+      "**",
+      "!packages/rp2040js",
+      "!apps/notebook/public",
+      "!apps/notebook/examples",
+      "!**/fixtures/*.json",
+      "!**/symbols.json"
+    ]
+  },
+  "formatter": { "indentStyle": "space", "indentWidth": 2, "lineWidth": 120 },
+  "javascript": { "formatter": { "quoteStyle": "double", "semicolons": "always", "trailingCommas": "all" } },
+  "css": { "parser": { "tailwindDirectives": true } },
+  "assist": { "actions": { "source": { "organizeImports": "on" } } },
+  "linter": {
+    "enabled": true,
+    "rules": {
+      "recommended": true,
+      "a11y": "off",
+      "style": { "noNonNullAssertion": "off" },
+      "complexity": { "useSimpleNumberKeys": "off", "noCommaOperator": "off" },
+      "correctness": { "useExhaustiveDependencies": "off" },
+      "security": { "noDangerouslySetInnerHtml": "off" },
+      "suspicious": { "noArrayIndexKey": "off", "noAssignInExpressions": "off", "useIterableCallbackReturn": "off" }
+    }
+  }
+}

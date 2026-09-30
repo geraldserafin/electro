@@ -23,7 +23,15 @@ export function Account() {
           {user.email && <span className="truncate text-[12px] text-muted">{user.email}</span>}
         </span>
       </div>
-      <MenuItem icon={<SignOut />} onSelect={async () => { await signOut({}); location.assign("/"); }}>{t("signOut")}</MenuItem>
+      <MenuItem
+        icon={<SignOut />}
+        onSelect={async () => {
+          await signOut({});
+          location.assign("/");
+        }}
+      >
+        {t("signOut")}
+      </MenuItem>
     </div>
   );
 }

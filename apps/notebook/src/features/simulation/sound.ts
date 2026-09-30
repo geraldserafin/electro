@@ -29,7 +29,8 @@ export class Sound {
       return;
     }
     if (!voice) {
-      const osc = context.createOscillator(), gain = context.createGain();
+      const osc = context.createOscillator(),
+        gain = context.createGain();
       osc.type = "square";
       gain.gain.value = 0;
       osc.connect(gain).connect(context.destination);

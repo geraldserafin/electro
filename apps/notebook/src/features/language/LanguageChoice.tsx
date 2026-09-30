@@ -7,8 +7,12 @@ export function LanguageChoice() {
   const { t, i18n } = useTranslation("language");
   return (
     <MenuRow label={t("label")}>
-      <MenuSelect label={t("label")} value={i18n.language as Language} onChange={chooseLanguage}
-                  options={LANGUAGES.map((lng) => ({ value: lng, label: t(`name.${lng}` as const) }))} />
+      <MenuSelect
+        label={t("label")}
+        value={i18n.language as Language}
+        onChange={chooseLanguage}
+        options={LANGUAGES.map((lng) => ({ value: lng, label: t(`name.${lng}` as const) }))}
+      />
     </MenuRow>
   );
 }

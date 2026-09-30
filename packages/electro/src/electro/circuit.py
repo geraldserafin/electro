@@ -16,7 +16,12 @@ from functools import cached_property
 from typing import TYPE_CHECKING
 
 from .issues import (
-    CloseNeedsNToN, NotACircuit, ParallelMismatch, SeriesMismatch, ShuntNeedsOneToOne, WrongNodeCount,
+    CloseNeedsNToN,
+    NotACircuit,
+    ParallelMismatch,
+    SeriesMismatch,
+    ShuntNeedsOneToOne,
+    WrongNodeCount,
 )
 
 if TYPE_CHECKING:

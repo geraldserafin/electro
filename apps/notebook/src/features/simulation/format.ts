@@ -1,5 +1,13 @@
 // Numbers as the board shows them: three significant digits and an SI prefix ("12.4 mA").
-const PREFIXES: [number, string][] = [[1e6, "M"], [1e3, "k"], [1, ""], [1e-3, "m"], [1e-6, "µ"], [1e-9, "n"], [1e-12, "p"]];
+const PREFIXES: [number, string][] = [
+  [1e6, "M"],
+  [1e3, "k"],
+  [1, ""],
+  [1e-3, "m"],
+  [1e-6, "µ"],
+  [1e-9, "n"],
+  [1e-12, "p"],
+];
 
 export function si(value: number, unit: string): string {
   if (!Number.isFinite(value)) return `– ${unit}`;

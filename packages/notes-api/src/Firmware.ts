@@ -3,18 +3,18 @@
  *  never changes). A note names one on its board's first line (``// firmware: /api/firmware/<id>/doom.uf2``,
  *  the name only for the reader); whoever has the note can run it, so fetching one needs no session —
  *  its id, which no one guesses, is enough. */
-import { HttpApiEndpoint, HttpApiGroup, HttpApiSchema } from "@effect/platform"
-import { Schema } from "effect"
-import { Authentication } from "./Auth.js"
+import { HttpApiEndpoint, HttpApiGroup, HttpApiSchema } from "@effect/platform";
+import { Schema } from "effect";
+import { Authentication } from "./Auth.js";
 
-export const FirmwareId = Schema.String.pipe(Schema.pattern(/^[0-9a-f]{64}$/))
-export type FirmwareId = typeof FirmwareId.Type
+export const FirmwareId = Schema.String.pipe(Schema.pattern(/^[0-9a-f]{64}$/));
+export type FirmwareId = typeof FirmwareId.Type;
 
 /** A file at most: a Pico's flash (16 MB); a user's files together at most. */
-export const FIRMWARE_MAX = 16 * 1024 * 1024
-export const FIRMWARE_QUOTA = 256 * 1024 * 1024
+export const FIRMWARE_MAX = 16 * 1024 * 1024;
+export const FIRMWARE_QUOTA = 256 * 1024 * 1024;
 
-export const Uploaded = Schema.Struct({ id: FirmwareId, size: Schema.Int })
+export const Uploaded = Schema.Struct({ id: FirmwareId, size: Schema.Int });
 
 /** Empty, or larger than FIRMWARE_MAX. */
 export class FirmwareSize extends Schema.TaggedError<FirmwareSize>()(
@@ -23,7 +23,7 @@ export class FirmwareSize extends Schema.TaggedError<FirmwareSize>()(
   HttpApiSchema.annotations({ status: 413 }),
 ) {
   get message() {
-    return `A firmware file of ${this.size} bytes: it must be 1 to ${this.max}.`
+    return `A firmware file of ${this.size} bytes: it must be 1 to ${this.max}.`;
   }
 }
 
@@ -34,7 +34,7 @@ export class FirmwareQuota extends Schema.TaggedError<FirmwareQuota>()(
   HttpApiSchema.annotations({ status: 413 }),
 ) {
   get message() {
-    return `Firmware files take ${this.used} bytes of the ${this.quota} a user may keep.`
+    return `Firmware files take ${this.used} bytes of the ${this.quota} a user may keep.`;
   }
 }
 
@@ -44,7 +44,7 @@ export class FirmwareNotFound extends Schema.TaggedError<FirmwareNotFound>()(
   HttpApiSchema.annotations({ status: 404 }),
 ) {
   get message() {
-    return `No firmware file ${this.id}.`
+    return `No firmware file ${this.id}.`;
   }
 }
 
@@ -57,15 +57,12 @@ export class FirmwareGroup extends HttpApiGroup.make("firmware")
       .addError(FirmwareSize)
       .addError(FirmwareQuota),
   )
-  .middleware(Authentication)
-{}
+  .middleware(Authentication) {}
 
 /** Fetching one by its id (and any name after it): no session needed. */
-export class FirmwareFilesGroup extends HttpApiGroup.make("firmwareFiles")
-  .add(
-    HttpApiEndpoint.get("get", "/firmware/:id/:name")
-      .setPath(Schema.Struct({ id: Schema.String, name: Schema.String }))
-      .addSuccess(HttpApiSchema.Uint8Array())
-      .addError(FirmwareNotFound),
-  )
-{}
+export class FirmwareFilesGroup extends HttpApiGroup.make("firmwareFiles").add(
+  HttpApiEndpoint.get("get", "/firmware/:id/:name")
+    .setPath(Schema.Struct({ id: Schema.String, name: Schema.String }))
+    .addSuccess(HttpApiSchema.Uint8Array())
+    .addError(FirmwareNotFound),
+) {}

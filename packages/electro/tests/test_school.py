@@ -1,10 +1,8 @@
 """Typical school problems."""
 
+import electro
 import pytest
 import sympy as sp
-
-import electro
-
 from electro import *
 from electro.issues import ConflictingData, Equals, ParallelMismatch, SeriesMismatch
 from electro.reasons import ControlledSource, OhmsLaw
@@ -60,8 +58,10 @@ def test_symbolic_answer():
 def test_wheatstone_bridge_balanced():
     c = net(
         (VoltageSource(10), "0", "A"),
-        (Resistor(100), "A", "B"), (Resistor(200), "B", "0"),
-        (Resistor(50), "A", "C"), (Resistor(100), "C", "0"),
+        (Resistor(100), "A", "B"),
+        (Resistor(200), "B", "0"),
+        (Resistor(50), "A", "C"),
+        (Resistor(100), "C", "0"),
         (Ammeter(), "B", "C"),
     )
     assert c.solve()["A1"].I == 0
@@ -70,8 +70,10 @@ def test_wheatstone_bridge_balanced():
 def test_wheatstone_bridge_unknown_resistor():
     c = net(
         (VoltageSource(10), "0", "A"),
-        (Resistor(100), "A", "B"), (Resistor(), "B", "0"),
-        (Resistor(50), "A", "C"), (Resistor(100), "C", "0"),
+        (Resistor(100), "A", "B"),
+        (Resistor(), "B", "0"),
+        (Resistor(50), "A", "C"),
+        (Resistor(100), "C", "0"),
         (Ammeter(), "B", "C"),
     )
     assert c.solve(I_A1=0)["R2"].value == 200
@@ -136,11 +138,21 @@ def test_steps_keep_their_laws():
 
 def test_three_sources_as_parallel_branches():
     """Whiteboard: E1+R1 | R2 | E2+(R3|Iz) between the top node and ground."""
-    uklad = (VoltageSource(12) + Resistor(2)) | Resistor(4) | ((Resistor(6) | CurrentSource(1)) + VoltageSource(6).transpose())
+    uklad = (
+        (VoltageSource(12) + Resistor(2))
+        | Resistor(4)
+        | ((Resistor(6) | CurrentSource(1)) + VoltageSource(6).transpose())
+    )
     sol = uklad.solve()
     assert sol["R2"].I == sp.Rational(-18, 11)  # branch read bottom → top; the board draws it downward
     parts = [
-        ((VoltageSource(e1) + Resistor(2)) | Resistor(4) | ((Resistor(6) | CurrentSource(iz)) + VoltageSource(e2).transpose())).solve()["R2"].I
+        (
+            (VoltageSource(e1) + Resistor(2))
+            | Resistor(4)
+            | ((Resistor(6) | CurrentSource(iz)) + VoltageSource(e2).transpose())
+        )
+        .solve()["R2"]
+        .I
         for e1, e2, iz in [(12, 0, 0), (0, 6, 0), (0, 0, 1)]
     ]
     assert sum(parts) == sol["R2"].I  # superposition
@@ -211,7 +223,10 @@ def test_hole_needs_a_source_when_current_flows_backwards():
 
 def test_hole_can_be_a_plain_wire():
     c = supply(12) + Resistor(10) + Hole() + ground
-    assert repr(c.fill(c.solve(I_R_1="1,2"))) == "ground.transpose() + VoltageSource(12 V) + Resistor(10 Ω) + wire + ground"
+    assert (
+        repr(c.fill(c.solve(I_R_1="1,2")))
+        == "ground.transpose() + VoltageSource(12 V) + Resistor(10 Ω) + wire + ground"
+    )
 
 
 def test_unknown_resistor_cannot_be_negative():
@@ -269,8 +284,12 @@ def test_meter_reading_can_contradict():
 
 
 def test_vcvs_amplifies_the_voltage_it_senses():
-    amp = net((VoltageSource(2), "GND", "in"), (Resistor(1000), "in", "GND"),
-              (VCVS(10), "in", "GND", "GND", "out"), (Resistor(50), "out", "GND"))
+    amp = net(
+        (VoltageSource(2), "GND", "in"),
+        (Resistor(1000), "in", "GND"),
+        (VCVS(10), "in", "GND", "GND", "out"),
+        (Resistor(50), "out", "GND"),
+    )
     sol = amp.solve()
     assert sol["VCVS_1"].U == 20
     assert sol["R_2"].I == sp.Rational(2, 5)
@@ -278,7 +297,9 @@ def test_vcvs_amplifies_the_voltage_it_senses():
 
 
 def test_vccs_is_a_transconductance():
-    sol = net((VoltageSource(2), "GND", "in"), (VCCS("0.5"), "in", "GND", "GND", "out"), (Resistor(10), "out", "GND")).solve()
+    sol = net(
+        (VoltageSource(2), "GND", "in"), (VCCS("0.5"), "in", "GND", "GND", "out"), (Resistor(10), "out", "GND")
+    ).solve()
     assert sol["R_1"].U == 10
 
 
@@ -293,8 +314,12 @@ def test_ccvs_and_cccs_sense_the_current_in_series():
 
 def test_the_gain_is_found_from_the_data():
     # a transistor stage as its small-signal model: r_be, then β·I_b into the collector's resistor
-    stage = net((VoltageSource("10m"), "GND", "in"), (Resistor(1000), "in", "b"),
-                (CCCS(), "b", "GND", "GND", "c"), (Resistor(2000), "c", "GND"))
+    stage = net(
+        (VoltageSource("10m"), "GND", "in"),
+        (Resistor(1000), "in", "b"),
+        (CCCS(), "b", "GND", "GND", "c"),
+        (Resistor(2000), "c", "GND"),
+    )
     sol = stage.solve(U_R_2=2, find="CCCS_1")
     assert sol["CCCS_1"].value == 100
     assert any(isinstance(law.reason, ControlledSource) for step in sol.steps for law in step.laws)

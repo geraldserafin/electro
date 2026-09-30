@@ -24,3 +24,17 @@ dev = ["pytest"]
 testpaths = ["packages/electro/tests", "packages/electro-schematic/tests", "packages/electro-render/tests", "packages/electro-notes/tests", "apps/notebook/python"]
 pythonpath = ["packages/electro/src", "packages/electro-schematic/src", "packages/electro-render/src", "packages/electro-notes/src", "apps/notebook/python"]
 addopts = "--import-mode=importlib"
+
+[tool.ruff]
+line-length = 120
+target-version = "py310"
+extend-exclude = [".llvm-wasm", "*.md"]
+
+[tool.ruff.lint]
+select = ["E4", "E7", "E9", "F", "I", "UP", "B"]
+ignore = [
+  "B905",  # zip() without strict=: the lengths match by construction
+  "E731",  # lambdas as small named functions
+  "E741", "E743",  # I, l: the names physics uses
+  "F403", "F405",  # from electro import *: the library as a language
+]

@@ -1,6 +1,6 @@
 // Running cells in Python: code cells print their outputs, schematics are solved. One cell at a
 // time per cell (``running``); "run all" goes through them in order.
-import { useRef, useState, type RefObject } from "react";
+import { type RefObject, useRef, useState } from "react";
 import { kernel } from "@/features/python";
 import type { Cell, Notebook, SchematicData } from "@/shared/model/types";
 
@@ -9,7 +9,9 @@ export function useRunner(latest: RefObject<Notebook>, update: (id: string, patc
   const executions = useRef(0);
 
   const schematics = (): Record<string, SchematicData> =>
-    Object.fromEntries(latest.current.cells.flatMap((c) => (c.type === "schematic" ? [[c.name, c.schematic] as const] : [])));
+    Object.fromEntries(
+      latest.current.cells.flatMap((c) => (c.type === "schematic" ? [[c.name, c.schematic] as const] : [])),
+    );
 
   const busy = async (id: string, work: () => Promise<void>) => {
     setRunning((r) => new Set(r).add(id));
@@ -27,7 +29,7 @@ export function useRunner(latest: RefObject<Notebook>, update: (id: string, patc
 
   const run = (id: string) => {
     const cell = latest.current.cells.find((c) => c.id === id);
-    if (!cell || cell.type !== "code") return Promise.resolve();
+    if (cell?.type !== "code") return Promise.resolve();
     return busy(id, async () => {
       try {
         const outputs = await kernel.run(cell.source, schematics(), String(latest.current.settings.symbols ?? "iec"));
@@ -41,7 +43,7 @@ export function useRunner(latest: RefObject<Notebook>, update: (id: string, patc
   /** ``schematic``: the drawing to solve, when it was just changed (the cell's state lags behind). */
   const simulate = (id: string, schematic?: SchematicData) => {
     const cell = latest.current.cells.find((c) => c.id === id);
-    if (!cell || cell.type !== "schematic") return Promise.resolve();
+    if (cell?.type !== "schematic") return Promise.resolve();
     return busy(id, async () => {
       try {
         const { results, problems } = await kernel.simulate(schematic ?? cell.schematic);

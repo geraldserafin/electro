@@ -5,7 +5,12 @@ import { isComponent } from "./model";
 export function SymbolIcon({ kind, library }: { kind: string; library: SymbolLibrary }) {
   if (isComponent(kind) || kind === "ground")
     return (
-      <svg viewBox={kind === "ground" ? "-14 -4 28 26" : "-6 -26 92 52"} width="30" height="22" className="flex-none text-fg">
+      <svg
+        viewBox={kind === "ground" ? "-14 -4 28 26" : "-6 -26 92 52"}
+        width="30"
+        height="22"
+        className="flex-none text-fg"
+      >
         <g className="w" dangerouslySetInnerHTML={{ __html: library.kinds[kind].svg }} />
       </svg>
     );

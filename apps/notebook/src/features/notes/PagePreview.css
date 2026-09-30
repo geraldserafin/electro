@@ -3,16 +3,52 @@
    slices draw in it (Markdown, the drawing). */
 @layer components {
   .page {
-    --bg: #fff; --paper: #fff; --board: #fff; --text: #1f1f1f; --muted: #5f6368; --line: #e0e0e0; --code-bg: #f5f5f5;
-    --primary: #1f1f1f; color-scheme: light;
-    align-self: start; justify-self: start;
-    width: 794px; min-height: 1123px; padding: 68px 60px; box-sizing: border-box;
-    transform: scale(0.267); transform-origin: top left; /* 212 / 794 */
-    background: #fff; color: var(--text); font-size: 15px; line-height: 1.55; pointer-events: none;
+    --bg: #fff;
+    --paper: #fff;
+    --board: #fff;
+    --text: #1f1f1f;
+    --muted: #5f6368;
+    --line: #e0e0e0;
+    --code-bg: #f5f5f5;
+    --primary: #1f1f1f;
+    color-scheme: light;
+    align-self: start;
+    justify-self: start;
+    width: 794px;
+    min-height: 1123px;
+    padding: 68px 60px;
+    box-sizing: border-box;
+    transform: scale(0.267);
+    transform-origin: top left; /* 212 / 794 */
+    background: #fff;
+    color: var(--text);
+    font-size: 15px;
+    line-height: 1.55;
+    pointer-events: none;
   }
-  .page .markdown-view { padding: 0; }
-  .page .page-code { margin: 1em 0; font: 13px/1.5 var(--mono); background: var(--code-bg); border-radius: 6px; padding: 10px 12px; white-space: pre-wrap; }
-  .page .pdf-drawing { position: static; visibility: visible; width: auto; height: auto; overflow: visible;
-                         display: flex; justify-content: center; margin: 8px 0 12px; }
-  .page .pdf-drawing svg { max-width: 100%; height: auto; }
+  .page .markdown-view {
+    padding: 0;
+  }
+  .page .page-code {
+    margin: 1em 0;
+    font: 13px / 1.5 var(--mono);
+    background: var(--code-bg);
+    border-radius: 6px;
+    padding: 10px 12px;
+    white-space: pre-wrap;
+  }
+  .page .pdf-drawing {
+    position: static;
+    visibility: visible;
+    width: auto;
+    height: auto;
+    overflow: visible;
+    display: flex;
+    justify-content: center;
+    margin: 8px 0 12px;
+  }
+  .page .pdf-drawing svg {
+    max-width: 100%;
+    height: auto;
+  }
 }

@@ -3,7 +3,9 @@ from electro import *
 from electro_schematic import Element, Schematic, Unsupported, Wire, layout
 from electro_schematic.issues import SkewedWire, UnknownKind
 
-BOARD = (VoltageSource(12) + Resistor(2)) | Resistor(4) | ((Resistor(6) | CurrentSource(1)) + VoltageSource(6).transpose())
+BOARD = (
+    (VoltageSource(12) + Resistor(2)) | Resistor(4) | ((Resistor(6) | CurrentSource(1)) + VoltageSource(6).transpose())
+)
 
 
 def bridge() -> Schematic:
@@ -11,14 +13,24 @@ def bridge() -> Schematic:
     return Schematic(
         elements=[
             Element("E_1", "voltage_source", (0, 12), 270, "10"),
-            Element("R_1", "resistor", (4, 0), 90, "100"), Element("R_2", "resistor", (4, 6), 90, None),
-            Element("R_3", "resistor", (12, 0), 90, "50"), Element("R_4", "resistor", (12, 6), 90, "100"),
+            Element("R_1", "resistor", (4, 0), 90, "100"),
+            Element("R_2", "resistor", (4, 6), 90, None),
+            Element("R_3", "resistor", (12, 0), 90, "50"),
+            Element("R_4", "resistor", (12, 6), 90, "100"),
             Element("A_1", "ammeter", (6, 5), 0),
             Element("gnd", "ground", (0, 12)),
         ],
-        wires=[Wire([(0, 8), (0, 0), (4, 0)]), Wire([(4, 0), (12, 0)]), Wire([(4, 4), (4, 6)]), Wire([(12, 4), (12, 6)]),
-               Wire([(4, 5), (6, 5)]), Wire([(10, 5), (12, 5)]), Wire([(4, 10), (4, 12)]),
-               Wire([(12, 10), (12, 12)]), Wire([(0, 12), (12, 12)])],
+        wires=[
+            Wire([(0, 8), (0, 0), (4, 0)]),
+            Wire([(4, 0), (12, 0)]),
+            Wire([(4, 4), (4, 6)]),
+            Wire([(12, 4), (12, 6)]),
+            Wire([(4, 5), (6, 5)]),
+            Wire([(10, 5), (12, 5)]),
+            Wire([(4, 10), (4, 12)]),
+            Wire([(12, 10), (12, 12)]),
+            Wire([(0, 12), (12, 12)]),
+        ],
     )
 
 
@@ -64,9 +76,14 @@ def test_t_junctions_connect_but_crossings_do_not():
 
 def test_net_labels_connect_by_name():
     sch = Schematic(
-        [Element("E_1", "voltage_source", (0, 0), 0, "5"), Element("R_1", "resistor", (10, 0), 0, "5"),
-         Element("a", "label", (4, 0), text="X"), Element("b", "label", (10, 0), text="X"),
-         Element("g1", "ground", (0, 0)), Element("g2", "ground", (14, 0))],
+        [
+            Element("E_1", "voltage_source", (0, 0), 0, "5"),
+            Element("R_1", "resistor", (10, 0), 0, "5"),
+            Element("a", "label", (4, 0), text="X"),
+            Element("b", "label", (10, 0), text="X"),
+            Element("g1", "ground", (0, 0)),
+            Element("g2", "ground", (14, 0)),
+        ],
         [],
     )
     assert sch.to_circuit().solve()["R_1"].I == 1

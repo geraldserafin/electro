@@ -25,10 +25,10 @@ from dataclasses import fields, is_dataclass
 import sympy as sp
 from electro.components import Law
 from electro.issues import Equals, Issue, IsZero, issue
-from sympy import I as sp_I
 from electro_render import Steps, symbol_library
 from electro_schematic import Schematic
 from electro_schematic.issues import Unsupported
+from sympy import I as sp_I
 
 CELL = "<cell>"
 PRELUDE = """
@@ -100,8 +100,7 @@ def from_code(source: str, name: str, old_json: str = "") -> str:
     Returns JSON ``{"schematic": ...}`` or ``{"error": {...}}`` (an error output).
     """
     from electro import Circuit
-    from electro_schematic import layout
-    from electro_schematic.layout import Unsupported
+    from electro_schematic import Unsupported, layout
 
     var = variable(name)
     scope: dict = {}
@@ -216,11 +215,14 @@ def live(schematic_json: str) -> str:
     except Exception as err:  # noqa: BLE001 — shown on the board
         return json.dumps({"error": _error(err)}, ensure_ascii=False)
     names = sch.node_names()
-    return json.dumps({
-        "program": json.loads(program.to_json()),
-        "wires": [names.get(w.points[0]) for w in sch.wires],
-        "pins": {e.id: [names.get(p) for p in e.pins()] for e in sch.components()},
-    }, ensure_ascii=False)
+    return json.dumps(
+        {
+            "program": json.loads(program.to_json()),
+            "wires": [names.get(w.points[0]) for w in sch.wires],
+            "pins": {e.id: [names.get(p) for p in e.pins()] for e in sch.components()},
+        },
+        ensure_ascii=False,
+    )
 
 
 def to_json(x):

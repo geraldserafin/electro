@@ -6,10 +6,10 @@ Ta paczka tylko je rysuje.
 ```python
 from electro_render import schematic, steps, symbol_library_json
 
-schematic(uklad)                  # obwód z kodu: auto-layout + SVG
-schematic(sch, sol)               # rysunek z siatki + prądy (strzałka w prawdziwym kierunku) i napięcia
-steps(sol)                        # rozwiązanie krok po kroku: Markdown + LaTeX
-symbol_library_json()             # te same symbole dla edytora w przeglądarce
+schematic(uklad)  # obwód z kodu: auto-layout + SVG
+schematic(sch, sol)  # rysunek z siatki + prądy (strzałka w prawdziwym kierunku) i napięcia
+steps(sol)  # rozwiązanie krok po kroku: Markdown + LaTeX
+symbol_library_json()  # te same symbole dla edytora w przeglądarce
 ```
 
 ## Biblioteka symboli

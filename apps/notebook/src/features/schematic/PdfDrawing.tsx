@@ -14,16 +14,27 @@ const PDF_PAD = 6;
  */
 const nothing = () => {};
 
-export function PdfDrawing({ value, library, results }: {
-  value: SchematicData; library: SymbolLibrary; results?: Record<string, ElementResult>;
+export function PdfDrawing({
+  value,
+  library,
+  results,
+}: {
+  value: SchematicData;
+  library: SymbolLibrary;
+  results?: Record<string, ElementResult>;
 }) {
   const G = library.grid;
   const content = useRef<SVGGElement>(null);
   const [box, setBox] = useState<[number, number, number, number] | null>(null);
   useLayoutEffect(() => {
     const b = content.current?.getBBox();
-    if (!b || !b.width) return;
-    const next: [number, number, number, number] = [b.x - PDF_PAD, b.y - PDF_PAD, b.width + 2 * PDF_PAD, b.height + 2 * PDF_PAD];
+    if (!b?.width) return;
+    const next: [number, number, number, number] = [
+      b.x - PDF_PAD,
+      b.y - PDF_PAD,
+      b.width + 2 * PDF_PAD,
+      b.height + 2 * PDF_PAD,
+    ];
     if (!box || next.some((v, i) => Math.abs(v - box[i]) > 0.5)) setBox(next);
   });
   if (!value.elements.length && !value.wires.length) return null;
@@ -34,11 +45,22 @@ export function PdfDrawing({ value, library, results }: {
       <svg className="canvas" viewBox={`${x} ${y} ${w} ${h}`} width={w * PDF_SCALE} height={h * PDF_SCALE}>
         <style>{library.style}</style>
         <g ref={content}>
-          {value.wires.map((wire, i) => <polyline key={i} className="w wire" points={pointsOf(wire.points)} />)}
-          {junctions(value, library).map(([jx, jy]) => <circle key={`j${jx},${jy}`} className="dot" cx={jx * G} cy={jy * G} r="3" />)}
+          {value.wires.map((wire, i) => (
+            <polyline key={i} className="w wire" points={pointsOf(wire.points)} />
+          ))}
+          {junctions(value, library).map(([jx, jy]) => (
+            <circle key={`j${jx},${jy}`} className="dot" cx={jx * G} cy={jy * G} r="3" />
+          ))}
           {value.elements.map((e) => (
-            <ElementView key={e.id} element={e} library={library} wires={value.wires} result={results?.[e.id]}
-                         selected={false} onPointerDown={nothing} />
+            <ElementView
+              key={e.id}
+              element={e}
+              library={library}
+              wires={value.wires}
+              result={results?.[e.id]}
+              selected={false}
+              onPointerDown={nothing}
+            />
           ))}
         </g>
       </svg>

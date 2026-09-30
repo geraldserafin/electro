@@ -3,16 +3,17 @@
 import { memo, useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ReadOnlyNotice, SyncNotice, useCreateNote, useNoteSync } from "@/features/notes";
-import { ExportDialog, PdfContext, pdfOf, warmUpWhenIdle, type PdfSettings } from "@/features/pdf-export";
+import { ExportDialog, PdfContext, type PdfSettings, pdfOf, warmUpWhenIdle } from "@/features/pdf-export";
 import { kernel, usePython } from "@/features/python";
 import { libraryFor } from "@/features/schematic";
 import { SettingsMenu, SymbolsChoice } from "@/features/settings";
-import { MenuItem } from "@/shared/ui/Menu";
+import { cn } from "@/shared/lib/cn";
 import { newCell } from "@/shared/model/cells";
 import { copyOf } from "@/shared/model/format";
 import type { Cell, CellType, Notebook as NotebookData, SymbolStandard } from "@/shared/model/types";
-import { Back, Export, OutlineIcon, RunAll, ShareIcon } from "@/shared/ui/icons";
 import { IslandButton, IslandLink, Islands } from "@/shared/ui/Island";
+import { Back, Export, OutlineIcon, RunAll, ShareIcon } from "@/shared/ui/icons";
+import { MenuItem } from "@/shared/ui/Menu";
 import { AddRow } from "./AddRow";
 import { CellFrame } from "./CellFrame";
 import { freeName, moveRange } from "./cellList";
@@ -25,13 +26,14 @@ import { useOutlineOpen } from "./useOutlineOpen";
 import { usePrintKey } from "./usePrintKey";
 import { useRemoved } from "./useRemoved";
 import { useRunner } from "./useRunner";
-import { cn } from "@/shared/lib/cn";
 
 // A cell is drawn again when its own data changes, not whenever the note does (a key typed in
 // another cell, the title, a save): its callbacks are made anew each render of the note, but
 // they only act on the cell by its id and on the note as it is then, so an older one does the same.
 const sameButCallbacks = <P extends object>(a: P, b: P) =>
-  (Object.keys(a) as (keyof P)[]).every((k) => a[k] === b[k] || (typeof a[k] === "function" && typeof b[k] === "function"));
+  (Object.keys(a) as (keyof P)[]).every(
+    (k) => a[k] === b[k] || (typeof a[k] === "function" && typeof b[k] === "function"),
+  );
 const Markdown = memo(MarkdownCell, sameButCallbacks);
 const Code = memo(CodeCell, sameButCallbacks);
 const Schematic = memo(SchematicCell, sameButCallbacks);
@@ -40,8 +42,18 @@ const Schematic = memo(SchematicCell, sameButCallbacks);
  * ``initial``/``revision``: the note as read from the server; ``reload``: read it again (after a
  * conflict, to take the server's version).
  */
-export function Notebook({ initial, revision, reload, onTitle, readOnly = false, back, onShare }: {
-  initial: NotebookData; revision: number | null; reload: () => void;
+export function Notebook({
+  initial,
+  revision,
+  reload,
+  onTitle,
+  readOnly = false,
+  back,
+  onShare,
+}: {
+  initial: NotebookData;
+  revision: number | null;
+  reload: () => void;
   onTitle?: (title: string) => void; // the title changed (the address shows it)
   readOnly?: boolean; // shared with the user to read: it runs, it is not saved
   back: { to: string; label: string }; // the way back: the folder it is in
@@ -57,9 +69,11 @@ export function Notebook({ initial, revision, reload, onTitle, readOnly = false,
   const [focused, setFocused] = useState<string | null>(null);
   const sync = useNoteSync(notebook, revision, reload, readOnly);
   const create = useCreateNote();
-  const copy = async () => { // a read-only note, the user's own to change (as it is now, with what they changed here)
+  const copy = async () => {
+    // a read-only note, the user's own to change (as it is now, with what they changed here)
     const own = copyOf(latest.current);
-    if (!(await create({ ...own, title: tNotes("readOnly.copyTitle", { title: own.title || t("untitled") }) }))) alert(tNotes("readOnly.copyFailed"));
+    if (!(await create({ ...own, title: tNotes("readOnly.copyTitle", { title: own.title || t("untitled") }) })))
+      alert(tNotes("readOnly.copyFailed"));
   };
   useEffect(() => onTitle?.(notebook.title), [notebook.title]); // eslint-disable-line react-hooks/exhaustive-deps
   const [outline, setOutline] = useOutlineOpen();
@@ -101,72 +115,149 @@ export function Notebook({ initial, revision, reload, onTitle, readOnly = false,
       // being worked on (the export dialog is a portal: its clicks bubble here too, and are not outside)
       onPointerDownCapture={(e) => {
         if (!(e.target as Element).closest("[data-cell], [data-keep-focus]")) setFocused(null);
-      }}>
+      }}
+    >
       {/* left: the way back, and the sidebar's switch (the note's title and its sections);
           right: run, PDF, the settings (theme, language) */}
       <Islands side="left">
-        <IslandLink to={back.to} title={back.label} aria-label={back.label}><Back /></IslandLink>
-        <IslandButton on={outline} onClick={() => setOutline(!outline)} aria-pressed={outline}
-                      title={outline ? t("hideOutline") : t("outline")} aria-label={t("outline")}>
+        <IslandLink to={back.to} title={back.label} aria-label={back.label}>
+          <Back />
+        </IslandLink>
+        <IslandButton
+          on={outline}
+          onClick={() => setOutline(!outline)}
+          aria-pressed={outline}
+          title={outline ? t("hideOutline") : t("outline")}
+          aria-label={t("outline")}
+        >
           <OutlineIcon />
         </IslandButton>
       </Islands>
-      <Sidebar open={outline} title={notebook.title} onTitle={setTitle} cells={notebook.cells}
-               onMove={(from, count, before) => setCells((cells) => moveRange(cells, from, count, before))} />
+      <Sidebar
+        open={outline}
+        title={notebook.title}
+        onTitle={setTitle}
+        cells={notebook.cells}
+        onMove={(from, count, before) => setCells((cells) => moveRange(cells, from, count, before))}
+      />
       <Islands side="right">
-        <IslandButton waiting={!ready} onClick={runAll} disabled={!ready}
-                      title={ready ? t("runAll") : python.kind === "error" ? t("python.failed", { error: python.error }) : t("python.loading")} aria-label={t("runAll")}><RunAll /></IslandButton>
+        <IslandButton
+          waiting={!ready}
+          onClick={runAll}
+          disabled={!ready}
+          title={
+            ready
+              ? t("runAll")
+              : python.kind === "error"
+                ? t("python.failed", { error: python.error })
+                : t("python.loading")
+          }
+          aria-label={t("runAll")}
+        >
+          <RunAll />
+        </IslandButton>
         <SettingsMenu
           // the note's own: share it, export it (Ctrl/⌘ P); its symbols among the preferences
-          actions={<>
-            {onShare && <MenuItem icon={<ShareIcon />} onSelect={() => onShare(latest.current)}>{t("share")}</MenuItem>}
-            <MenuItem icon={<Export />} shortcut={/Mac|iPhone|iPad/.test(navigator.platform) ? "⌘P" : "Ctrl+P"} onSelect={() => setExporting(true)}>{t("exportPdf")}</MenuItem>
-          </>}
-          preferences={<SymbolsChoice value={symbols} onChange={(next) => setNotebook((nb) => ({ ...nb, settings: { ...nb.settings, symbols: next } }))} />} />
+          actions={
+            <>
+              {onShare && (
+                <MenuItem icon={<ShareIcon />} onSelect={() => onShare(latest.current)}>
+                  {t("share")}
+                </MenuItem>
+              )}
+              <MenuItem
+                icon={<Export />}
+                shortcut={/Mac|iPhone|iPad/.test(navigator.platform) ? "⌘P" : "Ctrl+P"}
+                onSelect={() => setExporting(true)}
+              >
+                {t("exportPdf")}
+              </MenuItem>
+            </>
+          }
+          preferences={
+            <SymbolsChoice
+              value={symbols}
+              onChange={(next) => setNotebook((nb) => ({ ...nb, settings: { ...nb.settings, symbols: next } }))}
+            />
+          }
+        />
       </Islands>
-      {readOnly
-        ? <ReadOnlyNotice onCopy={() => void copy()} />
-        : <SyncNotice state={sync.state} onKeepMine={sync.keepMine} onTakeTheirs={sync.takeTheirs} />}
+      {readOnly ? (
+        <ReadOnlyNotice onCopy={() => void copy()} />
+      ) : (
+        <SyncNotice state={sync.state} onKeepMine={sync.keepMine} onTakeTheirs={sync.takeTheirs} />
+      )}
       {removed.last && (
         // the last removal: a moment, with the way back
-        <div role="status" className="fixed bottom-5 left-1/2 -translate-x-1/2 z-40 flex items-center gap-3 pl-4 pr-1.5 py-1.5 rounded-xl border border-line bg-paper shadow-menu text-[15px]">
+        <div
+          role="status"
+          className="fixed bottom-5 left-1/2 -translate-x-1/2 z-40 flex items-center gap-3 pl-4 pr-1.5 py-1.5 rounded-xl border border-line bg-paper shadow-menu text-[15px]"
+        >
           {t("cell.removed")}
           <button className="h-8 px-3 rounded-lg font-medium text-accent hover:bg-accent-soft" onClick={removed.undo}>
-            {t("cell.undo")} <kbd className="ml-1 font-sans text-[13px] text-faint">{/Mac|iPhone|iPad/.test(navigator.platform) ? "⌘Z" : "Ctrl+Z"}</kbd>
+            {t("cell.undo")}{" "}
+            <kbd className="ml-1 font-sans text-[13px] text-faint">
+              {/Mac|iPhone|iPad/.test(navigator.platform) ? "⌘Z" : "Ctrl+Z"}
+            </kbd>
           </button>
         </div>
       )}
       {exporting && (
-        <ExportDialog notebook={notebook} pdf={pdf} onChange={setPdf}
-                      onCode={(codeInPdf) => setNotebook((nb) => ({ ...nb, settings: { ...nb.settings, codeInPdf } }))}
-                      onClose={() => setExporting(false)} />
+        <ExportDialog
+          notebook={notebook}
+          pdf={pdf}
+          onChange={setPdf}
+          onCode={(codeInPdf) => setNotebook((nb) => ({ ...nb, settings: { ...nb.settings, codeInPdf } }))}
+          onClose={() => setExporting(false)}
+        />
       )}
 
       <PdfContext.Provider value={pdf}>
-      <main className={cn("appear", column(outline))}>
-        {/* the title is the note's first heading too (and the PDF's); in line with the cells' text */}
-        <input className="block w-full mt-0 mb-4 py-1 pr-2 pl-3 rounded-lg border-none bg-transparent text-[34px] font-semibold leading-tight
+        <main className={cn("appear", column(outline))}>
+          {/* the title is the note's first heading too (and the PDF's); in line with the cells' text */}
+          <input
+            className="block w-full mt-0 mb-4 py-1 pr-2 pl-3 rounded-lg border-none bg-transparent text-[34px] font-semibold leading-tight
                           placeholder:text-faint focus:outline-none focus:bg-hover"
-               value={notebook.title} placeholder={t("untitled")} aria-label={t("title")}
-               spellCheck={false} onChange={(e) => setTitle(e.target.value)} />
-        <AddRow onAdd={(type) => insert(0, type)} shown={notebook.cells.length === 0} />
-        {notebook.cells.map((cell, index) => (
-          <CellFrame key={cell.id} id={cell.id} type={cell.type} focused={focused === cell.id} onFocus={() => setFocused(cell.id)}
-                     onMoveTo={(before) => setCells((cells) => moveRange(cells, index, 1, before))}
-                     onRemove={() => removed.remove(cell.id)}
-                     onAdd={(type) => insert(index + 1, type)}>
-            {cell.type === "markdown" && <Markdown cell={cell} update={(p) => update(cell.id, p)} />}
-            {cell.type === "code" && (
-              <Code cell={cell} update={(p) => update(cell.id, p)} run={() => run(cell.id)} running={running.has(cell.id)} />
-            )}
-            {cell.type === "schematic" && (
-              <Schematic cell={cell} update={(p) => update(cell.id, p)} library={library}
-                             simulate={(s) => simulate(cell.id, s)} running={running.has(cell.id)} />
-            )}
-          </CellFrame>
-        ))}
-        {!notebook.cells.length && <p className="my-4.5 text-muted text-center">{t("empty")}</p>}
-      </main>
+            value={notebook.title}
+            placeholder={t("untitled")}
+            aria-label={t("title")}
+            spellCheck={false}
+            onChange={(e) => setTitle(e.target.value)}
+          />
+          <AddRow onAdd={(type) => insert(0, type)} shown={notebook.cells.length === 0} />
+          {notebook.cells.map((cell, index) => (
+            <CellFrame
+              key={cell.id}
+              id={cell.id}
+              type={cell.type}
+              focused={focused === cell.id}
+              onFocus={() => setFocused(cell.id)}
+              onMoveTo={(before) => setCells((cells) => moveRange(cells, index, 1, before))}
+              onRemove={() => removed.remove(cell.id)}
+              onAdd={(type) => insert(index + 1, type)}
+            >
+              {cell.type === "markdown" && <Markdown cell={cell} update={(p) => update(cell.id, p)} />}
+              {cell.type === "code" && (
+                <Code
+                  cell={cell}
+                  update={(p) => update(cell.id, p)}
+                  run={() => run(cell.id)}
+                  running={running.has(cell.id)}
+                />
+              )}
+              {cell.type === "schematic" && (
+                <Schematic
+                  cell={cell}
+                  update={(p) => update(cell.id, p)}
+                  library={library}
+                  simulate={(s) => simulate(cell.id, s)}
+                  running={running.has(cell.id)}
+                />
+              )}
+            </CellFrame>
+          ))}
+          {!notebook.cells.length && <p className="my-4.5 text-muted text-center">{t("empty")}</p>}
+        </main>
       </PdfContext.Provider>
     </div>
   );

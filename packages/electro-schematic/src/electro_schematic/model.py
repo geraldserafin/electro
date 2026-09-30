@@ -64,7 +64,9 @@ KINDS: dict[str, Kind] = {
     "buzzer": Kind(TWO_PINS, dev.Buzzer),
     "passive_buzzer": Kind(TWO_PINS, dev.PassiveBuzzer),
     "servo": Kind(((0, 0), (0, 1), (0, 2)), dev.Servo),  # signal, +, − (its cable's order)
-    "ultrasonic": Kind(((0, 4), (1, 4), (2, 4), (3, 4)), dev.Ultrasonic),  # VCC, Trig, Echo, GND below; the distance (cm) in ``text``
+    "ultrasonic": Kind(
+        ((0, 4), (1, 4), (2, 4), (3, 4)), dev.Ultrasonic
+    ),  # VCC, Trig, Echo, GND below; the distance (cm) in ``text``
     "lcd1602": Kind(tuple((i, 0) for i in range(16)), dev.LCD1602),  # its 16 pins in a row on top, VSS first
     # I²C modules: the address in ``text``
     "lcd1602_i2c": Kind(((0, 0), (0, 1), (0, 2), (0, 3)), dev.LCD1602I2C),  # GND, VCC, SDA, SCL down its left
@@ -82,12 +84,19 @@ KINDS: dict[str, Kind] = {
     # gnd, trig, out, reset, ctrl, thr, dis, vcc (DIP order)
     "timer555": Kind(((2, 6), (0, 2), (6, 3), (4, 0), (4, 6), (0, 3), (0, 4), (2, 0)), dev.Timer555),
     # D0–D13 on top (D13 on the left, as on the board), A0–A5, 5V and GND below
-    "arduino": Kind(tuple((16 - i if i < 8 else 15 - i, 0) for i in range(14))
-                    + tuple((9 + i, 8) for i in range(6)) + ((3, 8), (5, 8)), dev.Arduino),
+    "arduino": Kind(
+        tuple((16 - i if i < 8 else 15 - i, 0) for i in range(14))
+        + tuple((9 + i, 8) for i in range(6))
+        + ((3, 8), (5, 8)),
+        dev.Arduino,
+    ),
     # GP0–GP15 down its left; GP16–GP22, GP26–GP28 up its right, then VBUS, 3V3, GND at its top (the USB end)
-    "pico": Kind(tuple((0, i) for i in range(16))
-                 + ((8, 15), (8, 14), (8, 12), (8, 11), (8, 10), (8, 9), (8, 8), (8, 6), (8, 5), (8, 4))
-                 + ((8, 0), (8, 1), (8, 2)), dev.Pico),
+    "pico": Kind(
+        tuple((0, i) for i in range(16))
+        + ((8, 15), (8, 14), (8, 12), (8, 11), (8, 10), (8, 9), (8, 8), (8, 6), (8, 5), (8, 4))
+        + ((8, 0), (8, 1), (8, 2)),
+        dev.Pico,
+    ),
     "ground": Kind(((0, 0),)),
     "label": Kind(((0, 0),)),  # net label: same text = same node
     "terminal": Kind(((0, 0),)),  # an open end
@@ -116,7 +125,9 @@ class Element:
     at: Point
     rotation: int = 0  # 0, 90, 180, 270 (clockwise); 180 on a source = reversed polarity
     value: str | None = None  # as typed: "4.7k", "R", None = unknown
-    text: str | None = None  # net label name; or an LED's colour, a switch's position, a source's frequency, a sensor's reading, an Arduino's sketch
+    text: str | None = (
+        None  # net label name; or an LED's colour, a switch's position, a source's frequency, a sensor's reading, an Arduino's sketch
+    )
 
     def __post_init__(self):
         self.at = tuple(self.at)
@@ -127,7 +138,9 @@ class Element:
         self.rotation %= 360
 
     def pins(self) -> list[Point]:
-        return [(self.at[0] + dx, self.at[1] + dy) for dx, dy in (rotate(p, self.rotation) for p in KINDS[self.kind].pins)]
+        return [
+            (self.at[0] + dx, self.at[1] + dy) for dx, dy in (rotate(p, self.rotation) for p in KINDS[self.kind].pins)
+        ]
 
     def component(self) -> comp.Component | None:
         cls = KINDS[self.kind].component
