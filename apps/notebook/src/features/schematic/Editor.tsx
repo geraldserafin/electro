@@ -1064,6 +1064,7 @@ export function SchematicEditor({
           className={cn(
             boardIsland(),
             below ? "bottom-17" : "bottom-3", // above the simulation's controls
+            corner && (below ? "max-sm:bottom-31" : "max-sm:bottom-17"), // (a phone: above the corner's island too)
             "left-1/2 -translate-x-1/2 gap-2 px-3.5 py-2 border border-transparent text-[14px] font-medium text-fg hover:bg-selected",
           )}
           onClick={() => setCam(fitted())}
@@ -1072,7 +1073,11 @@ export function SchematicEditor({
         </button>
       )}
       {below && (
-        <BoardIsland stays className="bottom-3 left-1/2 -translate-x-1/2">
+        <BoardIsland
+          stays
+          // (a phone: a row up, the corner's island is as wide as the rest of the bottom)
+          className={cn("bottom-3 left-1/2 -translate-x-1/2", corner && "max-sm:bottom-17")}
+        >
           {below}
         </BoardIsland>
       )}
