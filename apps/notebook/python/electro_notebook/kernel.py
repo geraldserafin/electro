@@ -138,10 +138,10 @@ def from_code(source: str, name: str, old_json: str = "") -> str:
 def _same_but_values(old: Schematic, circuit, variable: str) -> Schematic | None:
     """``old`` with the values from ``circuit``, if that makes it the same circuit (else None)."""
     from electro.codegen import code
-    from electro.semantics import compile_circuit
+    from electro.semantics import structure
     from electro.values import UNKNOWN, to_text
 
-    parts = compile_circuit(circuit).parts
+    parts = structure(circuit).parts
     ids = {e.id for e in old.elements}
     if not set(parts) <= ids:
         return None

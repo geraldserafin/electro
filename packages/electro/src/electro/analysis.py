@@ -21,7 +21,7 @@ from .components import Capacitor, Context, CurrentSource, Inductor, VoltageSour
 from .devices import SineSource
 from .issues import NotAPort, NoThevenin, NotLinear
 from .numeric import LinearSystem
-from .semantics import compile_circuit
+from .semantics import compile_circuit, structure
 from .solver import solve
 from .values import fmt, parse
 
@@ -233,7 +233,7 @@ def sweep(c: Circuit, element: str, values, *outputs: str, omega=None, points: i
 
     Compiled once with the value as a symbol, then solved in numbers at each point.
     """
-    placed = compile_circuit(c).part(element)
+    placed = structure(c).part(element)
     param = placed.model.param
     if param is None:
         raise ValueError(f"sweep(): {element} has no value to change")

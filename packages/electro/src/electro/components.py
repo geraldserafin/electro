@@ -120,6 +120,11 @@ class Component(Circuit):
         """Arguments besides the value and the label, as code (``closed=True``): for ``code()``."""
         return []
 
+    def schematic_text(self) -> str | None:
+        """What a drawing keeps beside the value (a source's frequency, an LED's colour): the
+        inverse of ``from_schematic``, for ``layout()``."""
+        return None
+
     @property
     def dom(self) -> int:
         return len(self.left)

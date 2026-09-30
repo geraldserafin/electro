@@ -191,3 +191,9 @@ def compile_netlist(
 
 def compile_circuit(c: Circuit, **kw) -> System:
     return compile_netlist(c.netlist, **kw)
+
+
+def structure(c: Circuit) -> System:
+    """The circuit compiled for what its elements are and where (``.parts``), not for its laws:
+    as in time, which every element has (a diode or a sine source has no DC law)."""
+    return compile_circuit(c, ctx=Context(dt=sp.Symbol("dt"), t=sp.Symbol("t")))

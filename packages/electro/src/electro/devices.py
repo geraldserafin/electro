@@ -80,18 +80,21 @@ def _frequency(text) -> sp.Expr:
 
 
 class SineSource(TwoTerminal):
-    """``U = value·sin(2π·f·t)``, ``+`` on the right like ``VoltageSource``; ``value`` is the amplitude.
+    """``U = value·sin(2π·f·t + phase)``, ``+`` on the right like ``VoltageSource``; ``value`` is the
+    amplitude, ``phase`` in degrees.
 
-    On paper only as a phasor (``solve(omega=...)``: the amplitude, phase 0); with DC, it needs time.
+    On paper only as a phasor (``solve(omega=...)``: the amplitude at its phase); with DC, it needs time.
     """
 
     prefix, unit, active, positive = "E", "V", True, False
     on_paper = True  # as a phasor
     STEPS = 40  # at least this many steps a period
 
-    def __init__(self, value=None, frequency=50, label: str | None = None):
+    def __init__(self, value=None, frequency=50, phase=0, label: str | None = None):
         super().__init__(value, label)
         self.frequency = _frequency(frequency)
+        self.phase = sp.nsimplify(parse(phase))  # degrees
+        self._rad = sp.pi * self.phase / 180
 
     def build(self, label, V, param, ctx):
         if not ctx.transient and (ctx.omega is None or not self.on_paper):
@@ -102,20 +105,25 @@ class SineSource(TwoTerminal):
         return model
 
     def wave(self, x, t):
-        return x * sp.sin(2 * sp.pi * self.frequency * t)
+        return x * sp.sin(2 * sp.pi * self.frequency * t + self._rad)
 
     def law(self, U, I, x, ctx):
         if ctx.transient:
             return [(U - self.wave(x, ctx.t), DeviceModel)]
-        return [(U - x, SourceVoltage)]
+        return [(U - x * (sp.cos(self._rad) + sp.I * sp.sin(self._rad)), SourceVoltage)]
 
     def options(self):
-        return [f"frequency={float(self.frequency):g}"]
+        return [f"frequency={float(self.frequency):g}"] + ([f"phase={float(self.phase):g}"] if self.phase else [])
+
+    def schematic_text(self):
+        return f"{float(self.frequency):g}" + (f" {float(self.phase):g}°" if self.phase else "")
 
     @classmethod
     def from_schematic(cls, value, text, label):
-        """``text``: the frequency (``"50"``, ``"1 kHz"``)."""
-        return cls(parse(value), text or 50, label=label)
+        """``text``: the frequency, then the phase in degrees if not 0: ``"50"``, ``"1 kHz"``, ``"50 -120°"``."""
+        words = (text or "").split()
+        phase = words.pop().rstrip("°") if len(words) > 1 and words[-1].endswith("°") else 0
+        return cls(parse(value), " ".join(words) or 50, phase, label=label)
 
     def __repr__(self):
         args = ["?" if self.value is UNKNOWN else fmt(self.value, self.unit), *self.options()]
@@ -129,7 +137,7 @@ class SquareSource(SineSource):
     STEPS = 100
 
     def __init__(self, value=None, frequency=1000, duty: float = 0.5, label: str | None = None):
-        super().__init__(value, frequency, label)
+        super().__init__(value, frequency, label=label)
         self.duty = min(1.0, max(0.0, float(duty)))
 
     def build(self, label, V, param, ctx):
@@ -148,6 +156,9 @@ class SquareSource(SineSource):
 
     def options(self):
         return super().options() + ([] if self.duty == 0.5 else [f"duty={self.duty:g}"])
+
+    def schematic_text(self):
+        return f"{float(self.frequency):g}" + ("" if self.duty == 0.5 else f" {self.duty * 100:g}%")
 
     @classmethod
     def from_schematic(cls, value, text, label):
@@ -257,6 +268,9 @@ class LED(Diode):
 
     def options(self):
         return [] if self.color == "red" else [repr(self.color)]
+
+    def schematic_text(self):
+        return self.color
 
     @classmethod
     def from_schematic(cls, value, text, label):
@@ -615,6 +629,9 @@ class Switch(NoValue, TwoTerminal):
 
     def options(self):
         return ["closed=True"] if self.closed else []
+
+    def schematic_text(self):
+        return "closed" if self.closed else None
 
     @classmethod
     def from_schematic(cls, value, text, label):

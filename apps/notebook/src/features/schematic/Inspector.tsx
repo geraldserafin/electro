@@ -91,7 +91,7 @@ export function Inspector({
             : element.kind === "transformer"
               ? t("inspector.ratio")
               : t("inspector.value");
-  const { frequency, duty } = wave(element.text);
+  const { frequency, duty, phase } = wave(element.text);
   const commitId = () => {
     const clean = id.trim();
     if (clean && clean !== element.id && !taken.includes(clean)) onRename(clean);
@@ -145,13 +145,29 @@ export function Inspector({
               value={frequency}
               spellCheck={false}
               aria-label={t("inspector.frequency")}
-              onChange={(e) => onChange({ text: waveText(e.target.value, duty) })}
+              onChange={(e) => onChange({ text: waveText(e.target.value, duty, phase) })}
             />
             {/\d$/.test(frequency) && (
               <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted pointer-events-none">Hz</span>
             )}
           </span>
           <p className={hint}>{t("inspector.frequencyHint")}</p>
+        </Section>
+      )}
+      {!live && element.kind === "sine_source" && (
+        <Section label={t("inspector.phase")}>
+          <span className="relative block">
+            <input
+              className={cn(field, "pr-6")}
+              type="number"
+              step={1}
+              value={phase}
+              aria-label={t("inspector.phase")}
+              onChange={(e) => onChange({ text: waveText(frequency, duty, Number(e.target.value) || 0) })}
+            />
+            <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted pointer-events-none">°</span>
+          </span>
+          <p className={hint}>{t("inspector.phaseHint")}</p>
         </Section>
       )}
       {!live && element.kind === "square_source" && (

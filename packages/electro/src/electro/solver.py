@@ -378,6 +378,14 @@ def _check_zero(expr, law: Law, known):
         raise LawBroken(law, rest)
 
 
+def _sine_omega(circuit: Circuit):
+    """Sine sources all at one frequency: their ω = 2πf, to solve with phasors; else None (DC)."""
+    from .devices import SineSource
+
+    freqs = {c.frequency for c, _ in circuit.netlist.parts if isinstance(c, SineSource) and c.on_paper}
+    return 2 * sp.pi * freqs.pop() if len(freqs) == 1 else None
+
+
 def solve(circuit: Circuit, *equations, omega=None, find=None, **given) -> Solution:
     """Solve a circuit.
 
@@ -385,10 +393,13 @@ def solve(circuit: Circuit, *equations, omega=None, find=None, **given) -> Solut
     ``find=["R_1", "I_R_2"]``: the quantities asked for (a label means the component's value);
     the result shows only those, and ``MissingData`` says what is missing if they are not determined.
     A ``Hole`` the data does not pin down is filled with the simplest element that fits:
-    a resistor (E = 0), else a source (Z = 0).
+    a resistor (E = 0), else a source (Z = 0). Sine sources at one frequency and no ``omega``:
+    phasors at theirs.
     """
     if not isinstance(circuit, Circuit) and hasattr(circuit, "to_circuit"):
         circuit = circuit.to_circuit()  # a drawing (electro_schematic.Schematic)
+    if omega is None:
+        omega = _sine_omega(circuit)
     try:
         solution = _solve(circuit, equations, omega, find, given, {})
     except Contradiction as err:

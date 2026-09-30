@@ -15,7 +15,7 @@ from dataclasses import dataclass, field
 
 from electro import circuit as ct
 from electro.components import Ammeter, Component, Voltmeter
-from electro.semantics import compile_circuit
+from electro.semantics import structure
 from electro.values import UNKNOWN, fmt, to_text
 
 from .issues import CannotLayOut, CannotLayOutElement, CannotLayOutLoop, CannotLayOutParallel
@@ -226,7 +226,12 @@ def _component(comp: Component, frame: Frame, ctx: _Context, reversed_: bool) ->
             "element",
             [(first, 0)],
             (0, 0, 0, 0),
-            {"id": placed.label, "kind": kind_of(comp), "value": to_text(comp.value) if comp.has_value else None},
+            {
+                "id": placed.label,
+                "kind": kind_of(comp),
+                "value": to_text(comp.value) if comp.has_value else None,
+                "text": comp.schematic_text(),
+            },
             axis,
         )
     )
@@ -292,7 +297,7 @@ def layout(circuit: ct.Circuit, *, orientation: str | None = None) -> Schematic:
     if orientation is None:
         orientation = "vertical" if isinstance(circuit, ct.Par) else "horizontal"
     frame = {"horizontal": Frame(RIGHT, DOWN), "vertical": Frame(UP, RIGHT)}[orientation]
-    ctx = _Context(list(compile_circuit(circuit).parts.values()))
+    ctx = _Context(list(structure(circuit).parts.values()))
     if isinstance(circuit, ct.Par):
         block = _parallel(circuit, frame, ctx, outer=False)  # just the branches, like on paper
     else:
@@ -326,7 +331,14 @@ def _to_schematic(block: Block, frame: Frame) -> Schematic:
         elif item.kind == "element":
             rotation = _ROTATION[tuple(int(c) for c in frame.to_screen(item.axis))]
             sch.elements.append(
-                Element(item.data["id"], item.data["kind"], _grid(frame, item.points[0]), rotation, item.data["value"])
+                Element(
+                    item.data["id"],
+                    item.data["kind"],
+                    _grid(frame, item.points[0]),
+                    rotation,
+                    item.data["value"],
+                    item.data.get("text"),
+                )
             )
         elif item.kind == "ground":
             sch.elements.append(Element(auto_id("gnd"), "ground", _grid(frame, item.points[0])))

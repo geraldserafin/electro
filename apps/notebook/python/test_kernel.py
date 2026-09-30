@@ -99,6 +99,15 @@ def test_simulate_reports_problems():
     assert problem["kind"] == "error" and r"E_{1} = 12\,\mathrm{V}" in problem["issue"]["values"]
 
 
+def test_simulate_a_sine_source_with_phasors():
+    from electro import Resistor, loop
+    from electro.devices import SineSource
+    from electro_schematic import layout
+
+    out = json.loads(kernel.simulate(layout(loop(SineSource(10, 50, 90), Resistor(5))).to_json()))
+    assert out["problems"] == [] and out["results"]["R_1"]["I"] == "2 A ∠ 90°"
+
+
 def test_frequency_of_a_drawing():
     from electro import Capacitor, Resistor, VoltageSource, loop
     from electro_schematic import layout

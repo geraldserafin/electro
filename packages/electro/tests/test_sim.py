@@ -180,8 +180,10 @@ def test_square_source_has_its_frequency_and_duty():
 def test_sine_source_on_paper_is_a_phasor_and_the_square_needs_time():
     sine = net((SineSource(10, frequency=50), "GND", "a"), (Resistor(5), "a", "GND"))
     assert complex(sine.solve(omega=100 * math.pi)["R_1"].I) == pytest.approx(2)
-    with pytest.raises(NeedsSimulation):
-        sine.solve()
+    assert complex(sine.solve()["R_1"].I) == pytest.approx(2)  # no omega: its own frequency's
+    shifted = net((SineSource(10, frequency=50, phase=90), "GND", "a"), (Resistor(5), "a", "GND"))
+    assert complex(shifted.solve()["R_1"].I) == pytest.approx(2j)
+    assert max(simulate(shifted, t=0.001)["V_a"][:3]) == pytest.approx(10, rel=0.01)  # sin(90°) at t = 0
     with pytest.raises(NeedsSimulation):
         net((SquareSource(5), "GND", "a"), (Resistor(5), "a", "GND")).solve()
 

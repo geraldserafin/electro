@@ -34,7 +34,7 @@ export const KINDS = [
   { kind: "transformer", prefix: "TR", unit: "", group: "passive" },
   { kind: "voltage_source", prefix: "E", unit: "V", group: "sources" },
   { kind: "current_source", prefix: "J", unit: "A", group: "sources" },
-  { kind: "sine_source", prefix: "E", unit: "V", group: "sources", live: true },
+  { kind: "sine_source", prefix: "E", unit: "V", group: "sources" }, // on paper as a phasor at its frequency
   { kind: "square_source", prefix: "E", unit: "V", group: "sources", live: true },
   { kind: "vcvs", prefix: "VCVS", unit: "", group: "sources" },
   { kind: "vccs", prefix: "VCCS", unit: "S", group: "sources" },
@@ -133,19 +133,27 @@ export const I2C_ADDRESSES: Record<string, string[]> = { lcd1602_i2c: ["0x27", "
 export const defaultValue = (kind: string): string | null =>
   kind === "photoresistor" || kind === "thermistor" ? "10k" : kind === "lamp" ? "12" : null;
 
-/** A source in time's ``text`` (electro.devices.SquareSource.from_schematic): its frequency as typed, the duty in %. */
-export function wave(text: string | null): { frequency: string; duty: number } {
+/** A wave source's ``text`` (electro.devices ``from_schematic``): its frequency as typed, then a
+ * square's duty in % or a sine's phase in degrees: "1k 25%", "50 -120°". */
+export function wave(text: string | null): { frequency: string; duty: number; phase: number } {
   const words = (text ?? "").trim().split(/\s+/).filter(Boolean);
-  const duty =
-    words.length > 1 && words.at(-1)!.endsWith("%") ? Number(words.pop()!.slice(0, -1).replace(",", ".")) : 50;
-  return { frequency: words.join(" "), duty: Number.isFinite(duty) ? duty : 50 };
+  const last = (suffix: string) =>
+    words.length > 1 && words.at(-1)!.endsWith(suffix) ? Number(words.pop()!.slice(0, -1).replace(",", ".")) : null;
+  const duty = last("%") ?? 50;
+  const phase = last("°") ?? 0;
+  return {
+    frequency: words.join(" "),
+    duty: Number.isFinite(duty) ? duty : 50,
+    phase: Number.isFinite(phase) ? phase : 0,
+  };
 }
-export const waveText = (frequency: string, duty: number) => `${frequency.trim()}${duty === 50 ? "" : ` ${duty}%`}`;
-/** "50 Hz", "1kHz 25%": for the label beside the symbol. */
+export const waveText = (frequency: string, duty: number, phase = 0) =>
+  `${frequency.trim()}${duty === 50 ? "" : ` ${duty}%`}${phase === 0 ? "" : ` ${phase}°`}`;
+/** "50 Hz", "1kHz 25%", "50 Hz ∠-120°": for the label beside the symbol. */
 export function waveLabel(text: string | null): string {
-  const { frequency, duty } = wave(text);
+  const { frequency, duty, phase } = wave(text);
   const f = /hz$/i.test(frequency) ? frequency : `${frequency}${/\d$/.test(frequency) ? " " : ""}Hz`;
-  return waveText(f, duty);
+  return `${waveText(f, duty)}${phase === 0 ? "" : ` ∠${phase}°`}`;
 }
 export const isControlled = (kind: string) => ["vcvs", "vccs", "ccvs", "cccs"].includes(kind);
 export const isWaveSource = (kind: string) => kind === "sine_source" || kind === "square_source";
