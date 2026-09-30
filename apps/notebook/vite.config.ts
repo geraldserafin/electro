@@ -20,14 +20,12 @@ function reloadOnPython(): Plugin {
   };
 }
 
-const notesServer = process.env.NOTES_SERVER ?? "http://localhost:5191";
-
 export default defineConfig({
   plugins: [tailwindcss(), react(), reloadOnPython()],
   resolve: { alias: { "@": fileURLToPath(new URL("./src", import.meta.url)) } }, // @/features/…, @/shared/…
   worker: { format: "es" },
-  base: "/", // routes like /notes/:id: assets from the root
-  // the notes server (apps/server) behind /api, in development and in the preview build
-  server: { port: 5190, strictPort: true, proxy: { "/api": notesServer } },
-  preview: { proxy: { "/api": notesServer } },
+  // where the app is served (BASE: on GitHub Pages, /<repository>/); assets from there, not from the
+  // address of a route like /n/:id
+  base: process.env.BASE ?? "/",
+  server: { port: 5190, strictPort: true },
 });

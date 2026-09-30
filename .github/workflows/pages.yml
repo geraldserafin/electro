@@ -1,0 +1,65 @@
+# The notebook on GitHub Pages: built on every push to main. It needs, in the repository's settings:
+#   Pages: Source "GitHub Actions"
+#   Actions variables: OAUTH_CLIENT_ID (the OAuth app's id), AUTH_URL (the auth worker's address)
+name: Pages
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      # the toolchains (public/arduino) are in Git LFS: kept in the cache, so a deploy does not
+      # spend the LFS bandwidth each time
+      - run: git lfs ls-files --long | cut -d ' ' -f1 | sort > .lfs-assets
+      - uses: actions/cache@v4
+        with:
+          path: .git/lfs
+          key: lfs-${{ hashFiles('.lfs-assets') }}
+      - run: git lfs pull
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - id: pages
+        uses: actions/configure-pages@v5
+      - name: Build
+        working-directory: apps/notebook
+        env:
+          BASE: ${{ steps.pages.outputs.base_path }}/
+          VITE_GITHUB_CLIENT_ID: ${{ vars.OAUTH_CLIENT_ID }}
+          VITE_AUTH_URL: ${{ vars.AUTH_URL }}
+        run: |
+          pnpm build
+          # Pages has no rewrites: an address like /n/<id> gets 404.html — the app, which routes it
+          cp dist/index.html dist/404.html
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: apps/notebook/dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

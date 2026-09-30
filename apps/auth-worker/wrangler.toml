@@ -1,0 +1,15 @@
+# The notebook's way to GitHub (src/index.js: connecting, and git), on Cloudflare Workers:
+#
+#   pnpm dlx wrangler deploy
+#   pnpm dlx wrangler secret put GITHUB_CLIENT_ID
+#   pnpm dlx wrangler secret put GITHUB_CLIENT_SECRET
+#
+# In development: `pnpm dlx wrangler dev` (http://localhost:8787, the notebook's default VITE_AUTH_URL),
+# with the development OAuth app's id and secret in .dev.vars.
+name = "electro-auth"
+main = "src/index.js"
+compatibility_date = "2026-09-01"
+
+[vars]
+# the notebook's addresses: GitHub Pages' (https://<user>.github.io) and the development server's
+ALLOWED_ORIGINS = "http://localhost:5190"

@@ -85,9 +85,7 @@ in
   processes = {
     python-bundle.exec = "node ${notebook}/scripts/bundle-python.mjs --watch";
     notebook.exec = "cd ${notebook} && pnpm exec vite --port 5190 --strictPort";
-    notes-server = {
-      exec = "cd ${root}/apps/server && PORT=5191 pnpm dev";
-      after = [ "devenv:processes:postgres" ];
-    };
+    # signing in with GitHub (apps/auth-worker): the development OAuth app's id and secret in its .dev.vars
+    auth-worker.exec = "cd ${root}/apps/auth-worker && pnpm dlx wrangler dev --port 8787";
   };
 }

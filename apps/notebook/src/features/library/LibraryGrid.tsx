@@ -20,7 +20,7 @@ import {
   useWhen,
 } from "@/features/notes";
 import { library } from "@/features/schematic";
-import { leave, ShareDialog } from "@/features/sharing";
+import { leave, ShareDialog, enabled as sharingOn } from "@/features/sharing";
 import { blank } from "@/shared/model/format";
 import { FolderIcon, PageIcon } from "@/shared/ui/icons";
 import { dragging } from "./drag";
@@ -64,7 +64,7 @@ export function LibraryGrid({
   const actions = (card: ItemCard) => {
     const name = card.name || t("untitled");
     return [
-      ...(card.role === "owner" ? [{ label: `${tSharing("share")}…`, run: () => setSharing(card) }] : []),
+      ...(sharingOn && card.role === "owner" ? [{ label: `${tSharing("share")}…`, run: () => setSharing(card) }] : []),
       ...(canEdit(card)
         ? [
             {

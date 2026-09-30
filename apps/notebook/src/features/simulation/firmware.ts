@@ -1,8 +1,10 @@
 // A program for a board given whole instead of as a sketch to compile: its text's first line names the
 // file — "// firmware: /api/firmware/<id>/doom.uf2" — a UF2 (as one drags onto a Pico in BOOTSEL mode) or
-// a raw flash image (.bin), fetched from the page's server: one the user uploaded (the notes server keeps
-// it, @electro/notes-api's Firmware.ts), or any other address. For programs no sketch makes: Doom
+// a raw flash image (.bin): one the user uploaded (kept in their vault on GitHub, features/vault),
+// or at any other address. For programs no sketch makes: Doom
 // (scripts/make-pico-doom.sh).
+
+import { apiFetch } from "@/features/vault";
 
 const FLASH = 0x10000000; // where the RP2040's flash is mapped (a UF2's addresses)
 const UF2_MAGIC = [0x0a324655, 0x9e5d5157],
@@ -44,9 +46,10 @@ export function flashOf(bytes: Uint8Array): Uint8Array {
   return uf2 ? uf2Flash(bytes) : bytes;
 }
 
-/** The flash image in the file at ``url`` (a UF2, or else taken as a raw image). */
+/** The flash image in the file at ``url`` (a UF2, or else taken as a raw image); an uploaded one
+ *  (/api/firmware/…) from the user's vault. */
 export async function fetchFirmware(url: string): Promise<Uint8Array> {
-  const response = await fetch(url);
+  const response = url.startsWith("/api/") ? await apiFetch(new URL(url, location.origin)) : await fetch(url);
   if (!response.ok) throw new Error(`${url}: HTTP ${response.status}`);
   return flashOf(new Uint8Array(await response.arrayBuffer()));
 }

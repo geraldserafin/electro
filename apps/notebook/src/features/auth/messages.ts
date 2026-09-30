@@ -1,21 +1,28 @@
 export const pl = {
-  title: "Zaloguj się",
-  lead: "Notatki są prywatne: każdy widzi tylko swoje.",
-  with: { google: "Kontynuuj z Google", github: "Kontynuuj z GitHubem", microsoft: "Kontynuuj z Microsoftem" },
-  failed: "Nie udało się zalogować — spróbuj jeszcze raz.",
-  none: "Logowanie nie jest skonfigurowane na serwerze.",
-  unreachable: "Serwer notatek nie odpowiada — spróbuj za chwilę.",
-  account: "Konto",
-  signOut: "Wyloguj się",
+  account: "GitHub",
+  connect: "Połącz z GitHubem",
+  connected: "Notatki zapisują się też na GitHubie (electro-notes)",
+  disconnect: "Rozłącz GitHuba",
+  confirmDisconnect: "Rozłączyć GitHuba? Najpierw zapiszę na nim wszystkie zmiany.",
+  notSaved:
+    "Nie udało się zapisać zmian na GitHubie. Rozłączyć mimo to? Zmiany, których tam nie ma, zostaną w tej przeglądarce.",
+  wipe: "Usunąć też notatki z tej przeglądarki? Są bezpieczne na GitHubie. (Anuluj: zostaną tutaj.)",
+  otherAccount:
+    "Notatki w tej przeglądarce były zapisywane na koncie {{from}}. Dołączyć je do notatek konta {{to}}? (Anuluj: najpierw usunę je z tej przeglądarki — na GitHubie {{from}} zostaną.)",
+  notConfigured:
+    "Połączenie z GitHubem nie jest skonfigurowane: brakuje VITE_GITHUB_CLIENT_ID (aplikacji OAuth na GitHubie, zob. .env.example).",
 };
 
 export const en: typeof pl = {
-  title: "Sign in",
-  lead: "Notes are private: everyone sees only their own.",
-  with: { google: "Continue with Google", github: "Continue with GitHub", microsoft: "Continue with Microsoft" },
-  failed: "Could not sign in — please try again.",
-  none: "Signing in is not set up on the server.",
-  unreachable: "The notes server is not responding — try again in a moment.",
-  account: "Account",
-  signOut: "Sign out",
+  account: "GitHub",
+  connect: "Connect GitHub",
+  connected: "Notes are saved on GitHub too (electro-notes)",
+  disconnect: "Disconnect GitHub",
+  confirmDisconnect: "Disconnect GitHub? Every change is saved there first.",
+  notSaved: "The changes could not be saved on GitHub. Disconnect anyway? Changes not there stay in this browser.",
+  wipe: "Delete the notes from this browser too? They are safe on GitHub. (Cancel: they stay here.)",
+  otherAccount:
+    "The notes in this browser were saved to {{from}}'s account. Join them with {{to}}'s notes? (Cancel: they are deleted from this browser first — on GitHub, {{from}}'s stay.)",
+  notConfigured:
+    "Connecting GitHub is not set up: VITE_GITHUB_CLIENT_ID (a GitHub OAuth app, see .env.example) is missing.",
 };

@@ -1,14 +1,13 @@
-// /n/:id/:name — a note, read from the server and edited (or only read, if it was shared with the
-// user to read). The way back is the folder it is in; the name in the address follows its title.
+// /n/:id/:name — a note, read from the vault and edited. The way back is the folder it is in; the name in the address follows its title.
 import { useAtomSet } from "@effect-atom/atom-react";
 import { previewOf, RANK, type Role, slugify } from "@electro/notes-api";
 import { Exit } from "effect";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Link, useNavigate, useParams } from "react-router";
-import { Notebook, NoteSkeleton } from "@/features/notebook";
+import { Notebook } from "@/features/notebook";
 import { failure, folderUrl, fromDocument, getNote, noteUrl, toDocument } from "@/features/notes";
-import { ShareDialog } from "@/features/sharing";
+import { ShareDialog, enabled as sharingOn } from "@/features/sharing";
 import type { Notebook as NotebookData } from "@/shared/model/types";
 import { IslandLink, Islands } from "@/shared/ui/Island";
 import { Back } from "@/shared/ui/icons";
@@ -30,6 +29,15 @@ export function NotePage() {
   const [sharing, setSharing] = useState<NotebookData | null>(null); // open: the note as it was then (its picture)
   const [reads, setReads] = useState(0); // "read it again" (after a conflict, or a failed read)
   const home = { to: "/", label: tLibrary("home") };
+
+  // a save brought GitHub's version of this note: read again
+  useEffect(() => {
+    const pulled = (e: Event) => {
+      if ((e as CustomEvent<string[]>).detail.includes(id)) setReads((n) => n + 1);
+    };
+    window.addEventListener("electro:pulled", pulled);
+    return () => window.removeEventListener("electro:pulled", pulled);
+  }, [id]);
 
   useEffect(() => {
     let alive = true;
@@ -64,7 +72,7 @@ export function NotePage() {
           revision={loaded.revision}
           reload={() => setReads((n) => n + 1)}
           readOnly={RANK[loaded.role] < RANK.editor}
-          {...(loaded.role === "owner" ? { onShare: setSharing } : {})}
+          {...(sharingOn && loaded.role === "owner" ? { onShare: setSharing } : {})}
           back={loaded.back}
           onTitle={(next) => {
             // the name in the address follows the title
@@ -94,13 +102,7 @@ export function NotePage() {
       </IslandLink>
     </Islands>
   );
-  if (loaded.kind === "loading")
-    return (
-      <>
-        {back}
-        <NoteSkeleton />
-      </>
-    );
+  if (loaded.kind === "loading") return back;
   return (
     <>
       {back}

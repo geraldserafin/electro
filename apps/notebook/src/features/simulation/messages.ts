@@ -77,7 +77,7 @@ export const pl = {
     notSaved: "{{name}} działa, ale nie zapisał się w notatce ({{why}}) — po odświeżeniu go nie będzie.",
     signedOut: "trzeba się zalogować",
     quota: "twoje pliki zajmują już 256 MB",
-    unreachable: "nie ma połączenia z serwerem",
+    unreachable: "nie ma połączenia z GitHubem",
   },
 };
 
@@ -160,6 +160,6 @@ export const en: typeof pl = {
     notSaved: "{{name}} runs, but was not saved in the note ({{why}}) — it will be gone after a reload.",
     signedOut: "you need to sign in",
     quota: "your files take 256 MB already",
-    unreachable: "the server cannot be reached",
+    unreachable: "GitHub cannot be reached",
   },
 };

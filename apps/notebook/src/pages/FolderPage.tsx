@@ -8,7 +8,7 @@ import { Link, useNavigate, useParams } from "react-router";
 import { Breadcrumbs, LibraryGrid, useLibraryCalls } from "@/features/library";
 import { CardSkeletons, failure, folderAtom, folderUrl, LIBRARY, patchItem } from "@/features/notes";
 import { SettingsMenu } from "@/features/settings";
-import { ShareDialog } from "@/features/sharing";
+import { ShareDialog, enabled as sharingOn } from "@/features/sharing";
 import { cn } from "@/shared/lib/cn";
 import { IslandButton, IslandLink, Islands } from "@/shared/ui/Island";
 import { Back, ShareIcon } from "@/shared/ui/icons";
@@ -67,7 +67,7 @@ export function FolderPage() {
     <div>
       {backIsland}
       <Islands side="right">
-        {role === "owner" && (
+        {sharingOn && role === "owner" && (
           <IslandButton onClick={() => setSharing(true)} title={t("share")} aria-label={t("share")}>
             <ShareIcon />
           </IslandButton>

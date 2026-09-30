@@ -1,16 +1,26 @@
-// The notes server, as atoms: a typed client made from the contract (@electro/notes-api), the
-// home screen and each folder as queries, and everything that changes them as mutations. A
-// change refreshes the queries through the "library" reactivity key.
+// The notes, as atoms: a typed client made from the contract (@electro/notes-api), answered in the
+// page from the user's vault on GitHub (features/vault); the home screen and each folder as
+// queries, and everything that changes them as mutations. A change refreshes the queries through
+// the "library" reactivity key.
 
-import { FetchHttpClient } from "@effect/platform";
+import { FetchHttpClient, HttpClient } from "@effect/platform";
 import { AtomHttpApi } from "@effect-atom/atom-react";
 import { type NotebookDocument, NotesApi, slugify } from "@electro/notes-api";
+import { Effect, Layer } from "effect";
+import { apiFetch } from "@/features/vault";
 import type { Notebook } from "@/shared/model/types";
 
 export class NotesClient extends AtomHttpApi.Tag<NotesClient>()("NotesClient", {
   api: NotesApi,
-  httpClient: FetchHttpClient.layer,
-  baseUrl: typeof location === "undefined" ? "http://localhost" : location.origin, // /api goes to the server
+  // (fetch: the one the vault answers)
+  httpClient: Layer.effect(
+    HttpClient.HttpClient,
+    Effect.map(
+      HttpClient.HttpClient,
+      HttpClient.transform((request) => Effect.provideService(request, FetchHttpClient.Fetch, apiFetch)),
+    ),
+  ).pipe(Layer.provide(FetchHttpClient.layer)),
+  baseUrl: typeof location === "undefined" ? "http://localhost" : location.origin,
 }) {}
 
 /** What any change makes stale: the home screen, every folder, the destinations. */
@@ -36,7 +46,10 @@ export const saveNote = NotesClient.mutation("library", "save");
 export const createFolder = NotesClient.mutation("library", "createFolder");
 export const patchItem = NotesClient.mutation("library", "patch");
 export const removeItem = NotesClient.mutation("library", "remove");
-export const legacyNote = NotesClient.mutation("library", "legacy");
+
+/** The lists read again (after a sync brought GitHub's changes): a call that changes nothing, with the
+ *  library's reactivity key. */
+export const refreshLibrary = NotesClient.mutation("system", "health");
 
 /** Addresses: the id is what counts, the name after it is only for reading. */
 export const noteUrl = (id: string, name: string) => `/n/${id}/${slugify(name || "notatka")}`;

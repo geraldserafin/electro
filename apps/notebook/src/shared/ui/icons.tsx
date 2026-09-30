@@ -319,3 +319,16 @@ export const LinkIcon = () => (
     <path d="M14 10a4 4 0 00-5.7 0l-3 3a4 4 0 005.7 5.7l1.2-1.2" />
   </Icon>
 );
+export const SaveIcon = () => (
+  <Icon>
+    <path d="M5 4.5h11.5l3 3v12H5z" />
+    <path d="M8.5 4.5v4.5h6.5V4.5M8 19.5v-5.5h9v5.5" />
+  </Icon>
+);
+/** One's own component: a chip with its pins. */
+export const ComponentIcon = () => (
+  <Icon>
+    <path d="M7 5h10v14H7z" />
+    <path d="M4 8h3M4 12h3M4 16h3M17 8h3M17 12h3M17 16h3" />
+  </Icon>
+);

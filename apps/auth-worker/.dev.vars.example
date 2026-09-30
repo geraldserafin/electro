@@ -1,0 +1,4 @@
+# Copy to .dev.vars (git does not keep it): the development OAuth app's
+# (https://github.com/settings/developers, callback URL http://localhost:5190/auth/callback).
+GITHUB_CLIENT_ID=
+GITHUB_CLIENT_SECRET=

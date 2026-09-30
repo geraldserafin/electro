@@ -33,13 +33,13 @@ export const pl = {
     NoSuchPerson: "Nikt z adresem {{email}} jeszcze się tu nie logował. Wyślij tej osobie link.",
     RoleTooLow: "Udostępniać może tylko właściciel.",
     NotFound: "Tego już nie ma.",
-    failed: "Nie udało się — serwer notatek nie odpowiada.",
+    failed: "Nie udało się — spróbuj jeszcze raz.",
   },
   join: {
     joining: "Otwieram udostępnione…",
     missing: "Ten link nie działa",
     missingText: "Właściciel mógł go wyłączyć albo zastąpić nowym.",
-    unreachable: "Serwer notatek nie odpowiada",
+    unreachable: "Nie udało się wczytać",
     home: "Moje notatki",
   },
 };
@@ -80,13 +80,13 @@ export const en: typeof pl = {
     NoSuchPerson: "No one with {{email}} has signed in here yet. Send them the link.",
     RoleTooLow: "Only the owner can share.",
     NotFound: "This is gone.",
-    failed: "That did not work — the notes server is not responding.",
+    failed: "That did not work — please try again.",
   },
   join: {
     joining: "Opening what was shared…",
     missing: "This link does not work",
     missingText: "The owner may have turned it off or replaced it with a new one.",
-    unreachable: "The notes server is not responding",
+    unreachable: "Could not read it",
     home: "My notes",
   },
 };

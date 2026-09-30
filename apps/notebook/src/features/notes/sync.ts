@@ -1,12 +1,14 @@
-// Saving the note on /notes/:id to the notes server as it is edited.
+// Keeping the note on /n/:id in the vault (in this browser) as it is edited; the save button
+// commits it (features/vault), and first writes what is still pending here.
 //
-// Every change is sent at most a second after it happens, with the revision the note was read
+// Every change is written half a second after it happens, with the revision the note was read
 // at; one save is in flight at a time (a second one waits), so revisions never cross. A conflict
-// — the note changed elsewhere — stops saving until the user picks a version. When the server
-// cannot be reached, saving is retried; what is pending is sent when the page is left.
+// — a save brought GitHub's newer version of it — stops writing until the user picks a version.
+// Writing that fails is retried; what is pending is written when the page is left.
 import { useAtomSet } from "@effect-atom/atom-react";
 import { Cause, Exit, Option } from "effect";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { onSave } from "@/features/vault";
 import type { Notebook } from "@/shared/model/types";
 import { LIBRARY, saveNote, toDocument } from "./atoms";
 
@@ -18,7 +20,7 @@ export type SyncState =
   | { kind: "conflict"; current: number } // changed elsewhere since it was read
   | { kind: "error"; tag: string }; // the server's error (its _tag), said by SyncNotice
 
-const DELAY = 1000;
+const DELAY = 500;
 const RETRY = 10_000;
 
 /** The error a failed call ended with, if it is one of ours (tagged); null for transport and defects. */
@@ -105,6 +107,19 @@ export function useNoteSync(notebook: Notebook, revision: number | null, reload:
     }
     schedule();
   }, [notebook]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // saving (the button, ⌘S): what is pending first
+  useEffect(
+    () =>
+      onSave(async () => {
+        if (timer.current !== null) {
+          clearTimeout(timer.current);
+          timer.current = null;
+        }
+        await push();
+      }),
+    [push],
+  );
 
   // leaving the page (another note, the list): send what is pending
   useEffect(
