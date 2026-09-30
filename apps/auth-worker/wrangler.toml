@@ -12,4 +12,4 @@ compatibility_date = "2026-09-01"
 
 [vars]
 # the notebook's addresses: GitHub Pages' (https://<user>.github.io) and the development server's
-ALLOWED_ORIGINS = "http://localhost:5190"
+ALLOWED_ORIGINS = "http://localhost:5190,https://geraldserafin.github.io"
