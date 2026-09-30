@@ -2,6 +2,8 @@
 
 This is one more syntax for a circuit: two pins (or wire ends) on the same grid point
 are connected, exactly like two terminals with the same node name in ``net(...)``.
+One's own components (``Part``: a drawing of its own, its ports the pins of a box) are
+drawn as a box and, for solving and simulating, opened up: their insides joined in.
 Wires connect only with their ends (as in KiCad): a wire merely passing over a pin
 or crossing another wire does not connect to it.
 Gluing by coordinates is the same colimit as gluing by names, so ``to_circuit`` just
@@ -18,7 +20,16 @@ from electro import components as comp
 from electro import devices as dev
 from electro.values import parse
 
-from .issues import BadRotation, EmptySchematic, NoKindFor, NotOnSchematic, SkewedWire, UnknownKind
+from .issues import (
+    BadRotation,
+    EmptySchematic,
+    NoKindFor,
+    NotOnSchematic,
+    PartInItself,
+    SkewedWire,
+    UnknownKind,
+    UnknownPart,
+)
 
 Point = tuple[int, int]  # grid units; x to the right, y down (like the screen)
 GRID = 20  # suggested pixels per grid unit, for renderers and editors
@@ -74,6 +85,16 @@ KINDS: dict[str, Kind] = {
     "ds1307": Kind(((0, 0), (0, 1), (0, 2), (0, 3)), dev.DS1307),  # GND, VCC, SDA, SCL down its left
     # on SPI: VCC, GND, CS, RESET, DC, MOSI, SCK, LED, MISO down its left, as the module's header has them
     "ili9341": Kind(tuple((0, i) for i in range(9)), dev.ILI9341),
+    "lamp": Kind(TWO_PINS, dev.Lamp),  # its rated power (W) in ``text``
+    "motor": Kind(TWO_PINS, dev.Motor),
+    "relay": Kind(((0, 0), (0, 4), (4, 4), (4, 0), (6, 0)), dev.Relay),  # coil a, b; com, nc, no
+    # logic gates: the inputs on the left, the output on the right (no supply pins, as in logic diagrams)
+    "not_gate": Kind(TWO_PINS, dev.NOT),
+    "and_gate": Kind(((0, 0), (0, 2), (4, 1)), dev.AND),
+    "nand_gate": Kind(((0, 0), (0, 2), (4, 1)), dev.NAND),
+    "or_gate": Kind(((0, 0), (0, 2), (4, 1)), dev.OR),
+    "nor_gate": Kind(((0, 0), (0, 2), (4, 1)), dev.NOR),
+    "xor_gate": Kind(((0, 0), (0, 2), (4, 1)), dev.XOR),
     "switch": Kind(TWO_PINS, dev.Switch),
     "button": Kind(TWO_PINS, dev.Button),
     "potentiometer": Kind(((0, 0), (4, 0), (2, -2)), dev.Potentiometer),  # a, b, wiper
@@ -100,7 +121,57 @@ KINDS: dict[str, Kind] = {
     "ground": Kind(((0, 0),)),
     "label": Kind(((0, 0),)),  # net label: same text = same node
     "terminal": Kind(((0, 0),)),  # an open end
+    # in a component's own drawing: where it is connected from outside, by its name (``text``); on
+    # its own, a net label
+    "port": Kind(((0, 0),)),
+    "part": Kind(()),  # one of one's own components: ``text`` names its definition (Schematic.parts)
 }
+
+SIDES = ("left", "right", "top", "bottom")
+
+
+@dataclass
+class PartPin:
+    name: str  # a port's name in the component's drawing
+    side: str  # "left", "right", "top", "bottom"
+    at: int  # grid squares along its side, from the top (left, right) or the left (top, bottom)
+
+
+@dataclass
+class Part:
+    """One's own component: its box (``size``, grid squares), its pins around it, and what is inside
+    (``schematic``, where a ``port`` of the pin's name is). Placed, the box's top left corner is the
+    element's origin; each pin sticks out one square from its side."""
+
+    name: str
+    size: tuple[int, int]
+    pins: list[PartPin]
+    schematic: Schematic
+    prefix: str = "U"
+
+    def offsets(self) -> list[Point]:
+        w, h = self.size
+        where = {"left": lambda a: (-1, a), "right": lambda a: (w + 1, a), "top": lambda a: (a, -1)}
+        return [where.get(p.side, lambda a: (a, h + 1))(p.at) for p in self.pins]
+
+    @classmethod
+    def from_dict(cls, data: dict) -> Part:
+        return cls(
+            data["name"],
+            tuple(data["size"]),
+            [PartPin(**p) for p in data["pins"]],
+            Schematic.from_dict(data["schematic"]),
+            data.get("prefix", "U"),
+        )
+
+    def to_dict(self) -> dict:
+        return {
+            "name": self.name,
+            "size": list(self.size),
+            "pins": [asdict(p) for p in self.pins],
+            "schematic": self.schematic.to_dict(),
+            "prefix": self.prefix,
+        }
 
 
 def kind_of(component: comp.Component) -> str:
@@ -138,9 +209,16 @@ class Element:
         self.rotation %= 360
 
     def pins(self) -> list[Point]:
-        return [
-            (self.at[0] + dx, self.at[1] + dy) for dx, dy in (rotate(p, self.rotation) for p in KINDS[self.kind].pins)
-        ]
+        own = self.definition.offsets() if self.kind == "part" else KINDS[self.kind].pins
+        return [(self.at[0] + dx, self.at[1] + dy) for dx, dy in (rotate(p, self.rotation) for p in own)]
+
+    @property
+    def definition(self) -> Part:
+        """A part's: bound by the drawing it is on (Schematic.parts)."""
+        found = self.__dict__.get("_definition")
+        if found is None:
+            raise UnknownPart(self.text or "")
+        return found
 
     def component(self) -> comp.Component | None:
         cls = KINDS[self.kind].component
@@ -181,6 +259,16 @@ def on_segment(p: Point, a: Point, b: Point) -> bool:
 class Schematic:
     elements: list[Element] = field(default_factory=list)
     wires: list[Wire] = field(default_factory=list)
+    parts: dict[str, Part] = field(default_factory=dict)  # one's own components on it, by their key
+
+    def __post_init__(self):
+        self.bind()
+
+    def bind(self) -> None:
+        """Each part on the drawing given its definition."""
+        for e in self.elements:
+            if e.kind == "part":
+                e.__dict__["_definition"] = self.parts.get(e.text or "")
 
     def __getattr__(self, name: str):
         """Anything else is the circuit's: ``drawing.solve(...)``, ``drawing.transpose()``, …"""
@@ -241,7 +329,7 @@ class Schematic:
                         union(("wire", i), ("wire", j))
         by_label: dict[str, object] = {}
         for e in self.elements:
-            name = "GND" if e.kind == "ground" else e.text if e.kind == "label" else None
+            name = "GND" if e.kind == "ground" else e.text if e.kind in ("label", "port") else None
             if name:
                 key = pin_at[e.pins()[0]][0]
                 if name in by_label:
@@ -266,28 +354,47 @@ class Schematic:
         _, named = self._netlist_items()
         return named
 
-    def _netlist_items(self):
+    def _netlist_items(self, prefix: str = "", outside: dict[str, str] | None = None, within: tuple = ()):
+        """The netlist's items (component, node names…) and every point's node name. Inside a part
+        (``prefix``: its label and "_"), labels and elements are its own (prefixed), a port is the
+        outside's node (``outside``: port name → node name), ground is everyone's."""
         nodes = self.nodes()
         names: dict[object, str] = {}
         for e in self.elements:
             if e.kind == "ground":
                 names[nodes[e.pins()[0]]] = ct.GROUND
+        if outside is not None:
+            for e in self.elements:
+                if e.kind == "port" and e.text in outside:
+                    names.setdefault(nodes[e.pins()[0]], outside[e.text])
         for e in self.elements:
-            if e.kind == "label" and e.text:
-                names.setdefault(nodes[e.pins()[0]], e.text)
+            if e.kind in ("label", "port") and e.text:
+                names.setdefault(nodes[e.pins()[0]], prefix + e.text)
         taken, k = set(names.values()), 0
+
+        def name(p):
+            nonlocal k
+            root = nodes[p]
+            if root not in names:
+                while f"{prefix}n{k}" in taken or k == 0:
+                    k += 1
+                names[root] = f"{prefix}n{k}"
+                taken.add(names[root])
+            return names[root]
+
         items = []
-        for e in self.components():
-            node_names = []
-            for p in e.pins():
-                root = nodes[p]
-                if root not in names:
-                    while f"n{k}" in taken or k == 0:
-                        k += 1
-                    names[root] = f"n{k}"
-                    taken.add(names[root])
-                node_names.append(names[root])
-            items.append((e.component(), *node_names))
+        for e in self.elements:
+            if e.kind == "part":
+                d = e.definition
+                if e.text in within or len(within) > 16:
+                    raise PartInItself(e.text or "")
+                ports = {pin.name: name(p) for pin, p in zip(d.pins, e.pins())}
+                inner, _ = d.schematic._netlist_items(f"{prefix}{e.id}_", ports, (*within, e.text))
+                items += inner
+            elif KINDS[e.kind].component is not None:
+                node_names = [name(p) for p in e.pins()]
+                own = e if not prefix else Element(prefix + e.id, e.kind, e.at, e.rotation, e.value, e.text)
+                items.append((own.component(), *node_names))
         return items, {p: names[root] for p, root in nodes.items() if root in names}
 
     def to_code(self, name: str = "uklad") -> str:
@@ -349,13 +456,30 @@ class Schematic:
 
     # ------------------------------------------------------------------ JSON
 
+    def to_dict(self) -> dict:
+        out = {
+            "version": 1,
+            "elements": [asdict(e) for e in self.elements],
+            "wires": [{"points": [list(p) for p in w.points]} for w in self.wires],
+        }
+        if self.parts:
+            out["parts"] = {key: part.to_dict() for key, part in self.parts.items()}
+        return out
+
     def to_json(self) -> str:
-        return json.dumps({"version": 1, **asdict(self)}, ensure_ascii=False)
+        return json.dumps(self.to_dict(), ensure_ascii=False)
+
+    @classmethod
+    def from_dict(cls, data: dict) -> Schematic:
+        return cls(
+            [Element(**e) for e in data["elements"]],
+            [Wire(**w) for w in data["wires"]],
+            {key: Part.from_dict(p) for key, p in (data.get("parts") or {}).items()},
+        )
 
     @classmethod
     def from_json(cls, text: str) -> Schematic:
-        data = json.loads(text)
-        return cls([Element(**e) for e in data["elements"]], [Wire(**w) for w in data["wires"]])
+        return cls.from_dict(json.loads(text))
 
 
 def _simplify(points: list[Point]) -> list[Point]:

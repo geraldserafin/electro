@@ -15,9 +15,9 @@ from electro.components import Ammeter, Hole, Voltmeter, notation
 from electro.values import UNKNOWN, fmt
 from electro_schematic import GRID, KINDS, Schematic, layout
 from electro_schematic.layout import label_sides
-from electro_schematic.model import on_segment
+from electro_schematic.model import on_segment, rotate
 
-from .symbols import LETTERS, STYLE, UPRIGHT, symbol
+from .symbols import LETTERS, STYLE, UPRIGHT, part_symbol, symbol
 
 Vec = tuple[float, float]
 RIGHT, LEFT, UP, DOWN = (1, 0), (-1, 0), (0, -1), (0, 1)
@@ -108,9 +108,9 @@ def _tspans(text: str) -> str:
 def _junctions(sch: Schematic) -> list[tuple[int, int]]:
     """Grid points where three or more connected wires/pins meet (same rules as Schematic.nodes)."""
     count: Counter = Counter()
-    pins = {p for e in sch.elements if e.kind != "label" for p in e.pins()}
+    pins = {p for e in sch.elements if e.kind not in ("label", "port") for p in e.pins()}
     for e in sch.elements:
-        if e.kind != "label":
+        if e.kind not in ("label", "port"):
             for p in e.pins():
                 count[p] += 1
     free_ends = set()
@@ -206,14 +206,22 @@ def _draw(sch: Schematic, solution) -> Svg:
         rotation = 0 if e.kind in UPRIGHT else e.rotation
         state = " closed" if e.kind in ("switch", "button") and e.text == "closed" else ""
         canvas.items.append(
-            f'<g class="w{state}" transform="translate({x:g} {y:g}) rotate({rotation})">{symbol(e.kind)}</g>'
+            f'<g class="w{state}" transform="translate({x:g} {y:g}) rotate({rotation})">'
+            f"{part_symbol(e.definition) if e.kind == 'part' else symbol(e.kind)}</g>"
         )
         pins = [(px * GRID, py * GRID) for px, py in e.pins()]
         for px, py in pins:
             canvas.grow(px - 12, py - 12)
             canvas.grow(px + 12, py + 22)
-        if e.kind == "label":
-            canvas.text(x, y - 4, UP, [(e.text or "", "node")])
+        if e.kind in ("label", "port"):
+            canvas.text(x, y - (18 if e.kind == "port" else 4), UP, [(e.text or "", "node")])
+            continue
+        if e.kind == "part":  # its label above its box
+            box = [rotate(c, e.rotation) for c in ((0, 0), e.definition.size)]
+            left, top = min(c[0] for c in box), min(c[1] for c in box)
+            right = max(c[0] for c in box)
+            canvas.text(x + (left + right) * GRID / 2, y + top * GRID - 4, UP, [(e.id, "label")])
+            canvas.grow(x + left * GRID, y + top * GRID - 20)
             continue
         if KINDS[e.kind].component is None:
             continue

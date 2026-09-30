@@ -18,7 +18,7 @@ from electro_notes.issues import (
     UnnamedSchematic,
 )
 
-EXAMPLE = Path(__file__).parents[3] / "apps/notebook/examples/nieznane-i-dziury.electro.json"
+EXAMPLE = Path(__file__).parents[3] / "apps/notebook/examples/3-biblioteka/03-niewiadome-i-dziury.electro.json"
 
 
 def zadanie() -> Notebook:

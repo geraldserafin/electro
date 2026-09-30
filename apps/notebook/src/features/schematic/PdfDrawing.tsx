@@ -2,6 +2,7 @@ import { useLayoutEffect, useRef, useState } from "react";
 import type { ElementResult, Point, SchematicData, SymbolLibrary } from "@/shared/model/types";
 import { ElementView } from "./ElementView";
 import { junctions } from "./model";
+import { withParts } from "./parts";
 import "./Canvas.css";
 
 const PDF_SCALE = 1.1; // drawing px → CSS px on paper: labels come out about as big as the text
@@ -16,13 +17,14 @@ const nothing = () => {};
 
 export function PdfDrawing({
   value,
-  library,
+  library: symbols,
   results,
 }: {
   value: SchematicData;
   library: SymbolLibrary;
   results?: Record<string, ElementResult>;
 }) {
+  const library = withParts(symbols, value.parts);
   const G = library.grid;
   const content = useRef<SVGGElement>(null);
   const [box, setBox] = useState<[number, number, number, number] | null>(null);

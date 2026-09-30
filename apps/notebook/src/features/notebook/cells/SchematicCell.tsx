@@ -8,6 +8,7 @@ import {
 } from "react";
 import { useTranslation } from "react-i18next";
 import { useLocation, useNavigate, useSearchParams } from "react-router";
+import { removeComponent, SaveComponentDialog, useComponents } from "@/features/components";
 import { usePdf } from "@/features/pdf-export";
 import { kernel } from "@/features/python";
 import {
@@ -33,7 +34,7 @@ import { FailureBox } from "@/features/solution";
 import { cn } from "@/shared/lib/cn";
 import type { Failure } from "@/shared/model/issues";
 import type { Cell, SchematicData, SymbolLibrary } from "@/shared/model/types";
-import { Close, CodeIcon, Expand, Flash, SchematicIcon, Shrink } from "@/shared/ui/icons";
+import { Close, CodeIcon, ComponentIcon, Expand, Flash, SchematicIcon, Shrink } from "@/shared/ui/icons";
 import { Sash, useKeptSize } from "@/shared/ui/Splitter";
 import { barButton, RunButton } from "./CellBar";
 import { runOnShiftEnter } from "./CodeCell";
@@ -209,6 +210,9 @@ export function SchematicCell({
   const { t } = useTranslation("notebook");
   const { t: ts } = useTranslation("simulation");
   const { t: tk } = useTranslation("schematic");
+  const { t: tc } = useTranslation("components");
+  const mine = useComponents();
+  const [saving, setSaving] = useState(false); // "save as a component" open
   const empty = !cell.schematic.elements.length;
   const pdf = usePdf();
   const printed = pdf.results && !cell.stale ? cell.results : undefined; // values on the drawing, if the PDF has them
@@ -545,6 +549,14 @@ export function SchematicCell({
 
   const board = (
     <SchematicEditor
+      myParts={{
+        list: mine,
+        label: tc("mine"),
+        removeLabel: tc("remove"),
+        onRemove: (p) => {
+          if (confirm(tc("confirmRemove", { name: p.def.name }))) void removeComponent(p.id);
+        },
+      }}
       bare
       value={cell.schematic}
       onChange={(schematic) => update({ schematic, ...(cell.results ? { stale: true } : {}) })}
@@ -718,6 +730,16 @@ export function SchematicCell({
                     {sketchOf(g.active) && <UploadButton element={sketchOf(g.active)!} live={live} />}
                     {i === last && problems}
                     {i === last && runButton}
+                    {i === last && !running && (
+                      <button
+                        className={cn(barButton, "[&_svg]:size-4")}
+                        onClick={() => setSaving(true)}
+                        title={tc("button")}
+                        aria-label={tc("button")}
+                      >
+                        <ComponentIcon />
+                      </button>
+                    )}
                     {i === last && (
                       <button
                         className={cn(barButton, "[&_svg]:size-4")}
@@ -805,6 +827,14 @@ export function SchematicCell({
       )}
       {/* the PDF shows the circuit as drawn; results belong to code cells: schematic(układ1, sol) */}
       <PdfDrawing value={cell.schematic} library={library} results={printed} />
+      {saving && (
+        <SaveComponentDialog
+          schematic={cell.schematic}
+          name={cell.name}
+          library={library}
+          onClose={() => setSaving(false)}
+        />
+      )}
       {cell.results && Object.keys(cell.results).length > 0 && (
         <ResultsTable results={cell.results} stale={!!cell.stale} />
       )}

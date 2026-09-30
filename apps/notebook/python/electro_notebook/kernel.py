@@ -56,6 +56,12 @@ class OnlyValuesInCode(Issue, ValueError):
 
 
 @issue
+class PartsNotInCode(Issue, ValueError):
+    """A drawing with one's own components edited in its code view: there they are taken apart
+    already (their insides are plain elements), so the drawing would lose them."""
+
+
+@issue
 class BadDataEntry(Issue, ValueError):
     """An entry of a schematic's data that is not ``name = value`` (e.g. ``I_R_1 = 0,5``)."""
 
@@ -103,6 +109,8 @@ def from_code(source: str, name: str, old_json: str = "") -> str:
     from electro_schematic import Unsupported, layout
 
     var = variable(name)
+    if old_json and Schematic.from_json(old_json).parts:
+        return json.dumps({"error": _error(PartsNotInCode())}, ensure_ascii=False)
     scope: dict = {}
     exec(PRELUDE, scope)
     prelude = set(scope)
@@ -219,7 +227,11 @@ def live(schematic_json: str) -> str:
         {
             "program": json.loads(program.to_json()),
             "wires": [names.get(w.points[0]) for w in sch.wires],
-            "pins": {e.id: [names.get(p) for p in e.pins()] for e in sch.components()},
+            "pins": {
+                e.id: [names.get(p) for p in e.pins()]
+                for e in sch.elements
+                if e.kind == "part" or e in sch.components()
+            },
         },
         ensure_ascii=False,
     )
@@ -309,6 +321,7 @@ def run(code: str, schematics_json: str = "{}", standard: str = "iec") -> str:
     stdout = io.StringIO()
     with contextlib.redirect_stdout(stdout), warnings.catch_warnings(record=True) as caught:
         warnings.simplefilter("always")
+        warnings.simplefilter("ignore", DeprecationWarning)  # the libraries' own (sympy's), not the reader's
         try:
             tree = ast.parse(code, CELL)
             last = tree.body.pop() if tree.body and isinstance(tree.body[-1], ast.Expr) else None

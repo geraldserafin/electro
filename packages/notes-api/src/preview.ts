@@ -27,10 +27,22 @@ export const previewOf = (document: NotebookDocument): NotePreview => {
       cells.push({ type: "code", source });
     } else if (schematics < SCHEMATICS) {
       schematics++;
+      const parts = cell.schematic.parts as Record<string, Record<string, unknown>> | undefined;
       cells.push({
         type: "schematic",
         name: cell.name,
-        schematic: { elements: cell.schematic.elements, wires: cell.schematic.wires },
+        schematic: {
+          elements: cell.schematic.elements,
+          wires: cell.schematic.wires,
+          ...(parts && {
+            parts: Object.fromEntries(
+              Object.entries(parts).map(([key, { schematic: _, ...outline }]) => [
+                key,
+                { ...outline, schematic: { elements: [], wires: [] } },
+              ]),
+            ),
+          }),
+        },
       });
     }
   }

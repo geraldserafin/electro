@@ -101,9 +101,12 @@ export type Issue =
   | { type: "SkewedWire"; start: [number, number]; end: [number, number] }
   | { type: "NotOnSchematic"; id: string }
   | { type: "EmptySchematic" }
+  | { type: "UnknownPart"; part: string }
+  | { type: "PartInItself"; part: string }
   // the notebook's kernel
   | { type: "NoCircuitInCode"; variable: string }
   | { type: "OnlyValuesInCode"; cause: Issue }
+  | { type: "PartsNotInCode" }
   | { type: "BadDataEntry"; entry: string }
   | { type: "NoSuchSchematic"; name: string; available: string[] };
 

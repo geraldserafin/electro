@@ -78,6 +78,8 @@ const LIGHTS: Record<string, string[]> = {
 };
 const LCD_DATA = ["d0", "d1", "d2", "d3", "d4", "d5", "d6", "d7"];
 const LED_RATED = 0.02; // A: full brightness
+const LAMP_RATED = 3; // W: a bulb's full glow, unless its text says otherwise (electro.devices.Lamp)
+const SPIN = 0.02; // a motor's drawing turns this much slower than the motor (5700 rpm: about 2 turns a second)
 
 /** The inputs an element sets: [input name, value]. */
 function inputsOf(e: Part, pressed: Set<string>): [string, number][] {
@@ -98,6 +100,10 @@ export class Runner {
   private servos: Servoing[];
   private lcds: Lcd[];
   private sonars: Sonar[];
+  private lamps: { id: string; u: number; i: number }[]; // each bulb: its voltage's and current's index in x
+  private motors: { id: string; w: number; angle: number }[]; // each motor: its speed's index, how far it turned
+  private relays: { id: string; on: number }[];
+  private energy = new Map<string, number>(); // each bulb's, since the last frame (its glow: the mean power)
   // the I²C modules, by id: kept across a new sketch (the display keeps what it showed, as a real one does)
   private modules = new Map<string, Device>();
   private tfts = new Map<string, Ili9341>(); // the SPI displays, by id (kept so too)
@@ -144,6 +150,11 @@ export class Runner {
           ]
         : [],
     );
+    this.lamps = having("Lamp").flatMap(([id, q]) =>
+      q?.U !== undefined && q.I !== undefined ? [{ id, u: q.U, i: q.I }] : [],
+    );
+    this.motors = having("Motor").flatMap(([id, q]) => (q?.w !== undefined ? [{ id, w: q.w, angle: 0 }] : []));
+    this.relays = having("Relay").flatMap(([id, q]) => (q?.on !== undefined ? [{ id, on: q.on }] : []));
     this.sonars = having("Ultrasonic").flatMap(([id, q]) => (q?.U_trig !== undefined ? [sonar(id, q.U_trig)] : []));
     this.setParts(parts);
   }
@@ -217,6 +228,8 @@ export class Runner {
         g.charge.set(key, (g.charge.get(key) ?? 0) + Math.max(0, x[i]) * dt);
       }
       for (const b of this.buzzers) listen(b, x[b.u], dt);
+      for (const l of this.lamps) this.energy.set(l.id, (this.energy.get(l.id) ?? 0) + Math.abs(x[l.u] * x[l.i]) * dt);
+      for (const m of this.motors) m.angle = (m.angle + x[m.w] * dt * SPIN * (180 / Math.PI)) % 360;
       g.last = t;
     }
     for (const m of this.servos) watch(m, x[m.u], t);
@@ -285,6 +298,15 @@ export class Runner {
       sounds.push({ id: b.id, frequency, volume });
     }
     for (const m of this.servos) (looks[m.id] ??= {}).angle = turn(m, sim.t);
+    for (const l of this.lamps) {
+      const power =
+        span > 0 && this.energy.has(l.id) ? this.energy.get(l.id)! / span : Math.abs(sim.x[l.u] * sim.x[l.i]);
+      const rated = Number(this.parts.find((e) => e.id === l.id)?.text?.replace(",", ".")) || LAMP_RATED;
+      (looks[l.id] ??= {}).glow = Math.sqrt(Math.min(1, power / rated));
+    }
+    this.energy.clear();
+    for (const m of this.motors) (looks[m.id] ??= {}).spin = m.angle;
+    for (const r of this.relays) (looks[r.id] ??= {}).on = sim.x[r.on] > 0.5 ? 1 : 0;
     for (const u of this.sonars) (looks[u.id] ??= {}).ping = sim.t < u.until ? 1 : 0;
     for (const b of this.session.boards) if (b.chip.led !== undefined) (looks[b.label] ??= {}).led = b.chip.led ? 1 : 0;
     const screens: Record<string, Screen> = {};

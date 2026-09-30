@@ -1,9 +1,10 @@
 // The tools, top centre: select, hand; the wire and the elements drawn most (a resistor, a voltage
 // source, ground), each a key away; the element library for the rest.
+
 import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { cn } from "@/shared/lib/cn";
-import type { SymbolLibrary } from "@/shared/model/types";
+import type { PartDef, SymbolLibrary } from "@/shared/model/types";
 import { Hand, Pointer, WireIcon } from "@/shared/ui/icons";
 import { BoardButton, BoardIsland, islandButton, Separator } from "./Board";
 import { useKinds } from "./kinds";
@@ -33,7 +34,11 @@ const Library = () => (
   </svg>
 );
 
-export type Tool = { type: "select" } | { type: "hand" } | { type: "wire" } | { type: "place"; kind: string };
+export type Tool =
+  | { type: "select" }
+  | { type: "hand" }
+  | { type: "wire" }
+  | { type: "place"; kind: string; part?: { key: string; def: PartDef } }; // part: one's own component (its kind "part:<key>")
 
 const tool = (on: boolean) => cn(islandButton(on), "w-10");
 const Key = ({ children }: { children: ReactNode }) => (

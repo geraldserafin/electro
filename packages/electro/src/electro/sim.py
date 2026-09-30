@@ -8,7 +8,7 @@ notebook's live simulation (``Program.to_json``). Each step is then Newton's met
 plain numbers; between steps the elements' states (``Model.states``) move on.
 
     >>> from electro import *
-    >>> trace = simulate(supply(5) + Resistor(1000) + node("A") + shunt(Capacitor(1e-3)) + ground, t=5)
+    >>> trace = simulate(supply(5) + Resistor(1000) + node("A") + Capacitor(1e-3) + ground, t=5)
     >>> round(trace.at(1)["V_A"], 1)  # one time constant: 63 %
     3.2
 """

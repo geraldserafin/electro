@@ -659,6 +659,173 @@
    "letter": null,
    "upright": false
   },
+  "lamp": {
+   "pins": [
+    [
+     0,
+     0
+    ],
+    [
+     80,
+     0
+    ]
+   ],
+   "svg": "<path d=\"M0 0H27M53 0H80\"/><g transform=\"translate(40 0)\"><circle class=\"on\" r=\"13\" style=\"stroke:none;fill:#ffd60a;opacity:var(--glow,0)\"/><circle r=\"13\"/><path d=\"M-9.2 -9.2L9.2 9.2M-9.2 9.2L9.2 -9.2\"/></g>",
+   "letter": null,
+   "upright": false
+  },
+  "motor": {
+   "pins": [
+    [
+     0,
+     0
+    ],
+    [
+     80,
+     0
+    ]
+   ],
+   "svg": "<path d=\"M0 0H24M56 0H80\"/><g transform=\"translate(40 0)\"><circle r=\"16\"/><g style=\"transform-box:fill-box;transform-origin:center;transform:rotate(calc(var(--spin,0) * 1deg))\"><circle r=\"16\" style=\"fill:none;stroke:none\"/><path class=\"thick\" d=\"M0 -16V-11\"/></g></g>",
+   "letter": "M",
+   "upright": false
+  },
+  "relay": {
+   "pins": [
+    [
+     0,
+     0
+    ],
+    [
+     0,
+     80
+    ],
+    [
+     80,
+     80
+    ],
+    [
+     80,
+     0
+    ],
+    [
+     120,
+     0
+    ]
+   ],
+   "svg": "<path d=\"M0 0V24M0 56V80\"/><rect x=\"-12\" y=\"24\" width=\"24\" height=\"32\"/><path d=\"M80 80V56M80 0V22M120 0V12H104\"/><circle class=\"open\" cx=\"80\" cy=\"24\" r=\"2\"/><circle class=\"open\" cx=\"102\" cy=\"12\" r=\"2\"/><path d=\"M80 56L80 27\" style=\"opacity:calc(1 - var(--on,0))\"/><path d=\"M80 56L100 15\" style=\"opacity:var(--on,0)\"/><path class=\"dashed\" d=\"M12 40H84\"/><g class=\"pins\"><text x=\"68\" y=\"6\" text-anchor=\"end\">NC</text><text x=\"106\" y=\"27\">NO</text><text x=\"86\" y=\"76\">COM</text></g>",
+   "letter": null,
+   "upright": false
+  },
+  "not_gate": {
+   "pins": [
+    [
+     0,
+     0
+    ],
+    [
+     80,
+     0
+    ]
+   ],
+   "svg": "<path d=\"M0 0H22M60 0H80\"/><rect x=\"22\" y=\"-16\" width=\"28\" height=\"32\"/><circle cx=\"54\" r=\"4\"/><text class=\"chip\" x=\"36\" y=\"5\" text-anchor=\"middle\">1</text>",
+   "letter": null,
+   "upright": false
+  },
+  "and_gate": {
+   "pins": [
+    [
+     0,
+     0
+    ],
+    [
+     0,
+     40
+    ],
+    [
+     80,
+     20
+    ]
+   ],
+   "svg": "<path d=\"M0 0H16M0 40H16\"/><rect x=\"16\" y=\"-12\" width=\"36\" height=\"64\"/><path d=\"M52 20H80\"/><text class=\"chip\" x=\"34\" y=\"25\" text-anchor=\"middle\">&amp;</text>",
+   "letter": null,
+   "upright": false
+  },
+  "nand_gate": {
+   "pins": [
+    [
+     0,
+     0
+    ],
+    [
+     0,
+     40
+    ],
+    [
+     80,
+     20
+    ]
+   ],
+   "svg": "<path d=\"M0 0H16M0 40H16\"/><rect x=\"16\" y=\"-12\" width=\"36\" height=\"64\"/><circle cx=\"56\" cy=\"20\" r=\"4\"/><path d=\"M60 20H80\"/><text class=\"chip\" x=\"34\" y=\"25\" text-anchor=\"middle\">&amp;</text>",
+   "letter": null,
+   "upright": false
+  },
+  "or_gate": {
+   "pins": [
+    [
+     0,
+     0
+    ],
+    [
+     0,
+     40
+    ],
+    [
+     80,
+     20
+    ]
+   ],
+   "svg": "<path d=\"M0 0H16M0 40H16\"/><rect x=\"16\" y=\"-12\" width=\"36\" height=\"64\"/><path d=\"M52 20H80\"/><text class=\"chip\" x=\"34\" y=\"25\" text-anchor=\"middle\">≥1</text>",
+   "letter": null,
+   "upright": false
+  },
+  "nor_gate": {
+   "pins": [
+    [
+     0,
+     0
+    ],
+    [
+     0,
+     40
+    ],
+    [
+     80,
+     20
+    ]
+   ],
+   "svg": "<path d=\"M0 0H16M0 40H16\"/><rect x=\"16\" y=\"-12\" width=\"36\" height=\"64\"/><circle cx=\"56\" cy=\"20\" r=\"4\"/><path d=\"M60 20H80\"/><text class=\"chip\" x=\"34\" y=\"25\" text-anchor=\"middle\">≥1</text>",
+   "letter": null,
+   "upright": false
+  },
+  "xor_gate": {
+   "pins": [
+    [
+     0,
+     0
+    ],
+    [
+     0,
+     40
+    ],
+    [
+     80,
+     20
+    ]
+   ],
+   "svg": "<path d=\"M0 0H16M0 40H16\"/><rect x=\"16\" y=\"-12\" width=\"36\" height=\"64\"/><path d=\"M52 20H80\"/><text class=\"chip\" x=\"34\" y=\"25\" text-anchor=\"middle\">=1</text>",
+   "letter": null,
+   "upright": false
+  },
   "switch": {
    "pins": [
     [
@@ -1073,6 +1240,23 @@
    "svg": "<circle class=\"open\" r=\"3.5\"/>",
    "letter": null,
    "upright": true
+  },
+  "port": {
+   "pins": [
+    [
+     0,
+     0
+    ]
+   ],
+   "svg": "<path d=\"M0 0L-6 -6V-16H6V-6Z\"/>",
+   "letter": null,
+   "upright": true
+  },
+  "part": {
+   "pins": [],
+   "svg": "",
+   "letter": null,
+   "upright": false
   }
  },
  "standards": {
@@ -1081,7 +1265,13 @@
    "resistor": "<path d=\"M0 0H22M58 0H80\"/><g transform=\"translate(40 0)\"><path d=\"M-18 0L-15 -7L-9 7L-3 -7L3 7L9 -7L15 7L18 0\"/></g>",
    "voltage_source": "<path d=\"M0 0H36M44 0H80\"/><g transform=\"translate(40 0)\"><path class=\"thick\" d=\"M-4 -8V8\"/><path d=\"M4 -15V15\"/><path d=\"M10 -15h6M13 -18v6\"/></g>",
    "current_source": "<path d=\"M0 0H27M53 0H80\"/><g transform=\"translate(40 0)\"><circle r=\"13\"/><path d=\"M-7 0H4\"/><path class=\"fill\" d=\"M9 0l-6 -4.5v9z\"/></g>",
-   "potentiometer": "<path d=\"M0 0H22M58 0H80\"/><g transform=\"translate(40 0)\"><path d=\"M-18 0L-15 -7L-9 7L-3 -7L3 7L9 -7L15 7L18 0\"/></g><path d=\"M40 -40V-15\"/><path class=\"fill\" d=\"M40 -9l-4 -7h8z\"/>"
+   "potentiometer": "<path d=\"M0 0H22M58 0H80\"/><g transform=\"translate(40 0)\"><path d=\"M-18 0L-15 -7L-9 7L-3 -7L3 7L9 -7L15 7L18 0\"/></g><path d=\"M40 -40V-15\"/><path class=\"fill\" d=\"M40 -9l-4 -7h8z\"/>",
+   "not_gate": "<path d=\"M0 0H26M62 0H80\"/><path d=\"M26 -14L54 0L26 14Z\"/><circle cx=\"58\" r=\"4\"/>",
+   "and_gate": "<path d=\"M0 0H18M0 40H18\"/><path d=\"M18 -10H38A30 30 0 0 1 38 50H18Z\"/><path d=\"M60 20H80\"/>",
+   "nand_gate": "<path d=\"M0 0H18M0 40H18\"/><path d=\"M18 -10H38A30 30 0 0 1 38 50H18Z\"/><circle cx=\"64\" cy=\"20\" r=\"4\"/><path d=\"M68 20H80\"/>",
+   "or_gate": "<path d=\"M0 0H24M0 40H24\"/><path d=\"M16 -10Q46 -10 60 20Q46 50 16 50Q28 20 16 -10Z\"/><path d=\"M60 20H80\"/>",
+   "nor_gate": "<path d=\"M0 0H24M0 40H24\"/><path d=\"M16 -10Q46 -10 60 20Q46 50 16 50Q28 20 16 -10Z\"/><circle cx=\"64\" cy=\"20\" r=\"4\"/><path d=\"M68 20H80\"/>",
+   "xor_gate": "<path d=\"M0 0H24M0 40H24\"/><path d=\"M10 -10Q22 20 10 50\"/><path d=\"M16 -10Q46 -10 60 20Q46 50 16 50Q28 20 16 -10Z\"/><path d=\"M60 20H80\"/>"
   }
  }
 }

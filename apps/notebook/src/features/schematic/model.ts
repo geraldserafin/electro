@@ -2,6 +2,7 @@
 // (pins, rotation, wires following a moved element) so dragging needs no round trip
 // to Python; connectivity and solving stay on the Python side.
 import type { ElementData, Point, SchematicData, SymbolLibrary, WireData } from "@/shared/model/types";
+import { symbolOf } from "./parts";
 
 export type KindGroup =
   | "passive"
@@ -13,7 +14,8 @@ export type KindGroup =
   | "sensors"
   | "semiconductors"
   | "chips"
-  | "peripherals";
+  | "peripherals"
+  | "logic";
 
 /** What an element is, apart from its name (that is in messages.ts: kinds.<kind>). */
 export interface KindInfo {
@@ -41,9 +43,11 @@ export const KINDS = [
   { kind: "voltmeter", prefix: "V", unit: "V", meter: true, group: "meters" },
   { kind: "ground", prefix: "gnd", group: "connections" },
   { kind: "label", prefix: "lbl", group: "connections" },
+  { kind: "port", prefix: "pin", group: "connections" },
   { kind: "hole", prefix: "X", group: "other" },
   { kind: "opamp", prefix: "OA", group: "other" },
   { kind: "switch", prefix: "S", group: "controls" },
+  { kind: "relay", prefix: "K", group: "controls", live: true },
   { kind: "button", prefix: "B", group: "controls" },
   { kind: "potentiometer", prefix: "P", unit: "Ω", group: "controls" },
   { kind: "photoresistor", prefix: "LDR", unit: "Ω", group: "sensors" },
@@ -57,10 +61,18 @@ export const KINDS = [
   { kind: "pnp", prefix: "Q", group: "semiconductors", live: true },
   { kind: "nmos", prefix: "Q", group: "semiconductors", live: true },
   { kind: "pmos", prefix: "Q", group: "semiconductors", live: true },
+  { kind: "not_gate", prefix: "U", group: "logic", live: true },
+  { kind: "and_gate", prefix: "U", group: "logic", live: true },
+  { kind: "nand_gate", prefix: "U", group: "logic", live: true },
+  { kind: "or_gate", prefix: "U", group: "logic", live: true },
+  { kind: "nor_gate", prefix: "U", group: "logic", live: true },
+  { kind: "xor_gate", prefix: "U", group: "logic", live: true },
   { kind: "timer555", prefix: "IC", group: "chips", live: true },
   { kind: "arduino", prefix: "ARD", group: "chips", live: true },
   { kind: "pico", prefix: "PICO", group: "chips", live: true },
   { kind: "seven_segment", prefix: "DS", group: "peripherals", live: true },
+  { kind: "lamp", prefix: "H", unit: "Ω", group: "peripherals" },
+  { kind: "motor", prefix: "M", group: "peripherals", live: true },
   { kind: "buzzer", prefix: "BZ", group: "peripherals" },
   { kind: "passive_buzzer", prefix: "BZ", group: "peripherals" },
   { kind: "servo", prefix: "M", group: "peripherals" },
@@ -87,34 +99,38 @@ export const ledColor = (text: string | null) =>
 export const defaultText = (kind: string): string | null =>
   kind === "label"
     ? "A"
-    : kind === "led"
-      ? "red"
-      : kind === "arduino"
-        ? BLINK
-        : kind === "pico"
-          ? PICO_BLINK
-          : kind === "sine_source"
-            ? "50"
-            : kind === "square_source"
-              ? "1k"
-              : kind === "photoresistor"
-                ? "100"
-                : kind === "thermistor"
-                  ? "25"
-                  : kind === "ultrasonic"
-                    ? "100"
-                    : kind === "lcd1602_i2c"
-                      ? "0x27"
-                      : kind === "ssd1306"
-                        ? "0x3C"
-                        : kind === "ds1307"
-                          ? "0x68"
-                          : null;
+    : kind === "port"
+      ? "IN"
+      : kind === "led"
+        ? "red"
+        : kind === "arduino"
+          ? BLINK
+          : kind === "pico"
+            ? PICO_BLINK
+            : kind === "sine_source"
+              ? "50"
+              : kind === "square_source"
+                ? "1k"
+                : kind === "photoresistor"
+                  ? "100"
+                  : kind === "thermistor"
+                    ? "25"
+                    : kind === "ultrasonic"
+                      ? "100"
+                      : kind === "lcd1602_i2c"
+                        ? "0x27"
+                        : kind === "ssd1306"
+                          ? "0x3C"
+                          : kind === "ds1307"
+                            ? "0x68"
+                            : kind === "lamp"
+                              ? "3"
+                              : null;
 /** The addresses an I²C module can be set to (the first: as it comes). */
 export const I2C_ADDRESSES: Record<string, string[]> = { lcd1602_i2c: ["0x27", "0x3F"], ssd1306: ["0x3C", "0x3D"] };
 /** What a new element of a kind starts with in ``value``: a part that comes in one usual value. */
 export const defaultValue = (kind: string): string | null =>
-  kind === "photoresistor" || kind === "thermistor" ? "10k" : null;
+  kind === "photoresistor" || kind === "thermistor" ? "10k" : kind === "lamp" ? "12" : null;
 
 /** A source in time's ``text`` (electro.devices.SquareSource.from_schematic): its frequency as typed, the duty in %. */
 export function wave(text: string | null): { frequency: string; duty: number } {
@@ -188,7 +204,7 @@ export const canRunInTime = (sch: SchematicData) =>
   sch.elements.every(
     (e) => e.kind !== "hole" && (!hasValue(e.kind) || kindInfo(e.kind)?.meter || (e.value ?? "").trim() !== ""),
   );
-export const isComponent = (kind: string) => !["ground", "label", "terminal"].includes(kind);
+export const isComponent = (kind: string) => !["ground", "label", "terminal", "port"].includes(kind);
 
 export const key = ([x, y]: Point) => `${x},${y}`;
 export const same = (a: Point, b: Point) => a[0] === b[0] && a[1] === b[1];
@@ -199,7 +215,7 @@ export function rotate([x, y]: Point, rotation: number): Point {
 }
 
 export function pins(e: ElementData, lib: SymbolLibrary): Point[] {
-  return lib.kinds[e.kind].pins.map(([px, py]) => {
+  return symbolOf(e, lib).pins.map(([px, py]) => {
     const [dx, dy] = rotate([px / lib.grid, py / lib.grid], e.rotation);
     return [e.at[0] + dx, e.at[1] + dy];
   });
@@ -212,8 +228,8 @@ export function onSegment([x, y]: Point, [x1, y1]: Point, [x2, y2]: Point): bool
   return false;
 }
 
-export function nextId(sch: SchematicData, kind: string): string {
-  const prefix = kindInfo(kind)?.prefix ?? kind;
+export function nextId(sch: SchematicData, kind: string, own?: string): string {
+  const prefix = own ?? kindInfo(kind)?.prefix ?? kind;
   const sep = isComponent(kind) ? "_" : "";
   const used = sch.elements
     .map((e) => e.id.match(new RegExp(`^${prefix}${sep}(\\d+)$`)))
@@ -298,7 +314,7 @@ export function moveGroup(
   );
   let next = 0;
   const wires = sch.wires.map((w, i) => (own.has(i) ? { points: w.points.map(shift) } : others[next++]));
-  return { elements, wires };
+  return { ...sch, elements, wires };
 }
 
 /**
@@ -337,6 +353,7 @@ export function updateElement(
   const after = pins(updated, lib);
   const moved = new Map(before.map((p, i) => [key(p), after[i]] as const));
   return {
+    ...sch,
     elements: sch.elements.map((e) => (e.id === id ? updated : e)),
     wires: drag(sch.wires, moved),
   };
@@ -350,7 +367,7 @@ export function updateElement(
 function freeEnds(sch: SchematicData, lib: SymbolLibrary): Point[] {
   const pinKeys = new Set(
     sch.elements
-      .filter((e) => e.kind !== "label")
+      .filter((e) => e.kind !== "label" && e.kind !== "port")
       .flatMap((e) => pins(e, lib))
       .map(key),
   );
@@ -365,7 +382,7 @@ export function connections(sch: SchematicData, lib: SymbolLibrary): Map<string,
   const count = new Map<string, number>();
   const bump = (p: Point, n: number) => count.set(key(p), (count.get(key(p)) ?? 0) + n);
   sch.elements
-    .filter((e) => e.kind !== "label")
+    .filter((e) => e.kind !== "label" && e.kind !== "port")
     .flatMap((e) => pins(e, lib))
     .forEach((p) => bump(p, 1));
   sch.wires.forEach((w) => [w.points[0], w.points[w.points.length - 1]].forEach((p) => bump(p, 1)));

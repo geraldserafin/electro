@@ -19,13 +19,34 @@ export interface WireData {
 export interface SchematicData {
   elements: ElementData[];
   wires: WireData[];
+  parts?: Record<string, PartDef>; // one's own components on it (kind "part", its text the key)
+}
+
+/** A pin of one's own component: its port's name, which side of the box, how far along it. */
+export interface PartPin {
+  name: string;
+  side: "left" | "right" | "top" | "bottom";
+  at: number; // grid squares from the top (left, right) or the left (top, bottom)
+}
+
+/** One's own component (electro_schematic.Part): a box of `size` grid squares, its pins sticking out
+ *  a square from its sides, and inside a drawing whose ports are the pins. */
+export interface PartDef {
+  name: string;
+  size: [number, number];
+  pins: PartPin[];
+  schematic: SchematicData;
+  prefix?: string; // its elements' ids: U_1, U_2…
 }
 
 /** electro_render.symbol_library(): how every element kind looks. */
 export interface SymbolLibrary {
   grid: number;
   style: string;
-  kinds: Record<string, { pins: Point[]; svg: string; letter: string | null; upright: boolean }>;
+  kinds: Record<
+    string,
+    { pins: Point[]; svg: string; letter: string | null; upright: boolean; leads?: Point[]; box?: Point } // leads: from each pin into the body; box: a part's size (px)
+  >;
   standards?: Record<string, Record<string, string>>; // per standard, the symbols it draws unlike the kinds' (IEC's)
 }
 

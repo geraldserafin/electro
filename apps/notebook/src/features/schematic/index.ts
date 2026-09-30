@@ -8,4 +8,6 @@ export * as messages from "./messages";
 export { canRunInTime, inTimeOnly, isBoard, updateElement } from "./model";
 export { Panel, PanelHead, Section, Tile } from "./Panel";
 export { PdfDrawing } from "./PdfDrawing";
+export { arrange, firstSides, partKind, partSvg, ports, withParts } from "./parts";
+export { SymbolIcon } from "./SymbolIcon";
 export type { Camera } from "./useCamera";

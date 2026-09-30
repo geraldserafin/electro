@@ -134,9 +134,38 @@ SYMBOLS: dict[str, str] = {
     + "".join(f'<text x="{(9 + i) * 20}" y="134" text-anchor="middle">A{i}</text>' for i in range(6))
     + '<text x="60" y="134" text-anchor="middle">5V</text><text x="100" y="134" text-anchor="middle">GND</text>'
     + '</g><text class="chip" x="180" y="86" text-anchor="middle">Arduino Uno</text>',
+    # a bulb: a circle with a cross (IEC); it glows with its power (--glow)
+    "lamp": _body(
+        '<circle class="on" r="13" style="stroke:none;fill:#ffd60a;opacity:var(--glow,0)"/>'
+        '<circle r="13"/><path d="M-9.2 -9.2L9.2 9.2M-9.2 9.2L9.2 -9.2"/>',
+        13,
+    ),
+    # a motor: M in a circle (the letter, upright, apart); a mark on its rotor turns with it (--spin, degrees)
+    "motor": _body(
+        '<circle r="16"/><g style="transform-box:fill-box;transform-origin:center;transform:rotate(calc(var(--spin,0) * 1deg))">'
+        '<circle r="16" style="fill:none;stroke:none"/><path class="thick" d="M0 -16V-11"/></g>',
+        16,
+    ),
+    # a relay: its coil (a box) between a and b, the contact beside it — com below, nc straight above
+    # it, no to the right; the lever at rest on nc, pulled over to no while the coil holds it (--on)
+    "relay": '<path d="M0 0V24M0 56V80"/><rect x="-12" y="24" width="24" height="32"/>'
+    '<path d="M80 80V56M80 0V22M120 0V12H104"/><circle class="open" cx="80" cy="24" r="2"/><circle class="open" cx="102" cy="12" r="2"/>'
+    '<path d="M80 56L80 27" style="opacity:calc(1 - var(--on,0))"/><path d="M80 56L100 15" style="opacity:var(--on,0)"/>'
+    '<path class="dashed" d="M12 40H84"/>'
+    '<g class="pins"><text x="68" y="6" text-anchor="end">NC</text><text x="106" y="27">NO</text><text x="86" y="76">COM</text></g>',
+    "not_gate": '<path d="M0 0H22M60 0H80"/><rect x="22" y="-16" width="28" height="32"/><circle cx="54" r="4"/>'
+    '<text class="chip" x="36" y="5" text-anchor="middle">1</text>',
+    "and_gate": '<path d="M0 0H16M0 40H16"/><rect x="16" y="-12" width="36" height="64"/><path d="M52 20H80"/><text class="chip" x="34" y="25" text-anchor="middle">&amp;</text>',
+    "nand_gate": '<path d="M0 0H16M0 40H16"/><rect x="16" y="-12" width="36" height="64"/><circle cx="56" cy="20" r="4"/><path d="M60 20H80"/><text class="chip" x="34" y="25" text-anchor="middle">&amp;</text>',
+    "or_gate": '<path d="M0 0H16M0 40H16"/><rect x="16" y="-12" width="36" height="64"/><path d="M52 20H80"/><text class="chip" x="34" y="25" text-anchor="middle">≥1</text>',
+    "nor_gate": '<path d="M0 0H16M0 40H16"/><rect x="16" y="-12" width="36" height="64"/><circle cx="56" cy="20" r="4"/><path d="M60 20H80"/><text class="chip" x="34" y="25" text-anchor="middle">≥1</text>',
+    "xor_gate": '<path d="M0 0H16M0 40H16"/><rect x="16" y="-12" width="36" height="64"/><path d="M52 20H80"/><text class="chip" x="34" y="25" text-anchor="middle">=1</text>',
     "ground": '<path d="M0 0v10M-11 10h22M-7 14h14M-3 18h6"/>',
     "label": "",
     "terminal": '<circle class="open" r="3.5"/>',
+    # a component's pin, in its own drawing: a tag pointing at the point (its name above, as a label's)
+    "port": '<path d="M0 0L-6 -6V-16H6V-6Z"/>',
+    "part": "",  # drawn from its definition: part_symbol()
 }
 
 # IEEE Std 315's own (the rest as in IEC)
@@ -147,6 +176,16 @@ IEEE: dict[str, str] = {
     # the current's arrow inside the circle, the way it pushes the current (left → right)
     "current_source": _body('<circle r="13"/><path d="M-7 0H4"/><path class="fill" d="M9 0l-6 -4.5v9z"/>', 13),
     "potentiometer": _body(ZIGZAG, 18) + '<path d="M40 -40V-15"/><path class="fill" d="M40 -9l-4 -7h8z"/>',
+}
+
+# the distinctive shapes of logic gates
+IEEE |= {
+    "not_gate": '<path d="M0 0H26M62 0H80"/><path d="M26 -14L54 0L26 14Z"/><circle cx="58" r="4"/>',
+    "and_gate": '<path d="M0 0H18M0 40H18"/><path d="M18 -10H38A30 30 0 0 1 38 50H18Z"/><path d="M60 20H80"/>',
+    "nand_gate": '<path d="M0 0H18M0 40H18"/><path d="M18 -10H38A30 30 0 0 1 38 50H18Z"/><circle cx="64" cy="20" r="4"/><path d="M68 20H80"/>',
+    "or_gate": '<path d="M0 0H24M0 40H24"/><path d="M16 -10Q46 -10 60 20Q46 50 16 50Q28 20 16 -10Z"/><path d="M60 20H80"/>',
+    "nor_gate": '<path d="M0 0H24M0 40H24"/><path d="M16 -10Q46 -10 60 20Q46 50 16 50Q28 20 16 -10Z"/><circle cx="64" cy="20" r="4"/><path d="M68 20H80"/>',
+    "xor_gate": '<path d="M0 0H24M0 40H24"/><path d="M10 -10Q22 20 10 50"/><path d="M16 -10Q46 -10 60 20Q46 50 16 50Q28 20 16 -10Z"/><path d="M60 20H80"/>',
 }
 
 STANDARDS = {"iec": {}, "ieee": IEEE}  # a standard: the symbols it draws unlike IEC's
@@ -164,11 +203,40 @@ def symbol(kind: str) -> str:
     return STANDARDS[_standard].get(kind, SYMBOLS[kind])
 
 
+def part_symbol(part) -> str:
+    """One's own component (electro_schematic.Part): its box, a lead to each pin, the pins' names
+    inside the box and its own name in the middle (the web editor draws it the same: parts.ts)."""
+    from html import escape
+
+    w, h = part.size[0] * GRID, part.size[1] * GRID
+    leads, names = [], []
+    for pin, (px, py) in zip(part.pins, part.offsets()):
+        x, y = px * GRID, py * GRID
+        name = escape(pin.name)
+        if pin.side == "left":
+            leads.append(f"M{x} {y}H0")
+            names.append(f'<text x="4" y="{y + 3}">{name}</text>')
+        elif pin.side == "right":
+            leads.append(f"M{x} {y}H{w}")
+            names.append(f'<text x="{w - 4}" y="{y + 3}" text-anchor="end">{name}</text>')
+        elif pin.side == "top":
+            leads.append(f"M{x} {y}V0")
+            names.append(f'<text x="{x}" y="11" text-anchor="middle">{name}</text>')
+        else:
+            leads.append(f"M{x} {y}V{h}")
+            names.append(f'<text x="{x}" y="{h - 4}" text-anchor="middle">{name}</text>')
+    return (
+        f'<rect x="0" y="0" width="{w}" height="{h}" rx="3"/><path d="{"".join(leads)}"/>'
+        f'<g class="pins">{"".join(names)}</g>'
+        f'<text class="chip" x="{w / 2:g}" y="{h / 2 + 4:g}" text-anchor="middle">{escape(part.name)}</text>'
+    )
+
+
 # Letters stay upright, so they are drawn apart from the (rotating) symbol.
-LETTERS = {"ammeter": "A", "voltmeter": "V", "hole": "?"}
+LETTERS = {"ammeter": "A", "voltmeter": "V", "hole": "?", "motor": "M"}
 
 # Symbols that always point down on the page, whatever the element's rotation.
-UPRIGHT = {"ground", "label", "terminal"}
+UPRIGHT = {"ground", "label", "terminal", "port"}
 
 STYLE = """
 .w{stroke:currentColor;stroke-width:1.6;fill:none;stroke-linecap:round;stroke-linejoin:round}

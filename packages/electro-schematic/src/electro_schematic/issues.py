@@ -71,3 +71,17 @@ class NotOnSchematic(Issue, KeyError):
 @issue
 class EmptySchematic(Issue, ValueError):
     pass
+
+
+@issue
+class UnknownPart(Issue, KeyError):
+    """An element of one's own components (kind "part") whose definition the drawing does not have."""
+
+    part: str
+
+
+@issue
+class PartInItself(Issue, ValueError):
+    """A component that has itself inside (at some depth): it would never end."""
+
+    part: str

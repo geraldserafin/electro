@@ -145,6 +145,12 @@ export function sayer(t: TFunction<"solution">, lang: string) {
         return t("issue.NotOnSchematic", { id: code(i.id) });
       case "NoCircuitInCode":
         return t("issue.NoCircuitInCode", { variable: i.variable });
+      case "UnknownPart":
+        return t("issue.UnknownPart", { part: code(i.part) });
+      case "PartInItself":
+        return t("issue.PartInItself", { part: code(i.part) });
+      case "PartsNotInCode":
+        return t("issue.PartsNotInCode");
       case "OnlyValuesInCode":
         return t("issue.OnlyValuesInCode", { cause: issue(i.cause) });
       case "BadDataEntry":

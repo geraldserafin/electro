@@ -64,7 +64,12 @@ export const PreviewCell = Schema.Union(
   Schema.Struct({
     type: Schema.Literal("schematic"),
     name: Schema.String,
-    schematic: Schema.Struct({ elements: Schema.Array(Schema.Unknown), wires: Schema.Array(Schema.Unknown) }),
+    schematic: Schema.Struct({
+      elements: Schema.Array(Schema.Unknown),
+      wires: Schema.Array(Schema.Unknown),
+      // one's own components on it: their outlines (what is inside them is not drawn)
+      parts: Schema.optional(Schema.Record({ key: Schema.String, value: Schema.Unknown })),
+    }),
   }),
 );
 export type PreviewCell = typeof PreviewCell.Type;

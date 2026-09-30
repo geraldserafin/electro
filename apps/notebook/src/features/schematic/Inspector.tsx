@@ -6,7 +6,7 @@ import { type ReactNode, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { cn } from "@/shared/lib/cn";
 import { i2cParts, i2cText } from "@/shared/model/i2c";
-import type { ElementData } from "@/shared/model/types";
+import type { ElementData, PartDef } from "@/shared/model/types";
 import { CodeIcon, PageIcon, Rotate, Trash } from "@/shared/ui/icons";
 import { Adjusters, isAdjustable } from "./Adjusters";
 import { useKinds } from "./kinds";
@@ -49,7 +49,9 @@ export function Inspector({
   live,
   onSketch,
   onFirmware,
+  part,
 }: {
+  part?: PartDef; // one's own component: its definition
   element: ElementData | null;
   taken: string[];
   onChange: (patch: Partial<ElementData>) => void;
@@ -95,7 +97,11 @@ export function Inspector({
   };
   return (
     <Panel className={place} role="group" aria-label={t("inspector.label")}>
-      <PanelHead icon={icon} caption={name(element.kind)} title={isComponent(element.kind) && element.id} />
+      <PanelHead
+        icon={icon}
+        caption={element.kind === "part" ? (part?.name ?? t("inspector.part")) : name(element.kind)}
+        title={isComponent(element.kind) && element.id}
+      />
       {!live && isComponent(element.kind) && (
         <Section label={t("inspector.id")}>
           <input
@@ -160,6 +166,32 @@ export function Inspector({
           />
         </Section>
       )}
+      {!live && element.kind === "lamp" && (
+        <Section label={t("inspector.rated")}>
+          <span className="relative block">
+            <input
+              className={field}
+              value={element.text ?? ""}
+              inputMode="decimal"
+              spellCheck={false}
+              aria-label={t("inspector.rated")}
+              onChange={(e) => onChange({ text: e.target.value })}
+            />
+            <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted pointer-events-none">W</span>
+          </span>
+          <p className={hint}>{t("inspector.ratedHint")}</p>
+        </Section>
+      )}
+      {!live && element.kind === "motor" && <p className={hint}>{t("inspector.motorHint")}</p>}
+      {!live && element.kind === "part" && (
+        <p className={hint}>
+          {t("inspector.part")}
+          {part && `: ${part.pins.map((p) => p.name).join(", ")}. `}
+          {t("inspector.partHint")}
+        </p>
+      )}
+      {!live && element.kind === "relay" && <p className={hint}>{t("inspector.relayHint")}</p>}
+      {!live && element.kind.endsWith("_gate") && <p className={hint}>{t("inspector.gateHint")}</p>}
       {!live && element.kind === "led" && (
         <Section label={t("inspector.color")}>
           <div className="flex gap-1.5" role="radiogroup" aria-label={t("inspector.color")}>
@@ -263,15 +295,16 @@ export function Inspector({
       {!live && kindInfo(element.kind)?.live && !isBoard(element.kind) && (
         <p className={hint}>{t(isWaveSource(element.kind) ? "inspector.waveOnly" : "inspector.liveOnly")}</p>
       )}
-      {!live && element.kind === "label" && (
-        <Section label={t("inspector.node")}>
+      {!live && (element.kind === "label" || element.kind === "port") && (
+        <Section label={t(element.kind === "port" ? "inspector.port" : "inspector.node")}>
           <input
             className={field}
             value={element.text ?? ""}
             spellCheck={false}
-            aria-label={t("inspector.node")}
+            aria-label={t(element.kind === "port" ? "inspector.port" : "inspector.node")}
             onChange={(e) => onChange({ text: e.target.value })}
           />
+          {element.kind === "port" && <p className={hint}>{t("inspector.portHint")}</p>}
         </Section>
       )}
       {!live && (

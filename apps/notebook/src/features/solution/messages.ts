@@ -99,6 +99,10 @@ export const pl = {
     SkewedWire: "Przewód musi iść poziomo albo pionowo: {{start}} → {{end}}.",
     NotOnSchematic: "Nie ma elementu {{id}} na schemacie.",
     EmptySchematic: "Schemat nie ma żadnych elementów.",
+    UnknownPart: "Na schemacie jest komponent {{part}}, ale nie ma jego definicji.",
+    PartInItself: "Komponent {{part}} ma w środku sam siebie — to nie miałoby końca.",
+    PartsNotInCode:
+      "Schemat z własnymi komponentami zmieniaj na rysunku: w kodzie komponent byłby już rozłożony na części.",
     NoCircuitInCode: "W kodzie nie ma układu — przypisz go do zmiennej, np. `{{variable}} = loop(...)`.",
     OnlyValuesInCode: "{{cause}} Tu zmieniaj w kodzie tylko wartości, a elementy dodawaj na schemacie.",
     BadDataEntry: "Nie rozumiem „{{entry}}” — wpisz np. `I_R_1 = 0,5`.",
@@ -207,6 +211,10 @@ export const en: typeof pl = {
     SkewedWire: "A wire must run horizontally or vertically: {{start}} → {{end}}.",
     NotOnSchematic: "There is no element {{id}} on the schematic.",
     EmptySchematic: "The schematic has no elements.",
+    UnknownPart: "The schematic has a component {{part}}, but not its definition.",
+    PartInItself: "The component {{part}} has itself inside — it would never end.",
+    PartsNotInCode:
+      "Change a schematic with your own components on the drawing: in code, a component is already taken apart.",
     NoCircuitInCode: "The code has no circuit — assign one to a variable, e.g. `{{variable}} = loop(...)`.",
     OnlyValuesInCode: "{{cause}} Here, change only the values in code, and add elements on the drawing.",
     BadDataEntry: "“{{entry}}” is not understood — write e.g. `I_R_1 = 0,5`.",

@@ -11,6 +11,7 @@ import {
 } from "react";
 import type { ElementData, ElementResult, Point, SymbolLibrary, WireData } from "@/shared/model/types";
 import { hasValue, isBoard, isComponent, isWaveSource, keyLabel, kindInfo, pins, rotate, waveLabel } from "./model";
+import { symbolOf } from "./parts";
 
 /**
  * Where an element is grabbed: all of it as drawn (its body is not just its strokes — a module's
@@ -29,7 +30,7 @@ function hitArea(box: DOMRect | null, xs: number[], ys: number[]) {
 /** The text next to an element: "R_1 = 100 Ω", "A_1", or a net label's name. */
 function label_(e: ElementData): string {
   const unit = kindInfo(e.kind)?.unit ?? "";
-  if (e.kind === "label") return e.text ?? "";
+  if (e.kind === "label" || e.kind === "port") return e.text ?? "";
   if (!isComponent(e.kind)) return "";
   if (e.kind === "button" && e.text) return `${e.id} [${keyLabel(e.text)}]`; // held with that key while it runs
   if (!hasValue(e.kind)) return e.id;
@@ -186,7 +187,7 @@ export const ElementView = memo(
 
 function ElementView_({ element: e, library, wires, result, selected, closed, lit, look, live, onPointerDown }: Props) {
   const G = library.grid;
-  const symbol = library.kinds[e.kind];
+  const symbol = symbolOf(e, library);
   const ps = pins(e, library).map(([x, y]) => [x * G, y * G] as Point);
   const gradient = useId(); // unique on the page: other boards have their R_1 too
   // the symbol as drawn, measured (symbols differ, and rotate): what grabs it, and its frame when selected
@@ -212,8 +213,9 @@ function ElementView_({ element: e, library, wires, result, selected, closed, li
       e.kind === "pnp" ||
       e.kind === "nmos" ||
       e.kind === "pmos" ||
-      e.kind === "opamp")
-      ? leads(e.kind, symbol.pins)
+      e.kind === "opamp" ||
+      e.kind === "part")
+      ? (symbol.leads ?? leads(e.kind, symbol.pins))
           .map(([dx, dy], i) => {
             const [rx, ry] = rotate([dx, dy], symbol.upright ? 0 : e.rotation);
             return { from: ps[i], to: [ps[i][0] + rx, ps[i][1] + ry] as Point, colour: colours[i] };
@@ -245,7 +247,7 @@ function ElementView_({ element: e, library, wires, result, selected, closed, li
       (crosses(cx - labelWidth / 2, cx + labelWidth / 2, cy - 32, cy - 16) &&
         !crosses(cx - labelWidth / 2, cx + labelWidth / 2, cy + 16, cy + 32));
   // a 555, an Arduino, a display: the label beside the box, top right; no readings (its pins tell)
-  const chip = kindInfo(e.kind)?.group === "chips" || ps.length > 4;
+  const chip = kindInfo(e.kind)?.group === "chips" || ps.length > 4 || e.kind === "part";
   const vars =
     look &&
     (Object.fromEntries(Object.entries(look).map(([k, v]) => [`--${k}`, Math.round(v * 100) / 100])) as CSSProperties);
@@ -318,10 +320,18 @@ function ElementView_({ element: e, library, wires, result, selected, closed, li
         </text>
       )}
       {label &&
-        (e.kind === "label" ? (
-          <text x={cx + 4} y={cy - 6} className="node">
+        (e.kind === "label" || e.kind === "port" ? (
+          <text x={e.kind === "port" ? cx + 8 : cx + 4} y={e.kind === "port" ? cy - 9 : cy - 6} className="node">
             {label}
           </text>
+        ) : symbol.box && e.rotation === 0 ? (
+          // one's own component: beside its box, top right (past a lead on its right)
+          <Label
+            text={label}
+            x={Math.max(e.at[0] * G + symbol.box[0], ...xs) + 8}
+            y={e.at[1] * G + 12}
+            anchor="start"
+          />
         ) : chip ? (
           <Label
             text={label}

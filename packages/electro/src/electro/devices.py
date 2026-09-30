@@ -1,7 +1,7 @@
 """Elements that live in time: sine and square sources, diodes, LEDs (single, RGB, seven-segment)
 and Zener diodes, sensors (light, temperature, distance), buzzers, a servo and a character LCD,
-switches, a potentiometer, bipolar transistors and MOSFETs, the 555 timer, and boards: an Arduino
-Uno and a Raspberry Pi Pico.
+switches, a potentiometer, a bulb, a DC motor and a relay, bipolar transistors and MOSFETs, logic
+gates, the 555 timer, and boards: an Arduino Uno and a Raspberry Pi Pico.
 
 Semiconductors and chips are not linear, so they have laws only in time
 (``ctx.transient``), for ``electro.sim``: the solver on paper says ``NeedsSimulation``.
@@ -667,6 +667,166 @@ class Potentiometer(Component):
         except ValueError:
             position = 0.5
         return cls(parse(value), position, label=label)
+
+
+# ------------------------------------------------------------------ a bulb, a motor, a relay
+
+
+class Lamp(TwoTerminal):
+    """An incandescent bulb: its filament, hot, a resistor of ``value`` ohms (a 6 V 3 W bulb: 12 Ω), on
+    paper and in time alike. It glows with the power it takes, fully at ``rated`` watts (the page draws
+    it so)."""
+
+    prefix, unit = "H", "Ω"
+    RATED = 3.0  # W
+
+    def __init__(self, value=None, rated: float = RATED, label: str | None = None):
+        super().__init__(value, label)
+        self.rated = float(rated)
+
+    def law(self, U, I, x, ctx):
+        return [(U - x * I, OhmsLaw)]
+
+    def options(self):
+        return [] if self.rated == self.RATED else [f"rated={self.rated:g}"]
+
+    @classmethod
+    def from_schematic(cls, value, text, label):
+        try:
+            return cls(parse(value), float(text.replace(",", ".")) if text else cls.RATED, label=label)
+        except ValueError:
+            raise BadValue(text) from None
+
+    def __repr__(self):
+        args = [fmt(self.value, self.unit) if self.value is not UNKNOWN else "?", *self.options()]
+        return f"Lamp({', '.join(args + ([f'label={self.label!r}'] if self.label else []))})"
+
+
+class Motor(NoValue, TwoTerminal):
+    """A small DC motor (a 130-size one, for 3–6 V): its winding ``R`` and, turning at ω (rad/s), the
+    back-EMF ``K·ω``: ``U = R·I + K·ω``; its rotor ``J·dω/dt = K·I − B·ω``. Unloaded it speeds up to
+    about ``U/K`` — at 6 V some 5700 rpm, drawing 0.1 A —, stalled it takes ``U/R``. Reversed, it
+    turns the other way. The page turns its drawing by ω (``w``)."""
+
+    prefix = "M"
+    R, K, J, B = 5, 0.01, 1e-6, 1.6e-6  # Ω, V·s/rad, kg·m², N·m·s/rad
+
+    def build(self, label, V, param, ctx):
+        _paper_only(label, ctx)
+        model = super().build(label, V, param, ctx)
+        U, I = model.variables["U"], model.variables["I"]
+        w, w0 = sp.Symbol(f"w_{label}"), sp.Symbol(f"w_{label}_prev")
+        name = DeviceModel(sp.Symbol(label))
+        model.laws += [
+            Law(U - self.R * I - self.K * w, name),
+            Law(self.J * (w - w0) / ctx.dt - (self.K * I - self.B * w), name),
+        ]
+        model.variables["w"] = w
+        model.states[w0] = (w, 0.0, 60.0)
+        return model
+
+    def law(self, U, I, x, ctx):
+        return []
+
+
+class Relay(NoValue):
+    """A relay with a 5 V coil (an SRD-05VDC's: 70 Ω, 20 mH) between ``a`` and ``b``, and a changeover
+    contact: ``com`` to ``nc`` at rest, to ``no`` while the coil holds it — pulled in above ``PULL``,
+    let go below ``DROP`` (either way round). Switched off with nothing across it, the coil's voltage
+    leaps (only its own losses, ``R_LOSS``, hold it): that is what a diode across it is for."""
+
+    prefix = "K"
+    left, right = ("a", "b"), ("com", "nc", "no")
+    R, L, R_LOSS = 70, 0.02, 10_000  # Ω, H, Ω
+    PULL, DROP = 0.05, 0.015  # A
+
+    def build(self, label, V, param, ctx):
+        _paper_only(label, ctx)
+        U, I, I0 = sp.Symbol(f"U_{label}"), sp.Symbol(f"I_{label}"), sp.Symbol(f"I_{label}_prev")
+        q, on = sp.Symbol(f"{label}_q"), sp.Symbol(f"U_{label}_on")
+        name = DeviceModel(sp.Symbol(label))
+        no = (G_ON * q + G_OFF * (1 - q)) * (V["com"] - V["no"])
+        nc = (G_ON * (1 - q) + G_OFF * q) * (V["com"] - V["nc"])
+        laws = [
+            Law(U - (V["a"] - V["b"]), name, "kvl"),
+            Law(U - self.R * I - self.L * (I - I0) / ctx.dt, name),
+            Law(on - q, name),  # (so the page sees it: a state is not in x)
+        ]
+        inflow = {"a": I + U / self.R_LOSS, "b": -(I + U / self.R_LOSS), "com": no + nc, "no": -no, "nc": -nc}
+        model = Model(inflow, laws, {"U": U, "I": I, "on": on})
+        model.states[I0] = (I, 0.0, 0.01)
+        after = sp.Piecewise((1, sp.Abs(I) > self.PULL), (0, sp.Abs(I) < self.DROP), (q, True))
+        model.states[q] = (after, 0.0, None)
+        return model
+
+
+# ------------------------------------------------------------------ logic gates
+
+
+class Gate(NoValue):
+    """A logic gate (74HC), powered at ``VDD`` against ground without its supply pins drawn, as logic
+    diagrams have it. Its inputs take no current (a leak of ``GMIN`` to ground) and read 1 above half
+    the supply — smoothly, over a few tenths of a volt; its output ``y`` is a source of ``VDD`` or 0 V
+    behind ``R_OUT``, following the inputs within ``DELAY`` (a lag of the first order), so gates in a
+    loop — a latch, a ring — keep a state."""
+
+    right = ("y",)
+    VDD, R_OUT, DELAY, SHARP = 5.0, 50, 1e-7, 12.0  # V, Ω, s, 1/V
+
+    def logic(self, *h):
+        raise NotImplementedError
+
+    def build(self, label, V, param, ctx):
+        _paper_only(label, ctx)
+        h = [1 / (1 + limexp(-self.SHARP * (V[p] - self.VDD / 2))) for p in self.left]
+        y, y0 = sp.Symbol(f"U_{label}_y"), sp.Symbol(f"U_{label}_y_prev")
+        name = DeviceModel(sp.Symbol(label))
+        laws = [Law(self.DELAY * (y - y0) / ctx.dt - (self.VDD * self.logic(*h) - y), name)]
+        inflow = {p: GMIN * V[p] for p in self.left} | {"y": (V["y"] - y) / self.R_OUT}
+        model = Model(inflow, laws, {"U_y": y})
+        # where it starts: low or high by its label, so two gates in a latch do not start balanced
+        model.states[y0] = (y, self.VDD * (sum(map(ord, label)) % 2), 1.0)
+        return model
+
+
+class NOT(Gate):
+    """y = not a."""
+
+    prefix = "U"
+    left = ("a",)
+
+    def logic(self, a):
+        return 1 - a
+
+
+class AND(Gate):
+    """y = a and b."""
+
+    prefix = "U"
+    left = ("a", "b")
+
+    def logic(self, a, b):
+        return a * b
+
+
+class NAND(AND):
+    def logic(self, a, b):
+        return 1 - a * b
+
+
+class OR(AND):
+    def logic(self, a, b):
+        return 1 - (1 - a) * (1 - b)
+
+
+class NOR(AND):
+    def logic(self, a, b):
+        return (1 - a) * (1 - b)
+
+
+class XOR(AND):
+    def logic(self, a, b):
+        return a + b - 2 * a * b
 
 
 # ------------------------------------------------------------------ transistors

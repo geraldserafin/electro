@@ -25,7 +25,7 @@ import { ElementView, liveColor } from "./ElementView";
 import { HelpPanel } from "./HelpPanel";
 import { Inspector, type Selection } from "./Inspector";
 import { LcdScreen, type LcdScreenData } from "./LcdScreen";
-import { LibraryPanel } from "./LibraryPanel";
+import { LibraryPanel, type MyPart } from "./LibraryPanel";
 import {
   attach,
   bounds,
@@ -50,6 +50,7 @@ import {
   updateElement,
 } from "./model";
 import { OledScreen, type OledScreenData } from "./OledScreen";
+import { partBox, partKind, symbolKey, usedParts, withParts } from "./parts";
 import { SymbolIcon } from "./SymbolIcon";
 import { TftScreen, type TftScreenData } from "./TftScreen";
 import { type LiveTool, LiveToolbar, type Tool, Toolbar } from "./Toolbar";
@@ -100,6 +101,8 @@ interface Props {
   onFirmware?: (id: string, file: File) => void; // a Pico's program file, picked in its inspector
   bare?: boolean; // no frame of its own: it fills an editor group (the cell's)
   probe?: (target: ProbeTarget, onClose: () => void) => ReactNode; // running: the meter's panel for what it was put on
+  // the user's own components, offered first in the element library (features/components)
+  myParts?: { list: MyPart[]; label: string; removeLabel: string; onRemove: (part: MyPart) => void };
 }
 
 const PANEL = 260; // screen px the element panel takes on the left (with its margin)
@@ -134,7 +137,7 @@ let clipboard: SchematicData | null = null;
 
 /** Where a new element's first pin goes so that its middle lands on ``p`` (on the grid). */
 function placedAt(kind: string, p: Point, lib: SymbolLibrary): Point {
-  const ps = lib.kinds[kind].pins;
+  const ps = lib.kinds[kind]?.pins ?? [[0, 0]];
   const mid = (i: 0 | 1) => Math.round(ps.reduce((s, q) => s + q[i], 0) / ps.length / lib.grid);
   return [p[0] - mid(0), p[1] - mid(1)];
 }
@@ -142,7 +145,7 @@ function placedAt(kind: string, p: Point, lib: SymbolLibrary): Point {
 export function SchematicEditor({
   value,
   onChange,
-  library,
+  library: symbols,
   results,
   topLeft,
   topRight,
@@ -157,13 +160,20 @@ export function SchematicEditor({
   onFirmware,
   bare,
   probe,
+  myParts,
 }: Props) {
   const { t } = useTranslation("schematic");
+  const library = withParts(symbols, value.parts); // one's own components: kinds of their own ("part:<key>")
   const G = library.grid;
   const gridId = useId();
   const svgRef = useRef<SVGSVGElement>(null);
   const viewRef = useRef<HTMLDivElement>(null);
   const [tool, setTool] = useState<Tool>({ type: "select" });
+  // what the element being placed is drawn from (one's own component, not on the drawing yet: with it)
+  const placing =
+    tool.type === "place" && tool.part
+      ? withParts(symbols, { ...value.parts, [tool.part.key]: tool.part.def })
+      : library;
   const [selection, setSelection] = useState<Selection>(null);
   const [cursor, setCursor] = useState<Point | null>(null);
   // the wire being drawn: what is laid down is in the drawing already (``wire``: its index, from the
@@ -250,18 +260,22 @@ export function SchematicEditor({
 
   const removeSelected = () => {
     const { ids, wires } = picked(selection);
-    if (ids.length + wires.length)
+    if (ids.length + wires.length) {
+      const elements = value.elements.filter((e) => !ids.includes(e.id));
       commit({
-        elements: value.elements.filter((e) => !ids.includes(e.id)),
+        elements,
         wires: value.wires.filter((_, i) => !wires.includes(i)),
+        parts: usedParts({ ...value, elements }),
       });
+    }
     setSelection(null);
   };
 
   const copySelected = () => {
     const { ids, wires } = picked(selection);
     if (!ids.length && !wires.length) return false;
-    clipboard = { elements: value.elements.filter((e) => ids.includes(e.id)), wires: wires.map((i) => value.wires[i]) };
+    const elements = value.elements.filter((e) => ids.includes(e.id));
+    clipboard = { elements, wires: wires.map((i) => value.wires[i]), parts: usedParts({ ...value, elements }) };
     return true;
   };
 
@@ -271,10 +285,10 @@ export function SchematicEditor({
     const [x0, y0, x1, y1] = bounds(clipboard, library);
     const d: Point = cursor ? [cursor[0] - Math.round((x0 + x1) / 2), cursor[1] - Math.round((y0 + y1) / 2)] : [2, 2];
     const shift = ([x, y]: Point): Point => [x + d[0], y + d[1]];
-    let next = value;
+    let next = clipboard.parts ? { ...value, parts: { ...value.parts, ...clipboard.parts } } : value;
     const ids: string[] = [];
     for (const e of clipboard.elements) {
-      const id = nextId(next, e.kind);
+      const id = nextId(next, e.kind, e.kind === "part" ? next.parts?.[e.text ?? ""]?.prefix : undefined);
       ids.push(id);
       next = { ...next, elements: [...next.elements, { ...e, id, at: shift(e.at) }] };
     }
@@ -332,15 +346,27 @@ export function SchematicEditor({
     svgRef.current?.focus({ preventScroll: true });
     const p = toGrid(event);
     if (tool.type === "place") {
-      const element: ElementData = {
-        id: nextId(value, tool.kind),
-        kind: tool.kind,
-        at: placedAt(tool.kind, p, library),
-        rotation: 0,
-        value: defaultValue(tool.kind),
-        text: defaultText(tool.kind),
-      };
-      commit(attach({ ...value, elements: [...value.elements, element] }, library, element.id));
+      // one's own component: its definition comes onto the drawing with it
+      const part = tool.part;
+      const next = part ? { ...value, parts: { ...value.parts, [part.key]: part.def } } : value;
+      const element: ElementData = part
+        ? {
+            id: nextId(next, "part", part.def.prefix ?? "U"),
+            kind: "part",
+            at: placedAt(tool.kind, p, placing),
+            rotation: 0,
+            value: null,
+            text: part.key,
+          }
+        : {
+            id: nextId(value, tool.kind),
+            kind: tool.kind,
+            at: placedAt(tool.kind, p, library),
+            rotation: 0,
+            value: defaultValue(tool.kind),
+            text: defaultText(tool.kind),
+          };
+      commit(attach({ ...next, elements: [...next.elements, element] }, withParts(symbols, next.parts), element.id));
       setSelection({ type: "element", id: element.id });
       setTool({ type: "select" });
     } else if (tool.type === "wire") addDraftPoint(p);
@@ -664,6 +690,11 @@ export function SchematicEditor({
         setLibraryOpen(false);
         if (backToBoard) focusBoard();
       }}
+      parts={myParts?.list}
+      partsLabel={myParts?.label}
+      removeLabel={myParts?.removeLabel}
+      onRemovePart={myParts?.onRemove}
+      onChoosePart={(p) => setTool({ type: "place", kind: partKind(p.id), part: { key: p.id, def: p.def } })}
     />
   );
 
@@ -932,10 +963,10 @@ export function SchematicEditor({
           {tool.type === "place" && cursor && (
             <g
               className="w ghost"
-              transform={`translate(${placedAt(tool.kind, cursor, library)
+              transform={`translate(${placedAt(tool.kind, cursor, placing)
                 .map((c) => c * G)
                 .join(" ")})`}
-              dangerouslySetInnerHTML={{ __html: library.kinds[tool.kind].svg }}
+              dangerouslySetInnerHTML={{ __html: placing.kinds[tool.kind]?.svg ?? "" }}
             />
           )}
         </svg>
@@ -983,7 +1014,18 @@ export function SchematicEditor({
           }}
           onRotate={rotateSelected}
           onRemove={removeSelected}
-          icon={selectedElement ? <SymbolIcon kind={selectedElement.kind} library={library} /> : null}
+          part={selectedElement?.kind === "part" ? value.parts?.[selectedElement.text ?? ""] : undefined}
+          icon={
+            selectedElement ? (
+              <SymbolIcon
+                kind={symbolKey(selectedElement)}
+                library={library}
+                box={
+                  selectedElement.kind === "part" ? partBox(value.parts?.[selectedElement.text ?? ""], G) : undefined
+                }
+              />
+            ) : null
+          }
         />
       )}
       {lost && (
