@@ -51,6 +51,10 @@ export const pl = {
     copyFailed: "Nie udało się zrobić kopii — spróbuj jeszcze raz.",
     exampleText: "Przykład — zmieniaj i uruchamiaj do woli, ale nic się tu nie zapisze.",
     addExample: "Dodaj do moich notatek",
+    // on a phone
+    short: "Tylko do odczytu.",
+    exampleShort: "Przykład — nic się tu nie zapisze.",
+    addExampleShort: "Dodaj do notatek",
   },
 };
 
@@ -107,5 +111,9 @@ export const en: typeof pl = {
     copyFailed: "Could not make a copy — please try again.",
     exampleText: "An example — change it and run it as you like, but nothing here is saved.",
     addExample: "Add to my notes",
+    // on a phone
+    short: "Read only.",
+    exampleShort: "An example — nothing here is saved.",
+    addExampleShort: "Add to my notes",
   },
 };

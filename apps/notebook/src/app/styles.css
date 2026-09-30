@@ -11,6 +11,16 @@
     background: var(--bg);
     color: var(--text);
     font: 18px / 1.6 var(--sans);
+    /* a phone: a smaller text, more of it on the screen */
+    @media (max-width: 639px) {
+      font-size: 16px;
+    }
+  }
+  /* a phone: a smaller text, more of it on the screen */
+  @media (max-width: 639px) {
+    body {
+      font-size: 16px;
+    }
   }
   button:not(:disabled),
   [role="button"]:not(:disabled) {

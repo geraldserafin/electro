@@ -86,10 +86,31 @@
     color: var(--muted);
     font-weight: 500;
   }
+  .markdown:not(.page *) pre {
+    overflow-x: auto; /* a code block wider than the column scrolls on its own (not on a page's picture) */
+  }
   .markdown code {
     font-family: monospace;
     background: var(--code-bg);
     border-radius: 4px;
     padding: 0 4px;
+    overflow-wrap: anywhere; /* a long one breaks where it must, not past the column */
+  }
+
+  /* on a phone: headings a step smaller, a wide table scrolls on its own (not the page) — not on a
+     page's picture (.page: the PDF's, scaled down) */
+  @media (max-width: 639px) {
+    .markdown:not(.page *) h1 {
+      font-size: 1.6em;
+    }
+    .markdown:not(.page *) h2 {
+      font-size: 1.3em;
+    }
+    .markdown:not(.page *) table {
+      display: block;
+      max-width: 100%;
+      overflow-x: auto;
+      font-size: 15px;
+    }
   }
 }

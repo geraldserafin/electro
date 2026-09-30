@@ -121,7 +121,7 @@ export function MenuItem({
     >
       {icon}
       <span className="flex-1 truncate">{children}</span>
-      {shortcut && <kbd className="font-sans text-[13px] text-faint">{shortcut}</kbd>}
+      {shortcut && <kbd className="font-sans text-[13px] text-faint pointer-coarse:hidden">{shortcut}</kbd>}
     </button>
   );
 }

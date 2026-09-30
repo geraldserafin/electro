@@ -14,7 +14,8 @@ import { Credits, Islands } from "@/shared/ui/Island";
 import { Upload } from "@/shared/ui/icons";
 import { MenuItem } from "@/shared/ui/Menu";
 
-const grid = "grid grid-cols-[repeat(auto-fill,212px)] gap-x-6 gap-y-7";
+const grid =
+  "grid grid-cols-[repeat(auto-fill,212px)] gap-x-6 gap-y-7 max-sm:grid-cols-[repeat(2,212px)] max-sm:justify-between max-sm:gap-x-4 max-sm:[zoom:0.74]";
 const note = "mt-6 mb-3.5 text-[14px] text-muted";
 
 export function Home() {
@@ -42,6 +43,7 @@ export function Home() {
 
   return (
     <div>
+      <Islands side="left">{null /* nothing on the left: its half of the band on a phone */}</Islands>
       <Islands side="right">
         <input
           ref={fileInput}
@@ -63,7 +65,7 @@ export function Home() {
         />
       </Islands>
 
-      <div className="mx-auto max-w-310 px-8 pt-21 pb-24">
+      <div className="mx-auto max-w-310 px-8 max-sm:px-4 pt-21 pb-24">
         <h1 className="mt-0 mb-5 text-[22px] font-medium">{tLibrary("home")}</h1>
         {problem && <p className={cn(note, "text-danger")}>{problem}</p>}
         {Result.isSuccess(items) ? (

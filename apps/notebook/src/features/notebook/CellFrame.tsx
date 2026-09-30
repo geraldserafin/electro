@@ -54,7 +54,11 @@ export function CellFrame({
       data-focused={focused || undefined}
       onFocusCapture={onFocus}
       onPointerDownCapture={onFocus}
-      className={cn("group/cell relative mb-4 scroll-mt-18 transition-opacity", drag.dragging && "opacity-40")}
+      className={cn(
+        "group/cell relative mb-4 scroll-mt-18 transition-opacity",
+        "pointer-coarse:data-focused:mb-10", // (a touch screen: room under it for the row adding a cell, AddRow)
+        drag.dragging && "opacity-40",
+      )}
     >
       {/* a safe strip from the block's edge, its full height: the pointer on its way to the handle or
           the bin never leaves the cell; going, they stay a moment (a slip does not take them away) */}
@@ -65,7 +69,9 @@ export function CellFrame({
           "group-hover/cell:visible group-hover/cell:opacity-100 group-hover/cell:delay-0",
           "group-data-focused/cell:visible group-data-focused/cell:opacity-100 group-data-focused/cell:delay-0",
           drag.dragging && "visible opacity-100",
-          "max-[760px]:hidden",
+          // narrow (a phone): no room beside it — a row over its top right corner, while it is worked on
+          "max-[760px]:left-auto max-[760px]:right-0 max-[760px]:-top-9 max-[760px]:bottom-auto max-[760px]:flex-row",
+          "max-[760px]:w-auto max-[760px]:p-0.5 max-[760px]:rounded-lg max-[760px]:border max-[760px]:border-line max-[760px]:bg-surface",
         )}
       >
         <button

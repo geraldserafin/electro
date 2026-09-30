@@ -155,7 +155,7 @@ export function SaveCard({ state, onSave }: { state: SaveState; onSave: () => vo
     <div
       role="dialog"
       aria-label={t("label")}
-      className="absolute top-full right-0 mt-2 w-84 z-50 grid gap-3 p-4 rounded-2xl border border-line bg-paper shadow-menu text-[13px] text-left cursor-default"
+      className="absolute top-full right-0 mt-2 w-84 max-sm:fixed max-sm:top-17 max-sm:inset-x-3 max-sm:mt-0 max-sm:w-auto z-50 grid gap-3 p-4 rounded-2xl border border-line bg-paper shadow-menu text-[13px] text-left cursor-default"
     >
       <div className="flex items-center gap-2">
         <span
@@ -232,7 +232,7 @@ export function SaveCard({ state, onSave }: { state: SaveState; onSave: () => vo
           onClick={onSave}
         >
           {state.saving ? t("saving") : t("saveNow")}
-          <kbd className="font-sans text-[12px] opacity-70">{mac ? "⌘S" : "Ctrl+S"}</kbd>
+          <kbd className="font-sans text-[12px] opacity-70 pointer-coarse:hidden">{mac ? "⌘S" : "Ctrl+S"}</kbd>
         </button>
         {details?.github ? (
           <div className="grid justify-items-center gap-1 text-center text-[12px] text-muted leading-snug">

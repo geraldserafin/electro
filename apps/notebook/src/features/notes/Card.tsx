@@ -23,7 +23,7 @@ const open = "group/open grid content-start gap-0.5 text-left";
 // the page: A4's proportions, 212px wide
 const thumb =
   "grid place-items-center w-53 aspect-[794/1123] overflow-hidden rounded-md mb-2 transition-[box-shadow,transform] duration-120 group-focus-visible/open:outline-2 group-focus-visible/open:outline-offset-2 group-focus-visible/open:outline-accent";
-const title = "text-[15px] font-medium truncate max-w-53";
+const title = "text-[15px] max-sm:text-[19px] font-medium truncate max-w-53"; // (on a phone the grid is smaller: zoom)
 
 /** A card: a link to the note (or a button, for an example), with actions under "⋯". */
 export function Card({
@@ -69,7 +69,7 @@ export function Card({
         </span>
       )}
       <span className={title}>{name}</span>
-      {meta && <span className="text-[13px] text-muted">{meta}</span>}
+      {meta && <span className="text-[13px] max-sm:text-[17px] text-muted">{meta}</span>}
     </>
   );
   return (
@@ -97,7 +97,7 @@ export function Card({
             aria-label={t("more")}
             aria-expanded={menu}
             className="absolute top-2 right-2 inline-flex size-7.5 items-center justify-center rounded-lg bg-island hover:bg-hover shadow-island text-fg
-                             opacity-0 transition-opacity duration-120 group-hover:opacity-100 aria-expanded:opacity-100"
+                             opacity-0 transition-opacity duration-120 group-hover:opacity-100 aria-expanded:opacity-100 pointer-coarse:opacity-100"
           >
             <More />
           </button>

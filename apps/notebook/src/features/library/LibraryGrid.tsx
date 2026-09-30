@@ -28,7 +28,8 @@ import { FolderThumb } from "./FolderThumb";
 import { MoveDialog } from "./MoveDialog";
 import { canEdit, canTakeOut } from "./rules";
 
-const grid = "grid grid-cols-[repeat(auto-fill,212px)] gap-x-6 gap-y-7";
+const grid =
+  "grid grid-cols-[repeat(auto-fill,212px)] gap-x-6 gap-y-7 max-sm:grid-cols-[repeat(2,212px)] max-sm:justify-between max-sm:gap-x-4 max-sm:[zoom:0.74]";
 
 export function LibraryGrid({
   items,

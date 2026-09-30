@@ -5,11 +5,18 @@ import { Link, type LinkProps } from "react-router";
 import { cn } from "@/shared/lib/cn";
 
 const corner = { left: "left-3", right: "right-3" };
+const half = { left: "left-0 right-1/2", right: "left-1/2 right-0" }; // (its half of the band on a phone)
 
 /** A row of islands in a top corner of the page. */
 export function Islands({ side, children }: { side: "left" | "right"; children: ReactNode }) {
   return (
     <div data-keep-focus className={cn("fixed top-3 z-20 flex gap-2", corner[side])}>
+      {/* a phone: the page scrolls up under the islands — a band behind them, not the text between them
+          (each row draws its half: under its islands, over the page, whatever the page stacks) */}
+      <div
+        aria-hidden
+        className={cn("sm:hidden fixed top-0 h-16 -z-10 bg-bg/90 backdrop-blur-sm pointer-events-none", half[side])}
+      />
       {children}
     </div>
   );

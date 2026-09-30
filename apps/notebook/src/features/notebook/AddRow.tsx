@@ -20,12 +20,17 @@ export function AddRow({
     "hover:bg-hover hover:border-muted transition-opacity duration-120 " +
     (shown
       ? ""
-      : "invisible opacity-0 group-hover/add:visible group-hover/add:opacity-100 group-focus-within/add:visible group-focus-within/add:opacity-100");
+      : "invisible opacity-0 group-hover/add:visible group-hover/add:opacity-100 group-focus-within/add:visible group-focus-within/add:opacity-100 " +
+        // a touch screen (no hover): under the cell being worked on
+        "pointer-coarse:group-data-focused/cell:visible pointer-coarse:group-data-focused/cell:opacity-100");
   return (
     <div
       role="group"
       aria-label={t("add.label")}
-      className={cn("group/add flex h-7 items-center justify-center gap-2", edge && "absolute inset-x-0 -bottom-5 z-4")}
+      className={cn(
+        "group/add flex h-7 items-center justify-center gap-2",
+        edge && "absolute inset-x-0 -bottom-5 pointer-coarse:-bottom-9 z-4",
+      )}
     >
       <button className={pill} onClick={() => onAdd("code")} title={t("add.codeTitle")}>
         <Plus /> {t("add.code")}

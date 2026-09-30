@@ -144,6 +144,7 @@ export function Notebook({
         onTitle={setTitle}
         cells={notebook.cells}
         onMove={(from, count, before) => setCells((cells) => moveRange(cells, from, count, before))}
+        onClose={() => setOutline(false)}
       />
       <Islands side="right">
         <IslandButton
@@ -201,7 +202,7 @@ export function Notebook({
           {t("cell.removed")}
           <button className="h-8 px-3 rounded-lg font-medium text-accent hover:bg-accent-soft" onClick={removed.undo}>
             {t("cell.undo")}{" "}
-            <kbd className="ml-1 font-sans text-[13px] text-faint">
+            <kbd className="ml-1 font-sans text-[13px] text-faint pointer-coarse:hidden">
               {/Mac|iPhone|iPad/.test(navigator.platform) ? "⌘Z" : "Ctrl+Z"}
             </kbd>
           </button>
@@ -221,7 +222,7 @@ export function Notebook({
         <main className={cn("appear", column(outline))}>
           {/* the title is the note's first heading too (and the PDF's); in line with the cells' text */}
           <input
-            className="block w-full mt-0 mb-4 py-1 pr-2 pl-3 rounded-lg border-none bg-transparent text-[34px] font-semibold leading-tight
+            className="block w-full mt-0 mb-4 py-1 pr-2 pl-3 rounded-lg border-none bg-transparent text-[34px] max-sm:text-[26px] font-semibold leading-tight
                           placeholder:text-faint focus:outline-none focus:bg-hover"
             value={notebook.title}
             placeholder={t("untitled")}

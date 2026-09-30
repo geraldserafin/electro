@@ -52,9 +52,11 @@ function section(e: Entry, entries: Entry[], cells: Cell[]): { from: number; cou
 export function Outline({
   cells,
   onMove,
+  onGo,
 }: {
   cells: Cell[];
   onMove: (from: number, count: number, before: number) => void; // cells, moved before the one at before
+  onGo?: () => void; // a tile was clicked: the page scrolls there
 }) {
   const { t } = useTranslation("notebook");
   const entries = useMemo(() => cells.flatMap(headings), [cells]);
@@ -110,6 +112,7 @@ export function Outline({
               onClick={(event) => {
                 event.preventDefault();
                 place(e)?.scrollIntoView({ behavior: "smooth", block: "start" });
+                onGo?.();
               }}
             >
               {e.schematic && <SchematicIcon />}

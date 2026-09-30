@@ -1,12 +1,14 @@
 // Saving happens in the background and says nothing while it works. Only when it cannot — the
 // note changed elsewhere, or the server is away — a small notice shows, at the bottom.
 import { useTranslation } from "react-i18next";
+import { cn } from "@/shared/lib/cn";
 import { Eye, WarningIcon } from "@/shared/ui/icons";
 import type { SyncState } from "./sync";
 
 // data-notice: the notebook keeps its cell focused on a click here
 const notice =
   "fixed bottom-4 inset-x-0 mx-auto w-fit max-w-[calc(100vw-32px)] z-25 flex items-center gap-2.5 py-2 pr-2 pl-3.5 " +
+  "max-sm:inset-x-3 max-sm:bottom-3 max-sm:w-auto max-sm:max-w-none max-sm:text-[13px] " + // (a phone: its width)
   "rounded-xl border border-line bg-surface text-fg text-[14px] animate-rise [&>svg]:flex-none [&>svg]:text-warn";
 const button = "px-3 py-1.25 rounded-lg border border-line text-[14px] hover:bg-selected";
 
@@ -56,9 +58,11 @@ export function ReadOnlyNotice({ onCopy, example = false }: { onCopy: () => void
   return (
     <div className={notice} data-notice role="status">
       <Eye />
-      <span>{t(example ? "readOnly.exampleText" : "readOnly.text")}</span>
-      <button className={button} onClick={onCopy}>
-        {t(example ? "readOnly.addExample" : "readOnly.copy")}
+      <span className="max-sm:hidden">{t(example ? "readOnly.exampleText" : "readOnly.text")}</span>
+      <span className="sm:hidden">{t(example ? "readOnly.exampleShort" : "readOnly.short")}</span>
+      <button className={cn(button, "max-sm:ml-auto whitespace-nowrap")} onClick={onCopy}>
+        <span className="max-sm:hidden">{t(example ? "readOnly.addExample" : "readOnly.copy")}</span>
+        <span className="sm:hidden">{t(example ? "readOnly.addExampleShort" : "readOnly.copy")}</span>
       </button>
     </div>
   );
