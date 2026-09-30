@@ -10,14 +10,17 @@ from __future__ import annotations
 import cmath
 import math
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+from functools import cached_property
 
 import sympy as sp
+from sympy.solvers.solveset import NonlinearError
 
 from .circuit import GROUND, Circuit, Close, Seq, ground
 from .components import Capacitor, Context, CurrentSource, Inductor, VoltageSource
 from .devices import SineSource
 from .issues import NotAPort, NoThevenin, NotLinear
+from .numeric import LinearSystem
 from .semantics import compile_circuit
 from .solver import solve
 from .values import fmt, parse
@@ -64,7 +67,7 @@ def blackbox(c: Circuit, *, omega=None) -> Relation:
     variables = internal + system.boundary
     try:
         A, b = sp.linear_eq_to_matrix(exprs, variables)
-    except sp.solvers.solveset.NonlinearError as err:
+    except NonlinearError as err:
         raise NotLinear() from err
     reduced, pivots = A.row_join(b).rref(simplify=True)
     k, n = len(internal), len(variables)
@@ -122,12 +125,18 @@ OMEGA = sp.Symbol("omega", positive=True)
 
 @dataclass(frozen=True)
 class Response:
-    """Frequency responses ``H(jω) = output / input``: each output's expression in ``omega`` and its samples."""
+    """Frequency responses ``H(jω) = output / input``: each output's samples, and on asking
+    (``H``) its expression in ``omega`` — solved on paper, slow for a big circuit."""
 
-    H: dict[str, sp.Expr]
     input: str | None
     f: list[float]
     values: dict[str, list[complex]]
+    circuit: Circuit = field(repr=False, compare=False)
+
+    @cached_property
+    def H(self) -> dict[str, sp.Expr]:
+        sol = solve(self.circuit, omega=OMEGA)
+        return {n: sol(n) if self.input is None else sp.simplify(sol(n) / sol(self.input)) for n in self.values}
 
     @property
     def gain_db(self) -> dict[str, list[float]]:
@@ -155,37 +164,41 @@ class Response:
         return BodePlot(self)._repr_svg_()
 
 
-def _outputs(sol) -> list[str]:
+def _outputs(system) -> list[str]:
     """Named nodes' potentials (``V_A``), or else every capacitor's and inductor's voltage."""
-    named = [f"V_{n}" for n in sol.system.potentials if n != GROUND and not re.fullmatch(r"(.+_)?n\d+", n)]
-    return named or [
-        f"U_{p.label}" for p in sol.system.parts.values() if isinstance(p.component, (Capacitor, Inductor))
-    ]
+    named = [f"V_{n}" for n in system.potentials if n != GROUND and not re.fullmatch(r"(.+_)?n\d+", n)]
+    return named or [f"U_{p.label}" for p in system.parts.values() if isinstance(p.component, (Capacitor, Inductor))]
+
+
+def _source(system) -> str | None:
+    """The only voltage source's value (``E_1``), if there is just one."""
+    sources = [p for p in system.parts.values() if isinstance(p.component, (VoltageSource, SineSource))]
+    return sources[0].model.param.name if len(sources) == 1 else None
 
 
 def bode(c: Circuit, *outputs: str, input: str | None = None, f=(10, 1e6), points: int = 200) -> Response:
     """The frequency response of each of ``outputs`` (``"V_A"``, ``"I_R_1"``; by default the named
-    nodes that depend on it, else the capacitors' and inductors' voltages) from ``f[0]`` to ``f[1]`` Hz, per ``input``
-    (a quantity's name; by default the only voltage source's value, if there is one).
+    nodes that depend on it, else the capacitors' and inductors' voltages) from ``f[0]`` to ``f[1]`` Hz,
+    per ``input`` (a quantity's name; by default the only voltage source's value, if there is one).
 
-    Solved once with a symbolic ``omega``, then only evaluated at each frequency.
+    Compiled once with a symbolic ``omega``, then solved in numbers at each frequency.
     """
-    sol = solve(c, omega=OMEGA)
+    ls = LinearSystem(c, Context(OMEGA), (OMEGA,))
     given = bool(outputs)
-    outputs = outputs or tuple(_outputs(sol))
+    outputs = outputs or tuple(_outputs(ls.system))
     if not outputs:
         raise ValueError("bode(): no output — name a node or pass one, e.g. bode(c, 'V_A')")
-    if input is None:
-        sources = [p for p in sol.system.parts.values() if isinstance(p.component, (VoltageSource, SineSource))]
-        if len(sources) == 1:
-            input = sources[0].model.param.name
+    input = input or _source(ls.system)
     lo, hi = math.log10(f[0]), math.log10(f[1])
     freqs = [10 ** (lo + (hi - lo) * k / (points - 1)) for k in range(points)]
-    H = {name: sol(name) if input is None else sp.simplify(sol(name) / sol(input)) for name in outputs}
+    values: dict[str, list[complex]] = {n: [] for n in outputs}
+    for x in freqs:
+        w = (2 * math.pi * x,)
+        solution = ls.solve(*w)
+        ref = ls.value(input, solution, w) if input else 1
+        for n in outputs:
+            values[n].append(ls.value(n, solution, w) / ref)
     if not given:  # of the outputs picked here, not those the same at every frequency (the input's own node)
-        H = {n: h for n, h in H.items() if h.has(OMEGA)} or H
-    values = {}
-    for name in H:
-        at = sp.lambdify(OMEGA, H[name], "math")
-        values[name] = [complex(at(2 * math.pi * x)) for x in freqs]
-    return Response(H, input, freqs, values)
+        varies = {n: v for n, v in values.items() if max(abs(h - v[0]) for h in v) > 1e-9 * (abs(v[0]) + 1e-12)}
+        values = varies or values
+    return Response(input, freqs, values, c)

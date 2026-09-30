@@ -11,6 +11,8 @@ import warnings
 from dataclasses import dataclass
 
 import sympy as sp
+from sympy.polys.matrices import DomainMatrix
+from sympy.solvers.solveset import NonlinearError
 
 from .circuit import Circuit
 from .components import OPEN, Component, Context, Hole, Law, notation
@@ -425,6 +427,28 @@ def _report(solution: Solution) -> Solution:
     return solution
 
 
+def _linear_solve(exprs, variables) -> list[dict] | None:
+    """A linear system's solution as ``sp.solve(..., dict=True)`` gives it (pivots in terms of the
+    free variables; ``[]`` for none), by exact row reduction — many times faster for a big circuit.
+    ``None`` when it is not linear."""
+    try:
+        A, b = sp.linear_eq_to_matrix(exprs, variables)
+    except NonlinearError:
+        return None
+    reduced, pivots = DomainMatrix.from_Matrix(A.row_join(b)).to_field().rref()
+    reduced = reduced.to_Matrix()
+    n = len(variables)
+    if n in pivots:
+        return []
+    free = [k for k in range(n) if k not in pivots]
+    return [
+        {
+            variables[j]: reduced[i, n] - sum((reduced[i, k] * variables[k] for k in free), sp.S.Zero)
+            for i, j in enumerate(pivots)
+        }
+    ]
+
+
 def _solve(circuit: Circuit, equations, omega, find, given, assumed, drop: frozenset = frozenset()) -> Solution:
     """``drop``: data to leave out — ("given", index) or ("param", name), see _data_items."""
     ctx = Context(None if omega is None else parse(omega))
@@ -491,7 +515,9 @@ def _solve(circuit: Circuit, equations, omega, find, given, assumed, drop: froze
     if pending:
         exprs = [sp.simplify(law.expr.xreplace(known)) for law in pending]
         variables = sorted(set().union(*(e.free_symbols for e in exprs)) & unknown, key=lambda s: s.name)
-        solutions = sp.solve(exprs, variables, dict=True)
+        solutions = _linear_solve(exprs, variables)
+        if solutions is None:  # not linear (an unknown element's value times a current): sympy's own
+            solutions = sp.solve(exprs, variables, dict=True)
         if not solutions:
             raise NoSystemSolution(list(pending))
         if len(solutions) > 1:
