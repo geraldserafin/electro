@@ -65,7 +65,18 @@ export type Output =
   | { type: "text" | "stream" | "svg" | "markdown"; data: string }
   | ({ type: "error" | "warning" } & Failure)
   | ({ type: "issue"; kind: "error" | "warning" } & Failure) // display(err): an issue shown on purpose
-  | { type: "solution"; data: Steps }; // steps(sol)
+  | { type: "solution"; data: Steps } // steps(sol)
+  | {
+      // task(...): a field to answer in, the answer only as hashes (electro.task)
+      type: "task";
+      prompt: string;
+      quantity: string;
+      tex: string;
+      unit: string;
+      tol: number;
+      hashes: string[];
+      amplitude: boolean;
+    };
 
 /** What "Symuluj" found for one element (already formatted, e.g. "33.33 mA"). */
 export interface ElementResult {

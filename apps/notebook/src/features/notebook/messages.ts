@@ -71,6 +71,14 @@ export const pl = {
     warning: "Nie wszystko da się wyznaczyć",
     dismiss: "Ukryj (wróci przy następnym liczeniu, jeśli dalej coś jest nie tak)",
   },
+  task: {
+    answer: "Twoja odpowiedź",
+    check: "Sprawdź",
+    right: "Dobrze!",
+    wrong: "Jeszcze nie — sprawdź obliczenia.",
+    unreadable: "To nie jest liczba (np. 0,4, 400m, 400 mA).",
+    amplitude: "amplituda",
+  },
   results: {
     label: "Wyniki",
     element: "Element",
@@ -221,6 +229,14 @@ export const en: typeof pl = {
     error: "Error — cannot be solved",
     warning: "Not everything can be found",
     dismiss: "Hide (it comes back on the next run if something is still wrong)",
+  },
+  task: {
+    answer: "Your answer",
+    check: "Check",
+    right: "Right!",
+    wrong: "Not yet — check your working.",
+    unreadable: "That is not a number (e.g. 0.4, 400m, 400 mA).",
+    amplitude: "amplitude",
   },
   results: {
     label: "Results",

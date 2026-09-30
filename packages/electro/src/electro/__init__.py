@@ -113,6 +113,7 @@ from .issues import Issue
 from .sim import Trace, simulate
 from .solver import Ambiguous, CircuitError, Contradiction, Diagnosis, I, MissingData, P, Solution, U, V, solve
 from .spice import from_spice, to_spice
+from .task import Task, task
 from .values import fmt, parse
 
 __all__ = [
@@ -165,6 +166,8 @@ __all__ = [
     "code",
     "from_spice",
     "to_spice",
+    "task",
+    "Task",
     "equivalent",
     "resistance",
     "sweep",

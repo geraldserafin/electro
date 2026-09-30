@@ -1,6 +1,7 @@
 """Kurs 3: biblioteka electro — obwody jako kod, rozwiązywanie, netlisty, prąd zmienny, twierdzenia,
 symulacja, schematy w kodzie i teoria pod spodem. (Lekcja 3, niewiadome i dziury: make_examples.py.)"""
 
+from electro import Capacitor, Resistor, ground, node, supply
 from lib import Lesson, course
 
 C = "3-biblioteka"
@@ -417,7 +418,77 @@ Po więcej: John Baez i Brendan Fong, *A Compositional Framework for Passive Lin
     L.save()
 
 
+def lesson10():
+    L = Lesson(C, "10-analizy-i-zadania", "10. Analizy i zadania")
+    L.md("""
+# Analizy i zadania
+
+Poza rozwiązaniem jednego układu `electro` robi kilka analiz, które liczą ten sam układ setki razy —
+szybko, bo układ jest kompilowany raz, a potem tylko podstawiane są liczby.
+
+## Charakterystyka częstotliwościowa
+
+`bode(układ)` rysuje wzmocnienie w dB i fazę od 10 Hz do 1 MHz, z zaznaczoną częstotliwością graniczną
+$f_g$ (−3 dB). Domyślnie dla nazwanych węzłów, względem źródła. Na schemacie to samo robi przycisk ∿.
+""")
+    L.code("""
+filtr = supply(1) + Resistor("1k") + node("wy") + Capacitor("1u") + ground
+r = bode(filtr)
+print("f_g =", round(r.cutoffs()[0]), "Hz")
+r
+""")
+    L.circuit("filtr_rc", supply(1) + Resistor("1k") + node("wy") + Capacitor("1u") + ground)
+    L.md("""
+## Zmiana wartości elementu
+
+`sweep(układ, "R_2", (od, do))` pokazuje, jak wyjścia zależą od wartości jednego elementu:
+""")
+    L.code("""
+dzielnik = supply(12) + Resistor("1k") + node("A") + Resistor() + ground
+sweep(dzielnik, "R_2", ("100", "10k"))
+""")
+    L.md("""
+## Tolerancje
+
+Prawdziwe oporniki mają tolerancję (np. ±5 %). `tolerance()` buduje układ setki razy z losowymi
+wartościami w tych granicach i pokazuje, jak bardzo rozrzuca się wynik:
+""")
+    L.code("""
+tolerance(supply(12) + Resistor("10k") + node("A") + Resistor("10k") + ground, tol=0.05)
+""")
+    L.md("""
+## Trójfazówka
+
+`three_phase(230)` to źródło w gwiazdę (fazy 0°, −120°, 120°), a `star(...)` i `delta(...)` to odbiorniki.
+Łączą się po nazwach węzłów `L1`, `L2`, `L3` i `N`. Fazory wpisuje się też wprost: `"230∠-120"`.
+""")
+    L.code("""
+nierowna = three_phase(230) | star(Resistor(10), Resistor(20), Resistor(30))
+nierowna.solve(omega=314)
+""")
+    L.md("""
+## SPICE
+
+`to_spice()` zapisuje układ jako netlistę dla ngspice albo LTspice, a `from_spice()` wczytuje netlistę
+(w LTspice: *View → SPICE Netlist*). Wklejona w widok kodu schematu od razu się rysuje.
+""")
+    L.code("""
+print(to_spice(filtr))
+""")
+    L.md("""
+## Zadania do sprawdzenia
+
+`task(układ, "I_R_1", "treść")` pokazuje treść i pole na odpowiedź. Odpowiedź jest sprawdzana w
+przeglądarce z dokładnością 1 %, a w notatce zapisany jest tylko jej skrót — nie widać jej ani na stronie,
+ani w pliku. Wpisz wynik (np. `0,4` albo `400 mA`) i kliknij **Sprawdź**.
+""")
+    L.code("""
+task(supply(12) + Resistor(10) + Resistor(20) + ground, "I_R_1", "Jaki prąd płynie przez oba oporniki?")
+""")
+    L.save()
+
+
 if __name__ == "__main__":
     intro()
-    for lesson in (lesson01, lesson02, lesson04, lesson05, lesson06, lesson07, lesson08, lesson09):
+    for lesson in (lesson01, lesson02, lesson04, lesson05, lesson06, lesson07, lesson08, lesson09, lesson10):
         lesson()

@@ -26,6 +26,7 @@ import sympy as sp
 from electro.analysis import bode
 from electro.components import Law
 from electro.issues import Equals, Issue, IsZero, issue
+from electro.task import Task
 from electro_render import Steps, symbol_library
 from electro_schematic import Schematic
 from electro_schematic.issues import Unsupported
@@ -282,6 +283,19 @@ def to_output(obj) -> dict:
         obj = schematic(obj)
     if isinstance(obj, Steps):
         return {"type": "solution", "data": to_json(obj)}
+    if isinstance(obj, Task):  # a field to answer in: the answer only as hashes (electro.task)
+        from electro_render.trace import name
+
+        return {
+            "type": "task",
+            "prompt": obj.prompt,
+            "quantity": obj.quantity,
+            "tex": name(obj.quantity),
+            "unit": obj.unit,
+            "tol": obj.tol,
+            "hashes": list(obj.hashes),
+            "amplitude": obj.amplitude,
+        }
     if isinstance(obj, Issue):  # an error caught and shown on purpose: display(e)
         kind = "warning" if isinstance(obj, Warning) else "error"
         return {"type": "issue", "kind": kind, "data": repr(obj), "issue": to_json(obj)}
