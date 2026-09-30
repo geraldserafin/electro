@@ -119,5 +119,60 @@ export function useCamera({
     return () => el.removeEventListener("wheel", onWheel);
   });
 
+  // two fingers (a touch screen): pinching zooms, moving them pans — the drawing stays under them.
+  // Caught on the way down (capture): the board's own handlers do not see the second finger
+  const camNow = useRef(cam);
+  camNow.current = cam;
+  useEffect(() => {
+    const el = viewRef.current;
+    if (!el) return;
+    const touches = new Map<number, { x: number; y: number }>();
+    let pinch: { d: number; x: number; y: number; cam: Camera } | null = null;
+    let pinched = false; // till the last finger is up: the one left does not pan from where it started
+    const between = () => {
+      const [a, b] = [...touches.values()];
+      return { d: Math.hypot(a.x - b.x, a.y - b.y) || 1, x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
+    };
+    const down = (event: PointerEvent) => {
+      if (event.pointerType !== "touch") return;
+      touches.set(event.pointerId, { x: event.clientX, y: event.clientY });
+      if (touches.size < 2) return;
+      event.stopPropagation();
+      if (touches.size === 2) pinch = { ...between(), cam: camNow.current };
+      pinched = true;
+    };
+    const move = (event: PointerEvent) => {
+      if (!touches.has(event.pointerId)) return;
+      touches.set(event.pointerId, { x: event.clientX, y: event.clientY });
+      if (pinched) event.stopPropagation();
+      if (!pinch || touches.size !== 2) return;
+      const now = between();
+      const rect = el.getBoundingClientRect();
+      const k = screenScale();
+      const { cam: from } = pinch;
+      const zoom = clampZoom((from.zoom * now.d) / pinch.d);
+      // the drawing's point that was between the fingers, between them again
+      const px = from.x + (pinch.x - rect.left) / k / from.zoom,
+        py = from.y + (pinch.y - rect.top) / k / from.zoom;
+      setCam({ x: px - (now.x - rect.left) / k / zoom, y: py - (now.y - rect.top) / k / zoom, zoom });
+    };
+    const up = (event: PointerEvent) => {
+      touches.delete(event.pointerId);
+      if (touches.size < 2) pinch = null;
+      if (!touches.size) pinched = false;
+    };
+    el.addEventListener("pointerdown", down, true);
+    el.addEventListener("pointermove", move, true);
+    el.addEventListener("pointerup", up, true);
+    el.addEventListener("pointercancel", up, true);
+    return () => {
+      el.removeEventListener("pointerdown", down, true);
+      el.removeEventListener("pointermove", move, true);
+      el.removeEventListener("pointerup", up, true);
+      el.removeEventListener("pointercancel", up, true);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- screenScale reads the element as it is then
+  }, [viewRef]);
+
   return { cam, setCam, view, fitted, lost, zoomAround, screenScale };
 }

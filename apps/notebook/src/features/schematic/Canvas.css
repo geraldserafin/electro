@@ -12,12 +12,17 @@
     pointer-events: none;
   }
 
+  /* on a touch screen one finger scrolls the page past a board not in use (as the wheel does); once it is
+     tapped (or full screen), one finger pans or draws on it — two always pinch it (useCamera) */
   .canvas {
     display: block;
     color: var(--text);
-    touch-action: none;
+    touch-action: pan-y;
     user-select: none;
     -webkit-user-select: none;
+  }
+  .canvas:where([data-active] *) {
+    touch-action: none;
   }
   .canvas:focus {
     outline: none;

@@ -54,8 +54,13 @@ export function SimPanel({
   height?: number; // that pane's height, px
 }) {
   const { t } = useTranslation("simulation");
-  const [tab, setTab] = useState<Tab>("chart");
   const hasControls = elements.some(controlled);
+  // on a touch screen (no keys to press): the controls first, where there are buttons or switches to hold
+  const [tab, setTab] = useState<Tab>(() =>
+    matchMedia("(pointer: coarse)").matches && elements.some((e) => e.kind === "button" || e.kind === "switch")
+      ? "controls"
+      : "chart",
+  );
   const tabs: { id: Tab; label: string; icon: ReactNode }[] = [
     { id: "chart", label: t("panel.chart"), icon: <ChartIcon /> },
     ...(hasControls ? [{ id: "controls" as const, label: t("panel.controls"), icon: <SlidersIcon /> }] : []),

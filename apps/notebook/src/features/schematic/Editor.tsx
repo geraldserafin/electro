@@ -189,6 +189,15 @@ export function SchematicEditor({
   const [spaceHeld, setSpaceHeld] = useState(false);
   // the board is in use (clicked, or full screen): keys and the wheel go to it
   const [active, setActive] = useState(false);
+  // (a touch screen does not always move the focus off it: a tap elsewhere leaves it too)
+  useEffect(() => {
+    if (!active) return;
+    const away = (event: PointerEvent) => {
+      if (!viewRef.current?.parentElement?.contains(event.target as Node)) setActive(false);
+    };
+    document.addEventListener("pointerdown", away, true);
+    return () => document.removeEventListener("pointerdown", away, true);
+  }, [active]);
   const { cam, setCam, view, fitted, lost, zoomAround, screenScale } = useCamera({
     value,
     library,
@@ -386,6 +395,8 @@ export function SchematicEditor({
     (event: ReactPointerEvent, e: ElementData) => elementDown.current(event, e),
     [],
   );
+  // a finger on a board not yet tapped: it may be scrolling the page — nothing moves, nothing is wired
+  const untapped = (event: ReactPointerEvent) => event.pointerType === "touch" && !active && !full;
   const onElementDown = (event: ReactPointerEvent, e: ElementData) => {
     if (tool.type !== "select") return;
     if (live) {
@@ -413,6 +424,7 @@ export function SchematicEditor({
       setSelection(isAdjustable(e.kind) ? { type: "element", id: e.id } : null);
       return;
     }
+    if (untapped(event)) return;
     event.stopPropagation();
     svgRef.current?.focus({ preventScroll: true });
     if (event.shiftKey) {
@@ -448,7 +460,7 @@ export function SchematicEditor({
   };
 
   const onPinDown = (event: ReactPointerEvent, pin: Point) => {
-    if (tool.type !== "select" || live) return; // the wire tool handles pins like any other point
+    if (tool.type !== "select" || live || untapped(event)) return; // the wire tool handles pins like any other point
     event.stopPropagation();
     svgRef.current?.focus({ preventScroll: true });
     begin({ type: "wire", from: pin });
@@ -702,12 +714,15 @@ export function SchematicEditor({
     <div
       data-board
       data-full={full || undefined}
+      data-active={active || full || undefined} // (on a touch screen: one finger pans it, not the page — Canvas.css)
       className={
         bare ? "group/board relative overflow-hidden bg-board h-full" : cn(board, "h-120", active && "border-accent")
       }
       // with a bar laid over its top edge: as much board as without one, its islands below the bar
       style={bare ? undefined : { height: boardHeight }}
-      onPointerDownCapture={() => setActive(true)}
+      // (a finger: once it taps, not as it scrolls the page past)
+      onPointerDownCapture={(event) => event.pointerType !== "touch" && setActive(true)}
+      onClickCapture={() => setActive(true)}
       onBlur={(event) => {
         if (!event.currentTarget.contains(event.relatedTarget as Node)) setActive(false);
       }}
@@ -756,6 +771,9 @@ export function SchematicEditor({
               return;
             }
             onUp(event);
+          }}
+          onPointerCancel={() => {
+            pan.current = null; // (the page scrolled instead: a finger on a board not in use)
           }}
           onPointerLeave={() => {
             pointer.current = null;

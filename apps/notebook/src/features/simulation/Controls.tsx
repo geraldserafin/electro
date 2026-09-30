@@ -2,12 +2,13 @@
 // while it runs, in one place — sliders (potentiometers, sensors' readings, an LCD's contrast), the
 // switches and buttons — and what the meters read, as they read it.
 import { useTranslation } from "react-i18next";
-import { Adjusters, isAdjustable, useKinds } from "@/features/schematic";
+import { Adjusters, isAdjustable, keyLabel, useKinds } from "@/features/schematic";
 import { cn } from "@/shared/lib/cn";
 import type { ElementData } from "@/shared/model/types";
 import type { Live } from "./useLive";
 
-const card = "flex flex-col gap-2 min-w-52 flex-1 max-w-80 rounded-lg border border-line bg-board p-2.5";
+const card =
+  "flex flex-col gap-2 min-w-52 max-sm:min-w-28 flex-1 max-w-80 rounded-lg border border-line bg-board p-2.5"; // (a phone: three across)
 const toggle = "h-7 px-3 rounded-md border border-line text-[13px]";
 
 /** What the tab has something for: an element to turn, flip or hold, or a meter to read. */
@@ -63,7 +64,11 @@ export function Controls({
                   className={cn(
                     toggle,
                     pressed.includes(e.id) ? "bg-accent-soft text-fg" : "text-muted hover:bg-hover",
+                    // a finger: held, not scrolling, selecting or opening a menu; bigger
+                    "touch-none select-none [-webkit-touch-callout:none] max-sm:h-11",
                   )}
+                  onContextMenu={(ev) => ev.preventDefault()}
+                  title={t("controls.hold")}
                   onPointerDown={(ev) => {
                     ev.currentTarget.setPointerCapture(ev.pointerId);
                     onPress(e.id, true);
@@ -71,7 +76,7 @@ export function Controls({
                   onPointerUp={() => onPress(e.id, false)}
                   onPointerCancel={() => onPress(e.id, false)}
                 >
-                  {t("controls.hold")}
+                  {e.text ? keyLabel(e.text) : t("controls.hold")} {/* (the key that holds it too) */}
                 </button>
               )}
             </div>

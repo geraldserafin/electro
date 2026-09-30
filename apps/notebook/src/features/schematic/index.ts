@@ -5,7 +5,7 @@ export { SchematicEditor } from "./Editor";
 export { useKinds } from "./kinds";
 export { library, libraryFor } from "./library";
 export * as messages from "./messages";
-export { canRunInTime, inTimeOnly, isBoard, updateElement } from "./model";
+export { canRunInTime, inTimeOnly, isBoard, keyLabel, updateElement } from "./model";
 export { Panel, PanelHead, Section, Tile } from "./Panel";
 export { PdfDrawing } from "./PdfDrawing";
 export { arrange, firstSides, partKind, partSvg, ports, withParts } from "./parts";
