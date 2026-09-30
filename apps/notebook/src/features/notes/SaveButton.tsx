@@ -15,6 +15,12 @@ import { readSaveDetails, SaveCard } from "./SaveCard";
 
 const mac = typeof navigator !== "undefined" && /Mac|iPhone|iPad/.test(navigator.platform);
 
+/** A save; also the site's storage (the notes, the tools) asked to be kept for good, not only while there is room. */
+function saveKept() {
+  navigator.storage?.persist?.().catch(() => {});
+  return save();
+}
+
 export function SaveButton() {
   const { t } = useTranslation("notes", { keyPrefix: "save" });
   const state = useSaveState();
@@ -35,7 +41,7 @@ export function SaveButton() {
       if ((e.ctrlKey || e.metaKey) && !e.altKey && e.key.toLowerCase() === "s") {
         e.preventDefault();
         setConnectFailed(false);
-        void save();
+        void saveKept();
       }
     };
     window.addEventListener("keydown", press);
@@ -87,7 +93,7 @@ export function SaveButton() {
             state={state}
             onSave={() => {
               setConnectFailed(false);
-              void save();
+              void saveKept();
             }}
           />
         )}
