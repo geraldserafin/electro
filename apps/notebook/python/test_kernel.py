@@ -99,6 +99,16 @@ def test_simulate_reports_problems():
     assert problem["kind"] == "error" and r"E_{1} = 12\,\mathrm{V}" in problem["issue"]["values"]
 
 
+def test_frequency_of_a_drawing():
+    from electro import Capacitor, Resistor, VoltageSource, loop
+    from electro_schematic import layout
+
+    out = json.loads(kernel.frequency(layout(loop(VoltageSource(1), Resistor(1000), Capacitor("1u"))).to_json()))
+    assert "<polyline" in out["svg"] and "U" in out["svg"]  # the capacitor's voltage, no node named
+    out = json.loads(kernel.frequency(layout(loop(VoltageSource(1), Resistor(1000))).to_json()))
+    assert "no output" in out["error"]["data"]  # nothing named, nothing reactive
+
+
 def test_code_view_round_trip():
     from electro import Ammeter, Resistor, VoltageSource, loop
     from electro_schematic import Schematic, layout

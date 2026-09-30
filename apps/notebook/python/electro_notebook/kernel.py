@@ -23,6 +23,7 @@ import warnings
 from dataclasses import fields, is_dataclass
 
 import sympy as sp
+from electro.analysis import bode
 from electro.components import Law
 from electro.issues import Equals, Issue, IsZero, issue
 from electro_render import Steps, symbol_library
@@ -206,6 +207,15 @@ def simulate(schematic_json: str, data: str = "") -> str:
         }
     problems = [_problem("warning", w.message) for w in caught]
     return json.dumps({"results": results, "problems": problems}, ensure_ascii=False)
+
+
+def frequency(schematic_json: str) -> str:
+    """The frequency button of a schematic cell: ``bode()`` of the drawing (its named nodes, else its
+    capacitors' and inductors' voltages). Returns JSON ``{"svg": "..."}`` or ``{"error": {...}}``."""
+    try:
+        return json.dumps({"svg": bode(Schematic.from_json(schematic_json).to_circuit())._repr_svg_()})
+    except Exception as err:  # noqa: BLE001 — shown under the drawing
+        return json.dumps({"error": _error(err)}, ensure_ascii=False)
 
 
 def live(schematic_json: str) -> str:

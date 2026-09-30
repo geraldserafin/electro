@@ -34,7 +34,7 @@ import { usePhone } from "@/shared/hooks/usePhone";
 import { cn } from "@/shared/lib/cn";
 import type { Failure } from "@/shared/model/issues";
 import type { Cell, SchematicData, SymbolLibrary } from "@/shared/model/types";
-import { Close, CodeIcon, ComponentIcon, Expand, Flash, SchematicIcon, Shrink } from "@/shared/ui/icons";
+import { Close, CodeIcon, ComponentIcon, Expand, Flash, SchematicIcon, Shrink, Wave } from "@/shared/ui/icons";
 import { Sash, useKeptSize } from "@/shared/ui/Splitter";
 import { barButton, RunButton } from "./CellBar";
 import { runOnShiftEnter } from "./CodeCell";
@@ -221,6 +221,8 @@ export function SchematicCell({
   const [generated, setGenerated] = useState<string | null>(null);
   const [error, setError] = useState<Failure | null>(null);
   const [busy, setBusy] = useState(false);
+  // the Bode plot, of the drawing it was made for (another drawing since: dimmed, the button lit again)
+  const [bode, setBode] = useState<{ of: SchematicData; out: { svg: string } | { error: Failure } } | null>(null);
   const live = useLive(cell.schematic);
   const running = live.status === "running" || live.status === "paused";
   const timed = inTimeOnly(cell.schematic); // only in time: the bolt runs it
@@ -435,6 +437,11 @@ export function SchematicCell({
     }
   };
   const solve = () => withDrawing(simulate);
+  const frequency = () =>
+    withDrawing(async (schematic) => {
+      await kernel.ready;
+      setBode({ of: schematic, out: await kernel.frequency(schematic) });
+    });
   const runInTime = () => (running ? live.stop() : withDrawing((schematic) => live.start(schematic)));
   // Shift+Enter in the code: what the circuit can do — solved, or (only in time) run
   const run = () => (timed ? runInTime() : solve());
@@ -545,6 +552,11 @@ export function SchematicCell({
   const solveButton = !timed && (
     <RunButton run={solve} eager running={solving || busy} done={done || empty} label={t("schematic.run")} />
   );
+  // ∿ the frequency response: a circuit solved on paper with a capacitor or an inductor in it
+  const bodeDone = bode !== null && bode.of === cell.schematic;
+  const bodeButton = !timed && cell.schematic.elements.some((e) => e.kind === "capacitor" || e.kind === "inductor") && (
+    <RunButton run={frequency} running={busy} done={bodeDone} icon={<Wave />} label={t("schematic.frequency")} />
+  );
   const liveButton = inTime && (
     <RunButton
       run={runInTime}
@@ -568,6 +580,7 @@ export function SchematicCell({
     <>
       {problems}
       {solveButton}
+      {bodeButton}
       {liveButton}
       {/* (a phone, in the notebook: nothing edited there, no component made) */}
       {!running && !compact && (
@@ -862,6 +875,17 @@ export function SchematicCell({
           onClose={() => setSaving(false)}
         />
       )}
+      {bode &&
+        ("svg" in bode.out ? (
+          // SVG produced by our own renderer (electro.plot), from this drawing
+          <div
+            data-output="svg"
+            className={cn("overflow-x-auto [&_svg]:max-w-full [&_svg]:h-auto", !bodeDone && "opacity-50")}
+            dangerouslySetInnerHTML={{ __html: bode.out.svg }}
+          />
+        ) : (
+          <FailureBox failure={bode.out.error} kind="error" />
+        ))}
       {cell.results && Object.keys(cell.results).length > 0 && (
         <ResultsTable results={cell.results} stale={!!cell.stale} />
       )}

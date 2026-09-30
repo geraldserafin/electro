@@ -16,6 +16,7 @@ type Request =
   | { id: number; type: "fromCode"; source: string; name: string; old: string }
   | { id: number; type: "simulate"; schematic: string }
   | { id: number; type: "live"; schematic: string }
+  | { id: number; type: "frequency"; schematic: string }
   | { id: number; type: "reset" };
 
 interface Kernel {
@@ -24,6 +25,7 @@ interface Kernel {
   from_code(source: string, name: string, old: string): string;
   simulate(schematic: string): string;
   live(schematic: string): string;
+  frequency(schematic: string): string;
   reset(): void;
 }
 
@@ -85,7 +87,9 @@ self.onmessage = async (event: MessageEvent<Request>) => {
               ? k.simulate(request.schematic)
               : request.type === "live"
                 ? k.live(request.schematic)
-                : (k.reset(), null);
+                : request.type === "frequency"
+                  ? k.frequency(request.schematic)
+                  : (k.reset(), null);
     self.postMessage({ id: request.id, ok: true, result });
   } catch (error) {
     self.postMessage({ id: request.id, ok: false, error: String(error) });

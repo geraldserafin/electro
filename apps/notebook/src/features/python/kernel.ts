@@ -72,6 +72,11 @@ class Kernel {
     return JSON.parse((await this.call("live", { schematic: JSON.stringify(schematic) })) as string);
   }
 
+  /** A schematic cell's frequency button: the Bode plot of the drawing (or the error in it). */
+  async frequency(schematic: SchematicData): Promise<{ svg: string } | { error: Failure }> {
+    return JSON.parse((await this.call("frequency", { schematic: JSON.stringify(schematic) })) as string);
+  }
+
   async reset(): Promise<void> {
     await this.call("reset");
   }

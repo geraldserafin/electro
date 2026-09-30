@@ -205,6 +205,11 @@ export const OutlineIcon = () => (
     <path d="M4 6.5h16M8 12h12M8 17.5h12" />
   </Icon>
 );
+export const Wave = () => (
+  <Icon>
+    <path d="M2 12c2.5-7 5.5-7 8 0s5.5 7 8 0c1-2.8 2.2-4.3 4-4.5" />
+  </Icon>
+);
 export const Flash = () => (
   <Icon size={16}>
     <path d="M13 2L4 14h7l-1 8 9-12h-7z" fill="currentColor" stroke="none" />
