@@ -110,6 +110,7 @@ export type Issue =
   | { type: "PartInItself"; part: string }
   // the notebook's kernel
   | { type: "NoCircuitInCode"; variable: string }
+  | { type: "NoSweepRange"; element: string }
   | { type: "OnlyValuesInCode"; cause: Issue }
   | { type: "PartsNotInCode" }
   | { type: "BadDataEntry"; entry: string }

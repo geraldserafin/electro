@@ -205,6 +205,17 @@ export const OutlineIcon = () => (
     <path d="M4 6.5h16M8 12h12M8 17.5h12" />
   </Icon>
 );
+export const SweepIcon = () => (
+  <Icon>
+    <path d="M3 19c4 0 6-12 10-12s5 6 8 6M3 22h18" />
+    <circle cx="13" cy="7" r="2" fill="currentColor" stroke="none" />
+  </Icon>
+);
+export const SpreadIcon = () => (
+  <Icon>
+    <path d="M4 20h16M6 20v-3M9 20v-7M12 20V6M15 20v-8M18 20v-4" />
+  </Icon>
+);
 export const Wave = () => (
   <Icon>
     <path d="M2 12c2.5-7 5.5-7 8 0s5.5 7 8 0c1-2.8 2.2-4.3 4-4.5" />

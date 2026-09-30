@@ -108,6 +108,7 @@ export const pl = {
     PartInItself: "Komponent {{part}} ma w środku sam siebie — to nie miałoby końca.",
     PartsNotInCode:
       "Schemat z własnymi komponentami zmieniaj na rysunku: w kodzie komponent byłby już rozłożony na części.",
+    NoSweepRange: "{{element}} nie ma liczbowej wartości — wpisz zakres „od” i „do”.",
     NoCircuitInCode: "W kodzie nie ma układu — przypisz go do zmiennej, np. `{{variable}} = loop(...)`.",
     OnlyValuesInCode: "{{cause}} Tu zmieniaj w kodzie tylko wartości, a elementy dodawaj na schemacie.",
     BadDataEntry: "Nie rozumiem „{{entry}}” — wpisz np. `I_R_1 = 0,5`.",
@@ -225,6 +226,7 @@ export const en: typeof pl = {
     PartInItself: "The component {{part}} has itself inside — it would never end.",
     PartsNotInCode:
       "Change a schematic with your own components on the drawing: in code, a component is already taken apart.",
+    NoSweepRange: "{{element}} has no number for its value — type the range, “from” and “to”.",
     NoCircuitInCode: "The code has no circuit — assign one to a variable, e.g. `{{variable}} = loop(...)`.",
     OnlyValuesInCode: "{{cause}} Here, change only the values in code, and add elements on the drawing.",
     BadDataEntry: "“{{entry}}” is not understood — write e.g. `I_R_1 = 0,5`.",

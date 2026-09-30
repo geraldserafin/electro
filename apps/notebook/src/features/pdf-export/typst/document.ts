@@ -97,8 +97,8 @@ export function toTypst(
     } else {
       const svg = drawingOf(cell.id);
       if (svg) parts.push(image(svg, true));
-      if (pdf.outputs && cell.frequency && !cell.frequency.stale)
-        parts.push(output({ type: "svg", data: cell.frequency.svg }));
+      for (const plot of [cell.frequency, cell.sweep, cell.spread])
+        if (pdf.outputs && plot && !plot.stale) parts.push(output({ type: "svg", data: plot.svg }));
     }
   }
 

@@ -23,7 +23,7 @@ import warnings
 from dataclasses import fields, is_dataclass
 
 import sympy as sp
-from electro.analysis import bode
+from electro.analysis import bode, sweep, tolerance
 from electro.components import Law
 from electro.issues import Equals, Issue, IsZero, issue
 from electro.task import Task
@@ -40,6 +40,13 @@ from electro_schematic import Schematic, layout
 """
 
 namespace: dict = {}
+
+
+@issue
+class NoSweepRange(Issue, ValueError):
+    """A sweep of an element with no number for its value needs its range typed."""
+
+    element: str
 
 
 @issue
@@ -215,6 +222,38 @@ def frequency(schematic_json: str) -> str:
     capacitors' and inductors' voltages). Returns JSON ``{"svg": "..."}`` or ``{"error": {...}}``."""
     try:
         return json.dumps({"svg": bode(Schematic.from_json(schematic_json).to_circuit())._repr_svg_()})
+    except Exception as err:  # noqa: BLE001 — shown under the drawing
+        return json.dumps({"error": _error(err)}, ensure_ascii=False)
+
+
+def sweep_plot(schematic_json: str, element: str, lo: str = "", hi: str = "") -> str:
+    """The sweep in an element's inspector: the outputs as its value goes from ``lo`` to ``hi`` (by
+    default a tenth of it to ten times it). Returns JSON ``{"svg": "..."}`` or ``{"error": {...}}``."""
+    from electro.solver import _sine_omega
+
+    try:
+        circuit = Schematic.from_json(schematic_json).to_circuit()
+        if not (lo.strip() and hi.strip()):
+            from electro.semantics import structure
+
+            value = structure(circuit).part(element).component.value
+            if not isinstance(value, sp.Number):
+                raise NoSweepRange(element)
+            lo, hi = lo.strip() or value / 10, hi.strip() or value * 10
+        svg = sweep(circuit, element, (lo, hi), omega=_sine_omega(circuit))._repr_svg_()
+        return json.dumps({"svg": svg})
+    except Exception as err:  # noqa: BLE001 — shown under the drawing
+        return json.dumps({"error": _error(err)}, ensure_ascii=False)
+
+
+def spread(schematic_json: str, tol: float = 0.05) -> str:
+    """The tolerance button: the named nodes over many builds with every R, C and L within ``tol``.
+    Returns JSON ``{"svg": "..."}`` or ``{"error": {...}}``."""
+    from electro.solver import _sine_omega
+
+    try:
+        circuit = Schematic.from_json(schematic_json).to_circuit()
+        return json.dumps({"svg": tolerance(circuit, tol=tol, omega=_sine_omega(circuit))._repr_svg_()})
     except Exception as err:  # noqa: BLE001 — shown under the drawing
         return json.dumps({"error": _error(err)}, ensure_ascii=False)
 

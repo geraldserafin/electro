@@ -107,11 +107,16 @@ export type Cell =
       results?: Record<string, ElementResult>; // from the last run
       problems?: Problem[]; // why the last run could not find everything
       stale?: boolean; // the drawing changed since the last run
-      frequency?: { svg: string; stale?: boolean }; // the last Bode plot (∿), and whether the drawing changed since
+      frequency?: Plot; // the last Bode plot (∿)
+      sweep?: Plot; // the last sweep of an element's value (its inspector)
+      spread?: Plot; // the last spread over the parts' tolerances
       view?: SchematicView; // which side of the cell is shown
     };
 
 export type CellType = Cell["type"];
+
+/** A plot a schematic cell keeps (electro.plot's SVG), and whether the drawing changed since. */
+export type Plot = { svg: string; stale?: boolean };
 
 /** A schematic cell, while it is edited: as the board, or as code. */
 export type SchematicView = "schematic" | "code";

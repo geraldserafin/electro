@@ -17,6 +17,8 @@ type Request =
   | { id: number; type: "simulate"; schematic: string }
   | { id: number; type: "live"; schematic: string }
   | { id: number; type: "frequency"; schematic: string }
+  | { id: number; type: "sweep"; schematic: string; element: string; lo: string; hi: string }
+  | { id: number; type: "spread"; schematic: string; tol: number }
   | { id: number; type: "reset" };
 
 interface Kernel {
@@ -26,6 +28,8 @@ interface Kernel {
   simulate(schematic: string): string;
   live(schematic: string): string;
   frequency(schematic: string): string;
+  sweep_plot(schematic: string, element: string, lo: string, hi: string): string;
+  spread(schematic: string, tol: number): string;
   reset(): void;
 }
 
@@ -89,7 +93,11 @@ self.onmessage = async (event: MessageEvent<Request>) => {
                 ? k.live(request.schematic)
                 : request.type === "frequency"
                   ? k.frequency(request.schematic)
-                  : (k.reset(), null);
+                  : request.type === "sweep"
+                    ? k.sweep_plot(request.schematic, request.element, request.lo, request.hi)
+                    : request.type === "spread"
+                      ? k.spread(request.schematic, request.tol)
+                      : (k.reset(), null);
     self.postMessage({ id: request.id, ok: true, result });
   } catch (error) {
     self.postMessage({ id: request.id, ok: false, error: String(error) });

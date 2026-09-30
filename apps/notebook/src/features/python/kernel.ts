@@ -77,6 +77,21 @@ class Kernel {
     return JSON.parse((await this.call("frequency", { schematic: JSON.stringify(schematic) })) as string);
   }
 
+  /** An element's sweep (its inspector): the outputs as its value goes from ``lo`` to ``hi``. */
+  async sweep(
+    schematic: SchematicData,
+    element: string,
+    lo: string,
+    hi: string,
+  ): Promise<{ svg: string } | { error: Failure }> {
+    return JSON.parse((await this.call("sweep", { schematic: JSON.stringify(schematic), element, lo, hi })) as string);
+  }
+
+  /** The tolerance button: the outputs over many builds, each R, C and L within ``tol``. */
+  async spread(schematic: SchematicData, tol: number): Promise<{ svg: string } | { error: Failure }> {
+    return JSON.parse((await this.call("spread", { schematic: JSON.stringify(schematic), tol })) as string);
+  }
+
   async reset(): Promise<void> {
     await this.call("reset");
   }

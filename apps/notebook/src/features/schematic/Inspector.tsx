@@ -51,9 +51,11 @@ export function Inspector({
   onFirmware,
   part,
   models,
+  onSweep,
 }: {
   part?: PartDef; // one's own component: its definition
   models?: string[]; // real parts it can be (a 1N4148, an LM358): the element's ``text``, none a generic one
+  onSweep?: (lo: string, hi: string) => void; // plot the outputs as its value goes from lo to hi (empty: around it)
   element: ElementData | null;
   taken: string[];
   onChange: (patch: Partial<ElementData>) => void;
@@ -68,6 +70,7 @@ export function Inspector({
   const { t } = useTranslation("schematic");
   const { name } = useKinds();
   const [id, setId] = useState(element?.id ?? "");
+  const [range, setRange] = useState({ lo: "", hi: "" }); // the sweep's, as typed
   const remove = (
     <Tile
       className="hover:bg-err-bg hover:text-danger"
@@ -154,6 +157,35 @@ export function Inspector({
             )}
           </span>
           <p className={hint}>{t("inspector.frequencyHint")}</p>
+        </Section>
+      )}
+      {!live && onSweep && hasValue(element.kind) && !kindInfo(element.kind)?.meter && (
+        <Section label={t("inspector.sweep")}>
+          <span className="flex items-center gap-1.5">
+            <input
+              className={field}
+              value={range.lo}
+              placeholder={t("inspector.sweepFrom")}
+              aria-label={t("inspector.sweepFrom")}
+              onChange={(e) => setRange({ ...range, lo: e.target.value })}
+            />
+            –
+            <input
+              className={field}
+              value={range.hi}
+              placeholder={t("inspector.sweepTo")}
+              aria-label={t("inspector.sweepTo")}
+              onChange={(e) => setRange({ ...range, hi: e.target.value })}
+            />
+            <button
+              type="button"
+              className="h-8.5 flex-none px-3 rounded-lg bg-primary text-on-primary text-[13px] font-medium hover:bg-primary-hover"
+              onClick={() => onSweep(range.lo, range.hi)}
+            >
+              {t("inspector.sweepRun")}
+            </button>
+          </span>
+          <p className={hint}>{t("inspector.sweepHint")}</p>
         </Section>
       )}
       {!live && models && (

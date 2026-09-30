@@ -34,7 +34,17 @@ import { usePhone } from "@/shared/hooks/usePhone";
 import { cn } from "@/shared/lib/cn";
 import type { Failure } from "@/shared/model/issues";
 import type { Cell, SchematicData, SymbolLibrary } from "@/shared/model/types";
-import { Close, CodeIcon, ComponentIcon, Expand, Flash, SchematicIcon, Shrink, Wave } from "@/shared/ui/icons";
+import {
+  Close,
+  CodeIcon,
+  ComponentIcon,
+  Expand,
+  Flash,
+  SchematicIcon,
+  Shrink,
+  SpreadIcon,
+  Wave,
+} from "@/shared/ui/icons";
 import { Sash, useKeptSize } from "@/shared/ui/Splitter";
 import { barButton, RunButton } from "./CellBar";
 import { runOnShiftEnter } from "./CodeCell";
@@ -56,6 +66,10 @@ import {
 import { variableName } from "./NameBox";
 import { Problems } from "./Problems";
 import { ResultsTable } from "./ResultsTable";
+
+/** The plots a schematic cell keeps, in the order they show under it. */
+const PLOTS = ["frequency", "sweep", "spread"] as const;
+type PlotKind = (typeof PLOTS)[number];
 
 const Stop = () => (
   <svg viewBox="0 0 24 24" width={14} height={14} aria-hidden="true">
@@ -221,13 +235,13 @@ export function SchematicCell({
   const [generated, setGenerated] = useState<string | null>(null);
   const [error, setError] = useState<Failure | null>(null);
   const [busy, setBusy] = useState(false);
-  // the Bode plot is kept in the cell (``frequency``); why the last one could not be made, here
-  const [bodeError, setBodeError] = useState<Failure | null>(null);
+  // the plots are kept in the cell (Bode, a sweep, a spread); why the last one could not be made, here
+  const [plotError, setPlotError] = useState<{ kind: PlotKind; failure: Failure } | null>(null);
   /** A new drawing: what runs made of the old one is out of date. */
   const changed = (schematic: SchematicData): Partial<Cell> => ({
     schematic,
     ...(cell.results ? { stale: true } : {}),
-    ...(cell.frequency ? { frequency: { ...cell.frequency, stale: true } } : {}),
+    ...Object.fromEntries(PLOTS.flatMap((k) => (cell[k] ? [[k, { ...cell[k], stale: true }]] : []))),
   });
   const live = useLive(cell.schematic);
   const running = live.status === "running" || live.status === "paused";
@@ -443,13 +457,17 @@ export function SchematicCell({
     }
   };
   const solve = () => withDrawing(simulate);
-  const frequency = () =>
+  /** A plot of the drawing (kept in the cell under ``kind``), or why there is none. */
+  const plot = (kind: PlotKind, make: (schematic: SchematicData) => Promise<{ svg: string } | { error: Failure }>) =>
     withDrawing(async (schematic) => {
       await kernel.ready;
-      const out = await kernel.frequency(schematic);
-      setBodeError("error" in out ? out.error : null);
-      if ("svg" in out) update({ frequency: { svg: out.svg } });
+      const out = await make(schematic);
+      setPlotError("error" in out ? { kind, failure: out.error } : null);
+      if ("svg" in out) update({ [kind]: { svg: out.svg } });
     });
+  const plotDone = (kind: PlotKind) => !!cell[kind] && !cell[kind]?.stale && plotError?.kind !== kind;
+  const reactive = cell.schematic.elements.some((e) => e.kind === "capacitor" || e.kind === "inductor");
+  const passive = cell.schematic.elements.some((e) => ["resistor", "capacitor", "inductor"].includes(e.kind));
   const runInTime = () => (running ? live.stop() : withDrawing((schematic) => live.start(schematic)));
   // Shift+Enter in the code: what the circuit can do — solved, or (only in time) run
   const run = () => (timed ? runInTime() : solve());
@@ -560,10 +578,25 @@ export function SchematicCell({
   const solveButton = !timed && (
     <RunButton run={solve} eager running={solving || busy} done={done || empty} label={t("schematic.run")} />
   );
-  // ∿ the frequency response: a circuit solved on paper with a capacitor or an inductor in it
-  const bodeDone = !!cell.frequency && !cell.frequency.stale && !bodeError;
-  const bodeButton = !timed && cell.schematic.elements.some((e) => e.kind === "capacitor" || e.kind === "inductor") && (
-    <RunButton run={frequency} running={busy} done={bodeDone} icon={<Wave />} label={t("schematic.frequency")} />
+  // ∿ the frequency response (with a capacitor or an inductor); the spread over the parts' tolerances
+  // (with an R, C or L): a circuit solved on paper
+  const bodeButton = !timed && reactive && (
+    <RunButton
+      run={() => plot("frequency", (s) => kernel.frequency(s))}
+      running={busy}
+      done={plotDone("frequency")}
+      icon={<Wave />}
+      label={t("schematic.frequency")}
+    />
+  );
+  const spreadButton = !timed && passive && (
+    <RunButton
+      run={() => plot("spread", (s) => kernel.spread(s, 0.05))}
+      running={busy}
+      done={plotDone("spread")}
+      icon={<SpreadIcon />}
+      label={t("schematic.spread")}
+    />
   );
   const liveButton = inTime && (
     <RunButton
@@ -589,6 +622,7 @@ export function SchematicCell({
       {problems}
       {solveButton}
       {bodeButton}
+      {spreadButton}
       {liveButton}
       {/* (a phone, in the notebook: nothing edited there, no component made) */}
       {!running && !compact && (
@@ -669,6 +703,7 @@ export function SchematicCell({
       onFull={setFull}
       // an Arduino's sketch from its inspector: beside the board
       onFirmware={(id, file) => void loadFile(id, file)}
+      onSweep={timed ? undefined : (id, lo, hi) => void plot("sweep", (s) => kernel.sweep(s, id, lo, hi))}
       onSketch={(id) =>
         void go(
           shown(id) || !full
@@ -883,17 +918,21 @@ export function SchematicCell({
           onClose={() => setSaving(false)}
         />
       )}
-      {bodeError ? (
-        <FailureBox failure={bodeError} kind="error" />
-      ) : (
-        cell.frequency && (
-          // SVG produced by our own renderer (electro.plot), from this drawing
-          <div
-            data-output="svg"
-            className={cn("overflow-x-auto [&_svg]:max-w-full [&_svg]:h-auto", cell.frequency.stale && "opacity-50")}
-            dangerouslySetInnerHTML={{ __html: cell.frequency.svg }}
-          />
-        )
+      {PLOTS.map((kind) =>
+        plotError?.kind === kind ? (
+          <FailureBox key={kind} failure={plotError.failure} kind="error" />
+        ) : (
+          cell[kind] && (
+            // SVG produced by our own renderer (electro.plot), from this drawing
+            <div
+              key={kind}
+              data-output="svg"
+              data-plot={kind}
+              className={cn("overflow-x-auto [&_svg]:max-w-full [&_svg]:h-auto", cell[kind]?.stale && "opacity-50")}
+              dangerouslySetInnerHTML={{ __html: cell[kind]?.svg ?? "" }}
+            />
+          )
+        ),
       )}
       {cell.results && Object.keys(cell.results).length > 0 && (
         <ResultsTable results={cell.results} stale={!!cell.stale} />

@@ -126,6 +126,19 @@ def test_frequency_of_a_drawing():
     assert "no output" in out["error"]["data"]  # nothing named, nothing reactive
 
 
+def test_sweep_and_spread_of_a_drawing():
+    from electro import Resistor, VoltageSource, loop
+    from electro_schematic import layout
+
+    drawing = layout(loop(VoltageSource(12), Resistor("1k"), Resistor("2k"))).to_json()
+    out = json.loads(kernel.sweep_plot(drawing, "R_2"))  # no range: 200 Ω to 20 kΩ
+    assert "<polyline" in out["svg"] and "R<tspan" in out["svg"]
+    assert "<polyline" in json.loads(kernel.sweep_plot(drawing, "R_2", "1k", "5k"))["svg"]
+    assert "<rect" in json.loads(kernel.spread(drawing, 0.05))["svg"]
+    unknown = layout(loop(VoltageSource(12), Resistor("1k"), Resistor())).to_json()
+    assert json.loads(kernel.sweep_plot(unknown, "R_2"))["error"]["issue"]["type"] == "NoSweepRange"
+
+
 def test_code_view_round_trip():
     from electro import Ammeter, Resistor, VoltageSource, loop
     from electro_schematic import Schematic, layout

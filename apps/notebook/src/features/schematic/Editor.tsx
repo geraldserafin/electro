@@ -106,6 +106,7 @@ interface Props {
   onFull: (full: boolean) => void;
   onSketch?: (id: string) => void; // an Arduino's sketch, opened from its inspector
   onFirmware?: (id: string, file: File) => void; // a Pico's program file, picked in its inspector
+  onSweep?: (id: string, lo: string, hi: string) => void; // an element's value swept, from its inspector
   bare?: boolean; // no frame of its own: it fills an editor group (the cell's)
   probe?: (target: ProbeTarget, onClose: () => void) => ReactNode; // running: the meter's panel for what it was put on
   // the user's own components, offered first in the element library (features/components)
@@ -167,6 +168,7 @@ export function SchematicEditor({
   onFull,
   onSketch,
   onFirmware,
+  onSweep,
   bare,
   probe,
   myParts,
@@ -1077,6 +1079,7 @@ export function SchematicEditor({
           onRemove={removeSelected}
           part={selectedElement?.kind === "part" ? value.parts?.[selectedElement.text ?? ""] : undefined}
           models={selectedElement ? library.kinds[selectedElement.kind]?.parts : undefined}
+          onSweep={onSweep && selectedElement ? (lo, hi) => onSweep(selectedElement.id, lo, hi) : undefined}
           icon={
             selectedElement ? (
               <SymbolIcon

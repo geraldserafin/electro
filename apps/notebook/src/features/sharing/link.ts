@@ -9,7 +9,15 @@ function bare(notebook: Notebook): Notebook {
   const cells = notebook.cells.map((c): Cell => {
     if (c.type === "code") return { ...c, outputs: [], execution: undefined };
     if (c.type === "schematic")
-      return { ...c, results: undefined, problems: undefined, stale: undefined, frequency: undefined };
+      return {
+        ...c,
+        results: undefined,
+        problems: undefined,
+        stale: undefined,
+        frequency: undefined,
+        sweep: undefined,
+        spread: undefined,
+      };
     return c;
   });
   return { ...notebook, cells };

@@ -303,7 +303,8 @@ class Spread:
 
 
 def tolerance(c: Circuit, *outputs: str, tol=0.05, runs: int = 500, omega=None, seed: int = 0) -> Spread:
-    """``outputs`` (by default the named nodes) when every resistor, capacitor and inductor is
+    """``outputs`` (by default the named nodes, else the voltages across the first four parts that
+    vary) when every resistor, capacitor and inductor is
     anywhere within its tolerance (uniformly): ``tol`` for all, or by kind, ``{"R": 0.01, "C": 0.2}``.
     At a frequency ``omega``, amplitudes. The same ``seed``, the same builds."""
     import random
@@ -319,7 +320,12 @@ def tolerance(c: Circuit, *outputs: str, tol=0.05, runs: int = 500, omega=None, 
             if t:
                 varied.append((p.model.param, float(p.component.value), float(t)))
     ls = LinearSystem(c, ctx, tuple(s for s, _, _ in varied))
-    outputs = outputs or tuple(n for n in _outputs(ls.system) if n.startswith("V_")) or tuple(_outputs(ls.system))
+    # by default the named nodes, else the voltages across the parts that vary (the first four)
+    labels = {p.model.param: p.label for p in shape.parts.values()}
+    outputs = outputs or tuple(n for n in _outputs(ls.system) if n.startswith("V_"))
+    outputs = outputs or tuple(f"U_{labels[s]}" for s, _, _ in varied[:4])
+    if not outputs:
+        raise ValueError("tolerance(): nothing varies and nothing is named — give it an output, e.g. 'V_A'")
     rng = random.Random(seed)
     values: dict[str, list[float]] = {n: [] for n in outputs}
     for _ in range(runs):
