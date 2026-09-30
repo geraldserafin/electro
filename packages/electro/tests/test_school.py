@@ -412,3 +412,14 @@ def test_phasor_strings():
     assert parse("230∠-120") == -115 - 115 * sp.sqrt(3) * sp.I
     assert parse("3+4j") == 3 + 4 * sp.I
     assert VoltageSource("10∠90").value == 10 * sp.I
+
+
+def test_tolerance_of_a_divider():
+    """Two 5 % resistors: the middle within ±5 % of half, most builds near it; the same seed, the same."""
+    c = supply(12) + Resistor("10k") + node("A") + Resistor("10k") + ground
+    spread = tolerance(c, tol=0.05, runs=400)
+    s = spread.stats("V_A")
+    assert s["mean"] == pytest.approx(6, abs=0.03) and 5.7 <= s["min"] and s["max"] <= 6.3
+    assert tolerance(c, tol=0.05, runs=400).values == spread.values
+    assert tolerance(c, tol={"C": 0.1}, runs=5).stats("V_A")["std"] == 0  # no resistor varies
+    assert "<rect" in spread._repr_svg_()

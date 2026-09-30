@@ -17,7 +17,7 @@ import sympy as sp
 from sympy.solvers.solveset import NonlinearError
 
 from .circuit import GROUND, Circuit, Close, Seq, ground
-from .components import Capacitor, Context, CurrentSource, Inductor, VoltageSource
+from .components import Capacitor, Context, CurrentSource, Inductor, Resistor, VoltageSource
 from .devices import SineSource
 from .issues import NotAPort, NoThevenin, NotLinear
 from .numeric import LinearSystem
@@ -266,3 +266,66 @@ def sweep(c: Circuit, element: str, values, *outputs: str, omega=None, points: i
             y = ls.value(n, x, (v,))
             out[n].append(abs(y) if omega is not None else y.real)
     return Sweep(placed.label, placed.component.unit, values, out)
+
+
+@dataclass(frozen=True)
+class Spread:
+    """Outputs over many builds of the circuit, each part somewhere in its tolerance: their values
+    run by run (``values``), and what that makes of them (``stats``)."""
+
+    values: dict[str, list[float]]
+    tol: dict[str, float]
+
+    def stats(self, name: str) -> dict[str, float]:
+        v = sorted(self.values[name])
+        n = len(v)
+        mean = sum(v) / n
+        return {
+            "mean": mean,
+            "std": math.sqrt(sum((x - mean) ** 2 for x in v) / max(1, n - 1)),
+            "min": v[0],
+            "max": v[-1],
+            "p1": v[int(0.01 * (n - 1))],
+            "p99": v[int(0.99 * (n - 1))],
+        }
+
+    def __repr__(self):
+        rows = []
+        for n in self.values:
+            s = self.stats(n)
+            rows.append(f"{n}: {s['mean']:.4g} ± {s['std']:.2g} (od {s['min']:.4g} do {s['max']:.4g})")
+        return "\n".join(rows)
+
+    def _repr_svg_(self) -> str:
+        from .plot import HistogramPlot
+
+        return HistogramPlot(self)._repr_svg_()
+
+
+def tolerance(c: Circuit, *outputs: str, tol=0.05, runs: int = 500, omega=None, seed: int = 0) -> Spread:
+    """``outputs`` (by default the named nodes) when every resistor, capacitor and inductor is
+    anywhere within its tolerance (uniformly): ``tol`` for all, or by kind, ``{"R": 0.01, "C": 0.2}``.
+    At a frequency ``omega``, amplitudes. The same ``seed``, the same builds."""
+    import random
+
+    ctx = Context(None if omega is None else parse(omega))
+    shape = structure(c)
+    kinds = {comp.prefix: comp for comp in (Resistor, Capacitor, Inductor)}
+    varied = []
+    for p in shape.parts.values():
+        kind = type(p.component)
+        if kind in kinds.values() and p.model.param is not None:
+            t = tol if not isinstance(tol, dict) else tol.get(kind.prefix, 0)
+            if t:
+                varied.append((p.model.param, float(p.component.value), float(t)))
+    ls = LinearSystem(c, ctx, tuple(s for s, _, _ in varied))
+    outputs = outputs or tuple(n for n in _outputs(ls.system) if n.startswith("V_")) or tuple(_outputs(ls.system))
+    rng = random.Random(seed)
+    values: dict[str, list[float]] = {n: [] for n in outputs}
+    for _ in range(runs):
+        point = tuple(v * (1 + rng.uniform(-t, t)) for _, v, t in varied)
+        x = ls.solve(*point)
+        for n in outputs:
+            y = ls.value(n, x, point)
+            values[n].append(abs(y) if omega is not None else y.real)
+    return Spread(values, {str(s): t for s, _, t in varied})

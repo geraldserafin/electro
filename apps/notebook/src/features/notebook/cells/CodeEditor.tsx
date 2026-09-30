@@ -79,7 +79,7 @@ function electro(t: TFunction<"notebook">): Completion[] {
         "Pico",
       ] as const
     ).map((c) => doc(c, hint(c))),
-    ...(["simulate", "bode", "sweep"] as const).map((f) => doc(f, hint(f), "function")),
+    ...(["simulate", "bode", "sweep", "tolerance"] as const).map((f) => doc(f, hint(f), "function")),
     ...["loop", "net", "series", "parallel", "shunt", "supply", "node"].map((f) => doc(f, hint("circuit"), "function")),
     ...[
       "solve",

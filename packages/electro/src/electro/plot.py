@@ -258,3 +258,56 @@ class BodePlot:
             y0 += PANEL + 48
         parts.append("</svg>")
         return "".join(parts)
+
+
+class HistogramPlot:
+    """A spread (``analysis.Spread``) as one histogram per output: how many builds gave each value,
+    in 24 bins, the mean marked; its unit's prefix as on the traces."""
+
+    BINS = 24
+
+    def __init__(self, spread):
+        self.spread = spread
+
+    def _repr_svg_(self) -> str:
+        names = list(self.spread.values)
+        height = TOP + len(names) * (PANEL + 48) + 10
+        w = WIDTH - LEFT - RIGHT
+        uid = f"hp{id(self) % 100000}"
+        parts = _open(uid, height)
+        y0 = TOP
+        for k, name in enumerate(names):
+            v = self.spread.values[name]
+            lo, hi = min(v), max(v)
+            span = (hi - lo) or abs(hi) or 1.0
+            counts = [0] * self.BINS
+            for x in v:
+                counts[min(self.BINS - 1, int((x - lo) / span * self.BINS))] += 1
+            top = max(counts)
+            factor, prefix = _scale(max(abs(lo), abs(hi)))
+            unit = "A" if name.startswith("I_") else "V"
+            bar = w / self.BINS
+            parts.append(f'<text x="{LEFT}" y="{y0 - 10}">{_label(name)}</text>')
+            for i, n in enumerate(counts):
+                h = n / top * PANEL
+                parts.append(
+                    f'<rect class="k{k % len(SERIES)}" x="{LEFT + i * bar + 1:.1f}" y="{y0 + PANEL - h:.1f}" '
+                    f'width="{bar - 2:.1f}" height="{h:.1f}" rx="1.5"/>'
+                )
+            mean = sum(v) / len(v)
+            xm = LEFT + (mean - lo) / span * w
+            parts.append(
+                f'<line x1="{xm:.1f}" x2="{xm:.1f}" y1="{y0 - 4}" y2="{y0 + PANEL}" stroke="currentColor" '
+                f'stroke-width="1.5" stroke-dasharray="4 3"><title>{_num(mean / factor)} {prefix}{unit}</title></line>'
+            )
+            parts.append(f'<line class="axis" x1="{LEFT}" x2="{LEFT + w}" y1="{y0 + PANEL}" y2="{y0 + PANEL}"/>')
+            for t in _ticks(lo / factor, hi / factor):
+                if lo / factor - 1e-12 <= t <= hi / factor + 1e-12:
+                    x = LEFT + (t * factor - lo) / span * w
+                    parts.append(
+                        f'<text class="muted" x="{x:.1f}" y="{y0 + PANEL + 15}" text-anchor="middle">{_num(t)}</text>'
+                    )
+            parts.append(f'<text class="muted" x="{LEFT + w + 16}" y="{y0 + PANEL + 15}">{prefix}{unit}</text>')
+            y0 += PANEL + 48
+        parts.append("</svg>")
+        return "".join(parts)

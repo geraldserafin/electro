@@ -9,7 +9,19 @@
 
 from sympy import Eq, Symbol, symbols
 
-from .analysis import Relation, Response, Sweep, Thevenin, blackbox, bode, equivalent, resistance, sweep
+from .analysis import (
+    Relation,
+    Response,
+    Spread,
+    Sweep,
+    Thevenin,
+    blackbox,
+    bode,
+    equivalent,
+    resistance,
+    sweep,
+    tolerance,
+)
 from .circuit import (
     GROUND,
     Circuit,
@@ -156,6 +168,8 @@ __all__ = [
     "equivalent",
     "resistance",
     "sweep",
+    "tolerance",
+    "Spread",
     "Ambiguous",
     "CircuitError",
     "Contradiction",
