@@ -1,4 +1,6 @@
 export { join, joinUrl, leave } from "./atoms";
+export { LinkDialog } from "./LinkDialog";
+export { decodeNote } from "./link";
 export * as messages from "./messages";
 export { ShareDialog, type Shared } from "./ShareDialog";
 

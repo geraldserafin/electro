@@ -52,6 +52,7 @@ export function Notebook({
   example = false,
   back,
   onShare,
+  embed,
 }: {
   initial: NotebookData;
   revision: number | null;
@@ -61,9 +62,11 @@ export function Notebook({
   example?: boolean; // a lesson (features/examples), read-only too: added to the notes as it is, under its own title
   back: { to: string; label: string }; // the way back: the folder it is in
   onShare?: (notebook: NotebookData) => void; // the user's own: who else has it (and its picture, as it is now)
+  embed?: string; // in an <iframe>: no way back, no sidebar, no notice; this link opens it in the app
 }) {
   const { t } = useTranslation("notebook");
   const { t: tNotes } = useTranslation("notes");
+  const { t: tSharing } = useTranslation("sharing");
   const [notebook, setNotebook] = useState<NotebookData>(initial);
   const latest = useRef(notebook);
   latest.current = notebook;
@@ -124,28 +127,43 @@ export function Notebook({
     >
       {/* left: the way back, and the sidebar's switch (the note's title and its sections);
           right: run, PDF, the settings (theme, language) */}
-      <Islands side="left">
-        <IslandLink to={back.to} title={back.label} aria-label={back.label}>
-          <Back />
-        </IslandLink>
-        <IslandButton
-          on={outline}
-          onClick={() => setOutline(!outline)}
-          aria-pressed={outline}
-          title={outline ? t("hideOutline") : t("outline")}
-          aria-label={t("outline")}
-        >
-          <OutlineIcon />
-        </IslandButton>
-      </Islands>
-      <Sidebar
-        open={outline}
-        title={notebook.title}
-        onTitle={setTitle}
-        cells={notebook.cells}
-        onMove={(from, count, before) => setCells((cells) => moveRange(cells, from, count, before))}
-        onClose={() => setOutline(false)}
-      />
+      {embed ? (
+        <Islands side="left">
+          <a
+            href={embed}
+            target="_blank"
+            rel="noreferrer"
+            className="flex items-center h-10 px-3.5 rounded-xl border border-line bg-island shadow-tools text-[14px] hover:bg-hover"
+          >
+            {tSharing("openInApp")} ↗
+          </a>
+        </Islands>
+      ) : (
+        <Islands side="left">
+          <IslandLink to={back.to} title={back.label} aria-label={back.label}>
+            <Back />
+          </IslandLink>
+          <IslandButton
+            on={outline}
+            onClick={() => setOutline(!outline)}
+            aria-pressed={outline}
+            title={outline ? t("hideOutline") : t("outline")}
+            aria-label={t("outline")}
+          >
+            <OutlineIcon />
+          </IslandButton>
+        </Islands>
+      )}
+      {!embed && (
+        <Sidebar
+          open={outline}
+          title={notebook.title}
+          onTitle={setTitle}
+          cells={notebook.cells}
+          onMove={(from, count, before) => setCells((cells) => moveRange(cells, from, count, before))}
+          onClose={() => setOutline(false)}
+        />
+      )}
       <Islands side="right">
         <IslandButton
           waiting={!ready}
@@ -188,7 +206,7 @@ export function Notebook({
           }
         />
       </Islands>
-      {readOnly ? (
+      {embed ? null : readOnly ? (
         <ReadOnlyNotice onCopy={() => void copy()} example={example} />
       ) : (
         <SyncNotice state={sync.state} onKeepMine={sync.keepMine} onTakeTheirs={sync.takeTheirs} />

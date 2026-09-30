@@ -28,6 +28,15 @@ export const pl = {
   copied: "Skopiowano",
   loading: "Wczytuję…",
   leave: "Usuń z moich notatek",
+  linkTitle: "Udostępnij „{{name}}” linkiem",
+  linkIntro:
+    "Cała notatka jest w samym linku — nie trafia na żaden serwer. Kto go otworzy, zobaczy ją do odczytu, uruchomi i może zrobić kopię. Zmiany po skopiowaniu linku do niego nie trafią.",
+  readLink: "Link do notatki",
+  embed: "Do osadzenia na stronie (iframe)",
+  copy: "Kopiuj",
+  longLink: "Link jest długi ({{kb}} kB) — niektóre komunikatory mogą go uciąć.",
+  broken: "Tego linku nie da się odczytać — mógł zostać ucięty przy kopiowaniu.",
+  openInApp: "Otwórz w electro",
   confirmLeave: "Usunąć „{{name}}” z twoich notatek? Wrócisz tu tylko przez link albo gdy ktoś znów ci to udostępni.",
   problem: {
     NoSuchPerson: "Nikt z adresem {{email}} jeszcze się tu nie logował. Wyślij tej osobie link.",
@@ -74,6 +83,15 @@ export const en: typeof pl = {
   copied: "Copied",
   loading: "Loading…",
   leave: "Remove from my notes",
+  linkTitle: "Share “{{name}}” by link",
+  linkIntro:
+    "The whole note is in the link itself — it goes to no server. Whoever opens it reads it, runs it and can make a copy. Changes after the link was copied are not in it.",
+  readLink: "Link to the note",
+  embed: "To embed in a page (iframe)",
+  copy: "Copy",
+  longLink: "The link is long ({{kb}} kB) — some messengers may cut it short.",
+  broken: "This link cannot be read — it may have been cut short when copied.",
+  openInApp: "Open in electro",
   confirmLeave:
     "Remove “{{name}}” from your notes? You will get back only by the link, or when someone shares it with you again.",
   problem: {

@@ -7,7 +7,7 @@ import { useTranslation } from "react-i18next";
 import { Link, useNavigate, useParams } from "react-router";
 import { Notebook } from "@/features/notebook";
 import { failure, folderUrl, fromDocument, getNote, noteUrl, toDocument } from "@/features/notes";
-import { ShareDialog, enabled as sharingOn } from "@/features/sharing";
+import { LinkDialog, ShareDialog, enabled as sharingOn } from "@/features/sharing";
 import type { Notebook as NotebookData } from "@/shared/model/types";
 import { IslandLink, Islands } from "@/shared/ui/Island";
 import { Back } from "@/shared/ui/icons";
@@ -72,14 +72,15 @@ export function NotePage() {
           revision={loaded.revision}
           reload={() => setReads((n) => n + 1)}
           readOnly={RANK[loaded.role] < RANK.editor}
-          {...(sharingOn && loaded.role === "owner" ? { onShare: setSharing } : {})}
+          {...(loaded.role === "owner" ? { onShare: setSharing } : {})}
           back={loaded.back}
           onTitle={(next) => {
             // the name in the address follows the title
             if (name !== slugify(next || "notatka")) navigate(noteUrl(id, next), { replace: true });
           }}
         />
-        {sharing && (
+        {sharing && !sharingOn && <LinkDialog notebook={sharing} onClose={() => setSharing(null)} />}
+        {sharing && sharingOn && (
           <ShareDialog
             item={{
               id,

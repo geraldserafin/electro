@@ -12,12 +12,14 @@ import { ExamplePage } from "@/pages/ExamplePage";
 import { FolderPage } from "@/pages/FolderPage";
 import { Home } from "@/pages/Home";
 import { NotePage } from "@/pages/NotePage";
+import { SharedPage } from "@/pages/SharedPage";
 
 // /                    the user's library: their folders and notes
 // /f/:id/:name         a folder (the name is only for reading: the id is what counts)
 // /n/:id/:name         a note, edited
 // /examples/:course    a course: its lessons (features/examples)
 // /examples/:course/:lesson  a lesson: to read, change and run, saved only when added to the notes
+// /s#…, /embed#…      a note shared by link, to read (and copy); the same bare, for an <iframe>
 // /auth/callback       back from GitHub's consent screen: connected, then where it started
 // The notes are in this browser (features/vault); no one signs in. Opening the app saves the session
 // from before (with GitHub: what is new there brought in). All under the address the app is served
@@ -33,6 +35,8 @@ void finishConnecting().then(() => {
           <Route path="/n/:id/:name?" element={<NotePage />} />
           <Route path="/examples/:course" element={<CoursePage />} />
           <Route path="/examples/:course/:name" element={<ExamplePage />} />
+          <Route path="/s" element={<SharedPage />} />
+          <Route path="/embed" element={<SharedPage embed />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
         <Downloads />
