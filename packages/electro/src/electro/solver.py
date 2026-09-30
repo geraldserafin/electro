@@ -125,11 +125,14 @@ class PartResult:
     U: sp.Expr | None
     I: sp.Expr | None
     realized: Circuit | None = None  # for a Hole: the element it turned out to be
+    ac: bool = False  # U and I are phasors (amplitudes), P is the average power ½·Re(U·I*)
 
     @property
     def P(self):
         if self.U is None or self.I is None:
             return None
+        if self.ac:
+            return sp.simplify(sp.re(sp.expand_complex(self.U * sp.conjugate(self.I))) / 2)
         return sp.simplify(self.U * self.I)
 
     def __repr__(self):
@@ -185,7 +188,9 @@ class Solution:
         get = lambda role: self._value(p.model.variables[role]) if role in p.model.variables else None
         param = p.model.param
         value = None if param is None else self._value(param)
-        return PartResult(p.label, p.component, value, get("U"), get("I"), self.realize(p.label))
+        return PartResult(
+            p.label, p.component, value, get("U"), get("I"), self.realize(p.label), self.system.ctx.omega is not None
+        )
 
     def realize(self, label: str) -> Circuit | None:
         """For a ``Hole``: the simplest element matching the solution (None if undetermined)."""

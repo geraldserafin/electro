@@ -75,6 +75,26 @@ def _label(name: str) -> str:
     return f'{escape(head)}<tspan class="sub" dy="3">{escape(sub)}</tspan>' if sub else escape(head)
 
 
+def _open(uid: str, height: int) -> list[str]:
+    """The ``<svg>`` and its styles: series colours in both themes, text, grid and axis lines."""
+    style = "".join(
+        f".{uid} .s{k}{{stroke:{light}}}.{uid} .k{k}{{fill:{light}}}" for k, (light, _) in enumerate(SERIES)
+    )
+    style += "".join(
+        f':root[data-theme="dark"] .{uid} .s{k}{{stroke:{dark}}}:root[data-theme="dark"] .{uid} .k{k}{{fill:{dark}}}'
+        for k, (_, dark) in enumerate(SERIES)
+    )
+    return [
+        f'<svg xmlns="http://www.w3.org/2000/svg" class="{uid}" width="{WIDTH}" height="{height}" '
+        f'viewBox="0 0 {WIDTH} {height}" font-family="ui-sans-serif,system-ui,sans-serif" font-size="11">',
+        f"<style>{style}.{uid} text{{fill:currentColor}}.{uid} .muted{{opacity:.62}}"
+        f".{uid} .grid{{stroke:currentColor;opacity:.12;stroke-width:1}}"
+        f".{uid} .axis{{stroke:currentColor;opacity:.35;stroke-width:1}}"
+        f".{uid} .line{{fill:none;stroke-width:2;stroke-linejoin:round;stroke-linecap:round}}"
+        f".{uid} .sub{{font-size:8px}}</style>",
+    ]
+
+
 class TracePlot:
     def __init__(self, trace, names: list[str]):
         self.trace, self.names = trace, names
@@ -91,23 +111,7 @@ class TracePlot:
         w = WIDTH - LEFT - RIGHT
         uid = f"tp{id(self) % 100000}"
         colors = {n: k for k, n in enumerate(self.names)}
-        style = "".join(
-            f".{uid} .s{k}{{stroke:{light}}}.{uid} .k{k}{{fill:{light}}}" for k, (light, _) in enumerate(SERIES)
-        )
-        style += "".join(
-            f':root[data-theme="dark"] .{uid} .s{k}{{stroke:{dark}}}'
-            f':root[data-theme="dark"] .{uid} .k{k}{{fill:{dark}}}'
-            for k, (_, dark) in enumerate(SERIES)
-        )
-        parts = [
-            f'<svg xmlns="http://www.w3.org/2000/svg" class="{uid}" width="{WIDTH}" height="{height}" '
-            f'viewBox="0 0 {WIDTH} {height}" font-family="ui-sans-serif,system-ui,sans-serif" font-size="11">',
-            f"<style>{style}.{uid} text{{fill:currentColor}}.{uid} .muted{{opacity:.62}}"
-            f".{uid} .grid{{stroke:currentColor;opacity:.12;stroke-width:1}}"
-            f".{uid} .axis{{stroke:currentColor;opacity:.35;stroke-width:1}}"
-            f".{uid} .line{{fill:none;stroke-width:2;stroke-linejoin:round;stroke-linecap:round}}"
-            f".{uid} .sub{{font-size:8px}}</style>",
-        ]
+        parts = _open(uid, height)
         if len(self.names) > 1:  # legend: a short line-key and the name, in text ink
             x = LEFT
             for n in self.names:
@@ -159,6 +163,71 @@ class TracePlot:
                     f'<text class="muted" x="{x:.1f}" y="{y0 + PANEL + 15}" text-anchor="middle">{_num(v)}</text>'
                 )
             parts.append(f'<text class="muted" x="{LEFT + w + 16}" y="{y0 + PANEL + 15}">t [{t_prefix}s]</text>')
+            y0 += PANEL + 48
+        parts.append("</svg>")
+        return "".join(parts)
+
+
+_SI = [(1e9, "G"), (1e6, "M"), (1e3, "k"), (1, ""), (1e-3, "m")]
+
+
+def _hz(f: float) -> str:
+    """1000 → 1k, 2.5e6 → 2.5M."""
+    for factor, prefix in _SI:
+        if f >= factor * 0.999:
+            return f"{f / factor:.3g}{prefix}"
+    return _num(f)
+
+
+class BodePlot:
+    """A frequency response as two panels on a logarithmic frequency axis: |H| in dB, then its phase."""
+
+    def __init__(self, response):
+        self.response = response
+
+    def _repr_svg_(self) -> str:
+        r = self.response
+        f, panels = r.f, [(r.gain_db, "dB"), (r.phase_deg, "°")]
+        lo_f, hi_f = math.log10(f[0]), math.log10(f[-1])
+        height = TOP + len(panels) * (PANEL + 48) + 10
+        w = WIDTH - LEFT - RIGHT
+        uid = f"bp{id(self) % 100000}"
+        sx = lambda v: LEFT + (math.log10(v) - lo_f) / (hi_f - lo_f or 1) * w  # noqa: E731
+        parts = _open(uid, height)
+        parts.append(
+            f'<text x="{LEFT + 4}" y="14">{_label(r.output)}{" / " + _label(r.input) if r.input else ""}</text>'
+        )
+        decades = [10.0**k for k in range(math.ceil(lo_f - 1e-9), math.floor(hi_f + 1e-9) + 1)]
+        y0 = TOP
+        for values, unit in panels:
+            lo, hi = min(values), max(values)
+            if unit == "°":  # phase in steps of 45° (90° past a half turn)
+                step = 45 if hi - lo <= 180 else 90
+                lo, hi = step * math.floor(lo / step + 1e-9), step * math.ceil(hi / step - 1e-9)
+                if hi == lo:
+                    lo, hi = lo - step, hi + step
+                ticks = [lo + step * i for i in range(round((hi - lo) / step) + 1)]
+            else:
+                ticks = _ticks(lo, hi)
+                lo, hi = min(lo, ticks[0]), max(hi, ticks[-1])
+            sy = lambda v, lo=lo, hi=hi, y0=y0: y0 + PANEL - (v - lo) / (hi - lo or 1) * PANEL  # noqa: E731
+            for v in ticks:
+                y = sy(v)
+                parts.append(
+                    f'<line class="grid" x1="{LEFT}" x2="{LEFT + w}" y1="{y:.1f}" y2="{y:.1f}"/>'
+                    f'<text class="muted" x="{LEFT - 6}" y="{y + 3.5:.1f}" text-anchor="end">{_num(v)}</text>'
+                )
+            for d in decades:
+                x = sx(d)
+                parts.append(
+                    f'<line class="grid" x1="{x:.1f}" x2="{x:.1f}" y1="{y0}" y2="{y0 + PANEL}"/>'
+                    f'<text class="muted" x="{x:.1f}" y="{y0 + PANEL + 15}" text-anchor="middle">{_hz(d)}</text>'
+                )
+            parts.append(f'<text class="muted" x="{LEFT - 6}" y="{y0 - 8}" text-anchor="end">{unit}</text>')
+            path = " ".join(f"{sx(a):.1f},{sy(b):.1f}" for a, b in zip(f, values))
+            parts.append(f'<polyline class="line s0" points="{path}"/>')
+            parts.append(f'<line class="axis" x1="{LEFT}" x2="{LEFT + w}" y1="{y0 + PANEL}" y2="{y0 + PANEL}"/>')
+            parts.append(f'<text class="muted" x="{LEFT + w + 16}" y="{y0 + PANEL + 15}">f [Hz]</text>')
             y0 += PANEL + 48
         parts.append("</svg>")
         return "".join(parts)

@@ -94,6 +94,22 @@ def test_ac_impedance():
     assert resistance(Resistor(1) + Inductor(1), omega=2) == 1 + 2 * sp.I
 
 
+def test_ac_power_is_average():
+    sol = (supply(1) + Resistor(1000) + Capacitor(1e-6) + ground).solve(omega=1000)
+    assert float(sol["R1"].P) == pytest.approx(0.25e-3)  # ½·|I|²·R, |I| = 1/√2 mA
+    assert sol["C1"].P == 0
+
+
+def test_bode_rc_low_pass():
+    r = bode(supply(12) + Resistor("1k") + node("A") + Capacitor("1u") + ground, "V_A")
+    at = lambda f: min(range(len(r.f)), key=lambda k: abs(r.f[k] - f))  # noqa: E731
+    fc = at(1 / (2 * 3.14159265 * 1e-3))
+    assert r.input == "E_1" and r.gain_db[0] == pytest.approx(0, abs=0.05)
+    assert r.gain_db[fc] == pytest.approx(-3, abs=0.1) and r.phase_deg[fc] == pytest.approx(-45, abs=1)
+    assert r.gain_db[at(1e5)] - r.gain_db[at(1e4)] == pytest.approx(-20, abs=0.5)  # −20 dB a decade
+    assert "<polyline" in r._repr_svg_()
+
+
 def test_dc_capacitor_blocks():
     sol = (supply(5) + Resistor(100) + Capacitor("1u") + ground).solve()
     assert sol["R1"].I == 0 and sol["C1"].U == 5

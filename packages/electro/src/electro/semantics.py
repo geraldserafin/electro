@@ -39,6 +39,7 @@ class System:
     parts: dict[str, Placed]
     potentials: dict[str, sp.Symbol]  # node name -> V symbol
     boundary: list[sp.Symbol] = field(default_factory=list)  # V_in1, I_in1, ..., V_out1, I_out1, ...
+    ctx: Context = field(default_factory=Context)
 
     def symbol(self, name: str) -> sp.Symbol:
         """Find a variable or parameter by name (``"I_R_1"``, ``"R_2"``, ``"V_A"``).
@@ -185,7 +186,7 @@ def compile_netlist(
     unknowns += [V[names[n]] for n in range(net.size) if n not in references]
     unknowns += [s for s in boundary if s not in unknowns]
     laws.sort(key=lambda law: KIND_ORDER[law.kind])
-    return System(laws, list(dict.fromkeys(unknowns)), known, placed, {nm: V[nm] for nm in names}, boundary)
+    return System(laws, list(dict.fromkeys(unknowns)), known, placed, {nm: V[nm] for nm in names}, boundary, ctx)
 
 
 def compile_circuit(c: Circuit, **kw) -> System:

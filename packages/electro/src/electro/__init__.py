@@ -9,7 +9,7 @@
 
 from sympy import Eq, Symbol, symbols
 
-from .analysis import Relation, Thevenin, blackbox, equivalent, resistance
+from .analysis import Relation, Response, Thevenin, blackbox, bode, equivalent, resistance
 from .circuit import (
     GROUND,
     Circuit,
@@ -131,8 +131,10 @@ __all__ = [
     "Voltmeter",
     "supply",
     "Relation",
+    "Response",
     "Thevenin",
     "blackbox",
+    "bode",
     "code",
     "equivalent",
     "resistance",

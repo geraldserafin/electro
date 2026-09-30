@@ -7,14 +7,18 @@ variable eliminated. Two circuits are equivalent iff their black boxes are equal
 
 from __future__ import annotations
 
+import cmath
+import math
 from dataclasses import dataclass
 
 import sympy as sp
 
 from .circuit import Circuit, Close, Seq, ground
-from .components import Context, CurrentSource
+from .components import Context, CurrentSource, VoltageSource
+from .devices import SineSource
 from .issues import NotAPort, NoThevenin, NotLinear
 from .semantics import compile_circuit
+from .solver import solve
 from .values import fmt, parse
 
 
@@ -110,3 +114,60 @@ def equivalent(c: Circuit, *, omega=None) -> Thevenin:
 def resistance(c: Circuit, *, omega=None) -> sp.Expr:
     """Equivalent resistance (impedance for ``omega``) of a 1 → 1 circuit."""
     return equivalent(c, omega=omega).Z
+
+
+OMEGA = sp.Symbol("omega", positive=True)
+
+
+@dataclass(frozen=True)
+class Response:
+    """Frequency response ``H(jω) = output / input``: the expression in ``omega`` and its samples."""
+
+    H: sp.Expr
+    output: str
+    input: str | None
+    f: list[float]
+    values: list[complex]
+
+    @property
+    def gain_db(self) -> list[float]:
+        return [20 * math.log10(max(abs(h), 1e-300)) for h in self.values]
+
+    @property
+    def phase_deg(self) -> list[float]:
+        """Unwrapped: no jumps of 360° where the phase passes −180°."""
+        out: list[float] = []
+        for h in self.values:
+            p = math.degrees(cmath.phase(h))
+            if out:
+                p += 360 * round((out[-1] - p) / 360)
+            out.append(p)
+        return out
+
+    def __repr__(self):
+        return f"H(jω) = {self.H}"
+
+    def _repr_svg_(self) -> str:
+        from .plot import BodePlot
+
+        return BodePlot(self)._repr_svg_()
+
+
+def bode(c: Circuit, output: str, input: str | None = None, *, f=(10, 1e6), points: int = 200) -> Response:
+    """The frequency response of ``output`` (``"V_A"``, ``"I_R_1"``) from ``f[0]`` to ``f[1]`` Hz, per
+    ``input`` (a quantity's name; by default the only voltage source's value, if there is one).
+
+    Solved once with a symbolic ``omega``, then only evaluated at each frequency.
+    """
+    sol = solve(c, omega=OMEGA)
+    H = sol(output)
+    if input is None:
+        sources = [p for p in sol.system.parts.values() if isinstance(p.component, (VoltageSource, SineSource))]
+        if len(sources) == 1:
+            input = sources[0].model.param.name
+    if input is not None:
+        H = sp.simplify(H / sol(input))
+    at = sp.lambdify(OMEGA, H, "math")
+    lo, hi = math.log10(f[0]), math.log10(f[1])
+    freqs = [10 ** (lo + (hi - lo) * k / (points - 1)) for k in range(points)]
+    return Response(H, output, input, freqs, [complex(at(2 * math.pi * x)) for x in freqs])
