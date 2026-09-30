@@ -3,6 +3,7 @@ import { IClock } from './clock/clock';
 import { ICpuCore } from './cpu-core';
 import { Logger } from './utils/logging';
 import { RPPIO } from './peripherals/pio';
+import type { RPSPI } from './peripherals/spi';
 
 export interface IRPChip {
   readonly identifier: string; // "rp2040" or "rp2350"
@@ -48,6 +49,9 @@ export interface IRPChip {
 
   dma_clearDREQ(dreq: number): void;
   dma_setDREQ(dreq: number): void;
+  /** (ours) The SPI whose data register ``address`` is, if its bytes go to a sink (for DMA's bursts); memory a DMA reads from in one go: a DataView and the offset in it. */
+  sinkAt?(address: number): RPSPI | null;
+  memoryAt?(address: number, length: number): [DataView, number] | null;
   clock: IClock;
 
   reset(): void;

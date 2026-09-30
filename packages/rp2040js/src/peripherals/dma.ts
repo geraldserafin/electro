@@ -203,7 +203,41 @@ export class RPDMAChannel<ChipType extends IRPChip = IRPChip> implements AlarmCa
     );
   }
 
+  // (ours) to an SPI whose bytes go to a sink, reading on through RAM or the flash, paced by that SPI: its
+  // TX request stays up, so fire()'s loop would go the whole burst — the SPI takes the burst at once
+  private burstToSink(): boolean {
+    const { ctrl, dataSize, rpchip } = this;
+    if (!(ctrl & INCR_READ) || ctrl & INCR_WRITE || this.ringMask || dataSize > 2) return false;
+    if (this.transferKind !== TransferKind.Direct8 && this.transferKind !== TransferKind.Direct16) return false;
+    if (!rpchip.sinkAt || !rpchip.memoryAt) return false;
+    const spi = rpchip.sinkAt(this.writeAddr);
+    if (!spi || this.treqValue !== spi.dreq.tx) return false;
+    const count = Math.min(this.transCount, BURST);
+    const memory = rpchip.memoryAt(this.readAddr, count * dataSize);
+    if (!memory || !spi.sinkBurst(memory[0], memory[1], count, dataSize)) return false;
+    this.readAddr += count * dataSize;
+    this.transCount -= count;
+    if (this.transCount > 0) this.scheduleTransfer();
+    else this.complete();
+    return true;
+  }
+
+  private complete() {
+    this.ctrl &= ~BUSY;
+    if (!(this.ctrl & IRQ_QUIET)) {
+      this.dma.intRaw |= 1 << this.index;
+      this.dma.checkInterrupts();
+    }
+    // `chainTo` is 4-bit (0-15) but RP2040 has only 12 DMA channels (unlike RP2350,
+    // where the mask matches CHANNEL_COUNT) — an explicit length check is needed to
+    // no-op out-of-range values. (`?.` can't be used: cts2c can't transpile it.)
+    if (this.chainTo !== this.index && this.chainTo < this.dma.channels.length) {
+      this.dma.channels[this.chainTo].start();
+    }
+  }
+
   fire() {
+    if (this.burstToSink()) return;
     const { ctrl, dataSize, ringMask } = this;
     // (ours) while the peripheral's request stays up — an SPI takes a byte at once, as the notebook completes
     // it — the next transfers follow in the same go, not an alarm each (up to BURST: others get their turn)
@@ -243,17 +277,7 @@ export class RPDMAChannel<ChipType extends IRPChip = IRPChip> implements AlarmCa
       if (burst < BURST && this.treqValue !== TREQ.Permanent && this.dma.dreq[this.treqValue]) continue;
       this.scheduleTransfer();
     } else {
-      this.ctrl &= ~BUSY;
-      if (!(this.ctrl & IRQ_QUIET)) {
-        this.dma.intRaw |= 1 << this.index;
-        this.dma.checkInterrupts();
-      }
-      // `chainTo` is 4-bit (0-15) but RP2040 has only 12 DMA channels (unlike RP2350,
-      // where the mask matches CHANNEL_COUNT) — an explicit length check is needed to
-      // no-op out-of-range values. (`?.` can't be used: cts2c can't transpile it.)
-      if (this.chainTo !== this.index && this.chainTo < this.dma.channels.length) {
-        this.dma.channels[this.chainTo].start();
-      }
+      this.complete();
     }
     return;
     }

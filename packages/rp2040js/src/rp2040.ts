@@ -58,6 +58,17 @@ export class RP2040 implements IRPChip {
   readonly sramView = new DataView(this.sram.buffer);
   // (ours) the RAM's 256-byte pages with translated code in them (jit.ts), and what to do when one is written
   readonly codePages = new Uint8Array((264 * KB) >> 8);
+  /** (ours) IRPChip.sinkAt: SPI0's or SPI1's SSPDR, the SPI having a sink. */
+  sinkAt(address: number): RPSPI | null {
+    const spi = address === 0x4003c008 ? this.spi[0] : address === 0x40040008 ? this.spi[1] : null;
+    return spi && spi.sink ? spi : null;
+  }
+  /** (ours) IRPChip.memoryAt: the RAM or the flash, when all of it is there. */
+  memoryAt(address: number, length: number): [DataView, number] | null {
+    if (address >= RAM_START_ADDRESS && address + length <= RAM_START_ADDRESS + this.sram.length) return [this.sramView, address - RAM_START_ADDRESS];
+    if (address >= FLASH_START_ADDRESS && address + length <= FLASH_START_ADDRESS + this.flash.length) return [this.flashView, address - FLASH_START_ADDRESS];
+    return null;
+  }
   onCodeWrite: (offset: number) => void = () => {};
   readonly flash = new Uint8Array(16 * MB);
   readonly flash16 = new Uint16Array(this.flash.buffer);

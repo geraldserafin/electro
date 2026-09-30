@@ -1,8 +1,9 @@
 // (ours) A block translator for a Cortex-M0+ core: the Thumb code from an address up to the next
-// branch (a "block") becomes one JavaScript function — each instruction the interpreter's own
-// statements (cortex-m0-core.ts), with its registers, immediates and the PC written in — which V8 then
-// compiles to machine code. What the interpreter decodes every time it runs an instruction is done
-// once; a loop of Doom's runs as a few calls of compiled code.
+// branch taken (a "block": on past a conditional one not taken, along a B forward) becomes one
+// JavaScript function — each instruction the interpreter's own statements (cortex-m0-core.ts), with its
+// registers, immediates and the PC written in — which V8 then compiles to machine code. What the
+// interpreter decodes every time it runs an instruction is done once; a loop of Doom's that branches back
+// to its block's start goes round inside the function, its registers in locals.
 //
 // It keeps the interpreter's semantics to the bit: the same flags, the same cycles, memory through the
 // same chip functions (with the RAM and the flash read in place). Interrupts are taken between blocks;
@@ -17,9 +18,11 @@ const RAM = 0x20000000;
 const RAM_SIZE = 264 * 1024;
 const FLASH = 0x10000000;
 const MAX_INSTRUCTIONS = 48;
+const VERIFY_LOOPING = 200; // cycles a block that loops may go on for, checked (verify())
 const PAGE = 8; // log2 of a RAM page's size (as rp2040.ts's codePages has it)
 
-type Block = () => void;
+// a block: run once, or — a loop that branches back to its start — again while the core's cycles are below ``limit``
+type Block = (limit: number) => void;
 
 /** One instruction translated: its statements, its cycles (fixed part), whether the block ends with it. */
 interface Translation {
@@ -27,6 +30,7 @@ interface Translation {
   cycles: number;
   ends: boolean;
   exits?: boolean; // it may leave the block early (its statements contain an exit)
+  jump?: number; // a branch the block follows: its next instruction is there
 }
 
 const hex = (n: number) => `0x${(n >>> 0).toString(16)}`;
@@ -172,10 +176,41 @@ export class BlockJit {
     if (block) {
       this.stats.blocks++;
       if (this.verifying) this.verify(block, pc);
-      else block();
+      else block(0);
     } else {
       this.stats.interpreted++;
       core.executeInstruction();
+    }
+  }
+
+  /**
+   * Blocks (step()s) until the core's cycles reach ``limit`` or it waits (WFE, WFI): what as many step()s
+   * do, with less between the blocks — a loop of a few instructions costs little more than its code.
+   */
+  run(limit: number): void {
+    const core = this.core, flashIndex = this.flashIndex, blocks = this.blocks;
+    if (this.verifying) {
+      while (core.cycles < limit && !core.waiting) this.step();
+      return;
+    }
+    while (core.cycles < limit && !core.waiting) {
+      if (core.interruptsUpdated && core.checkForInterrupts()) { // (as in step())
+        core.waiting = false;
+        continue;
+      }
+      const pc = core.registers[15] & ~1;
+      const f = (pc - FLASH) >>> 1;
+      const k = f < flashIndex.length ? flashIndex[f] : 0;
+      if (k > 0) {
+        blocks[k](limit);
+        continue;
+      }
+      const block = this.lookup(pc);
+      if (block) block(limit);
+      else {
+        this.stats.interpreted++;
+        core.executeInstruction();
+      }
     }
   }
 
@@ -191,18 +226,18 @@ export class BlockJit {
     const before = { R: R.slice(), N: core.N, Z: core.Z, C: core.C, V: core.V, PM: core.PM, cycles: core.cycles };
     const mode = [core.currentMode, core.IPSR, core.SPSEL, core.bankedSP].join();
     this.recorder.start();
-    block();
+    block(core.cycles + VERIFY_LOOPING); // (a loop's block going round a few times: the interpreter as many)
     const { writes, slow } = this.recorder.stop();
     // (nor those that returned from an exception: the mode, the stacks cannot be put back as simply)
     if (slow || this.mismatch || [core.currentMode, core.IPSR, core.SPSEL, core.bankedSP].join() !== mode) return;
-    const jitState = state();
+    const jitState = state(), cycles = core.cycles;
     const jitWords = new Map<number, number>();
     for (let i = 0; i < writes.length; i += 2) jitWords.set(writes[i], ram.getUint32(writes[i], true));
     for (let i = writes.length - 2; i >= 0; i -= 2) ram.setUint32(writes[i], writes[i + 1], true);
     R.set(before.R);
     Object.assign(core, { N: before.N, Z: before.Z, C: before.C, V: before.V, PM: before.PM, cycles: before.cycles });
     const n = this.lengths.get(block)!;
-    for (let i = 0; i < n; i++) core.executeInstruction();
+    while (core.cycles < cycles) core.executeInstruction(); // (as many instructions as took the block its cycles)
     const interpreted = state();
     const words: string[] = [];
     for (const [w, v] of jitWords) if (ram.getUint32(w, true) !== v) words.push(`${hex(RAM + w)}: jit ${hex(v)} interpreter ${hex(ram.getUint32(w, true))}`);
@@ -277,12 +312,12 @@ export class BlockJit {
       const opcode = core.readUint16(pc);
       const wide = opcode >> 12 === 0b1111 || opcode >> 11 === 0b11101;
       const opcode2 = wide ? core.readUint16(pc + 2) : 0;
-      const t = translateOne(opcode, opcode2, pc, cycles, (a) => core.readUint16(a));
+      const t = translateOne(opcode, opcode2, pc, cycles, (a) => core.readUint16(a), start);
       if (!t) break; // (left to the interpreter: the block ends before it)
       lines.push(t.code);
       cycles += t.cycles;
       count++;
-      pc += wide ? 4 : 2;
+      pc = t.jump ?? pc + (wide ? 4 : 2);
       if (t.ends) {
         ended = true;
         break;
@@ -291,7 +326,7 @@ export class BlockJit {
     if (!count) return null;
     this.lastEnd = pc;
     if (!ended) lines.push(`R[15] = ${hex(pc)};`);
-    const source = `return function block_${start.toString(16)}() {\n${localize(lines, cycles)}\n};`;
+    const source = `return function block_${start.toString(16)}(limit) {\n${localize(lines, cycles)}\n};`;
     const env = this.env;
     // eslint-disable-next-line @typescript-eslint/no-implied-eval
     const make = new Function(...Object.keys(env), source) as (...args: unknown[]) => Block;
@@ -305,7 +340,8 @@ export class BlockJit {
 /**
  * The block's statements with its registers and flags in locals (q0–q15: not r8, r16, the memory functions' names): read from the core at the start, written
  * back where it leaves (the exits, the end) and before a call that looks at the core (BXWritePC, blTaken:
- * after those the block ends). A register's value as the core keeps it: 32 bits, unsigned.
+ * after those the block ends). A register's value as the core keeps it: 32 bits, unsigned. A block that
+ * branches back to its start is a loop (its branch continues it): the registers stay in the locals.
  */
 function localize(lines: string[], cycles: number): string {
   let body = lines.join('\n');
@@ -324,6 +360,7 @@ function localize(lines: string[], cycles: number): string {
   const back = [...assigned].map((n) => `R[${n}] = q${n};`).join(' ') + (flagsSet ? ' core.N = N; core.Z = Z; core.C = C; core.V = V;' : '');
   const calls = /core\.(BXWritePC|blTaken)\(/.test(lines[lines.length - 1]) || /core\.(BXWritePC|blTaken)\(/.test(lines[lines.length - 2] ?? '');
   body = body.replace(/return;/g, `${back} return;`).replace(/core\.(BXWritePC|blTaken)\(/g, `${back} core.$1(`);
+  if (body.includes('continue;')) body = `for (;;) {\n${body}\nbreak;\n}`;
   const head = ['const R = core.registers; let x, y, res, a;'];
   if (used.size) head.push(`let ${[...used].map((n) => `q${n} = R[${n}]`).join(', ')};`);
   if (flagsRead) head.push('let N = core.N, Z = core.Z, C = core.C, V = core.V;');
@@ -347,11 +384,13 @@ const sub = (a: string, b: string) =>
  * One instruction's statements, the interpreter's (cortex-m0-core.ts: the same tests, in the same order);
  * ``before``: the block's cycles before it (for an exit's count). Null: not translated.
  */
-function translateOne(opcode: number, opcode2: number, pc: number, before: number, read16: (a: number) => number): Translation | null {
+function translateOne(opcode: number, opcode2: number, pc: number, before: number, read16: (a: number) => number, start: number): Translation | null {
   const next = pc + 2;
   const r = (n: number) => reg(n, pc);
   // leaving the block after this instruction (its fixed cycles ``c`` counted), at ``to``
   const exit = (to: string, c: number) => `{ R[15] = ${to}; core.cycles += ${before + c}; return; }`;
+  // a branch back to the block's start: round again (the block is a loop, see localize) while there is time
+  const again = (to: number, c: number) => `{ core.cycles += ${before + c}; if (core.cycles < limit) continue; R[15] = ${hex(to)}; return; }`;
   // an access that went to a peripheral may have made an interrupt pending: then the core takes it now
   const checked = (code: string, c: number, after = next) =>
     ({ code: `${code}\nif (core.interruptsUpdated) ${exit(hex(after), c)}`, cycles: c, ends: false, exits: true });
@@ -420,14 +459,19 @@ function translateOne(opcode: number, opcode2: number, pc: number, before: numbe
     let imm8 = (opcode & 0xff) << 1;
     const cond = (opcode >> 8) & 0xf;
     if (imm8 & (1 << 8)) imm8 = (imm8 & 0x1ff) - 0x200;
-    return { code: `if (${condition(cond)}) ${exit(hex(next + imm8 + 2), 2)}\nR[15] = ${hex(next)};`, cycles: 1, ends: true };
+    const to = next + imm8 + 2;
+    // (not taken, the block goes on)
+    return { code: `if (${condition(cond)}) ${to === start ? again(to, 2) : exit(hex(to), 2)}`, cycles: 1, ends: false, exits: true };
   }
   // B
   if (opcode >> 11 === 0b11100) {
     let imm11 = (opcode & 0x7ff) << 1;
     if (imm11 & (1 << 11)) imm11 = (imm11 & 0x7ff) - 0x800;
     if (read16(pc + 2) === 0xabcd && read16(pc + 4) === 0xffff) return null; // (the profiler's trace marker: the interpreter's)
-    return { code: `R[15] = ${hex(next + imm11 + 2)};`, cycles: 2, ends: true };
+    const to = next + imm11 + 2;
+    if (to === start) return { code: `${again(to, 2)}\nR[15] = ${hex(to)};`, cycles: 2, ends: true };
+    if (to > pc) return { code: '', cycles: 2, ends: false, jump: to }; // (forward: the block goes on there)
+    return { code: `R[15] = ${hex(to)};`, cycles: 2, ends: true };
   }
   // BICS
   if (opcode >> 6 === 0b0100001110) {

@@ -60,7 +60,9 @@ function tick() {
   try {
     while (sim.t < target - 1e-15) {
       runner.advanceTo(Math.min(target, sim.t + dtMax * 4), dtMax);
-      if (performance.now() - now > BUDGET) break;
+      const at = performance.now();
+      if (visible && at - sent >= FRAME) send(at); // (on time, not only as a tick ends)
+      if (at - now > BUDGET) break;
     }
   } catch (e) {
     running = false;
@@ -77,7 +79,7 @@ function tick() {
   }
   if (!lagging) behindSince = null;
   else behindSince ??= now;
-  if (visible && now - sent >= FRAME) send(now);
+  if (visible && performance.now() - sent >= FRAME) send(performance.now());
   schedule(lagging);
 }
 

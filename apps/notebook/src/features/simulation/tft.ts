@@ -51,17 +51,33 @@ export class Ili9341 {
   }
 
   transmit(byte: number) {
+    if (!this.listening()) return;
+    if (!this.wiring!.data()) this.begin(byte);
+    else if (this.command === 0x2c || this.command === 0x3c) this.write(byte);
+    else this.parameter(byte);
+  }
+
+  /** Bytes one after another (the pins as they are: nothing runs between them), as many transmit()s. */
+  transmitMany(memory: DataView, offset: number, count: number, size: number, mask: number) {
+    if (!this.listening()) return;
+    const byte = (i: number) => (size === 2 ? memory.getUint16(offset + 2 * i, true) : memory.getUint8(offset + i)) & mask;
+    if (!this.wiring!.data()) for (let i = 0; i < count; i++) this.begin(byte(i));
+    else if (this.command === 0x2c || this.command === 0x3c) {
+      if (size === 1) for (let i = 0; i < count; i++) this.write(memory.getUint8(offset + i) & mask);
+      else for (let i = 0; i < count; i++) this.write(byte(i));
+    } else for (let i = 0; i < count; i++) this.parameter(byte(i));
+  }
+
+  // powered, not held in reset (just held: reset), selected
+  private listening(): boolean {
     const w = this.wiring;
-    if (!w || !w.powered()) return;
+    if (!w || !w.powered()) return false;
     const held = w.reset();
     if (held !== this.wasReset) {
       this.wasReset = held;
       if (held) this.hardwareReset();
     }
-    if (held || !w.selected()) return;
-    if (!w.data()) this.begin(byte);
-    else if (this.command === 0x2c || this.command === 0x3c) this.write(byte);
-    else this.parameter(byte);
+    return !held && w.selected();
   }
 
   private hardwareReset() {

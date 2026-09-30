@@ -21,6 +21,9 @@ const LED = 25; // on the board, not a pin
 const LOW_BELOW = 0.8, HIGH_ABOVE = 2.0, VDD = 3.3;
 // steer(): the worker busier than BUSY, or behind, the cores slow down; less busy than IDLE, they speed up
 const BUSY = 0.92, IDLE = 0.8, SLOWEST = 0.01;
+// runUntil(): the most cycles a core runs before the other catches up and the clock goes on (1 µs or so:
+// a core waiting on the other, spinning, spins that long at most)
+const QUANTUM = 256;
 
 const MODE: Record<GPIOPinState, Mode> = {
   [GPIOPinState.Low]: "low", [GPIOPinState.High]: "high", [GPIOPinState.Input]: "input",
@@ -79,7 +82,10 @@ export class Pico implements Chip {
       new Spi(["GP2", "GP6", "GP18", "GP22"], ["GP3", "GP7", "GP19"]),
       new Spi(["GP10", "GP14", "GP26"], ["GP11", "GP15", "GP27"]),
     ];
-    mcu.spi.forEach((port, n) => (port.sink = (value) => this.spi[n].transmit(value))); // (at once: nothing drives MISO back)
+    mcu.spi.forEach((port, n) => { // (at once: nothing drives MISO back)
+      port.sink = (value) => this.spi[n].transmit(value);
+      port.sinkMany = (memory, offset, count, size, mask) => this.spi[n].transmitMany(memory, offset, count, size, mask);
+    });
   }
 
   get time(): number {
@@ -108,8 +114,9 @@ export class Pico implements Chip {
   }
 
   /**
-   * Run the program up to ``time`` (s since reset): core 0 a block, core 1 as far (asleep, a core only
-   * keeps up with the other); both asleep (WFE, WFI), the clock jumps to what wakes them.
+   * Run the program up to ``time`` (s since reset) in slices of at most QUANTUM cycles (ending at the next
+   * timer alarm): core 0 its slice, core 1 as far (asleep, a core only keeps up with the other), then the
+   * clock; both asleep (WFE, WFI), the clock jumps to what wakes them.
    */
   runUntil(time: number) {
     const mcu = this.mcu, clock = mcu.clock, [core0, core1] = mcu.core, [jit0, jit1] = this.jits;
@@ -121,17 +128,16 @@ export class Pico implements Chip {
         clock.tick(alarm > 0 ? Math.min(alarm, end - clock.nanos) : end - clock.nanos);
         continue;
       }
-      const start = core0.cycles;
+      const start = core0.cycles, alarm = clock.nanosToNextAlarm;
+      const until = Math.min(end - clock.nanos, alarm > 0 ? alarm : Infinity);
+      const limit = start + Math.max(1, Math.min(QUANTUM, Math.ceil(until / nanosPerCycle)));
       mcu.currentCore = 0; // (the SIO, the PPB: each core its own)
-      if (core0.waiting) core0.cycles = Math.max(core0.cycles, core1.cycles) + 1;
-      else jit0.step();
+      if (core0.waiting) core0.cycles = limit;
+      else jit0.run(limit);
       mcu.currentCore = 1;
-      while (core1.cycles < core0.cycles) {
-        if (core1.waiting) {
-          core1.cycles = core0.cycles;
-          break;
-        }
-        jit1.step();
+      if (core1.cycles < core0.cycles) {
+        jit1.run(core0.cycles);
+        if (core1.waiting && core1.cycles < core0.cycles) core1.cycles = core0.cycles;
       }
       const cycles = core0.cycles - start;
       if (mcu.pioActiveSmCount) mcu.stepPios(cycles);

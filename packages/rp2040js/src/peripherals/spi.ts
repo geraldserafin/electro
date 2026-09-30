@@ -78,6 +78,30 @@ export class RPSPI<ChipType extends IRPChip = IRPChip>
    * gets its every byte so; onTransmit is then not called).
    */
   sink: ((value: number) => void) | null = null;
+  /** (ours) Set too, a burst (sinkBurst) goes to it whole: the values in memory, as sinkBurst reads them, each masked. */
+  sinkMany: ((memory: DataView, offset: number, count: number, size: number, mask: number) => void) | null = null;
+
+  /**
+   * (ours) What ``count`` writes to SSPDR do, each going to the sink — the values read from ``memory`` at
+   * ``offset`` on, ``size`` bytes each (1 or 2): a DMA's burst to a display in one go. False, and nothing
+   * done, when they would not go to the sink.
+   */
+  sinkBurst(memory: DataView, offset: number, count: number, size: number): boolean {
+    const sink = this.sink;
+    if (!sink || !this.txFIFO.empty || this.busy) return false;
+    const mask = (1 << this.dataBits) - 1;
+    if (this.sinkMany) this.sinkMany(memory, offset, count, size, mask);
+    else if (size === 2) for (let i = 0; i < count; i++) sink(memory.getUint16(offset + 2 * i, true) & mask);
+    else for (let i = 0; i < count; i++) sink(memory.getUint8(offset + i) & mask);
+    const room = this.rxFIFO.size - this.rxFIFO.itemCount;
+    for (let i = 0; i < Math.min(room, count); i++) this.rxFIFO.push(0);
+    if (count > 0 && room > 0) this.fifosUpdated();
+    if (count > room && !(this.intRaw & SSPRORINTR)) {
+      this.intRaw |= SSPRORINTR;
+      this.checkInterrupts();
+    }
+    return true;
+  }
 
   private busy = false;
   private control0 = 0;

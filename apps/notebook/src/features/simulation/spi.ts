@@ -7,6 +7,8 @@ import type { Board, Session } from "./session";
 
 export interface SpiDevice {
   transmit(byte: number): void;
+  /** Bytes one after another, nothing between them (a DMA's burst): as many transmit()s. */
+  transmitMany(memory: DataView, offset: number, count: number, size: number, mask: number): void;
 }
 
 /** One of the chip's SPIs: the pins its SCK and TX (MOSI) can be on, and the devices on them. */
@@ -17,6 +19,10 @@ export class Spi {
 
   transmit(byte: number) {
     for (const d of this.devices) d.transmit(byte);
+  }
+
+  transmitMany(memory: DataView, offset: number, count: number, size: number, mask: number) {
+    for (const d of this.devices) d.transmitMany(memory, offset, count, size, mask);
   }
 }
 
