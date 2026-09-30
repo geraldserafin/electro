@@ -402,3 +402,14 @@ def test_ili9341_loads_the_3v3_rail_and_its_backlight_pin():
     assert solved["TFT_1"].I == pytest.approx(3.3 / 150)
     lit = simulate(tft, t=1e-4, inputs={"PICO_1.GP22": "high"}).at(1e-4)
     assert lit["V_bl"] == pytest.approx(3.3 * 1000 / 1040, rel=1e-3)  # the pin's 40 Ω, the backlight driver's 1 kΩ
+
+
+def test_spectrum_of_a_square_wave():
+    """Odd harmonics only, 4/(πn) of the half swing each; the mean at 0 Hz."""
+    trace = simulate(ground.transpose() + SquareSource(1, frequency=100) + Resistor(1) + ground, t=0.1)
+    s = trace.spectrum("U_R_1", f_max=1000)
+    at = lambda f: s["U_R_1"][round(f / s.t[1])]  # noqa: E731
+    assert at(0) == pytest.approx(0.5, abs=0.01)
+    for n in (1, 3, 5):
+        assert at(100 * n) == pytest.approx(2 / (math.pi * n), rel=0.02)
+    assert at(200) < 0.01 and at(400) < 0.01

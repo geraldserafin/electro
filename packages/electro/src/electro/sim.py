@@ -15,6 +15,7 @@ plain numbers; between steps the elements' states (``Model.states``) move on.
 
 from __future__ import annotations
 
+import cmath
 import json
 import math
 from array import array
@@ -382,6 +383,44 @@ class Simulation:
 # ------------------------------------------------------------------ simulate()
 
 
+def _resample(t: list[float], y: list[float], at: list[float]) -> list[float]:
+    """``y(t)`` at the times ``at`` (increasing), by straight lines between the steps."""
+    out, i = [], 0
+    for s in at:
+        while i + 1 < len(t) - 1 and t[i + 1] <= s:
+            i += 1
+        t0, t1 = t[i], t[min(i + 1, len(t) - 1)]
+        f = 0.0 if t1 == t0 else min(max((s - t0) / (t1 - t0), 0.0), 1.0)
+        out.append(y[i] + f * (y[min(i + 1, len(t) - 1)] - y[i]))
+    return out
+
+
+def _fft(x: list[float]) -> list[complex]:
+    """Radix-2 FFT (``len(x)`` a power of two), iterative: no numpy in the notebook."""
+    n = len(x)
+    a = [complex(v) for v in x]
+    j = 0
+    for i in range(1, n):  # bit-reversed order
+        bit = n >> 1
+        while j & bit:
+            j ^= bit
+            bit >>= 1
+        j |= bit
+        if i < j:
+            a[i], a[j] = a[j], a[i]
+    size = 2
+    while size <= n:
+        w = cmath.exp(-2j * math.pi / size)
+        for start in range(0, n, size):
+            wk = 1
+            for k in range(size // 2):
+                u, v = a[start + k], a[start + k + size // 2] * wk
+                a[start + k], a[start + k + size // 2] = u + v, u - v
+                wk *= w
+        size <<= 1
+    return a
+
+
 @dataclass
 class Trace:
     """What happened: ``t`` and every quantity's value at each accepted step."""
@@ -427,6 +466,27 @@ class Trace:
         from .plot import TracePlot
 
         return TracePlot(self, list(names) or self.default_signals())
+
+    def spectrum(self, *names: str, points: int = 4096, f_max: float | None = None):
+        """Each quantity's amplitude at each frequency (FFT of the trace resampled evenly, Hann
+        window): a sine of 5 V at 50 Hz is a peak of 5 at 50. Up to ``f_max`` Hz (by default a
+        quarter of the sampling rate). Plots like a sweep, over f."""
+        from .analysis import Sweep
+
+        names = names or tuple(self.default_signals())
+        t0, t1 = self.t[0], self.t[-1]
+        n = 1 << max(3, (points - 1).bit_length())  # a power of two
+        dt = (t1 - t0) / n
+        window = [0.5 - 0.5 * math.cos(2 * math.pi * k / n) for k in range(n)]
+        gain = 2 / sum(window)
+        keep = n // 4 if f_max is None else min(n // 2, int(f_max * dt * n) + 1)
+        values = {}
+        for name in names:
+            samples = _resample(self.t, self[name], [t0 + k * dt for k in range(n)])
+            mean = sum(samples) / n
+            spectrum = _fft([(v - mean) * w for v, w in zip(samples, window)])
+            values[name] = [abs(mean)] + [abs(x) * gain for x in spectrum[1:keep]]
+        return Sweep("f", "Hz", [k / (dt * n) for k in range(keep)], values)
 
     def default_signals(self) -> list[str]:
         """Capacitors' voltages, LEDs' currents and named nodes (at most four); else every node."""
