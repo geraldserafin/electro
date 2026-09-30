@@ -31,6 +31,7 @@ import {
   useLive,
 } from "@/features/simulation";
 import { FailureBox } from "@/features/solution";
+import { usePhone } from "@/shared/hooks/usePhone";
 import { cn } from "@/shared/lib/cn";
 import type { Failure } from "@/shared/model/issues";
 import type { Cell, SchematicData, SymbolLibrary } from "@/shared/model/types";
@@ -291,8 +292,12 @@ export function SchematicCell({
   const location = useLocation();
   const navigate = useNavigate();
   const full = params.get("board") === cell.id;
-  // what shows: the split is for full screen; in the notebook one bar, every tab on it
-  const viewOf = (l: Layout) => (full ? l : flat(l));
+  // what shows: the split is for full screen; in the notebook one bar, every tab on it — on a phone only the
+  // drawing, looked at (its tabs, its code and editing it are full screen's)
+  const phone = usePhone();
+  const compact = phone && !full;
+  const viewOf = (l: Layout): Layout =>
+    full ? l : compact ? { groups: [{ tabs: ["board"], active: "board", size: 1 }], focus: 0 } : flat(l);
   const view = viewOf(layout);
   const shown = (id: string) => view.groups.some((g) => g.active === id);
   const circuitShown = shown("circuit");
@@ -522,11 +527,14 @@ export function SchematicCell({
 
   // the results are up to date: the run button rests until something changes
   const done = cell.results !== undefined && !cell.stale && !(circuitShown && source !== generated);
+  // the cell's actions (what is wrong, run, a component, full screen): at the end of the last bar — on a
+  // phone in the drawing's corner, where a finger finds them (the bar's are small, a cell's edge near)
+  const inBoard = phone && shown("board");
   // what solving found wrong: not for a circuit that only runs in time (the bolt does not solve it;
   // what is there is from before), and not once hidden, until a run brings a new list
   const problems =
     !timed && !cell.stale && cell.problems?.length && cell.problems !== dismissed ? (
-      <Problems problems={cell.problems} below compact onDismiss={() => setDismissed(cell.problems)} />
+      <Problems problems={cell.problems} below={!inBoard} compact onDismiss={() => setDismissed(cell.problems)} />
     ) : null;
   // the bolt: solves the circuit — or runs (and stops) one that only works in time
   const runButton = (
@@ -538,6 +546,30 @@ export function SchematicCell({
       done={timed ? empty : done || empty}
       label={timed ? (running ? ts("controls.stop") : ts("controls.startTitle")) : t("schematic.run")}
     />
+  );
+  const actions = (
+    <>
+      {problems}
+      {runButton}
+      {!running && (
+        <button
+          className={cn(barButton, "[&_svg]:size-4")}
+          onClick={() => setSaving(true)}
+          title={tc("button")}
+          aria-label={tc("button")}
+        >
+          <ComponentIcon />
+        </button>
+      )}
+      <button
+        className={cn(barButton, "[&_svg]:size-4")}
+        onClick={() => setFull(!full)}
+        title={full ? t("schematic.exitFull") : t("schematic.full")}
+        aria-label={t("schematic.full")}
+      >
+        {full ? <Shrink /> : <Expand />}
+      </button>
+    </>
   );
 
   // a button held down (on the board or in the panel): drawn pressed, and closed in the circuit
@@ -558,6 +590,8 @@ export function SchematicCell({
         },
       }}
       bare
+      viewOnly={compact}
+      corner={inBoard ? actions : undefined}
       value={cell.schematic}
       onChange={(schematic) => update({ schematic, ...(cell.results ? { stale: true } : {}) })}
       library={library}
@@ -690,7 +724,8 @@ export function SchematicCell({
                 style={{ flex: `${g.size} 1 0px` }}
                 onPointerDownCapture={() => full && layout.focus !== i && setLayoutState({ ...layout, focus: i })}
               >
-                <div data-tab-bar className={BAR}>
+                {/* (a phone, in the notebook: none — only the drawing shows) */}
+                <div data-tab-bar className={cn(BAR, compact && "hidden")}>
                   <div
                     role="tablist"
                     aria-label={ts("code.tabs")}
@@ -728,28 +763,7 @@ export function SchematicCell({
                       what is wrong, the bolt, full screen */}
                   <div className="flex flex-none items-center gap-0.5 pr-1">
                     {sketchOf(g.active) && <UploadButton element={sketchOf(g.active)!} live={live} />}
-                    {i === last && problems}
-                    {i === last && runButton}
-                    {i === last && !running && (
-                      <button
-                        className={cn(barButton, "[&_svg]:size-4")}
-                        onClick={() => setSaving(true)}
-                        title={tc("button")}
-                        aria-label={tc("button")}
-                      >
-                        <ComponentIcon />
-                      </button>
-                    )}
-                    {i === last && (
-                      <button
-                        className={cn(barButton, "[&_svg]:size-4")}
-                        onClick={() => setFull(!full)}
-                        title={full ? t("schematic.exitFull") : t("schematic.full")}
-                        aria-label={t("schematic.full")}
-                      >
-                        {full ? <Shrink /> : <Expand />}
-                      </button>
-                    )}
+                    {i === last && !inBoard && actions}
                   </div>
                 </div>
                 <div

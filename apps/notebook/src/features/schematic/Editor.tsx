@@ -91,6 +91,8 @@ interface Props {
   topLeft?: ReactNode;
   topRight?: ReactNode;
   status?: ReactNode; // next to the full screen button, as it is (e.g. the warning sign)
+  corner?: ReactNode; // an island of the cell's own in the bottom right corner (a phone: run it, full screen)
+  viewOnly?: boolean; // looked at, not edited: no tools, nothing moves (while it runs, its buttons still work)
   camera?: { current: Camera | null }; // where the view was: kept here while the editor is away
   autoFocus?: boolean; // take the keyboard when shown
   live?: LiveView; // running in time: wires coloured by voltage, LEDs lit, switches and buttons work
@@ -150,6 +152,8 @@ export function SchematicEditor({
   topLeft,
   topRight,
   status,
+  corner,
+  viewOnly = false,
   camera,
   autoFocus,
   live,
@@ -217,6 +221,14 @@ export function SchematicEditor({
     setCursor((c) => (c && same(c, p) ? c : p));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cam]);
+  // only looked at now (a phone, out of full screen): what was picked, let go
+  useEffect(() => {
+    if (!viewOnly) return;
+    setSelection(null);
+    setTool({ type: "select" });
+    setLibraryOpen(false);
+    setDraft(null);
+  }, [viewOnly]);
   // running in time: the board is an instrument, not a drawing — switches, buttons, the
   // potentiometer's slider; what would change the circuit steps aside
   useEffect(() => {
@@ -424,7 +436,7 @@ export function SchematicEditor({
       setSelection(isAdjustable(e.kind) ? { type: "element", id: e.id } : null);
       return;
     }
-    if (untapped(event)) return;
+    if (viewOnly || untapped(event)) return;
     event.stopPropagation();
     svgRef.current?.focus({ preventScroll: true });
     if (event.shiftKey) {
@@ -460,7 +472,7 @@ export function SchematicEditor({
   };
 
   const onPinDown = (event: ReactPointerEvent, pin: Point) => {
-    if (tool.type !== "select" || live || untapped(event)) return; // the wire tool handles pins like any other point
+    if (tool.type !== "select" || live || viewOnly || untapped(event)) return; // the wire tool handles pins like any other point
     event.stopPropagation();
     svgRef.current?.focus({ preventScroll: true });
     begin({ type: "wire", from: pin });
@@ -523,7 +535,7 @@ export function SchematicEditor({
       setProbed({ type: "wire", index: wire });
       return;
     }
-    if (tool.type !== "select" || live) return;
+    if (tool.type !== "select" || live || viewOnly || untapped(event)) return;
     event.stopPropagation();
     svgRef.current?.focus({ preventScroll: true });
     if (event.shiftKey) {
@@ -745,7 +757,7 @@ export function SchematicEditor({
           onPointerDown={(event) => {
             if (spaceHeld || tool.type === "hand" || (live && liveTool === "hand") || event.button === 1)
               startPan(event, false);
-            else if (tool.type === "select" && event.shiftKey)
+            else if (tool.type === "select" && event.shiftKey && !viewOnly)
               startBox(event); // shift + drag: select many
             else if (tool.type === "select")
               startPan(event, true); // empty space: drag pans, click deselects
@@ -787,7 +799,7 @@ export function SchematicEditor({
               event.preventDefault();
               return;
             }
-            onKey(event);
+            if (!viewOnly) onKey(event);
           }}
           onKeyUp={(event) => {
             if (live && pressKey(event, false)) return;
@@ -1000,7 +1012,7 @@ export function SchematicEditor({
             focusBoard();
           }}
         />
-      ) : (
+      ) : viewOnly ? null : (
         <Toolbar
           current={tool}
           libraryOpen={libraryOpen}
@@ -1016,7 +1028,7 @@ export function SchematicEditor({
       {live && probed && probe?.(probed, () => setProbed(null))}
       {panel}
       {topRight && <BoardIsland className="top-[calc(var(--board-top,0px)+0.75rem)] right-3">{topRight}</BoardIsland>}
-      {(live ? isAdjustable(selectedKind ?? "") && !probed : selectedElement) && (
+      {(live ? isAdjustable(selectedKind ?? "") && !probed : !viewOnly && selectedElement) && (
         <Inspector
           key={selectedElement?.id}
           element={selectedElement}
@@ -1070,17 +1082,22 @@ export function SchematicEditor({
         onFit={() => setCam(fitted())}
         onUndo={undoStep}
         onRedo={redo}
-        history={!live}
+        history={!live && !viewOnly}
       />
       {/* bottom right: what is wrong with the circuit (always shown, a sign of its own), then full screen */}
       <div className="absolute bottom-3 right-3 z-3 flex items-end gap-1.5">
         {status}
+        {corner && (
+          <BoardIsland stays className="static gap-1 [&_button]:size-9">
+            {corner}
+          </BoardIsland>
+        )}
         <ScreenAndHelp
           className="static"
           full={full}
           onFull={() => onFull(!full)}
           onHelp={() => setHelp((h) => !h)}
-          help={!live}
+          help={!live && !viewOnly}
           screen={!bare}
         />
       </div>

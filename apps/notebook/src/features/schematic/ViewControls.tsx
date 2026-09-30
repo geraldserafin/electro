@@ -22,8 +22,9 @@ export function ZoomAndHistory({
   const { t } = useTranslation("schematic");
   return (
     <BoardIsland className="bottom-3 left-3">
+      {/* (a phone: two fingers zoom it) */}
       <BoardButton
-        className={islandButton()}
+        className={cn(islandButton(), "max-sm:hidden")}
         title={t("view.zoomOut")}
         aria-label={t("view.zoomOut")}
         onClick={() => onZoom(1 / 1.2)}
@@ -39,7 +40,7 @@ export function ZoomAndHistory({
         {Math.round(zoom * 100)}%
       </BoardButton>
       <BoardButton
-        className={islandButton()}
+        className={cn(islandButton(), "max-sm:hidden")}
         title={t("view.zoomIn")}
         aria-label={t("view.zoomIn")}
         onClick={() => onZoom(1.2)}
@@ -89,7 +90,7 @@ export function ScreenAndHelp({
   const { t } = useTranslation("schematic");
   if (!screen && !help) return null;
   return (
-    <BoardIsland className={className ?? "bottom-3 right-3"}>
+    <BoardIsland className={cn(className ?? "bottom-3 right-3", !screen && "max-sm:hidden")}>
       {screen && (
         <BoardButton
           className={islandButton()}
@@ -102,7 +103,7 @@ export function ScreenAndHelp({
       )}
       {help && (
         <BoardButton
-          className={islandButton()}
+          className={cn(islandButton(), "max-sm:hidden")}
           title={t("view.helpTitle")}
           aria-label={t("view.help")}
           onClick={onHelp}
