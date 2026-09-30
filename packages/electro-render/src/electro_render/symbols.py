@@ -45,6 +45,13 @@ SYMBOLS: dict[str, str] = {
     "vccs": '<path d="M0 0H14M0 80H14"/><path d="M20 0h8M24 -4v8M20 80h8"/><path d="M80 0V24M80 56V80M80 24L96 40L80 56L64 40Z"/><path d="M80 51V38"/><path class="fill" d="M80 31l-4 7h8z"/>',
     "ccvs": '<path d="M0 0V80"/><path class="fill" d="M0 46l-4.5 -8h9z"/><path d="M80 0V24M80 56V80M80 24L96 40L80 56L64 40Z"/><path d="M76 34h8M80 30v8M76 47h8"/>',
     "cccs": '<path d="M0 0V80"/><path class="fill" d="M0 46l-4.5 -8h9z"/><path d="M80 0V24M80 56V80M80 24L96 40L80 56L64 40Z"/><path d="M80 51V38"/><path class="fill" d="M80 31l-4 7h8z"/>',
+    # an ideal transformer: two windings facing each other across a core (two lines), dots at p1 and s1
+    "transformer": '<path d="M0 0H24V16'
+    + "a8 8 0 0 1 0 16" * 3
+    + 'V80H0"/><path d="M80 0H56V16'
+    + "a8 8 0 0 0 0 16" * 3
+    + 'V80H80"/><path d="M37 10V70M43 10V70"/><circle class="fill" cx="28" cy="8" r="2.5"/>'
+    '<circle class="fill" cx="52" cy="8" r="2.5"/>',
     "hole": _body('<rect class="dashed" x="-18" y="-10" width="36" height="20"/>', 18),
     "opamp": '<path d="M0 0H20M0 40H20M60 20H80"/><path d="M20 -10L20 50L62 20Z"/>'
     '<path d="M24 0h7M24 40h7M27.5 36.5v7"/>',

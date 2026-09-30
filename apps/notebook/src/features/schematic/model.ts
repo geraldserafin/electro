@@ -31,6 +31,7 @@ export const KINDS = [
   { kind: "resistor", prefix: "R", unit: "Ω", group: "passive" },
   { kind: "capacitor", prefix: "C", unit: "F", group: "passive" },
   { kind: "inductor", prefix: "L", unit: "H", group: "passive" },
+  { kind: "transformer", prefix: "TR", unit: "", group: "passive" },
   { kind: "voltage_source", prefix: "E", unit: "V", group: "sources" },
   { kind: "current_source", prefix: "J", unit: "A", group: "sources" },
   { kind: "sine_source", prefix: "E", unit: "V", group: "sources", live: true },

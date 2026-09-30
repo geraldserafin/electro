@@ -107,6 +107,34 @@ class ControlledSource(Reason):
 
 
 @dataclass(frozen=True)
+class TransformerVoltage(Reason):
+    """U₁ = n·U₂."""
+
+    label: sp.Symbol
+
+
+@dataclass(frozen=True)
+class TransformerCurrent(Reason):
+    """I₂ = n·I₁: the power in is the power out."""
+
+    label: sp.Symbol
+
+
+@dataclass(frozen=True)
+class WindingShortDC(Reason):
+    """In a DC steady state a winding is a short circuit."""
+
+    label: sp.Symbol
+
+
+@dataclass(frozen=True)
+class MutualInductance(Reason):
+    """U₁ = jωL₁·I₁ + jωM·I₂ (and the other winding the same way)."""
+
+    label: sp.Symbol
+
+
+@dataclass(frozen=True)
 class IdealOpAmp(Reason):
     """V+ = V−."""
 

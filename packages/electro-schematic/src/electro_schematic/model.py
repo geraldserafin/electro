@@ -60,6 +60,8 @@ KINDS: dict[str, Kind] = {
     "vccs": Kind(((0, 0), (0, 4), (4, 4), (4, 0)), comp.VCCS),
     "ccvs": Kind(((0, 0), (0, 4), (4, 4), (4, 0)), comp.CCVS),
     "cccs": Kind(((0, 0), (0, 4), (4, 4), (4, 0)), comp.CCCS),
+    # p1, p2 (the primary, on the left), s2, s1 (the secondary): the turns ratio in ``value``
+    "transformer": Kind(((0, 0), (0, 4), (4, 4), (4, 0)), comp.Transformer),
     # in time only (electro.devices): the value, where there is one, is in ``value``; the rest
     # (an LED's colour, a switch's position, a potentiometer's wiper, an Arduino's sketch) in ``text``
     "sine_source": Kind(TWO_PINS, dev.SineSource),  # the frequency in ``text``

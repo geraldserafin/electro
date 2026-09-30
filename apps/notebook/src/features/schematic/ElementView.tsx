@@ -109,6 +109,13 @@ function leads(kind: string, symbolPins: number[][]): number[][] {
       [0, -24],
       [0, 24],
     ];
+  if (kind === "transformer")
+    return [
+      [24, 0],
+      [24, 0],
+      [-24, 0],
+      [-24, 0],
+    ];
   if (kind === "ccvs" || kind === "cccs")
     return [
       [0, 40],

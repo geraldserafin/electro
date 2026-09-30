@@ -88,7 +88,9 @@ export function Inspector({
           ? t("inspector.zenerValue")
           : isControlled(element.kind)
             ? t("inspector.gain")
-            : t("inspector.value");
+            : element.kind === "transformer"
+              ? t("inspector.ratio")
+              : t("inspector.value");
   const { frequency, duty } = wave(element.text);
   const commitId = () => {
     const clean = id.trim();

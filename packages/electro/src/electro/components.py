@@ -27,13 +27,17 @@ from .reasons import (
     InductorImpedance,
     InductorShortDC,
     InductorStep,
+    MutualInductance,
     OhmsLaw,
     Reason,
     SourceCurrent,
     SourceVoltage,
+    TransformerCurrent,
+    TransformerVoltage,
     UnknownElement,
     VoltageAcross,
     VoltmeterReading,
+    WindingShortDC,
 )
 
 OPEN = open_end + open_end.transpose()  # 1 → 1 with nothing between: a break in the circuit
@@ -324,6 +328,71 @@ class OpAmp(NoValue):
         I = sp.Symbol(f"I_{label}")
         laws = [Law(V["plus"] - V["minus"], IdealOpAmp(sp.Symbol(label)))]
         return Model({"plus": sp.Integer(0), "minus": sp.Integer(0), "out": -I}, laws, {"I": I})
+
+
+class Transformer(Component):
+    """Ideal transformer, 2 → 2 like a controlled source: the primary (``p1`` above ``p2``) on the
+    left, the secondary (``s2`` below ``s1``) on the right, the dots at ``p1`` and ``s1``.
+
+    ``value``: the turns ratio ``n = N₁/N₂``; ``U₁ = n·U₂`` and ``I₂ = n·I₁`` (``I₁`` into ``p1``,
+    ``I₂`` out of ``s1``), so the power in is the power out. In a DC steady state both windings are
+    short circuits; in time it stays ideal (it passes DC too).
+    """
+
+    prefix, unit = "TR", ""
+    left, right = ("p1", "p2"), ("s2", "s1")
+
+    def build(self, label, V, param, ctx):
+        name = sp.Symbol(label)
+        U1, I1, U2, I2 = (sp.Symbol(f"{q}_{label}") for q in ("U1", "I1", "U2", "I2"))
+        laws = [
+            Law(U1 - (V["p1"] - V["p2"]), VoltageAcross(name), "kvl"),
+            Law(U2 - (V["s1"] - V["s2"]), VoltageAcross(name), "kvl"),
+        ]
+        if ctx.omega is None and not ctx.transient:
+            laws += [Law(U1, WindingShortDC(name)), Law(U2, WindingShortDC(name))]
+        else:
+            laws += [Law(U1 - param * U2, TransformerVoltage(name)), Law(I2 - param * I1, TransformerCurrent(name))]
+        inflow = {"p1": I1, "p2": -I1, "s1": -I2, "s2": I2}
+        return Model(inflow, laws, {"U1": U1, "I1": I1, "U2": U2, "I2": I2}, param)
+
+
+class Coupled(Component):
+    """Two magnetically coupled inductors ``L1``, ``L2`` (henries), 2 → 2 like ``Transformer``;
+    ``value``: the mutual inductance ``M``. Both currents flow in at the dots (``p1``, ``s1``):
+    ``U₁ = jωL₁·I₁ + jωM·I₂``, ``U₂ = jωM·I₁ + jωL₂·I₂``; in DC both are short circuits."""
+
+    prefix, unit = "M", "H"
+    left, right = ("p1", "p2"), ("s2", "s1")
+    positive = False  # M < 0: a dot on the other end
+
+    def __init__(self, value=None, L1=None, L2=None, label: str | None = None):
+        super().__init__(value, label)
+        self.L1, self.L2 = parse(L1, positive=True), parse(L2, positive=True)
+
+    def options(self):
+        return [f"L1={fmt(self.L1, 'H')!r}", f"L2={fmt(self.L2, 'H')!r}"]
+
+    def build(self, label, V, param, ctx):
+        name = sp.Symbol(label)
+        U1, I1, U2, I2 = (sp.Symbol(f"{q}_{label}") for q in ("U1", "I1", "U2", "I2"))
+        laws = [
+            Law(U1 - (V["p1"] - V["p2"]), VoltageAcross(name), "kvl"),
+            Law(U2 - (V["s1"] - V["s2"]), VoltageAcross(name), "kvl"),
+        ]
+        model = Model({"p1": I1, "p2": -I1, "s1": I2, "s2": -I2}, laws, {"U1": U1, "I1": I1, "U2": U2, "I2": I2}, param)
+        if ctx.transient:  # backward Euler on both fluxes
+            p1, p2 = sp.Symbol(f"I1_{label}_prev"), sp.Symbol(f"I2_{label}_prev")
+            laws.append(Law(U1 - (self.L1 * (I1 - p1) + param * (I2 - p2)) / ctx.dt, MutualInductance(name)))
+            laws.append(Law(U2 - (param * (I1 - p1) + self.L2 * (I2 - p2)) / ctx.dt, MutualInductance(name)))
+            model.states[p1], model.states[p2] = (I1, 0.0, 1e-3), (I2, 0.0, 1e-3)
+        elif ctx.omega is None:
+            laws += [Law(U1, WindingShortDC(name)), Law(U2, WindingShortDC(name))]
+        else:
+            jw = sp.I * ctx.omega
+            laws.append(Law(U1 - jw * (self.L1 * I1 + param * I2), MutualInductance(name)))
+            laws.append(Law(U2 - jw * (param * I1 + self.L2 * I2), MutualInductance(name)))
+        return model
 
 
 class Hole(NoValue, TwoTerminal):

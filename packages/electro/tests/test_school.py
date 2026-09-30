@@ -366,3 +366,27 @@ def test_controlled_sources_simulate_and_come_back_as_code():
     scope: dict = {}
     exec("from electro import *\n" + code(amp), scope)
     assert scope["uklad"].solve()["R_1"].U == -6
+
+
+def test_ideal_transformer_steps_down():
+    """n = 2: half the voltage, twice the current, the same power."""
+    c = net((VoltageSource(10), "GND", "A"), (Transformer(2), "A", "GND", "GND", "B"), (Resistor(10), "B", "GND"))
+    sol = c.solve(omega=100)
+    assert sol["R1"].U == 5 and sol["R1"].I == sp.Rational(1, 2)
+    assert sol(sp.Symbol("I1_TR_1")) == sp.Rational(1, 4) and sol(sp.Symbol("U2_TR_1")) == 5
+    dc = net((VoltageSource(10), "GND", "S"), (Resistor(5), "S", "A"), (Transformer(2), "A", "GND", "GND", "B"))
+    assert dc.solve()["R1"].I == 2  # DC: the primary is a short circuit
+
+
+def test_coupled_inductors():
+    """Secondary open: U₂ = jωM·I₁, and I₁ sees only jωL₁."""
+    c = net(
+        (VoltageSource(1), "GND", "A"),
+        (Resistor(1), "A", "B"),
+        (Coupled("1m", L1="2m", L2="3m"), "B", "GND", "GND", "C"),
+        (Resistor("1G"), "C", "GND"),
+    )
+    sol = c.solve(omega=1000)
+    i1 = complex(sol(sp.Symbol("I1_M_1")))
+    assert i1 == pytest.approx(1 / (1 + 2j), rel=1e-6)
+    assert complex(sol(sp.Symbol("U2_M_1"))) == pytest.approx(1j * i1, rel=1e-6)

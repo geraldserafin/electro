@@ -233,6 +233,29 @@
    "letter": null,
    "upright": false
   },
+  "transformer": {
+   "pins": [
+    [
+     0,
+     0
+    ],
+    [
+     0,
+     80
+    ],
+    [
+     80,
+     80
+    ],
+    [
+     80,
+     0
+    ]
+   ],
+   "svg": "<path d=\"M0 0H24V16a8 8 0 0 1 0 16a8 8 0 0 1 0 16a8 8 0 0 1 0 16V80H0\"/><path d=\"M80 0H56V16a8 8 0 0 0 0 16a8 8 0 0 0 0 16a8 8 0 0 0 0 16V80H80\"/><path d=\"M37 10V70M43 10V70\"/><circle class=\"fill\" cx=\"28\" cy=\"8\" r=\"2.5\"/><circle class=\"fill\" cx=\"52\" cy=\"8\" r=\"2.5\"/>",
+   "letter": null,
+   "upright": false
+  },
   "sine_source": {
    "pins": [
     [
