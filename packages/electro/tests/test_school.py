@@ -104,10 +104,18 @@ def test_bode_rc_low_pass():
     r = bode(supply(12) + Resistor("1k") + node("A") + Capacitor("1u") + ground, "V_A")
     at = lambda f: min(range(len(r.f)), key=lambda k: abs(r.f[k] - f))  # noqa: E731
     fc = at(1 / (2 * 3.14159265 * 1e-3))
-    assert r.input == "E_1" and r.gain_db[0] == pytest.approx(0, abs=0.05)
-    assert r.gain_db[fc] == pytest.approx(-3, abs=0.1) and r.phase_deg[fc] == pytest.approx(-45, abs=1)
-    assert r.gain_db[at(1e5)] - r.gain_db[at(1e4)] == pytest.approx(-20, abs=0.5)  # −20 dB a decade
+    gain, phase = r.gain_db["V_A"], r.phase_deg["V_A"]
+    assert r.input == "E_1" and gain[0] == pytest.approx(0, abs=0.05)
+    assert gain[fc] == pytest.approx(-3, abs=0.1) and phase[fc] == pytest.approx(-45, abs=1)
+    assert gain[at(1e5)] - gain[at(1e4)] == pytest.approx(-20, abs=0.5)  # −20 dB a decade
     assert "<polyline" in r._repr_svg_()
+
+
+def test_bode_outputs_by_default():
+    named = supply(1) + Resistor(10) + node("A") + Inductor("1m") + node("B") + Capacitor("1u") + ground
+    assert list(bode(named).H) == ["V_A", "V_B"]
+    assert list(bode(supply(1) + node("IN") + Resistor(10) + node("OUT") + Capacitor("1u") + ground).H) == ["V_OUT"]
+    assert list(bode(supply(1) + Resistor(10) + Inductor("1m") + Capacitor("1u") + ground).H) == ["U_L_1", "U_C_1"]
 
 
 def test_dc_capacitor_blocks():

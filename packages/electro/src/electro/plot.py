@@ -187,20 +187,30 @@ class BodePlot:
 
     def _repr_svg_(self) -> str:
         r = self.response
-        f, panels = r.f, [(r.gain_db, "dB"), (r.phase_deg, "°")]
+        names = list(r.values)
+        gains, phases = r.gain_db, r.phase_deg
+        f, panels = r.f, [(gains, "dB"), (phases, "°")]
         lo_f, hi_f = math.log10(f[0]), math.log10(f[-1])
         height = TOP + len(panels) * (PANEL + 48) + 10
         w = WIDTH - LEFT - RIGHT
         uid = f"bp{id(self) % 100000}"
         sx = lambda v: LEFT + (math.log10(v) - lo_f) / (hi_f - lo_f or 1) * w  # noqa: E731
         parts = _open(uid, height)
-        parts.append(
-            f'<text x="{LEFT + 4}" y="14">{_label(r.output)}{" / " + _label(r.input) if r.input else ""}</text>'
-        )
+        x = LEFT + 4  # legend: each output (per the input, if there is one), a key in its colour
+        for k, n in enumerate(names):
+            key = (
+                f'<rect class="k{k % len(SERIES)}" x="{x}" y="9" width="14" height="3" rx="1.5"/>'
+                if len(names) > 1
+                else ""
+            )
+            per = f" / {_label(r.input)}" if r.input else ""
+            parts.append(f'{key}<text x="{x + (19 if key else 0)}" y="14">{_label(n)}{per}</text>')
+            x += 40 + 7 * (len(n) + (len(r.input) + 3 if r.input else 0))
         decades = [10.0**k for k in range(math.ceil(lo_f - 1e-9), math.floor(hi_f + 1e-9) + 1)]
         y0 = TOP
-        for values, unit in panels:
-            lo, hi = min(values), max(values)
+        for series, unit in panels:
+            lo = min(min(v) for v in series.values())
+            hi = max(max(v) for v in series.values())
             if unit == "°":  # phase in steps of 45° (90° past a half turn)
                 step = 45 if hi - lo <= 180 else 90
                 lo, hi = step * math.floor(lo / step + 1e-9), step * math.ceil(hi / step - 1e-9)
@@ -209,6 +219,8 @@ class BodePlot:
                 ticks = [lo + step * i for i in range(round((hi - lo) / step) + 1)]
             else:
                 ticks = _ticks(lo, hi)
+                if len(ticks) > 1 and ticks[-1] < hi - 1e-9:  # a tick above the top too (−0.05 dB: up to 0)
+                    ticks.append(ticks[-1] + ticks[1] - ticks[0])
                 lo, hi = min(lo, ticks[0]), max(hi, ticks[-1])
             sy = lambda v, lo=lo, hi=hi, y0=y0: y0 + PANEL - (v - lo) / (hi - lo or 1) * PANEL  # noqa: E731
             for v in ticks:
@@ -224,8 +236,11 @@ class BodePlot:
                     f'<text class="muted" x="{x:.1f}" y="{y0 + PANEL + 15}" text-anchor="middle">{_hz(d)}</text>'
                 )
             parts.append(f'<text class="muted" x="{LEFT - 6}" y="{y0 - 8}" text-anchor="end">{unit}</text>')
-            path = " ".join(f"{sx(a):.1f},{sy(b):.1f}" for a, b in zip(f, values))
-            parts.append(f'<polyline class="line s0" points="{path}"/>')
+            for k, n in enumerate(names):
+                path = " ".join(f"{sx(a):.1f},{sy(b):.1f}" for a, b in zip(f, series[n]))
+                parts.append(
+                    f'<polyline class="line s{k % len(SERIES)}" points="{path}"><title>{escape(n)}</title></polyline>'
+                )
             parts.append(f'<line class="axis" x1="{LEFT}" x2="{LEFT + w}" y1="{y0 + PANEL}" y2="{y0 + PANEL}"/>')
             parts.append(f'<text class="muted" x="{LEFT + w + 16}" y="{y0 + PANEL + 15}">f [Hz]</text>')
             y0 += PANEL + 48
