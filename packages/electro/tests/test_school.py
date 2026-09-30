@@ -6,6 +6,7 @@ import sympy as sp
 from electro import *
 from electro.issues import ConflictingData, Equals, ParallelMismatch, SeriesMismatch
 from electro.reasons import ControlledSource, OhmsLaw
+from electro.values import parse
 
 
 def test_divider_with_unknown_resistor():
@@ -390,3 +391,22 @@ def test_coupled_inductors():
     i1 = complex(sol(sp.Symbol("I1_M_1")))
     assert i1 == pytest.approx(1 / (1 + 2j), rel=1e-6)
     assert complex(sol(sp.Symbol("U2_M_1"))) == pytest.approx(1j * i1, rel=1e-6)
+
+
+def test_three_phase_star_and_delta():
+    balanced = three_phase(230) | star(Resistor(10))
+    sol = balanced.solve(omega=314)
+    neutral = sum(sol(sp.Symbol(f"I_E_{k}")) for k in (1, 2, 3))
+    assert sp.simplify(neutral) == 0  # balanced: nothing in the neutral
+    # unbalanced, three wires: the star point floats away from the source's neutral
+    floating = (three_phase(230) | star(Resistor(10), Resistor(20), Resistor(30), neutral="N0")).solve(omega=314)
+    assert abs(complex(floating.V("N0"))) > 1
+    # delta: each load between two lines, at √3 the phase voltage and 30° ahead
+    d = (three_phase(230) | delta(Resistor(10))).solve(omega=314)
+    assert (d["R1"].U - 230 * sp.sqrt(3) * sp.exp(sp.I * sp.pi / 6)).expand(complex=True) == 0
+
+
+def test_phasor_strings():
+    assert parse("230∠-120") == -115 - 115 * sp.sqrt(3) * sp.I
+    assert parse("3+4j") == 3 + 4 * sp.I
+    assert VoltageSource("10∠90").value == 10 * sp.I

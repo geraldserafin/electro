@@ -26,6 +26,8 @@ _UNITS = "|".join(UNITS)
 _NUMBER = re.compile(rf"^\s*([+-]?\d+(?:[.,]\d+)?(?:e[+-]?\d+)?)\s*([pnuµmkMG]?)\s*(?:{_UNITS})?\s*$")
 _RKM = re.compile(r"^\s*(\d+)([pnuµmkMGR])(\d+)\s*$")  # "4k7" = 4.7k, "4R7" = 4.7
 _IDENT = re.compile(r"^[^\W\d]\w*$")
+_POLAR = re.compile(r"^\s*(.+?)\s*[∠@]\s*([+-]?\d+(?:[.,]\d+)?)\s*°?\s*$")  # "230∠-120", "10 V @ 30°"
+_COMPLEX = re.compile(r"^\s*[+-]?[\d.,]*\s*(?:[+-]\s*[\d.,]*)?[jJ]\s*$|^\s*[+-]?[\d.,]+[jJ]?\s*[+-]\s*[\d.,]+[jJ]?\s*$")
 _FRACTION = re.compile(r"^\s*([+-]?\d+)\s*/\s*(\d+)\s*$")
 
 
@@ -69,6 +71,12 @@ def parse(value, *, positive: bool = False):
         if m := _NUMBER.match(value):
             number, prefix = m.groups()
             return sp.Rational(number.replace(",", ".")) * PREFIXES[prefix]
+        if m := _POLAR.match(value):  # a phasor: magnitude and angle in degrees, exact for 30°, 120°, …
+            angle = sp.pi * sp.Rational(m.group(2).replace(",", ".")) / 180
+            return sp.nsimplify(parse(m.group(1))) * (sp.cos(angle) + sp.I * sp.sin(angle))
+        if _COMPLEX.match(value):  # "3+4j", "-2j"
+            number = complex(value.replace(" ", "").replace(",", ".").replace("J", "j"))
+            return parse(number)
         if _IDENT.match(value):
             return sp.Symbol(value, positive=True) if positive else sp.Symbol(value)
     raise BadValue(str(value))

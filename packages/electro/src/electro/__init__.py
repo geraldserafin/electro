@@ -50,7 +50,10 @@ from .components import (
     TwoTerminal,
     VoltageSource,
     Voltmeter,
+    delta,
+    star,
     supply,
+    three_phase,
 )
 from .devices import (
     AND,
@@ -134,6 +137,9 @@ __all__ = [
     "VoltageSource",
     "Voltmeter",
     "supply",
+    "star",
+    "delta",
+    "three_phase",
     "Relation",
     "Response",
     "Sweep",

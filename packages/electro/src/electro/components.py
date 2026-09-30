@@ -444,3 +444,50 @@ def notation(c: Circuit, sign: int = 1) -> str:
 def supply(value=None, label: str | None = None) -> Circuit:
     """Voltage source from ground, 0 → 1: ``ground.transpose() + VoltageSource(value)``."""
     return ground.transpose() + VoltageSource(value, label)
+
+
+# ---------------------------------------------------------------- three-phase (in AC: solve(omega=…))
+
+LINES = ("L1", "L2", "L3")
+_PHASES = (
+    sp.Integer(1),
+    sp.exp(-2 * sp.pi * sp.I / 3).expand(complex=True),
+    sp.exp(2 * sp.pi * sp.I / 3).expand(complex=True),
+)
+
+
+def three_phase(E=230, lines=LINES, neutral: str = "N") -> Circuit:
+    """A symmetric three-phase source in a star: phase voltage ``E`` (amplitude, as every phasor
+    here) from ``neutral`` to each line, at 0°, −120° and 120°. Joined to loads by the nodes'
+    names: ``three_phase(230) | star(Resistor(10), Resistor(20), Resistor(30))``."""
+    from .circuit import net
+
+    e = parse(E)
+    return net(*((VoltageSource(e * p), neutral, line) for p, line in zip(_PHASES, lines)))
+
+
+def star(*loads: Circuit, lines=LINES, neutral: str = "N") -> Circuit:
+    """A star load: one load (``1 → 1``) from each line to ``neutral`` — the source's (four
+    wires), or a name of its own for a floating star point (three wires). One load for all three
+    is copied."""
+    from .circuit import net
+
+    return net(*((z, line, neutral) for z, line in zip(_three(loads), lines)))
+
+
+def delta(*loads: Circuit, lines=LINES) -> Circuit:
+    """A delta load: L1–L2, L2–L3, L3–L1. One load for all three is copied."""
+    from .circuit import net
+
+    a, b, c = lines
+    return net(*((z, x, y) for z, (x, y) in zip(_three(loads), ((a, b), (b, c), (c, a)))))
+
+
+def _three(loads):
+    if len(loads) == 1:
+        from copy import deepcopy
+
+        return [loads[0], deepcopy(loads[0]), deepcopy(loads[0])]
+    if len(loads) != 3:
+        raise ValueError(f"three loads, or one for all three (got {len(loads)})")
+    return loads

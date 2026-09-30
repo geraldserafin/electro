@@ -145,7 +145,7 @@ class PartResult:
         fields = [f"U = {fmt(self.U, 'V')}", f"I = {fmt(self.I, 'A')}"]
         if self.P is not None and not self.P.has(sp.I):
             fields.append(f"P = {fmt(self.P, 'W')}")
-        return f"{head:<18}" + "   ".join(fields)
+        return head.ljust(17) + " " + "   ".join(fields)
 
 
 class Solution:
