@@ -17,9 +17,9 @@ export const pl = {
     pending: "Zmiany zapiszą się same za chwilę",
     autosaved: "Zapisane automatycznie — Zapisz kończy sesję jednym commitem",
     saving: "Zapisuję…",
-    local: "Zapisuje w tej przeglądarce — połącz GitHuba (menu ⋯), żeby mieć kopię w chmurze.",
+    local: "Zapisuje w tej przeglądarce — połącz GitHuba (pod tym przyciskiem), żeby mieć kopię w chmurze.",
     failed: "Nie udało się zapisać na GitHubie — zmiany są w przeglądarce, spróbuj jeszcze raz.",
-    auth: "GitHub nie przyjmuje już połączenia — połącz go ponownie (menu ⋯).",
+    auth: "GitHub nie przyjmuje już połączenia — rozłącz go i połącz ponownie (przycisk zapisu).",
     connectFailed: "Nie udało się połączyć z GitHubem.",
     copyTitle: "{{title}} (z GitHuba)",
     card: {
@@ -73,9 +73,9 @@ export const en: typeof pl = {
     pending: "Changes save by themselves in a moment",
     autosaved: "Autosaved — Save ends the session with one commit",
     saving: "Saving…",
-    local: "Saves in this browser — connect GitHub (the ⋯ menu) for a copy in the cloud.",
+    local: "Saves in this browser — connect GitHub (under this button) for a copy in the cloud.",
     failed: "Could not save to GitHub — the changes are in this browser, please try again.",
-    auth: "GitHub no longer takes the connection — connect it again (the ⋯ menu).",
+    auth: "GitHub no longer takes the connection — disconnect it and connect again (the save button).",
     connectFailed: "Could not connect GitHub.",
     copyTitle: "{{title}} (from GitHub)",
     card: {

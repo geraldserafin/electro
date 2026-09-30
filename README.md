@@ -46,7 +46,7 @@ apps/notebook ──HttpApiClient──▶ /api (w stronie: features/vault/api.t
 - **Vault to repo git w przeglądarce.** `library.json` (foldery i to, co w którym leży), `notes/<id>.json`
   (dokumenty; nazwa notatki to jej tytuł) i `firmware/<sha-256>`. Zmiany trafiają do plików na bieżąco,
   a **Zapisz** (⌘S / Ctrl+S) robi commit. Kropka na przycisku znaczy, że coś nie jest zapisane.
-- **GitHub jest opcjonalny.** „Połącz z GitHubem” w menu ⋯ (OAuth, zakres `repo`) zakłada prywatne
+- **GitHub jest opcjonalny.** „Połącz z GitHubem” pod przyciskiem zapisu (OAuth, zakres `repo`) zakłada prywatne
   `electro-notes`. Od tej pory Zapisz też synchronizuje: pobiera commity z GitHuba, scala je plik po pliku
   (`merge.ts`) i wypycha. Notatkę zmienioną w obu miejscach zostawia w wersji z przeglądarki, a wersję
   z GitHuba dokłada obok jako kopię. Nic nie ginie.
