@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import re
+from decimal import Decimal
 from fractions import Fraction
 
 import sympy as sp
@@ -95,9 +96,15 @@ def to_text(value) -> str | None:
             q //= 2
         while q % 5 == 0:
             q //= 5
-        if q == 1:  # terminating decimal
-            text = f"{sp.N(value, 30)}".rstrip("0")
-            return text.rstrip(".")
+        if q == 1:  # a terminating decimal: 0.5, 0.0047 — below a thousandth with its prefix (100n, 4.7µ)
+            small = [(f, p) for f, p in _ENG if f < sp.Rational(1, 1000)]
+            factor, prefix = (
+                next(((f, p) for f, p in small if abs(value) >= f), (1, ""))
+                if abs(value) < sp.Rational(1, 1000)
+                else (1, "")
+            )
+            scaled = Decimal(int((value / factor).p)) / Decimal(int((value / factor).q))
+            return f"{scaled.normalize():f}{prefix}"
         return f"{value.p}/{value.q}"
     return str(value)
 
