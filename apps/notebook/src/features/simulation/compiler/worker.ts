@@ -2,7 +2,11 @@
 // The in-page Arduino compiler (toolchain.ts), off the main thread: its files are fetched from
 // public/arduino/ once — the program and clang's headers on the first "load" or "compile", a board's
 // sysroot the first time that board is asked for (a Pico's is the larger one).
+import { trackDownloads } from "@/shared/lib/trackDownloads";
 import { type Board, type Compiled, compile, type Toolchain, toolchain } from "./toolchain";
+
+// its files shown on the page as they come: the compiler, each board's libraries
+trackDownloads((url) => (url.endsWith("sysroot.tar") ? "uno" : url.endsWith("pico.tar") ? "pico" : "compiler"));
 
 export type { Compiled };
 

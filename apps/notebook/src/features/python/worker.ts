@@ -2,6 +2,10 @@
 // Python (Pyodide) runs here, off the main thread, so the page stays responsive.
 import type { PyodideAPI } from "pyodide";
 import { runProgram } from "@/features/simulation/engine";
+import { trackDownloads } from "@/shared/lib/trackDownloads";
+
+// everything it fetches (Pyodide, its packages, our Python) shown on the page as it comes
+trackDownloads(() => "python");
 
 const PYODIDE = "https://cdn.jsdelivr.net/pyodide/v314.0.7/full/";
 

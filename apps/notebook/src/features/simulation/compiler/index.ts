@@ -1,6 +1,7 @@
 // The page's handle on the compiler worker: every call a message and a promise. The worker starts
 // only when asked (an Arduino or a Pico on a board), and then fetches the compiler once (tens of MB,
 // cached), and each board's sysroot the first time.
+import { type Progress, report } from "@/features/downloads/store";
 import type { Board, Compiled } from "./toolchain";
 
 export type { Board, Compiled };
@@ -16,7 +17,8 @@ class Compiler {
   private call(type: string, payload: object = {}): Promise<unknown> {
     if (!this.worker) {
       this.worker = new Worker(new URL("./worker.ts", import.meta.url), { type: "module" });
-      this.worker.onmessage = (event: MessageEvent<Reply>) => {
+      this.worker.onmessage = (event: MessageEvent<Reply | { progress: Progress }>) => {
+        if ("progress" in event.data) return report(event.data.progress);
         const call = this.pending.get(event.data.id);
         if (!call) return;
         this.pending.delete(event.data.id);

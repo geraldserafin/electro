@@ -1,5 +1,6 @@
 // The page's handle on the Python worker: every call is a message and a promise.
 
+import { type Progress, report } from "@/features/downloads/store";
 import type { LiveCircuit } from "@/features/simulation/engine";
 import type { Failure } from "@/shared/model/issues";
 import type { ElementResult, Output, Problem, SchematicData } from "@/shared/model/types";
@@ -13,7 +14,8 @@ class Kernel {
   readonly ready: Promise<void>;
 
   constructor() {
-    this.worker.onmessage = (event: MessageEvent<Reply>) => {
+    this.worker.onmessage = (event: MessageEvent<Reply | { progress: Progress }>) => {
+      if ("progress" in event.data) return report(event.data.progress);
       const reply = event.data;
       const call = this.pending.get(reply.id);
       if (!call) return;

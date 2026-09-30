@@ -5,35 +5,53 @@ import "katex/dist/katex.min.css";
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { BrowserRouter, Navigate, Route, Routes } from "react-router";
-import { AuthGate } from "@/features/auth";
+import { Downloads } from "@/features/downloads";
+import { finishConnecting, startSaving } from "@/features/vault";
+import { CoursePage } from "@/pages/CoursePage";
 import { ExamplePage } from "@/pages/ExamplePage";
 import { FolderPage } from "@/pages/FolderPage";
 import { Home } from "@/pages/Home";
-import { JoinPage } from "@/pages/JoinPage";
-import { LegacyNotePage } from "@/pages/LegacyNotePage";
 import { NotePage } from "@/pages/NotePage";
 
-// /                    the user's library: their folders and notes, and what was shared with them
+// /                    the user's library: their folders and notes
 // /f/:id/:name         a folder (the name is only for reading: the id is what counts)
-// /n/:id/:name         a note, read from the server and edited
-// /notes/:ref          a note's address from before folders: goes to /n/:id
-// /examples/:name      a new note from an example (then its address)
-// /join/:token        a share's link: the item becomes the user's to open, and opens
-// all behind signing in: without a session, the sign-in page (at the same address)
-createRoot(document.getElementById("root")!).render(
-  <StrictMode>
-    <BrowserRouter>
-      <AuthGate>
+// /n/:id/:name         a note, edited
+// /examples/:course    a course: its lessons (features/examples)
+// /examples/:course/:lesson  a lesson: to read, change and run, saved only when added to the notes
+// /auth/callback       back from GitHub's consent screen: connected, then where it started
+// The notes are in this browser (features/vault); no one signs in. Opening the app saves the session
+// from before (with GitHub: what is new there brought in). All under the address the app is served
+// at (BASE_URL: on GitHub Pages, the repository's name).
+void finishConnecting().then(() => {
+  createRoot(document.getElementById("root")!).render(
+    <StrictMode>
+      <BrowserRouter basename={import.meta.env.BASE_URL}>
         <Routes>
           <Route path="/" element={<Home />} />
           <Route path="/f/:id/:name?" element={<FolderPage />} />
           <Route path="/n/:id/:name?" element={<NotePage />} />
-          <Route path="/notes/:ref" element={<LegacyNotePage />} />
-          <Route path="/examples/:name" element={<ExamplePage />} />
-          <Route path="/join/:token" element={<JoinPage />} />
+          <Route path="/examples/:course" element={<CoursePage />} />
+          <Route path="/examples/:course/:name" element={<ExamplePage />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
-      </AuthGate>
-    </BrowserRouter>
-  </StrictMode>,
-);
+        <Downloads />
+      </BrowserRouter>
+    </StrictMode>,
+  );
+  startSaving(); // (after the first render: the lists hear what it brings from GitHub)
+  dismissBoot();
+});
+
+/** The loader over the page (index.html): once its bolt has filled up at least once, faded away. */
+function dismissBoot() {
+  const boot = document.getElementById("boot");
+  if (!boot) return;
+  const FILLED = 150 + 1000; // ms from the page's start: its delay, then 70 % of the 1.4 s fill
+  window.setTimeout(
+    () => {
+      boot.classList.add("done");
+      window.setTimeout(() => boot.remove(), 400);
+    },
+    Math.max(0, FILLED - performance.now()),
+  );
+}

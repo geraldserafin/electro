@@ -1,5 +1,6 @@
 // The page's handle on the Typst worker: started when first needed, then kept (the compiler and
 // the fonts load once). Every document is an answer to wait for.
+import { type Progress, report } from "@/features/downloads/store";
 import type { TypstDocument } from "./document";
 import type { Reply, Request } from "./protocol";
 
@@ -12,7 +13,8 @@ const waiting = new Map<number, (reply: Reply) => void>();
 function start(): Worker {
   if (worker) return worker;
   worker = new Worker(new URL("./worker.ts", import.meta.url), { type: "module" });
-  worker.onmessage = ({ data }: MessageEvent<Reply>) => {
+  worker.onmessage = ({ data }: MessageEvent<Reply | { progress: Progress }>) => {
+    if ("progress" in data) return report(data.progress);
     waiting.get(data.id)?.(data);
     waiting.delete(data.id);
   };

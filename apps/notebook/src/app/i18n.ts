@@ -4,6 +4,8 @@
 import i18n from "i18next";
 import { initReactI18next } from "react-i18next";
 import { messages as auth } from "@/features/auth";
+import { messages as components } from "@/features/components";
+import { messages as downloads } from "@/features/downloads";
 import { messages as language, savedLanguage } from "@/features/language";
 import { messages as library } from "@/features/library";
 import { messages as notebook } from "@/features/notebook";
@@ -31,6 +33,8 @@ const resources = {
     settings: settings.pl,
     language: language.pl,
     auth: auth.pl,
+    components: components.pl,
+    downloads: downloads.pl,
     pages: pages.pl,
   },
   en: {
@@ -46,6 +50,8 @@ const resources = {
     settings: settings.en,
     language: language.en,
     auth: auth.en,
+    components: components.en,
+    downloads: downloads.en,
     pages: pages.en,
   },
 };

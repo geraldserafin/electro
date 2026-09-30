@@ -6,8 +6,11 @@ import initRenderer, { type TypstRenderer, TypstRendererBuilder } from "@myriadd
 import rendererWasm from "@myriaddreamin/typst-ts-renderer/wasm?url";
 import initCompiler, { type TypstCompiler, TypstCompilerBuilder } from "@myriaddreamin/typst-ts-web-compiler";
 import compilerWasm from "@myriaddreamin/typst-ts-web-compiler/wasm?url";
+import { trackDownloads } from "@/shared/lib/trackDownloads";
 import template from "./electro.typ?raw";
 import type { Reply, Request } from "./protocol";
+
+trackDownloads(() => "pdf"); // the compiler, the renderer, the fonts: shown on the page as they come
 
 const ASSETS = `${import.meta.env.BASE_URL}typst/`;
 const FONTS = [

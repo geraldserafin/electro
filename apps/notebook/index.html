@@ -15,9 +15,39 @@
           : matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
       }
     </script>
+    <style>
+      /* until the app's own styles and script are here: its background, and in the middle a bolt filling
+         up with yellow, over the app — main.tsx lets it fill at least once, then fades it away */
+      html { background: #ffffff; color-scheme: light; }
+      html[data-theme="dark"] { background: #1e1e1e; color-scheme: dark; }
+      .boot { position: fixed; inset: 0; z-index: 1000; display: grid; place-items: center; background: inherit; }
+      .boot svg { animation: boot-in 0.3s 0.15s ease both; }
+      .boot.done { opacity: 0; transition: opacity 0.35s ease; pointer-events: none; }
+      .boot.done .level { animation: none; transform: none; }
+      .boot svg { width: 56px; height: 56px; }
+      .boot .empty { fill: #e4e4e7; }
+      html[data-theme="dark"] .boot .empty { fill: #f5f5f5; }
+      .boot .fill { fill: #f9ab00; }
+      .boot .level { animation: boot-fill 1.4s 0.15s cubic-bezier(0.5, 0, 0.3, 1) infinite both; }
+      @keyframes boot-in { from { opacity: 0; } }
+      @keyframes boot-fill {
+        0% { transform: translateY(-24px); }
+        70%, 100% { transform: translateY(0); }
+      }
+      @media (prefers-reduced-motion: reduce) { .boot .level { animation: none; } }
+    </style>
   </head>
   <body>
     <div id="root"></div>
+    <div id="boot" class="boot" role="progressbar" aria-label="electro">
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <defs>
+            <clipPath id="boot-bolt"><path d="M13 2L4 14h7l-1 8 9-12h-7z" /></clipPath>
+          </defs>
+          <path class="empty" d="M13 2L4 14h7l-1 8 9-12h-7z" />
+          <g clip-path="url(#boot-bolt)"><rect class="fill level" x="0" y="0" width="24" height="24" /></g>
+        </svg>
+    </div>
     <script type="module" src="/src/app/main.tsx"></script>
   </body>
 </html>
