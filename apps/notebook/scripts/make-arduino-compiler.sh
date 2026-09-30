@@ -26,7 +26,7 @@ cp "$work/gen/llvm.js" "$work"/gen/*.wasm "$out/"
   const modules = require("fs").readFileSync(0, "utf8").trim().split("\n");
   require("fs").writeFileSync(process.argv[1], JSON.stringify({ modules }) + "\n");' "$out/llvm.json"
 
-# only the freestanding C headers: the rest (CUDA, OpenCL, x86/ARM intrinsics, …) is of no use on an AVR
+# only the freestanding C headers: the rest (CUDA, OpenCL, x86/ARM intrinsics, …) no sketch includes
 headers=$(find "$build" -type d -path '*/include' -exec test -f '{}/stddef.h' \; -print | head -1)
 mkdir -p "$work/clang/include"
 for h in stddef.h stdarg.h stdbool.h stdint.h inttypes.h float.h limits.h stdalign.h stdnoreturn.h stdatomic.h \

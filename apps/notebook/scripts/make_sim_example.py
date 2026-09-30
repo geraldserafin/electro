@@ -66,7 +66,7 @@ md("""
 Szkic działa na emulowanym ATmega328P (jak w prawdziwym Arduino Uno): dioda na pinie 13 miga, a gdy
 przytrzymasz przycisk na pinie 2, miga szybciej. `analogRead(A0)` czyta napięcie z suwaka potencjometru —
 zmień jego położenie w panelu elementu i patrz na monitor portu szeregowego pod schematem.
-Szkic kompiluje serwer, więc potrzebne jest zalogowanie.
+Szkic kompiluje przeglądarka (za pierwszym razem pobiera kompilator), bez logowania.
 """)
 SKETCH = """// Dioda na pinie 13 miga; przycisk na pinie 2 (do masy) przyspiesza ją.
 // Na porcie szeregowym: napięcie z potencjometru na A0.

@@ -9,6 +9,7 @@ import type { ElementData } from "@/shared/model/types";
 import { cn } from "@/shared/lib/cn";
 import { Upload } from "@/shared/ui/icons";
 import { compiler } from "./compiler";
+import { firmwareFile } from "./firmware";
 import type { Live, SketchState } from "./useLive";
 
 /** What the sketch is doing, in words ("" when there is nothing to say). */
@@ -49,9 +50,10 @@ export function SketchEditor({ element, live, onChange, fill }: {
   onChange: (sketch: string) => void;
   fill?: boolean; // as tall as its parent (the side pane, full screen), edge to edge
 }) {
-  // an Arduino on the board: the page's compiler starts loading now, so the first upload does not wait for it
-  // (a Pico's sketch is compiled on the server)
-  useEffect(() => { if (element.kind === "arduino") compiler.load().catch(() => {}); }, [element.kind]);
+  // the page's compiler for the board starts loading now, so the first upload does not wait for it (not for a
+  // program given whole)
+  const given = firmwareFile(element.text ?? "") !== null;
+  useEffect(() => { if (!given) compiler.load(element.kind === "pico" ? "pico" : "uno").catch(() => {}); }, [element.kind, given]);
   const state = live.sketches[element.id];
   return (
     <section className={cn("flex flex-col", fill && "h-full min-h-0")}>

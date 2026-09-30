@@ -5,9 +5,11 @@ let
   notebook = "${root}/apps/notebook";
   # the Raspberry Pi Pico's Arduino core (earlephilhower's arduino-pico): its board index
   picoCore = "https://github.com/earlephilhower/arduino-pico/releases/download/global/package_rp2040_index.json";
-  # Arduino sketches (the live simulation) are compiled by arduino-cli with the arduino:avr core.
-  # The compiler and ctags that core downloads are x86 builds, so on an ARM Mac they come from
-  # nixpkgs instead (apps/server/src/Arduino.ts passes these paths as build properties).
+  # Sketches are compiled in the page (apps/notebook/src/features/simulation/compiler/); arduino-cli, with
+  # the arduino:avr and rp2040:rp2040 cores and the libraries, only builds what that compiler links in
+  # (apps/notebook/scripts/make-*-sysroot.sh) and the tests' fixtures (make-arduino-fixtures.sh): run
+  # arduino-setup once. The compiler and ctags the AVR core downloads are x86 builds, so on an ARM Mac
+  # they come from nixpkgs instead (the scripts pass these paths as build properties).
   avr = pkgs.pkgsCross.avr.buildPackages;
   avrToolchain = pkgs.symlinkJoin {
     name = "avr-toolchain";
@@ -19,7 +21,7 @@ let
   };
 in
 {
-  packages = [ pkgs.uv pkgs.arduino-cli pkgs.git-lfs ]; # git-lfs: the in-page Arduino compiler (public/arduino/*.wasm)
+  packages = [ pkgs.uv pkgs.arduino-cli pkgs.git-lfs ]; # git-lfs: the in-page Arduino compiler (public/arduino/*.wasm, pico.tar)
 
   env = pkgs.lib.optionalAttrs (pkgs.stdenv.isDarwin && pkgs.stdenv.isAarch64) {
     ARDUINO_COMPILER_PATH = "${avrToolchain}/bin/";
@@ -62,12 +64,14 @@ in
 
   dotenv.enable = true;
 
+  # the Arduino cores and the libraries the notebook offers (downloaded once), for the scripts above
+  scripts.arduino-setup.exec = "(arduino-cli core list | grep -q arduino:avr || arduino-cli core install arduino:avr); (arduino-cli lib list | grep -q '^Servo ' || arduino-cli lib install Servo); (arduino-cli lib list | grep -q '^LiquidCrystal ' || arduino-cli lib install LiquidCrystal); (arduino-cli lib list | grep -q '^RTClib ' || arduino-cli lib install 'LiquidCrystal I2C' 'Adafruit SSD1306' RTClib); (arduino-cli lib list | grep -q '^Adafruit ILI9341 ' || arduino-cli lib install 'Adafruit ILI9341'); (arduino-cli core list | grep -q rp2040:rp2040 || (arduino-cli core update-index --additional-urls ${picoCore} && arduino-cli core install rp2040:rp2040 --additional-urls ${picoCore}))";
+
   processes = {
     python-bundle.exec = "node ${notebook}/scripts/bundle-python.mjs --watch";
     notebook.exec = "cd ${notebook} && pnpm exec vite --port 5190 --strictPort";
     notes-server = {
-      # the first time: the Arduino core for compiling sketches, and the libraries the notebook offers (downloaded once)
-      exec = "(arduino-cli core list | grep -q arduino:avr || arduino-cli core install arduino:avr); (arduino-cli lib list | grep -q '^Servo ' || arduino-cli lib install Servo); (arduino-cli lib list | grep -q '^LiquidCrystal ' || arduino-cli lib install LiquidCrystal); (arduino-cli lib list | grep -q '^RTClib ' || arduino-cli lib install 'LiquidCrystal I2C' 'Adafruit SSD1306' RTClib); (arduino-cli lib list | grep -q '^Adafruit ILI9341 ' || arduino-cli lib install 'Adafruit ILI9341'); (arduino-cli core list | grep -q rp2040:rp2040 || (arduino-cli core update-index --additional-urls ${picoCore} && arduino-cli core install rp2040:rp2040 --additional-urls ${picoCore})); cd ${root}/apps/server && PORT=5191 pnpm dev";
+      exec = "cd ${root}/apps/server && PORT=5191 pnpm dev";
       after = [ "devenv:processes:postgres" ];
     };
   };

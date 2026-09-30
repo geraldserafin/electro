@@ -1,26 +1,26 @@
 {
  "format": "electro-notebook",
  "version": 2,
- "id": "bac0d85e931cf22e",
+ "id": "b1fcf3512ba71d47",
  "title": "Symulacja w czasie",
- "created": "2026-09-28T19:17:16+00:00",
- "modified": "2026-09-28T19:17:16+00:00",
+ "created": "2026-09-30T12:26:01+00:00",
+ "modified": "2026-09-30T12:26:01+00:00",
  "settings": {
   "codeInPdf": true
  },
  "cells": [
   {
-   "id": "580fe11a",
+   "id": "85d4157f",
    "type": "markdown",
    "source": "Obwód z diodą, tranzystorem albo układem scalonym nie jest liniowy — nie rozwiązuje się go na papierze,\ntylko **w czasie**: krok po kroku, jak w symulatorze. Pod każdym schematem jest przycisk **▶ Symuluj w czasie**.\nPrzewody zmieniają kolor z napięciem (zielony: dodatnie), diody świecą, łączniki przełączasz kliknięciem,\na przyciski działają, dopóki je przytrzymujesz. Oscyloskop pod schematem pokazuje przebiegi."
   },
   {
-   "id": "c5221219",
+   "id": "2b6a74db",
    "type": "markdown",
    "source": "## 1. Dioda i łącznik\nKliknij łącznik $S_1$ w czasie symulacji."
   },
   {
-   "id": "adc5ec4b",
+   "id": "793a35a8",
    "type": "schematic",
    "name": "dioda",
    "schematic": {
@@ -147,12 +147,12 @@
    }
   },
   {
-   "id": "27c08cc7",
+   "id": "02671633",
    "type": "markdown",
    "source": "## 2. Migacz na NE555\nKondensator $C_1$ ładuje się przez $R_1 + R_2$ do ⅔ napięcia zasilania i rozładowuje przez $R_2$ do ⅓ —\nwyjście (pin 3) przełącza się za każdym razem. Okres $T \\approx 0{,}693\\,(R_1 + 2R_2)\\,C_1 \\approx 1{,}5$ s."
   },
   {
-   "id": "2e345cc1",
+   "id": "052db562",
    "type": "schematic",
    "name": "migacz",
    "schematic": {
@@ -471,12 +471,12 @@
    }
   },
   {
-   "id": "79e9ac69",
+   "id": "8a2b802f",
    "type": "markdown",
-   "source": "## 3. Arduino\nSzkic działa na emulowanym ATmega328P (jak w prawdziwym Arduino Uno): dioda na pinie 13 miga, a gdy\nprzytrzymasz przycisk na pinie 2, miga szybciej. `analogRead(A0)` czyta napięcie z suwaka potencjometru —\nzmień jego położenie w panelu elementu i patrz na monitor portu szeregowego pod schematem.\nSzkic kompiluje serwer, więc potrzebne jest zalogowanie."
+   "source": "## 3. Arduino\nSzkic działa na emulowanym ATmega328P (jak w prawdziwym Arduino Uno): dioda na pinie 13 miga, a gdy\nprzytrzymasz przycisk na pinie 2, miga szybciej. `analogRead(A0)` czyta napięcie z suwaka potencjometru —\nzmień jego położenie w panelu elementu i patrz na monitor portu szeregowego pod schematem.\nSzkic kompiluje przeglądarka (za pierwszym razem pobiera kompilator), bez logowania."
   },
   {
-   "id": "34de3c69",
+   "id": "01a758be",
    "type": "schematic",
    "name": "arduino",
    "schematic": {
@@ -643,18 +643,18 @@
    }
   },
   {
-   "id": "955a264f",
+   "id": "839a9415",
    "type": "markdown",
    "source": "## 4. W kodzie: `simulate()`\nTo samo z kodu: `simulate(układ, t=…)` zwraca przebiegi — narysowane pod komórką, a liczby w `trace[\"V_A\"]`,\n`trace.at(t)`. Multiwibrator na dwóch tranzystorach: diody świecą na zmianę."
   },
   {
-   "id": "9ded63e1",
+   "id": "d0621711",
    "type": "code",
    "source": "multiwibrator = net(\n    (VoltageSource(9), \"GND\", \"vcc\"),\n    (Resistor(470), \"vcc\", \"a1\"), (LED(\"red\"), \"a1\", \"c1\"),\n    (Resistor(470), \"vcc\", \"a2\"), (LED(\"green\"), \"a2\", \"c2\"),\n    (Resistor(47000), \"vcc\", \"b2\"), (Resistor(47000), \"vcc\", \"b1\"),\n    (Capacitor(47e-6), \"c1\", \"b2\"), (Capacitor(33e-6), \"c2\", \"b1\"),\n    (NPN(), \"b1\", \"c1\", \"GND\"), (NPN(), \"b2\", \"c2\", \"GND\"),\n)\nprzebieg = simulate(multiwibrator, t=6)\nprzebieg.plot(\"I_LED_1\", \"I_LED_2\", \"V_b1\")",
    "outputs": []
   },
   {
-   "id": "c57165d9",
+   "id": "34dab6c0",
    "type": "code",
    "source": "# schematy z komórek też: migacz z punktu 2\nsimulate(migacz, t=5).plot(\"U_C_1\", \"I_LED_1\")",
    "outputs": []

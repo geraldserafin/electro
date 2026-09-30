@@ -1,29 +1,32 @@
 // The in-page compiler, for real: clang and lld as WebAssembly (public/arduino/, from
-// scripts/make-arduino-compiler.sh and make-arduino-sysroot.sh) compile a sketch, and the
-// emulated Uno runs it. Skipped when the compiler has not been built.
+// scripts/make-arduino-compiler.sh, make-arduino-sysroot.sh and make-pico-sysroot.sh) compile a sketch,
+// and the emulated Uno or Pico runs it. Skipped when the compiler has not been built.
 import { existsSync, readFileSync } from "node:fs";
 import { PinState } from "avr8js";
 import { beforeAll, describe, expect, it } from "vitest";
-import type { Application } from "@yowasp/runtime";
 import { CLOCK, Uno } from "../arduino";
 import { Backpack, Clock, Oled } from "../i2c";
 import { lcd, screen, watch } from "../lcd";
-import { compile, toolchain } from "./toolchain";
+import { Pico } from "../pico";
+import { Runner } from "../runner";
+import { WIDTH } from "../tft";
+import { compile, toolchain, type Board, type Toolchain } from "./toolchain";
 
 const dir = new URL("../../../../public/arduino/", import.meta.url);
-const built = existsSync(new URL("llvm.json", dir)) && existsSync(new URL("sysroot.tar", dir));
+const built = (sysroot: string) => existsSync(new URL("llvm.json", dir)) && existsSync(new URL(sysroot, dir));
 const read = (name: string) => readFileSync(new URL(name, dir));
 const buffer = (b: Buffer) => b.buffer.slice(b.byteOffset, b.byteOffset + b.byteLength) as ArrayBuffer;
 
-describe.skipIf(!built)("clang for AVR, as WebAssembly", () => {
-  let app: Application;
+async function load(board: Board, sysroot: string) {
+  const { modules: names } = JSON.parse(read("llvm.json").toString()) as { modules: string[] };
+  const { instantiate } = await import(/* @vite-ignore */ new URL("llvm.js", dir).href);
+  const modules = Object.fromEntries(await Promise.all(names.map(async (n) => [n, await WebAssembly.compile(read(n))] as const)));
+  return toolchain({ instantiate, modules, clangHeaders: buffer(read("clang-headers.tar")), sysroot: buffer(read(sysroot)) }, board);
+}
 
-  beforeAll(async () => {
-    const { modules: names } = JSON.parse(read("llvm.json").toString()) as { modules: string[] };
-    const { instantiate } = await import(/* @vite-ignore */ new URL("llvm.js", dir).href);
-    const modules = Object.fromEntries(await Promise.all(names.map(async (n) => [n, await WebAssembly.compile(read(n))] as const)));
-    app = await toolchain({ instantiate, modules, clangHeaders: buffer(read("clang-headers.tar")), sysroot: buffer(read("sysroot.tar")) });
-  }, 120_000);
+describe.skipIf(!built("sysroot.tar"))("clang for AVR, as WebAssembly", () => {
+  let app: Toolchain;
+  beforeAll(async () => { app = await load("uno", "sysroot.tar"); }, 120_000);
 
   it("compiles a sketch that runs: PWM, tone(), micros(), Serial", async () => {
     const sketch = readFileSync(new URL("../fixtures/features.ino", import.meta.url), "utf8");
@@ -104,6 +107,62 @@ void later() { s.write(90); }
   it("says what is wrong, on the sketch's own line", async () => {
     const result = await compile(app, "void setup() {\n  nope();\n}\nvoid loop() {}\n");
     expect(result).toHaveProperty("failed");
+    expect((result as { failed: string }).failed).toMatch(/sketch\.ino:2:3: error: use of undeclared identifier 'nope'/);
+  }, 120_000);
+});
+
+describe.skipIf(!built("pico.tar"))("clang for a Pico (ARM), as WebAssembly", () => {
+  let app: Toolchain;
+  beforeAll(async () => { app = await load("pico", "pico.tar"); }, 120_000);
+  const build = async (sketch: string) => {
+    const result = await compile(app, sketch);
+    if (!("image" in result)) throw new Error(JSON.stringify(result));
+    return result.image;
+  };
+
+  it("a sketch that runs: GP15 blinking, analogRead(), Serial and Serial1", async () => {
+    const pico = new Pico(await build(readFileSync(new URL("../fixtures/blink.pico.ino", import.meta.url), "utf8")));
+    let serial = "";
+    pico.onSerial = (text) => (serial += text);
+    pico.sense("GP26", 1.65);
+    pico.sense("GP14", 3.3);
+    pico.runUntil(0.6);
+    const rises = pico.take().filter((c) => c.pin === "GP15" && c.mode === "high").map((c) => c.time).slice(2);
+    expect((rises[rises.length - 1] - rises[0]) / (rises.length - 1)).toBeCloseTo(0.1, 2);
+    expect(Math.abs(Number(serial.match(/adc=(\d+)/)?.[1]) - 512)).toBeLessThan(8);
+    expect(serial).toMatch(/gp14=1/);
+  }, 120_000);
+
+  it("Adafruit_ILI9341 (with GFX, BusIO, SPI): the picture as from arduino-cli's build", async () => {
+    const image = await build(readFileSync(new URL("../fixtures/tft.pico.ino", import.meta.url), "utf8"));
+    const runner = new Runner(JSON.parse(readFileSync(new URL("../fixtures/tft.live.json", import.meta.url), "utf8")), []);
+    runner.attach("PICO_1", { board: "pico", image });
+    (runner.session.boards[0].chip as Pico).adaptive = false;
+    runner.advanceTo(1.0, 1e-3);
+    let picture: Uint8ClampedArray | undefined;
+    for (let p = runner.pictures(true)?.TFT_1; p; p = runner.pictures(true)?.TFT_1) picture = p;
+    const at = (x: number, y: number) => Array.from(picture!.slice((y * WIDTH + x) * 4, (y * WIDTH + x) * 4 + 3));
+    expect(at(10, 10)).toEqual([0, 0, 255]);
+    expect(at(300, 220)).toEqual([255, 0, 0]);
+  }, 120_000);
+
+  it("the other libraries link: Servo, EEPROM, LiquidCrystal_I2C, SSD1306, RTClib, the C++ library; the examples' game", async () => {
+    await build(readFileSync(new URL("../fixtures/hell.pico.ino", import.meta.url), "utf8"));
+    await build(`#include <Servo.h>
+#include <EEPROM.h>
+#include <LiquidCrystal_I2C.h>
+#include <Adafruit_SSD1306.h>
+#include <RTClib.h>
+#include <vector>
+Servo s; LiquidCrystal_I2C lcd(0x27, 16, 2); Adafruit_SSD1306 oled(128, 64, &Wire); RTC_DS1307 rtc; std::vector<int> v;
+void setup() { s.attach(2); lcd.init(); oled.begin(SSD1306_SWITCHCAPVCC, 0x3C); rtc.begin(); EEPROM.begin(256); v.push_back(3); later(); }
+void loop() {}
+void later() { Serial.println(sqrt(2.0) + v[0]); }
+`);
+  }, 120_000);
+
+  it("says what is wrong, on the sketch's own line", async () => {
+    const result = await compile(app, "void setup() {\n  nope();\n}\nvoid loop() {}\n");
     expect((result as { failed: string }).failed).toMatch(/sketch\.ino:2:3: error: use of undeclared identifier 'nope'/);
   }, 120_000);
 });

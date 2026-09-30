@@ -1,5 +1,5 @@
 // A Raspberry Pi Pico in the page: its RP2040 emulated, both cores (@electro/rp2040js), boots from its
-// bootrom the flash image the server compiled (arduino-pico: boot stage 2 first) or one given whole (a
+// bootrom the flash image the page compiled (compiler/: arduino-pico's, boot stage 2 first) or one given whole (a
 // UF2), and its pins meet the circuit as an Uno's do (chip.ts). Serial is its USB (a host is emulated
 // too), Serial1 its UART0; Wire is I²C0 on GP4 (SDA) and GP5 (SCL), as arduino-pico has them; its two
 // SPIs hand their bytes to the devices on them (spi.ts).

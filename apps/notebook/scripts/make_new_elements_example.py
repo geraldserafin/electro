@@ -609,8 +609,8 @@ d.cell("zegar")
 
 md("""
 ## 10. Raspberry Pi Pico: strzelanka w stylu Dooma
-Druga płytka: **Raspberry Pi Pico** (RP2040, logika 3,3 V). Szkic kompiluje serwer (rdzeń arduino-pico), więc
-trzeba być zalogowanym; emulowany jest jeden rdzeń. Na nim gra: korytarze liczone metodą rzucania promieni
+Druga płytka: **Raspberry Pi Pico** (RP2040, logika 3,3 V). Szkic kompiluje przeglądarka (rdzeń arduino-pico;
+za pierwszym razem pobiera kompilator, bez logowania). Na nim gra: korytarze liczone metodą rzucania promieni
 (jak w Wolfensteinie 3D), ściany cieniowane ditheringiem, demony jako sprite'y — na OLED-zie 128×64 przez I²C
 (GP4 SDA, GP5 SCL), z buzzerem na GP15.
 

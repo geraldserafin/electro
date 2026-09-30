@@ -1,5 +1,4 @@
-// Compiling an Arduino sketch on the server (@electro/notes-api: ArduinoGroup); a firmware file kept there (FirmwareGroup).
+// A firmware file kept on the notes server (@electro/notes-api: FirmwareGroup).
 import { NotesClient } from "@/features/notes/atoms";
 
-export const compileSketch = NotesClient.mutation("arduino", "compile");
 export const uploadFirmware = NotesClient.mutation("firmware", "upload");

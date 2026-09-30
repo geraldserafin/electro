@@ -8,3 +8,6 @@ allowBuilds:
   esbuild: true
   "@parcel/watcher": false
   msgpackr-extract: false
+
+patchedDependencies:
+  '@yowasp/runtime@11.0.67': patches/@yowasp__runtime@11.0.67.patch

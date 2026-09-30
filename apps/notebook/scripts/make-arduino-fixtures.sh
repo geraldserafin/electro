@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # Compiles src/features/simulation/fixtures/*.ino for the tests (needs arduino-cli with the arduino:avr
 # and rp2040:rp2040 cores — devenv shell; on an ARM Mac with ARDUINO_COMPILER_PATH / ARDUINO_CTAGS_PATH,
-# as the server): NAME.ino to NAME.hex for an Uno, NAME.pico.ino to NAME.pico.bin (the flash image) for a Pico.
-# The sketch goes in as C++ next to an empty .ino, like the server does it, so there is no ctags step to go wrong.
+# as the sysroot scripts): NAME.ino to NAME.hex for an Uno, NAME.pico.ino to NAME.pico.bin (the flash image) for a Pico.
+# The sketch goes in as C++ next to an empty .ino (as compiler/sketch.ts makes it), so there is no ctags step to go wrong.
 set -euo pipefail
 cd "$(dirname "$0")/../src/features/simulation/fixtures"
 for ino in *.ino; do
@@ -10,7 +10,7 @@ for ino in *.ino; do
   dir=$(mktemp -d)
   mkdir "$dir/sketch"
   : > "$dir/sketch/sketch.ino"
-  # as prepareSketch (@electro/notes-api) has it, prototypes apart: the fixtures do not need them
+  # as prepareSketch (compiler/sketch.ts) has it, prototypes apart: the fixtures do not need them
   { echo '#include <Arduino.h>'
     echo 'extern "C" __attribute__((weak)) int __cxa_atexit(void (*)(void *), void *, void *) { return 0; }'
     echo '__attribute__((weak)) void *__dso_handle;'

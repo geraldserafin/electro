@@ -12,3 +12,4 @@ dist/
 .data/
 
 .env
+/.llvm-wasm/

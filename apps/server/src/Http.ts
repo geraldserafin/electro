@@ -1,4 +1,4 @@
-/** The HTTP side: the contract's endpoints, implemented with LibraryRepo, SharingRepo and Accounts (and Arduino.ts, Firmware.ts). */
+/** The HTTP side: the contract's endpoints, implemented with LibraryRepo, SharingRepo and Accounts (and Firmware.ts). */
 import { HttpApiBuilder, HttpServerResponse } from "@effect/platform"
 import type { Cookie } from "@effect/platform/Cookies"
 import {
@@ -7,7 +7,6 @@ import {
 import * as arctic from "arctic"
 import { Config, Effect, Layer, Option, Redacted } from "effect"
 import { Accounts, SESSION_DAYS } from "./Accounts.js"
-import { ArduinoLive } from "./Arduino.js"
 import { FirmwareFilesLive, FirmwareLive } from "./Firmware.js"
 import { LibraryRepo } from "./LibraryRepo.js"
 import { Providers } from "./Providers.js"
@@ -128,7 +127,7 @@ export const SystemLive = HttpApiBuilder.group(NotesApi, "system", (handlers) =>
 
 /** The whole API; needs a database (SqlClient) and the OAuth Providers. */
 export const ApiLive = HttpApiBuilder.api(NotesApi).pipe(
-  Layer.provide([LibraryLive, SharingLive, AuthLive, SystemLive, ArduinoLive, FirmwareLive, FirmwareFilesLive]),
+  Layer.provide([LibraryLive, SharingLive, AuthLive, SystemLive, FirmwareLive, FirmwareFilesLive]),
   Layer.provide(AuthenticationLive),
   Layer.provide([LibraryRepo.Default, SharingRepo.Default, Accounts.Default]),
 )

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# clang + lld (+ llvm-objcopy) as one WebAssembly (WASI) program that compiles for AVR: YoWASP's
-# build (github.com/YoWASP/clang, build.sh) with the AVR backend in place of WebAssembly and only
+# clang + lld (+ llvm-objcopy) as one WebAssembly (WASI) program that compiles for AVR (an Uno) and ARM (a Pico): YoWASP's
+# build (github.com/YoWASP/clang, build.sh) with the AVR and ARM backends in place of WebAssembly and only
 # the tools the page runs. Takes a while (an hour or two) and several GB in <work dir>; then
 # make-arduino-compiler.sh <work dir>/llvm-build puts it in public/arduino/.
 #
@@ -53,7 +53,7 @@ if ! [ -f tblgen-build/bin/llvm-tblgen -a -f tblgen-build/bin/clang-tblgen ]; th
   cmake -G Ninja -B tblgen-build -S llvm-src/llvm \
     -DCMAKE_BUILD_TYPE=Release -DLLVM_BUILD_RUNTIME=OFF -DLLVM_BUILD_TOOLS=OFF -DLLVM_INCLUDE_UTILS=OFF \
     -DLLVM_INCLUDE_RUNTIMES=OFF -DLLVM_INCLUDE_EXAMPLES=OFF -DLLVM_INCLUDE_TESTS=OFF -DLLVM_INCLUDE_BENCHMARKS=OFF \
-    -DLLVM_INCLUDE_DOCS=OFF -DLLVM_TARGETS_TO_BUILD=AVR -DLLVM_ENABLE_PROJECTS=clang \
+    -DLLVM_INCLUDE_DOCS=OFF -DLLVM_TARGETS_TO_BUILD="AVR;ARM" -DLLVM_ENABLE_PROJECTS=clang \
     -DCLANG_BUILD_EXAMPLES=OFF -DCLANG_BUILD_TOOLS=OFF -DCLANG_INCLUDE_TESTS=OFF
   cmake --build tblgen-build --target llvm-tblgen clang-tblgen $(grep -q llvm-min-tblgen tblgen-build/build.ninja && echo llvm-min-tblgen)
 fi
@@ -68,7 +68,7 @@ cmake -G Ninja -B llvm-build -S llvm-src/llvm \
   -DLLVM_BUILD_RUNTIME=OFF -DLLVM_BUILD_TOOLS=OFF -DLLVM_INCLUDE_UTILS=OFF -DLLVM_BUILD_UTILS=OFF \
   -DLLVM_INCLUDE_RUNTIMES=OFF -DLLVM_INCLUDE_EXAMPLES=OFF -DLLVM_INCLUDE_TESTS=OFF \
   -DLLVM_INCLUDE_BENCHMARKS=OFF -DLLVM_INCLUDE_DOCS=OFF \
-  -DLLVM_TARGETS_TO_BUILD=AVR -DLLVM_DEFAULT_TARGET_TRIPLE=avr \
+  -DLLVM_TARGETS_TO_BUILD="AVR;ARM" -DLLVM_DEFAULT_TARGET_TRIPLE=avr \
   -DLLVM_TOOL_BUGPOINT_BUILD=OFF \
   -DLLVM_TOOL_BUGPOINT_PASSES_BUILD=OFF \
   -DLLVM_TOOL_DSYMUTIL_BUILD=OFF \

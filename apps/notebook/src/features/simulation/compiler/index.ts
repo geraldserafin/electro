@@ -1,8 +1,9 @@
 // The page's handle on the compiler worker: every call a message and a promise. The worker starts
-// only when asked (an Arduino on a board), and then fetches the compiler once (tens of MB, cached).
-import type { Compiled } from "./toolchain";
+// only when asked (an Arduino or a Pico on a board), and then fetches the compiler once (tens of MB,
+// cached), and each board's sysroot the first time.
+import type { Board, Compiled } from "./toolchain";
 
-export type { Compiled };
+export type { Board, Compiled };
 
 type Reply = { id: number; ok: true; result: unknown } | { id: number; ok: false; error: string };
 
@@ -10,7 +11,7 @@ class Compiler {
   private worker: Worker | null = null;
   private pending = new Map<number, { resolve: (v: unknown) => void; reject: (e: Error) => void }>();
   private nextId = 1;
-  private loading: Promise<void> | null = null;
+  private loading: Partial<Record<Board, Promise<void>>> = {};
 
   private call(type: string, payload: object = {}): Promise<unknown> {
     if (!this.worker) {
@@ -30,14 +31,15 @@ class Compiler {
     });
   }
 
-  /** Fetch the compiler ahead of the first sketch (a note with an Arduino was opened). */
-  load(): Promise<void> {
-    return (this.loading ??= this.call("load").then(() => undefined).catch((e) => { this.loading = null; throw e; }));
+  /** Fetch the compiler for ``board`` ahead of the first sketch (a note with one was opened). */
+  load(board: Board): Promise<void> {
+    return (this.loading[board] ??= this.call("load", { board }).then(() => undefined)
+      .catch((e) => { delete this.loading[board]; throw e; }));
   }
 
-  /** A sketch → the Uno's program (Intel HEX), or what the compiler said. */
-  async compile(sketch: string): Promise<Compiled> {
-    return (await this.call("compile", { sketch })) as Compiled;
+  /** A sketch → the board's program (an Uno's Intel HEX, a Pico's flash image), or what the compiler said. */
+  async compile(sketch: string, board: Board): Promise<Compiled> {
+    return (await this.call("compile", { sketch, board })) as Compiled;
   }
 }
 

@@ -1,26 +1,26 @@
 {
  "format": "electro-notebook",
  "version": 2,
- "id": "206bd0b10bf22517",
+ "id": "78b026238858ece1",
  "title": "Nowe elementy",
- "created": "2026-09-30T11:04:26+00:00",
- "modified": "2026-09-30T11:04:26+00:00",
+ "created": "2026-09-30T12:26:05+00:00",
+ "modified": "2026-09-30T12:26:05+00:00",
  "settings": {
   "codeInPdf": true
  },
  "cells": [
   {
-   "id": "49c00c2e",
+   "id": "60f7e6c1",
    "type": "markdown",
    "source": "Przegląd elementów dodanych ostatnio. Schematy uruchamiasz przyciskiem **▶ Symuluj w czasie** pod każdym\nz nich: przewody zmieniają kolor z napięciem, a oscyloskop pod schematem pokazuje przebiegi. Czujniki\n(fotorezystor, termistor, czujnik odległości) mają w czasie symulacji suwak — kliknij element.\nSzkice Arduino kompilują się w przeglądarce; biblioteki `Servo`, `LiquidCrystal`, `LiquidCrystal_I2C`,\n`Adafruit_SSD1306` i `RTClib` są dostępne od razu."
   },
   {
-   "id": "3b8b48d2",
+   "id": "9eb8831a",
    "type": "markdown",
    "source": "## 1. Źródła zmienne w czasie\n**Źródło sinusoidalne** (amplituda i częstotliwość) na filtrze RC: przy częstotliwości granicznej\n$f_g = \\frac{1}{2\\pi RC} \\approx 48$ Hz na kondensatorze zostaje $\\frac{1}{\\sqrt 2}$ amplitudy, opóźnione.\nPorównaj na oscyloskopie `V_we` i `V_wy`."
   },
   {
-   "id": "708bad48",
+   "id": "199884c6",
    "type": "schematic",
    "name": "filtr",
    "schematic": {
@@ -142,12 +142,12 @@
    }
   },
   {
-   "id": "be7a8b47",
+   "id": "1242aef0",
    "type": "markdown",
    "source": "**Generator prostokąta** (poziom, częstotliwość, wypełnienie): 2 Hz z wypełnieniem 25 % — dioda błyska\nkrótko dwa razy na sekundę. Zmień wypełnienie suwakiem w panelu źródła."
   },
   {
-   "id": "108fda94",
+   "id": "2d2762ae",
    "type": "schematic",
    "name": "migacz_prostokat",
    "schematic": {
@@ -247,23 +247,23 @@
    }
   },
   {
-   "id": "5f4a3f85",
+   "id": "f770ea92",
    "type": "markdown",
    "source": "W kodzie: `SineSource(amplituda, frequency=…)`, `SquareSource(poziom, frequency=…, duty=…)`."
   },
   {
-   "id": "b9e4acfa",
+   "id": "d7dc4f74",
    "type": "code",
    "source": "przebieg = simulate(filtr, t=0.1)\nprzebieg.plot(\"V_we\", \"V_wy\")",
    "outputs": []
   },
   {
-   "id": "a0e3f2e3",
+   "id": "ba851bd0",
    "type": "markdown",
    "source": "## 2. Dioda Zenera — stabilizator napięcia\nZener 5,1 V w kierunku zaporowym trzyma napięcie na obciążeniu, choć zasilanie jest wyższe; nadmiar\nodkłada się na $R_1$. W symulacji woltomierz pokazuje ok. 5,1 V — zmień napięcie $E_1$ albo obciążenie $R_2$."
   },
   {
-   "id": "788bc2e0",
+   "id": "00281fe1",
    "type": "schematic",
    "name": "stabilizator",
    "schematic": {
@@ -453,23 +453,23 @@
    }
   },
   {
-   "id": "787bcca2",
+   "id": "81b01eaf",
    "type": "markdown",
    "source": "Ogranicznik: sinus 10 V obcięty z góry do 5,1 V (przebicie), z dołu do ok. −0,7 V (przewodzenie)."
   },
   {
-   "id": "82e51d30",
+   "id": "2341f8ad",
    "type": "code",
    "source": "ogranicznik = net(\n    (SineSource(10, frequency=50), \"GND\", \"we\"),\n    (Resistor(1000), \"we\", \"wy\"),\n    (Zener(5.1), \"GND\", \"wy\"),\n)\nsimulate(ogranicznik, t=0.04).plot(\"V_we\", \"V_wy\")",
    "outputs": []
   },
   {
-   "id": "c7423a13",
+   "id": "acea58cf",
    "type": "markdown",
    "source": "## 3. MOSFET jako klucz\nProstokąt 1 Hz na bramce tranzystora N-MOSFET: powyżej napięcia progowego (2 V) kanał przewodzi\n(ok. 0,7 Ω) i dioda świeci. Bramka pobiera prąd tylko przy przeładowaniu swojej pojemności — zobacz `I_Q_1_G`\nna mierniku. W kodzie: `NMOS()`, `PMOS()` — bramka, dren, źródło."
   },
   {
-   "id": "930e270f",
+   "id": "61a091b8",
    "type": "schematic",
    "name": "klucz",
    "schematic": {
@@ -626,12 +626,12 @@
    }
   },
   {
-   "id": "26afab88",
+   "id": "be3b1ce5",
    "type": "markdown",
    "source": "## 4. Źródła sterowane — na papierze, krok po kroku\nWzmacniacz napięciowy jako **źródło napięcia sterowane napięciem** ($\\mu = 10$): lewa para zacisków\nmierzy napięcie, prawa jest źródłem. Uruchom komórkę przyciskiem ▶ — to obwód liniowy, więc solver\nrozwiązuje go na papierze."
   },
   {
-   "id": "16588261",
+   "id": "b69b0978",
    "type": "schematic",
    "name": "wzmacniacz",
    "schematic": {
@@ -747,23 +747,23 @@
    }
   },
   {
-   "id": "82cc6971",
+   "id": "1dbcae6d",
    "type": "markdown",
    "source": "Źródło prądu sterowane prądem jako model tranzystora: prąd bazy płynie przez gałąź pomiarową (ze strzałką),\nkolektor to źródło $\\beta \\cdot I_b$. Z pomiaru napięcia na $R_2$ solver wyznacza $\\beta$."
   },
   {
-   "id": "453f29de",
+   "id": "e6d06628",
    "type": "code",
    "source": "stopien = net(\n    (VoltageSource(\"10m\"), \"GND\", \"we\"),\n    (Resistor(1000), \"we\", \"b\"),       # r_be\n    (CCCS(), \"b\", \"GND\", \"GND\", \"c\"),  # β · I_b\n    (Resistor(2000), \"c\", \"GND\"),\n)\nsol = stopien.solve(U_R_2=2, find=\"CCCS_1\")\nsteps(sol)",
    "outputs": []
   },
   {
-   "id": "31e97155",
+   "id": "d8981579",
    "type": "markdown",
    "source": "## 5. Czujniki: światło i temperatura\nDzielniki z **fotorezystorem** (10 kΩ przy 10 lx) i **termistorem NTC** (10 kΩ przy 25 °C). Na papierze\nliczą się przy świetle i temperaturze ustawionych w panelu; w symulacji zmieniasz je suwakiem, a woltomierze\nnadążają. Ciemniej — większy opór fotorezystora; cieplej — mniejszy termistora."
   },
   {
-   "id": "f7e18ff8",
+   "id": "afae290b",
    "type": "schematic",
    "name": "czujniki",
    "schematic": {
@@ -963,12 +963,12 @@
    }
   },
   {
-   "id": "aed24f92",
+   "id": "9d033dd2",
    "type": "markdown",
    "source": "## 6. Arduino: serwo i buzzer\nPotencjometr na A0 ustawia kąt serwa (biblioteka `Servo`: impulsy 0,54–2,4 ms na D9), a buzzer pasywny\nna D6 gra `tone()` tym wyższy, im dalej suwak. Buzzer słychać — na pasku symulacji jest przycisk wyciszenia."
   },
   {
-   "id": "0ca59037",
+   "id": "62bcac7d",
    "type": "schematic",
    "name": "serwo",
    "schematic": {
@@ -1188,12 +1188,12 @@
    }
   },
   {
-   "id": "4a384c54",
+   "id": "adeafdac",
    "type": "markdown",
    "source": "## 7. Wyświetlacz 7-segmentowy i dioda RGB\nLicznik 0–9 na wyświetlaczu ze wspólną katodą (segmenty a–g na D2–D8, każdy przez swój rezystor 220 Ω:\nok. 12 mA na segment, więc każda cyfra świeci tak samo jasno — z jednym wspólnym rezystorem na katodzie prąd\ndzieliłby się między zapalone segmenty i „8” byłaby ciemniejsza niż „1”), a dioda RGB płynnie zmienia kolor\n(PWM na D9–D11)."
   },
   {
-   "id": "a1707e9e",
+   "id": "f1b3bc17",
    "type": "schematic",
    "name": "licznik",
    "schematic": {
@@ -1804,12 +1804,12 @@
    }
   },
   {
-   "id": "9e4accfd",
+   "id": "0809576c",
    "type": "markdown",
    "source": "## 8. Czujnik odległości HC-SR04 i wyświetlacz LCD 16×2\nSzkic co chwilę wysyła impuls na TRIG (10 µs), mierzy `pulseIn()` długość echa (58 µs na centymetr) i pisze\nodległość na LCD (biblioteka `LiquidCrystal`, tryb 4-bitowy: RS, E, D4–D7). Przesuń przeszkodę suwakiem\nczujnika. Kontrast ustawia potencjometr na V0, jak w prawdziwym układzie — pokręć nim w czasie symulacji\n(kliknij go albo zakładka **Regulacja**): za mało i znaki znikają, za dużo i wychodzą ciemne kratki.\nRW jest przy masie (tylko zapis); podświetlenie to dioda między A i K, przez rezystor."
   },
   {
-   "id": "0eb7cf21",
+   "id": "f449dcbb",
    "type": "schematic",
    "name": "odleglosc",
    "schematic": {
@@ -2260,12 +2260,12 @@
    }
   },
   {
-   "id": "7574ebe0",
+   "id": "442dfbf2",
    "type": "markdown",
    "source": "## 9. I²C: zegar, OLED i LCD z konwerterem\nTrzy moduły na jednej magistrali: SDA do A4, SCL do A5. Zegar **DS1307** startuje od czasu na\nTwoim komputerze; **OLED** 128×64 (`Adafruit_SSD1306`, adres 0x3C) pokazuje godzinę dużymi cyframi,\na **LCD z konwerterem PCF8574** (`LiquidCrystal_I2C`, 0x27) datę. Adres modułu zmienisz w jego panelu —\nwtedy szkic go nie znajdzie, jak w prawdziwym układzie."
   },
   {
-   "id": "86f8340a",
+   "id": "1213d80d",
    "type": "schematic",
    "name": "zegar",
    "schematic": {
@@ -2597,12 +2597,12 @@
    }
   },
   {
-   "id": "4aff0304",
+   "id": "a97b7081",
    "type": "markdown",
-   "source": "## 10. Raspberry Pi Pico: strzelanka w stylu Dooma\nDruga płytka: **Raspberry Pi Pico** (RP2040, logika 3,3 V). Szkic kompiluje serwer (rdzeń arduino-pico), więc\ntrzeba być zalogowanym; emulowany jest jeden rdzeń. Na nim gra: korytarze liczone metodą rzucania promieni\n(jak w Wolfensteinie 3D), ściany cieniowane ditheringiem, demony jako sprite'y — na OLED-zie 128×64 przez I²C\n(GP4 SDA, GP5 SCL), z buzzerem na GP15.\n\nSterowanie: przyciski mają przypisane klawisze — **kliknij schemat** (żeby miał fokus) i graj **strzałkami**,\n**spacja** strzela i zaczyna grę. Można też trzymać przyciski myszką albo w zakładce **Regulacja**.\nTo jeszcze nie prawdziwy Doom — ten jest niżej."
+   "source": "## 10. Raspberry Pi Pico: strzelanka w stylu Dooma\nDruga płytka: **Raspberry Pi Pico** (RP2040, logika 3,3 V). Szkic kompiluje przeglądarka (rdzeń arduino-pico;\nza pierwszym razem pobiera kompilator, bez logowania). Na nim gra: korytarze liczone metodą rzucania promieni\n(jak w Wolfensteinie 3D), ściany cieniowane ditheringiem, demony jako sprite'y — na OLED-zie 128×64 przez I²C\n(GP4 SDA, GP5 SCL), z buzzerem na GP15.\n\nSterowanie: przyciski mają przypisane klawisze — **kliknij schemat** (żeby miał fokus) i graj **strzałkami**,\n**spacja** strzela i zaczyna grę. Można też trzymać przyciski myszką albo w zakładce **Regulacja**.\nTo jeszcze nie prawdziwy Doom — ten jest niżej."
   },
   {
-   "id": "e01e8630",
+   "id": "d82ef475",
    "type": "schematic",
    "name": "pico_gra",
    "schematic": {
@@ -2982,12 +2982,12 @@
    }
   },
   {
-   "id": "cd54123a",
+   "id": "8765e081",
    "type": "markdown",
    "source": "## 11. Prawdziwy DOOM na Pico\nObwód jest gotowy: kolorowy wyświetlacz **TFT 320×240** na SPI (ILI9341: SCK GP18, MOSI GP19, CS GP17, DC GP20,\nRESET GP21, podświetlenie GP22) i osiem przycisków. Brakuje programu — i to już twoja robota: **prawdziwy Doom**\n(shareware'owy DOOM1.WAD, epizod pierwszy) to nie szkic, tylko gotowy obraz flasha, jak plik UF2 przeciągany\nna prawdziwe Pico.\n\n1. **Zbuduj go**: w repozytorium Electro `apps/notebook/scripts/make-pico-doom.sh doom.bin` (potrzebne git i\n   nix). Skrypt bierze port [kilograham/rp2040-doom](https://github.com/kilograham/rp2040-doom), wyświetlacz z\n   [pondahai/rp2040-doom-ili9341](https://github.com/pondahai/rp2040-doom-ili9341) i małą łatkę pod emulator\n   (bez dźwięku, klatki przez DMA).\n2. **Wgraj go**: zaznacz płytkę i kliknij **Wgraj plik .uf2 / .bin** — albo po prostu upuść plik na płytkę.\n   Plik zapisze się w notatce, a pierwsza linia programu płytki będzie na niego wskazywać.\n3. Uruchom symulację (⚡). Po chwili ekran tytułowy i demo; **kliknij schemat** i graj z klawiatury:\n   **Enter** — menu i wybór (New Game), **strzałki** — ruch, **Ctrl** — strzał, **spacja** — drzwi, **Esc** — menu.\n\nDoom zbudowany bez łatki też ruszy, tylko kilka razy za wolno: gra muzykę przez PIO, czego emulator nie liczy\ntanio. Gdy komputer nie nadąża, rdzenie zwalniają — o ile, widać przy płytce (np. **PICO_1 · 150 MHz**)."
   },
   {
-   "id": "9ba45a12",
+   "id": "1423c6e9",
    "type": "schematic",
    "name": "pico_doom",
    "schematic": {
@@ -3481,12 +3481,12 @@
    }
   },
   {
-   "id": "02814e04",
+   "id": "98c3f282",
    "type": "markdown",
    "source": "## W kodzie\nKażdy z tych elementów jest też w Pythonie — `code()` zapisze schemat jako kod:\n`Photoresistor(10000, lux=100)`, `Thermistor(10000, temperature=25)`, `Zener(5.1)`, `NMOS()`, `VCVS(10)`,\n`Servo()`, `Buzzer()`, `PassiveBuzzer()`, `RGBLED()`, `SevenSegment()`, `LCD1602()`, `Ultrasonic(distance=80)`,\n`LCD1602I2C()`, `SSD1306()`, `ILI9341()`, `DS1307()`, `Pico()`."
   },
   {
-   "id": "274be162",
+   "id": "bd2ce6ce",
    "type": "code",
    "source": "code(czujniki)",
    "outputs": []

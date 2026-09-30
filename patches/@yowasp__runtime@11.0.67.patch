@@ -1,0 +1,24 @@
+diff --git a/lib/wasi-virt.js b/lib/wasi-virt.js
+index c716119cb5f014bf1313183a1641f42621ccd446..37d7f501edb80b65d5cdc2a9ed53a9964d17f175 100644
+--- a/lib/wasi-virt.js
++++ b/lib/wasi-virt.js
+@@ -152,6 +152,7 @@ class Directory {
+   traverse(path, { create = null, remove = false } = {}) {
+     let entry = this;
+     let separatorAt = -1;
++    const parents = []; // (electro: "a/../b" is b — clang includes "../x" from a header)
+     do {
+       if (entry instanceof File)
+         throw 'not-directory';
+@@ -163,9 +164,9 @@ class Directory {
+       else if (segment === '' || segment === '.')
+         /* disregard */;
+       else if (segment === '..')
+-        /* hack to make scandir() work */;
++        entry = parents.length ? parents.pop() : entry; /* above where it started: stays (scandir()) */
+       else if (Object.hasOwn(files, segment))
+-        entry = files[segment];
++        parents.push(entry), entry = files[segment];
+       else if (create === 'directory' || (create !== null && separatorAt !== -1))
+         entry = files[segment] = new Directory({});
+       else if (create === 'file')

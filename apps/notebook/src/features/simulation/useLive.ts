@@ -4,13 +4,10 @@
 // servo's angle, the displays, the readings, the scope. Here: the sketches compiled, the buzzers
 // heard (sound.ts: Web Audio is the page's), and what the drawing changes sent on (switches, buttons,
 // sliders, sensors' readings).
-import { useAtomSet } from "@effect-atom/atom-react";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { failure } from "@/features/notes/sync";
 import { kernel } from "@/features/python";
 import type { ElementResult, SchematicData } from "@/shared/model/types";
 import type { Failure } from "@/shared/model/issues";
-import { compileSketch } from "./atoms";
 import { compiler } from "./compiler";
 import type { LiveCircuit } from "./engine";
 import type { Firmware, Frame, OledData, Part, ScopeTrace } from "./runner";
@@ -42,10 +39,10 @@ export interface LiveFrame {
 /** An Arduino's sketch as it goes to the chip: compiling, running, or what the compiler said. */
 export type SketchState =
   | { kind: "compiling" }
-  | { kind: "running"; sketch: string; where: "page" | "server" | "file" } // where it was compiled (a file: given whole)
+  | { kind: "running"; sketch: string; where: "page" | "file" } // compiled in the page, or a file given whole
   | { kind: "failed"; output: string }
   | { kind: "tooBig"; size: number; flash: number }
-  | { kind: "unavailable" | "signedOut" | "unreachable" };
+  | { kind: "unavailable" }; // the compiler could not be fetched
 
 export const SPEEDS = [1, 0.1, 0.01, 0.001];
 
@@ -72,10 +69,6 @@ class Pictures {
     this.last.clear();
   }
 }
-
-/** A Pico's flash image as the server sends it (base64) → bytes. (Here, not in pico.ts: the emulator
- *  itself — rp2040js, the boot ROM — is the worker's alone.) */
-const flashImage = (base64: string) => Uint8Array.from(atob(base64), (c) => c.charCodeAt(0));
 
 /** The drawing without what may change while it runs (switches, positions, readings, sketches): if
  *  that is the same, the circuit is too. */
@@ -106,7 +99,6 @@ export function useLive(schematic: SchematicData) {
   const [sketches, setSketches] = useState<Record<string, SketchState>>({});
   const [muted, setMuted] = useState(false);
   const [hasSound, setHasSound] = useState(false); // a buzzer in it: the bar offers to mute
-  const compile = useAtomSet(compileSketch, { mode: "promiseExit" });
 
   const worker = useRef<Worker | null>(null);
   const circuit = useRef<LiveCircuit | null>(null);
@@ -160,7 +152,7 @@ export function useLive(schematic: SchematicData) {
     const sketch = element.text ?? "";
     const board = element.kind === "pico" ? "pico" : "uno";
     setSketches((all) => ({ ...all, [id]: { kind: "compiling" } }));
-    const run = (firmware: Firmware, where: "page" | "server" | "file") => {
+    const run = (firmware: Firmware, where: "page" | "file") => {
       w.postMessage({ type: "attach", id, firmware } satisfies Request);
       setSketches((all) => ({ ...all, [id]: { kind: "running", sketch, where } }));
     };
@@ -173,31 +165,15 @@ export function useLive(schematic: SchematicData) {
       else run({ board: "pico", image }, "file");
       return;
     }
-    // an Uno's in the page first, the server only if the page's compiler could not be loaded; a Pico's
-    // on the server (the page's compiler is AVR's)
-    const local = board === "uno" ? await compiler.compile(sketch).catch(() => null) : null;
+    // compiled in the page (compiler/): the compiler fetched the first time, each board's parts too
+    const compiled = await compiler.compile(sketch, board).catch(() => null);
     if (worker.current !== w) return; // stopped meanwhile
-    if (local) {
-      if ("hex" in local) run({ board: "uno", hex: local.hex }, "page");
-      else setSketches((all) => ({
-        ...all, [id]: "failed" in local ? { kind: "failed", output: local.failed } : { kind: "tooBig", size: local.tooBig, flash: local.flash },
-      }));
-      return;
-    }
-    const exit = await compile({ payload: { sketch, board } });
-    if (worker.current !== w) return;
-    if (exit._tag === "Failure") {
-      const e = failure(exit.cause);
-      const state: SketchState = e?._tag === "CompileFailed" ? { kind: "failed", output: (e as { output: string }).output }
-        : e?._tag === "CompilerUnavailable" ? { kind: "unavailable" }
-        : e?._tag === "Unauthorized" ? { kind: "signedOut" }
-        : { kind: "unreachable" };
-      setSketches((all) => ({ ...all, [id]: state }));
-      return;
-    }
-    const compiled = exit.value;
-    run("image" in compiled ? { board: "pico", image: flashImage(compiled.image) } : { board: "uno", hex: compiled.hex }, "server");
-  }, [compile]);
+    if (compiled && "hex" in compiled) return run({ board: "uno", hex: compiled.hex }, "page");
+    if (compiled && "image" in compiled) return run({ board: "pico", image: compiled.image }, "page");
+    const state: SketchState = !compiled ? { kind: "unavailable" }
+      : "failed" in compiled ? { kind: "failed", output: compiled.failed } : { kind: "tooBig", size: compiled.tooBig, flash: compiled.flash };
+    setSketches((all) => ({ ...all, [id]: state }));
+  }, []);
 
   const halt = () => {
     worker.current?.terminate();

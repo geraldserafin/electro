@@ -10,9 +10,9 @@
 #                     lib<Name>.a — the core and libraries compiled by clang
 #   avr5.x            the GNU linker script for the avr5 family, in the syntax lld reads
 #
-# The same compiler flags as the browser uses are in ../src/features/arduino/toolchain.ts (FLAGS).
+# The same compiler flags as the browser uses are in ../src/features/simulation/compiler/toolchain.ts (FLAGS).
 # Needs nix (it fetches clang, avr-libc and avr-gcc's libgcc) and arduino-cli with the arduino:avr
-# core and the libraries from the Library Manager above (devenv's notes-server installs them).
+# core and the libraries from the Library Manager above (devenv's arduino-setup installs them).
 set -euo pipefail
 here=$(cd "$(dirname "$0")" && pwd)
 out="$here/../public/arduino"
