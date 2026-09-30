@@ -6,7 +6,8 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Roboto+Mono:wght@400;500&family=Roboto:wght@400;500;700&display=swap" />
-    <title>Notatnik elektroniki</title>
+    <title>Electro Notebook</title>
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <script>
       // the theme (as features/theme sets it), before the first paint: the one chosen, or the system's
       {
@@ -23,12 +24,12 @@
       .boot { position: fixed; inset: 0; z-index: 1000; display: grid; place-items: center; background: inherit; }
       .boot svg { animation: boot-in 0.3s 0.15s ease both; }
       .boot.done { opacity: 0; transition: opacity 0.35s ease; pointer-events: none; }
-      .boot.done .level { animation: none; transform: none; }
       .boot svg { width: 56px; height: 56px; }
       .boot .empty { fill: #e4e4e7; }
       html[data-theme="dark"] .boot .empty { fill: #f5f5f5; }
       .boot .fill { fill: #f9ab00; }
       .boot .level { animation: boot-fill 1.4s 0.15s cubic-bezier(0.5, 0, 0.3, 1) infinite both; }
+      .boot.done .level { animation: none; transform: none; }
       @keyframes boot-in { from { opacity: 0; } }
       @keyframes boot-fill {
         0% { transform: translateY(-24px); }
@@ -39,7 +40,7 @@
   </head>
   <body>
     <div id="root"></div>
-    <div id="boot" class="boot" role="progressbar" aria-label="electro">
+    <div id="boot" class="boot" role="progressbar" aria-label="Electro Notebook">
         <svg viewBox="0 0 24 24" aria-hidden="true">
           <defs>
             <clipPath id="boot-bolt"><path d="M13 2L4 14h7l-1 8 9-12h-7z" /></clipPath>

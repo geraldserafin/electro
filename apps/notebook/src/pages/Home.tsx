@@ -7,6 +7,7 @@ import { COURSES, CourseCard } from "@/features/examples";
 import { LibraryGrid } from "@/features/library";
 import { CardSkeletons, homeAtom, useCreateNote } from "@/features/notes";
 import { SettingsMenu } from "@/features/settings";
+import { useTitle } from "@/shared/hooks/useTitle";
 import { cn } from "@/shared/lib/cn";
 import { copyOf, FormatError, upload } from "@/shared/model/format";
 import { Credits, Islands } from "@/shared/ui/Island";
@@ -20,6 +21,7 @@ export function Home() {
   const { t } = useTranslation("pages", { keyPrefix: "home" });
   const { t: tLibrary } = useTranslation("library");
   const { t: tFile } = useTranslation("pages", { keyPrefix: "file" });
+  useTitle(null);
   const items = useAtomValue(homeAtom);
   const refresh = useAtomRefresh(homeAtom);
   useEffect(refresh, [refresh]); // things change on their own pages: read the home screen afresh on coming back

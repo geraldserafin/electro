@@ -7,6 +7,7 @@ import { ExportDialog, PdfContext, type PdfSettings, pdfOf, warmUpWhenIdle } fro
 import { kernel, usePython } from "@/features/python";
 import { libraryFor } from "@/features/schematic";
 import { SettingsMenu, SymbolsChoice } from "@/features/settings";
+import { useTitle } from "@/shared/hooks/useTitle";
 import { cn } from "@/shared/lib/cn";
 import { newCell } from "@/shared/model/cells";
 import { copyOf } from "@/shared/model/format";
@@ -66,6 +67,7 @@ export function Notebook({
   const [notebook, setNotebook] = useState<NotebookData>(initial);
   const latest = useRef(notebook);
   latest.current = notebook;
+  useTitle(notebook.title || t("untitled"));
   const python = usePython();
   const ready = python.kind === "ready";
   const [focused, setFocused] = useState<string | null>(null);

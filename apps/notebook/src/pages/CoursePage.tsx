@@ -10,6 +10,7 @@ import { course as findCourse, fromExample, useLessons } from "@/features/exampl
 import { Card, CardSkeletons, createFolder, folderUrl, LIBRARY, saveNote, toDocument } from "@/features/notes";
 import { library } from "@/features/schematic";
 import { SettingsMenu } from "@/features/settings";
+import { useTitle } from "@/shared/hooks/useTitle";
 import { IslandLink, Islands } from "@/shared/ui/Island";
 import { Back } from "@/shared/ui/icons";
 import { PageMessage } from "@/shared/ui/PageMessage";
@@ -21,6 +22,7 @@ export function CoursePage() {
   const { t: tLibrary } = useTranslation("library");
   const { course: slug = "" } = useParams();
   const course = findCourse(slug);
+  useTitle(course?.title ?? t("missing"));
   const lessons = useLessons(course);
   const folder = useAtomSet(createFolder, { mode: "promiseExit" });
   const save = useAtomSet(saveNote, { mode: "promiseExit" });

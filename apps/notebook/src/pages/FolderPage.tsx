@@ -9,6 +9,7 @@ import { Breadcrumbs, LibraryGrid, useLibraryCalls } from "@/features/library";
 import { CardSkeletons, failure, folderAtom, folderUrl, LIBRARY, patchItem } from "@/features/notes";
 import { SettingsMenu } from "@/features/settings";
 import { ShareDialog, enabled as sharingOn } from "@/features/sharing";
+import { useTitle } from "@/shared/hooks/useTitle";
 import { cn } from "@/shared/lib/cn";
 import { IslandButton, IslandLink, Islands } from "@/shared/ui/Island";
 import { Back, ShareIcon } from "@/shared/ui/icons";
@@ -26,6 +27,7 @@ export function FolderPage() {
   const { said, moveTo } = useLibraryCalls(setProblem);
 
   const here = Result.isSuccess(folder) ? folder.value : null;
+  useTitle(here ? here.folder.name || t("untitled") : null);
   useEffect(() => {
     // the name in the address: the folder's own (it may have been renamed)
     if (here && name !== slugify(here.folder.name || "folder"))
