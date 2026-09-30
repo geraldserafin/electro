@@ -2,9 +2,9 @@
 import "./styles.css";
 import "./i18n";
 import "katex/dist/katex.min.css";
-import { StrictMode } from "react";
+import { StrictMode, useLayoutEffect } from "react";
 import { createRoot } from "react-dom/client";
-import { BrowserRouter, Navigate, Route, Routes } from "react-router";
+import { BrowserRouter, Navigate, Route, Routes, useLocation, useNavigationType } from "react-router";
 import { Downloads } from "@/features/downloads";
 import { finishConnecting, startSaving } from "@/features/vault";
 import { CoursePage } from "@/pages/CoursePage";
@@ -26,6 +26,7 @@ void finishConnecting().then(() => {
   createRoot(document.getElementById("root")!).render(
     <StrictMode>
       <BrowserRouter basename={import.meta.env.BASE_URL}>
+        <ScrollOnNavigate />
         <Routes>
           <Route path="/" element={<Home />} />
           <Route path="/f/:id/:name?" element={<FolderPage />} />
@@ -41,6 +42,17 @@ void finishConnecting().then(() => {
   startSaving(); // (after the first render: the lists hear what it brings from GitHub)
   dismissBoot();
 });
+
+/** A page gone to (a link, not back or forward, nor the address following a note's title) starts at its
+ *  top: the window would keep where the page before was scrolled. Back, the browser brings it back. */
+function ScrollOnNavigate() {
+  const { pathname } = useLocation();
+  const how = useNavigationType();
+  useLayoutEffect(() => {
+    if (how === "PUSH") window.scrollTo(0, 0);
+  }, [pathname]); // eslint-disable-line react-hooks/exhaustive-deps -- (how: as it was when it moved)
+  return null;
+}
 
 /** The loader over the page (index.html): once its bolt has filled up at least once, faded away. */
 function dismissBoot() {
