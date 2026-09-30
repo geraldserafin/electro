@@ -2,13 +2,14 @@
 // emulated chip while the circuit runs. It sits in the cell's code view (a tab of its own) or,
 // full screen, beside the board like a file in an IDE; how it compiled and what the chip writes
 // to its serial port are in the console.
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { useTranslation } from "react-i18next";
 import { CodeEditor } from "@/features/notebook/cells/CodeEditor";
 import { cn } from "@/shared/lib/cn";
 import type { ElementData } from "@/shared/model/types";
 import { Upload } from "@/shared/ui/icons";
 import { compiler } from "./compiler";
+import { isPrebuilt } from "./compiler/prebuilt";
 import { firmwareFile } from "./firmware";
 import type { Live, SketchState } from "./useLive";
 
@@ -77,10 +78,15 @@ export function SketchEditor({
   fill?: boolean; // as tall as its parent (the side pane, full screen), edge to edge
 }) {
   // the page's compiler for the board starts loading now, so the first upload does not wait for it (not for a
-  // program given whole)
+  // program given whole, nor for a sketch compiled ahead: an example's, as it is there)
   const given = firmwareFile(element.text ?? "") !== null;
+  const opened = useRef(element.text ?? "");
   useEffect(() => {
-    if (!given) compiler.load(element.kind === "pico" ? "pico" : "uno").catch(() => {});
+    const board = element.kind === "pico" ? "pico" : "uno";
+    if (!given)
+      void isPrebuilt(board, opened.current).then((ahead) => {
+        if (!ahead) compiler.load(board).catch(() => {});
+      });
   }, [element.kind, given]);
   const state = live.sketches[element.id];
   return (

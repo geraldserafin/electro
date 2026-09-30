@@ -25,6 +25,15 @@ class Compiler {
         if (event.data.ok) call.resolve(event.data.result);
         else call.reject(new Error(event.data.error));
       };
+      // the worker itself failed (out of memory, on a phone): every call waiting fails, the next starts anew
+      this.worker.onerror = (event) => {
+        event.preventDefault();
+        this.worker?.terminate();
+        this.worker = null;
+        this.loading = {};
+        for (const call of this.pending.values()) call.reject(new Error(event.message || "the compiler stopped"));
+        this.pending.clear();
+      };
     }
     const id = this.nextId++;
     return new Promise((resolve, reject) => {

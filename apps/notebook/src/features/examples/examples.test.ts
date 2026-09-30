@@ -4,7 +4,10 @@
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { Uno } from "@/features/simulation/arduino";
+import { fileOf, keyOf } from "@/features/simulation/compiler/prebuilt";
+import keys from "@/features/simulation/compiler/prebuilt.json";
 import { type Board, compile, type Toolchain, toolchain } from "@/features/simulation/compiler/toolchain";
+import { firmwareFile } from "@/features/simulation/firmware";
 import { Backpack, Oled } from "@/features/simulation/i2c";
 import { Pico } from "@/features/simulation/pico";
 import type { Notebook } from "@/shared/model/types";
@@ -82,3 +85,13 @@ for (const [board, sysroot] of [
     );
   });
 }
+
+// compiled ahead (compiler/prebuilt.ts): an example runs without the compiler — on a phone, say
+describe("the examples' sketches compiled ahead", () => {
+  it.each(sketches.map((s) => [s.where, s.board, s.text] as const))("%s", async (_, board, text) => {
+    if (firmwareFile(text)) return; // (a program given whole)
+    const key = await keyOf(board, text);
+    expect(keys, "run pnpm prebuild-sketches").toContain(key);
+    expect(existsSync(new URL(`built/${fileOf(board, key)}`, dir))).toBe(true);
+  });
+});

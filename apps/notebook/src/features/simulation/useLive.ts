@@ -9,6 +9,7 @@ import { kernel } from "@/features/python";
 import type { Failure } from "@/shared/model/issues";
 import type { ElementResult, SchematicData } from "@/shared/model/types";
 import { compiler } from "./compiler";
+import { prebuilt } from "./compiler/prebuilt";
 import type { LiveCircuit } from "./engine";
 import { fetchFirmware, firmwareFile } from "./firmware";
 import type { Screen } from "./lcd";
@@ -188,6 +189,10 @@ export function useLive(schematic: SchematicData) {
       else run({ board: "pico", image }, "file");
       return;
     }
+    // an example's, as it is there: compiled ahead
+    const ahead = await prebuilt(board, sketch).catch(() => null);
+    if (worker.current !== w) return;
+    if (ahead) return run(ahead, "page");
     // compiled in the page (compiler/): the compiler fetched the first time, each board's parts too
     const compiled = await compiler.compile(sketch, board).catch(() => null);
     if (worker.current !== w) return; // stopped meanwhile

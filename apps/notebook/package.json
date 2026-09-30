@@ -10,6 +10,7 @@
     "typecheck": "tsc -b",
     "test:pyodide": "node scripts/bundle-python.mjs && node scripts/test-pyodide.mjs",
     "test:e2e": "pnpm build && node scripts/test-e2e.mjs",
+    "prebuild-sketches": "tsx scripts/prebuild-sketches.ts",
     "test": "vitest run"
   },
   "dependencies": {
