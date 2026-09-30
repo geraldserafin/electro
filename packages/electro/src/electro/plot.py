@@ -22,7 +22,7 @@ SERIES = [
 WIDTH, PANEL, LEFT, RIGHT, TOP = 640, 150, 52, 76, 26
 MAX_POINTS = 1200
 
-_PREFIXES = [(1, ""), (1e-3, "m"), (1e-6, "µ"), (1e-9, "n")]
+_PREFIXES = [(1e6, "M"), (1e3, "k"), (1, ""), (1e-3, "m"), (1e-6, "µ"), (1e-9, "n")]
 
 
 def _scale(largest: float) -> tuple[float, str]:
@@ -104,15 +104,16 @@ class TracePlot:
         volts = [n for n in self.names if not n.startswith("I_")]
         amps = [n for n in self.names if n.startswith("I_")]
         panels = [(group, unit) for group, unit in ((volts, "V"), (amps, "A")) if group]
-        t = trace.t
-        t_end = t[-1] if t else 1.0
-        t_factor, t_prefix = _scale(t_end)
+        t = trace.t  # the x axis: time, or what a sweep changes (``x_name``, ``x_unit``)
+        t_start, t_end = (t[0], t[-1]) if t else (0.0, 1.0)
+        t_factor, t_prefix = _scale(max(abs(t_start), abs(t_end)))
+        x_name, x_unit = getattr(trace, "x_name", "t"), getattr(trace, "x_unit", "s")
         height = TOP + len(panels) * (PANEL + 48) + 10
         w = WIDTH - LEFT - RIGHT
         uid = f"tp{id(self) % 100000}"
         colors = {n: k for k, n in enumerate(self.names)}
         parts = _open(uid, height)
-        if len(self.names) > 1:  # legend: a short line-key and the name, in text ink
+        if self.names:  # legend: a short line-key and the name, in text ink
             x = LEFT
             for n in self.names:
                 k = colors[n] % len(SERIES)
@@ -133,7 +134,7 @@ class TracePlot:
             ticks = _ticks(lo, hi)
             lo, hi = min(lo, ticks[0]), max(hi, ticks[-1])
             sy = lambda v, lo=lo, hi=hi, y0=y0: y0 + PANEL - (v - lo) / (hi - lo or 1) * PANEL  # noqa: E731
-            sx = lambda s: LEFT + s / (t_end or 1) * w  # noqa: E731
+            sx = lambda s: LEFT + (s - t_start) / ((t_end - t_start) or 1) * w  # noqa: E731
             for v in ticks:
                 y = sy(v)
                 parts.append(
@@ -155,14 +156,17 @@ class TracePlot:
                 for y, n in ends:
                     parts.append(f'<text x="{LEFT + w + 6}" y="{y + 3.5:.1f}">{_label(n)}</text>')
             parts.append(f'<line class="axis" x1="{LEFT}" x2="{LEFT + w}" y1="{y0 + PANEL}" y2="{y0 + PANEL}"/>')
-            for v in _ticks(0, t_end / t_factor):
-                if v * t_factor > t_end * 1.0001:
+            span = (t_end - t_start) * 1e-4
+            for v in _ticks(t_start / t_factor, t_end / t_factor):
+                if not t_start - span <= v * t_factor <= t_end + span:
                     continue
                 x = sx(v * t_factor)
                 parts.append(
                     f'<text class="muted" x="{x:.1f}" y="{y0 + PANEL + 15}" text-anchor="middle">{_num(v)}</text>'
                 )
-            parts.append(f'<text class="muted" x="{LEFT + w + 16}" y="{y0 + PANEL + 15}">t [{t_prefix}s]</text>')
+            parts.append(
+                f'<text class="muted" x="{LEFT + w + 16}" y="{y0 + PANEL + 15}">{_label(x_name)} [{t_prefix}{x_unit}]</text>'
+            )
             y0 += PANEL + 48
         parts.append("</svg>")
         return "".join(parts)

@@ -118,6 +118,17 @@ def test_bode_outputs_by_default():
     assert list(bode(supply(1) + Resistor(10) + Inductor("1m") + Capacitor("1u") + ground).H) == ["U_L_1", "U_C_1"]
 
 
+def test_sweep_a_divider():
+    s = sweep(supply(12) + Resistor("1k") + node("A") + Resistor() + ground, "R2", ("100", "10k"), points=3)
+    assert s.t == [100, 5050, 10000] and s["V_A"][0] == pytest.approx(12 * 100 / 1100)
+    assert "R<tspan" in s._repr_svg_()  # the x axis is the resistance
+
+
+def test_sweep_at_a_frequency_gives_amplitudes():
+    s = sweep(supply(1) + Resistor("1k") + Capacitor("1u") + ground, "C1", ["1u", "1n"], omega=1000)
+    assert s["U_C_1"] == pytest.approx([1 / abs(1 + 1j), 1 / abs(1 + 1e-3j)])
+
+
 def test_dc_capacitor_blocks():
     sol = (supply(5) + Resistor(100) + Capacitor("1u") + ground).solve()
     assert sol["R1"].I == 0 and sol["C1"].U == 5

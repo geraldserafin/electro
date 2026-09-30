@@ -202,3 +202,54 @@ def bode(c: Circuit, *outputs: str, input: str | None = None, f=(10, 1e6), point
         varies = {n: v for n, v in values.items() if max(abs(h - v[0]) for h in v) > 1e-9 * (abs(v[0]) + 1e-12)}
         values = varies or values
     return Response(input, freqs, values, c)
+
+
+@dataclass(frozen=True)
+class Sweep:
+    """Outputs as one element's value (``x_name``) goes through ``t``: a plot like a trace's, over
+    that value instead of time. With ``omega``, each output's amplitude."""
+
+    x_name: str
+    x_unit: str
+    t: list[float]
+    values: dict[str, list[float]]
+
+    def __getitem__(self, name: str) -> list[float]:
+        return self.values[name]
+
+    def __repr__(self):
+        return f"Sweep({self.x_name}: {fmt(self.t[0], self.x_unit)} … {fmt(self.t[-1], self.x_unit)}; {', '.join(self.values)})"
+
+    def _repr_svg_(self) -> str:
+        from .plot import TracePlot
+
+        return TracePlot(self, list(self.values))._repr_svg_()
+
+
+def sweep(c: Circuit, element: str, values, *outputs: str, omega=None, points: int = 100) -> Sweep:
+    """``outputs`` (by default the named nodes, else the element's own ``U`` and ``I``) as the value
+    of ``element`` (``"R_2"``, ``"R2"``) goes through ``values``: a list, or ``(lo, hi)`` in ``points``
+    even steps. At a frequency ``omega`` (rad/s), their amplitudes.
+
+    Compiled once with the value as a symbol, then solved in numbers at each point.
+    """
+    placed = compile_circuit(c).part(element)
+    param = placed.model.param
+    if param is None:
+        raise ValueError(f"sweep(): {element} has no value to change")
+    ctx = Context(None if omega is None else parse(omega))
+    ls = LinearSystem(c, ctx, (param,))
+    outputs = outputs or tuple(
+        [n for n in _outputs(ls.system) if n.startswith("V_")] or (f"U_{placed.label}", f"I_{placed.label}")
+    )
+    if isinstance(values, tuple) and len(values) == 2:
+        lo, hi = (float(parse(v)) for v in values)
+        values = [lo + (hi - lo) * k / (points - 1) for k in range(points)]
+    values = [float(parse(v)) for v in values]
+    out: dict[str, list[float]] = {n: [] for n in outputs}
+    for v in values:
+        x = ls.solve(v)
+        for n in outputs:
+            y = ls.value(n, x, (v,))
+            out[n].append(abs(y) if omega is not None else y.real)
+    return Sweep(placed.label, placed.component.unit, values, out)
