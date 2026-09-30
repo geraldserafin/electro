@@ -19,8 +19,10 @@ from electro import (
     Capacitor,
     Counter,
     DFlipFlop,
+    Diode,
     Inductor,
     JKFlipFlop,
+    OpAmp,
     PassiveBuzzer,
     Photoresistor,
     Potentiometer,
@@ -42,7 +44,7 @@ from electro import (
     simulate,
     supply,
 )
-from electro.issues import NeedsSimulation, NoSuchInput, ValueNeeded
+from electro.issues import BadValue, NeedsSimulation, NoSuchInput, ValueNeeded
 from electro.sim import compile_sim
 
 
@@ -445,3 +447,26 @@ def test_d_flip_flop_takes_d_on_the_edge_only():
     trace = simulate(c, t=0.01)
     # D is high until 1.67 ms: the edges at 0 and 1 ms give 1, the one at 2 ms gives 0
     assert [round(trace.at(t)["V_Q"]) for t in (0.0005, 0.0015, 0.0025)] == [5, 5, 0]
+
+
+def test_real_parts():
+    """A 1N4148 drops less than the generic diode at a few mA; an LM358 as a comparator swings to its
+    rails, slewing at its 0.3 V/µs; as a ×10 amplifier it gives 10 at 1 kHz."""
+    vf = lambda d: simulate(supply(5) + Resistor(430) + node("A") + d + ground, t=1e-3)["V_A"][-1]  # noqa: E731
+    assert 0.6 < vf(Diode(part="1N4148")) < vf(Diode()) < 0.75
+    comparator = net((SineSource(1, frequency=100), "GND", "IN"), (OpAmp(part="LM358"), "IN", "GND", "OUT"))
+    trace = simulate(comparator, t=0.02)
+    v, t = trace["V_OUT"], trace.t
+    assert min(v) == pytest.approx(-15, abs=0.3) and max(v) == pytest.approx(13.5, abs=0.3)
+    slope = max((v[i] - v[i - 1]) / (t[i] - t[i - 1]) for i in range(1, len(t)) if t[i] > t[i - 1])
+    assert slope == pytest.approx(0.3e6, rel=0.1)
+    amp = net(
+        (SineSource(0.1, frequency=1000), "GND", "IN"),
+        (OpAmp(part="LM358"), "IN", "F", "OUT"),
+        (Resistor("9k"), "OUT", "F"),
+        (Resistor("1k"), "F", "GND"),
+    )
+    trace = simulate(amp, t=0.005)
+    assert max(trace["V_OUT"][len(trace.t) // 2 :]) == pytest.approx(1, rel=0.02)
+    with pytest.raises(BadValue):
+        NPN(part="BC999")

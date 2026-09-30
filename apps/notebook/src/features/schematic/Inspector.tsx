@@ -50,8 +50,10 @@ export function Inspector({
   onSketch,
   onFirmware,
   part,
+  models,
 }: {
   part?: PartDef; // one's own component: its definition
+  models?: string[]; // real parts it can be (a 1N4148, an LM358): the element's ``text``, none a generic one
   element: ElementData | null;
   taken: string[];
   onChange: (patch: Partial<ElementData>) => void;
@@ -152,6 +154,24 @@ export function Inspector({
             )}
           </span>
           <p className={hint}>{t("inspector.frequencyHint")}</p>
+        </Section>
+      )}
+      {!live && models && (
+        <Section label={t("inspector.model")}>
+          <select
+            className={field}
+            value={element.text ?? ""}
+            aria-label={t("inspector.model")}
+            onChange={(e) => onChange({ text: e.target.value || null })}
+          >
+            <option value="">{t(element.kind === "opamp" ? "inspector.ideal" : "inspector.generic")}</option>
+            {models.map((m) => (
+              <option key={m} value={m}>
+                {m}
+              </option>
+            ))}
+          </select>
+          {element.kind === "opamp" && <p className={hint}>{t("inspector.opampModelHint")}</p>}
         </Section>
       )}
       {!live && element.kind === "sine_source" && (

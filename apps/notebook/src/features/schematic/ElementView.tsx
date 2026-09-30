@@ -33,6 +33,7 @@ function label_(e: ElementData): string {
   if (e.kind === "label" || e.kind === "port") return e.text ?? "";
   if (!isComponent(e.kind)) return "";
   if (e.kind === "button" && e.text) return `${e.id} [${keyLabel(e.text)}]`; // held with that key while it runs
+  if (["diode", "npn", "pnp", "opamp"].includes(e.kind) && e.text) return `${e.id} ${e.text}`; // a real part: its name
   if (!hasValue(e.kind)) return e.id;
   if (kindInfo(e.kind)?.meter && !e.value) return e.id; // no reading: the simulation fills it in
   const wave = isWaveSource(e.kind) ? `, ${waveLabel(e.text)}` : "";

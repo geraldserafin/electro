@@ -45,7 +45,15 @@ export interface SymbolLibrary {
   style: string;
   kinds: Record<
     string,
-    { pins: Point[]; svg: string; letter: string | null; upright: boolean; leads?: Point[]; box?: Point } // leads: from each pin into the body; box: a part's size (px)
+    {
+      pins: Point[];
+      svg: string;
+      letter: string | null;
+      upright: boolean;
+      leads?: Point[];
+      box?: Point;
+      parts?: string[];
+    } // leads: from each pin into the body; box: a part's size (px); parts: real parts to choose (the element's ``text``)
   >;
   standards?: Record<string, Record<string, string>>; // per standard, the symbols it draws unlike the kinds' (IEC's)
 }

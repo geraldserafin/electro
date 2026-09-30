@@ -82,6 +82,7 @@ class Program:
                 "sqrt": math.sqrt,
                 "sin": math.sin,
                 "cos": math.cos,
+                "tanh": math.tanh,
                 "floor": math.floor,
                 "pi": math.pi,
                 "math": math,

@@ -281,6 +281,7 @@ def symbol_library() -> dict:
                 "svg": SYMBOLS[kind],
                 "letter": LETTERS.get(kind),
                 "upright": kind in UPRIGHT,
+                **({"parts": list(parts)} if (parts := getattr(KINDS[kind].component, "PARTS", None)) else {}),
             }
             for kind in KINDS
         },

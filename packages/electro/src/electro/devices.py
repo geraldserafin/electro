@@ -19,7 +19,7 @@ import math
 
 import sympy as sp
 
-from .components import Component, Context, Law, Model, NoValue, TwoTerminal
+from .components import Component, Context, Law, Model, NoValue, Parts, TwoTerminal
 from .issues import BadValue, NeedsSimulation
 from .reasons import DeviceModel, OhmsLaw, PotentiometerDivider, SourceVoltage, SwitchClosed, SwitchOpen
 from .values import UNKNOWN, fmt, parse
@@ -176,11 +176,16 @@ class SquareSource(SineSource):
 # ------------------------------------------------------------------ diodes
 
 
-class Diode(NoValue, TwoTerminal):
+class Diode(Parts, NoValue, TwoTerminal):
     """``a``: anode, ``b``: cathode; ``I = I_S·(e^{U/(n·V_T)} − 1)``."""
 
     prefix = "D"
     IS, N = 1e-14, 1.0
+    PARTS = {"1N4148": {"IS": 2.52e-9, "N": 1.752}, "1N4007": {"IS": 76.9e-12, "N": 1.45}}
+
+    def __init__(self, label: str | None = None, part: str | None = None):
+        super().__init__(label=label)
+        self._use(part)
 
     def build(self, label, V, param, ctx):
         _paper_only(label, ctx)
@@ -260,6 +265,7 @@ class LED(Diode):
     prefix = "LED"
     N = LED_N
     RATED = LED_RATED
+    PARTS: dict[str, dict] = {}  # a colour instead
 
     def __init__(self, color: str = "red", label: str | None = None):
         super().__init__(label=label)
@@ -929,13 +935,23 @@ class Counter(NoValue):
 # ------------------------------------------------------------------ transistors
 
 
-class NPN(NoValue):
+class NPN(Parts, NoValue):
     """A bipolar transistor (Ebers–Moll): base ``b``, collector ``c``, emitter ``e``."""
 
     prefix = "Q"
     left, right = ("b",), ("c", "e")
     POLARITY = 1
     IS, BF, BR = 1e-14, 100.0, 1.0
+    PARTS = {
+        "BC547B": {"IS": 2.39e-14, "BF": 294.3, "BR": 7.946},
+        "2N2222": {"IS": 14.34e-15, "BF": 255.9, "BR": 6.092},
+        "2N3904": {"IS": 6.734e-15, "BF": 416.4, "BR": 0.7371},
+    }
+
+    def __init__(self, label: str | None = None, part: str | None = None):
+        super().__init__(label=label)
+        self._use(part)
+
     CJE, CJC = 8e-12, 4e-12  # F: the junctions' capacitances — without them switching (in a flip-flop
     # of two transistors) would take no time at all, and the step across it would have no solution
 
@@ -973,6 +989,7 @@ class NPN(NoValue):
 
 class PNP(NPN):
     POLARITY = -1
+    PARTS = {"BC557B": {"IS": 3.83e-14, "BF": 344.4, "BR": 14.84}, "2N3906": {"IS": 1.41e-15, "BF": 180.7, "BR": 4.977}}
 
 
 class NMOS(NoValue):

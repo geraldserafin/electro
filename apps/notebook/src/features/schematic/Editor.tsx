@@ -1076,6 +1076,7 @@ export function SchematicEditor({
           onRotate={rotateSelected}
           onRemove={removeSelected}
           part={selectedElement?.kind === "part" ? value.parts?.[selectedElement.text ?? ""] : undefined}
+          models={selectedElement ? library.kinds[selectedElement.kind]?.parts : undefined}
           icon={
             selectedElement ? (
               <SymbolIcon

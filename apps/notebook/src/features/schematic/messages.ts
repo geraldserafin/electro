@@ -180,6 +180,11 @@ export const pl = {
     frequencyHint: "Np. 50, 1k, 2,5 kHz.",
     duty: "Wypełnienie: {{percent}}%",
     phase: "Faza",
+    model: "Model",
+    ideal: "Idealny",
+    generic: "Ogólny",
+    opampModelHint:
+      "W czasie (⚡) ze wzmocnieniem, pasmem, szybkością narastania i szynami zasilania (±15 V, MCP6002 na 5 V). Na papierze (▶) zawsze idealny.",
     phaseHint: "Np. −120 i 120 dla faz L2 i L3. Na papierze (▶) liczy się fazorami przy tej częstotliwości.",
     zenerValue: "Napięcie Zenera",
     gain: "Wzmocnienie",
@@ -395,6 +400,11 @@ export const en: typeof pl = {
     frequencyHint: "E.g. 50, 1k, 2.5 kHz.",
     duty: "Duty cycle: {{percent}}%",
     phase: "Phase",
+    model: "Model",
+    ideal: "Ideal",
+    generic: "Generic",
+    opampModelHint:
+      "In time (⚡) with its gain, bandwidth, slew rate and supply rails (±15 V, the MCP6002 on 5 V). On paper (▶) always ideal.",
     phaseHint: "E.g. −120 and 120 for phases L2 and L3. On paper (▶) it is solved with phasors at this frequency.",
     zenerValue: "Zener voltage",
     gain: "Gain",

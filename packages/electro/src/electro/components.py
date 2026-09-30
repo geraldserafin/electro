@@ -8,6 +8,7 @@ means subclassing ``Component`` (or ``TwoTerminal``) and writing its laws.
 
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass, field
 
 import sympy as sp
@@ -41,6 +42,7 @@ from .reasons import (
 )
 
 OPEN = open_end + open_end.transpose()  # 1 → 1 with nothing between: a break in the circuit
+from .issues import BadValue  # noqa: E402
 from .values import UNKNOWN, fmt, parse  # noqa: E402
 
 
@@ -147,6 +149,31 @@ class Component(Circuit):
         if self.label:
             args.append(f"label={self.label!r}")
         return f"{type(self).__name__}({', '.join(args)})"
+
+
+class Parts:
+    """A choice of real parts, ``part="1N4148"``: each the class's model parameters as its maker's
+    SPICE model has them (the main ones); none, the class's own — a generic element."""
+
+    PARTS: dict[str, dict] = {}
+    part: str | None = None
+
+    def _use(self, part):
+        if part and part not in self.PARTS:
+            raise BadValue(f"{part} (known: {', '.join(self.PARTS)})")
+        self.part = part or None
+        for key, value in self.PARTS.get(self.part, {}).items():
+            setattr(self, key, value)
+
+    def options(self):
+        return [f"part={self.part!r}"] if self.part else []
+
+    def schematic_text(self):
+        return self.part
+
+    @classmethod
+    def from_schematic(cls, value, text, label):
+        return cls(label=label, part=(text or "").strip() or None)
 
 
 class NoValue(Component):
@@ -320,19 +347,49 @@ class CCCS(Controlled):
     prefix, senses, drives = "CCCS", "I", "I"
 
 
-class OpAmp(NoValue):
+class OpAmp(Parts, NoValue):
     """Ideal op-amp with negative feedback, as a morphism 2 → 1: (plus, minus) → out.
 
-    The output current is supplied from the (implicit) ground rails.
+    The output current is supplied from the (implicit) supply rails. With a ``part`` it is that
+    op-amp in time: gain ``A``, one pole at ``GBW``, the output slewing at most ``SR`` and never past
+    its ``RAILS`` (on the usual supply: ±15 V, the MCP6002 on 5 V) — a comparator works. On paper
+    it stays ideal, as problems have it.
     """
 
     prefix = "OA"
     left, right = ("plus", "minus"), ("out",)
+    PARTS = {
+        "LM358": {"A": 1e5, "GBW": 1e6, "SR": 0.3e6, "RAILS": (-15.0, 13.5)},
+        "TL072": {"A": 2e5, "GBW": 3e6, "SR": 13e6, "RAILS": (-13.5, 13.5)},
+        "MCP6002": {"A": 4e5, "GBW": 1e6, "SR": 0.6e6, "RAILS": (0.0, 5.0)},
+    }
+    R_OUT = 75.0  # Ω
+
+    def __init__(self, label: str | None = None, part: str | None = None):
+        super().__init__(label=label)
+        self._use(part)
 
     def build(self, label, V, param, ctx):
         I = sp.Symbol(f"I_{label}")
-        laws = [Law(V["plus"] - V["minus"], IdealOpAmp(sp.Symbol(label)))]
-        return Model({"plus": sp.Integer(0), "minus": sp.Integer(0), "out": -I}, laws, {"I": I})
+        if not (self.part and ctx.transient):
+            laws = [Law(V["plus"] - V["minus"], IdealOpAmp(sp.Symbol(label)))]
+            return Model({"plus": sp.Integer(0), "minus": sp.Integer(0), "out": -I}, laws, {"I": I})
+        lo, hi = self.RAILS
+        y, y0 = sp.Symbol(f"U_{label}_y"), sp.Symbol(f"U_{label}_y_prev")
+        name = IdealOpAmp(sp.Symbol(label))
+        tau = self.A / (2 * math.pi * self.GBW)  # the one pole: A at DC, 1 at GBW
+        drive = (self.A * (V["plus"] - V["minus"]) - y) / tau
+        slope = self.SR * sp.tanh(drive / self.SR)  # never faster than the slew rate
+        # at a rail it stops going further that way (no wind-up past it), smoothly over 50 mV
+        up, down = (1 - sp.tanh(20 * (y - hi))) / 2, (1 + sp.tanh(20 * (y - lo))) / 2
+        rising = (1 + sp.tanh(slope / 1e3)) / 2
+        laws = [
+            Law((y - y0) / ctx.dt - slope * (rising * up + (1 - rising) * down), name),
+            Law(I - (y - V["out"]) / self.R_OUT, name),
+        ]
+        model = Model({"plus": sp.Integer(0), "minus": sp.Integer(0), "out": -I}, laws, {"I": I, "U_y": y})
+        model.states[y0] = (y, min(max(0.0, lo), hi), (hi - lo) / 40)
+        return model
 
 
 class Transformer(Component):
