@@ -1,7 +1,7 @@
 // The element library, open while "Elementy" is on: a panel floating over the left of the board,
 // like Excalidraw's (nothing moves to make room). A search, then a section per group — its label and
-// a grid of tiles, one per element: its symbol, its name on hover, its key in the corner (as on the
-// toolbar). Search by name, other names or group; Enter places the first one found.
+// a grid of tiles, three in a row, one per element: its symbol whole (as big as the tile lets it), its
+// name under it, its key in the corner (as on the toolbar). Search by name, other names or group; Enter places the first one found.
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import type { PartDef, SymbolLibrary } from "@/shared/model/types";
@@ -17,6 +17,10 @@ export const shortcut = (kind: string) => {
   const i = KINDS.findIndex((k) => k.kind === kind);
   return i >= 0 && i < 10 ? String((i + 1) % 10) : "";
 };
+
+// a tile: the symbol filling its top, the name under it (two lines at most)
+const tile = "w-full h-auto grid-rows-[56px_auto] content-start gap-1 px-1.5 pt-2 pb-1.5 [&_svg]:w-full [&_svg]:h-14";
+const name = "w-full text-[11.5px] leading-tight text-center text-muted line-clamp-2 break-words";
 
 /** One of the user's own components, as the library offers it. */
 export interface MyPart {
@@ -60,7 +64,11 @@ export function LibraryPanel({
   );
 
   return (
-    <Panel role="complementary" aria-label={t("library.label")} className="top-15 left-3 bottom-16 z-6 w-66 gap-3">
+    <Panel
+      role="complementary"
+      aria-label={t("library.label")}
+      className="top-15 left-3 bottom-16 z-6 w-80 max-w-[calc(100%-24px)] gap-3"
+    >
       <PanelHead caption={t("library.title")} onClose={() => onClose()} closeLabel={t("library.closeTitle")} />
       <label
         className="flex flex-none items-center gap-2 px-2.5 h-9 rounded-lg bg-hover text-faint
@@ -83,7 +91,7 @@ export function LibraryPanel({
       <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden -mx-1 px-1 pb-1 grid content-start gap-4">
         {mine.length > 0 && onChoosePart && (
           <Section label={partsLabel}>
-            <div className="grid grid-cols-5 gap-1.5">
+            <div className="grid grid-cols-3 gap-1.5">
               {mine.map((p) => {
                 const G = library.grid;
                 return (
@@ -92,10 +100,11 @@ export function LibraryPanel({
                       on={chosen === partKind(p.id)}
                       title={p.def.name}
                       aria-label={p.def.name}
-                      className="w-full h-11 [&_svg]:size-auto"
+                      className={tile}
                       onClick={() => onChoosePart(p)}
                     >
                       <SymbolIcon kind={partKind(p.id)} library={partsLibrary} box={partBox(p.def, G)} />
+                      <span className={name}>{p.def.name}</span>
                     </Tile>
                     {onRemovePart && (
                       <button
@@ -115,7 +124,7 @@ export function LibraryPanel({
         )}
         {groups.map((group) => (
           <Section key={group} label={group}>
-            <div className="grid grid-cols-5 gap-1.5">
+            <div className="grid grid-cols-3 gap-1.5">
               {found
                 .filter((k) => k.groupName === group)
                 .map((k) => (
@@ -124,12 +133,13 @@ export function LibraryPanel({
                     on={chosen === k.kind}
                     title={k.name}
                     aria-label={k.name}
-                    className="w-full h-11 [&_svg]:size-auto"
+                    className={tile}
                     onClick={() => onChoose(k.kind)}
                   >
                     <SymbolIcon kind={k.kind} library={library} />
+                    <span className={name}>{k.name}</span>
                     {shortcut(k.kind) && (
-                      <span className="absolute right-1 bottom-0.5 text-[9px] text-faint">{shortcut(k.kind)}</span>
+                      <span className="absolute right-1.5 top-1 text-[10px] text-faint">{shortcut(k.kind)}</span>
                     )}
                   </Tile>
                 ))}

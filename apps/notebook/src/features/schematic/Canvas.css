@@ -215,3 +215,11 @@
     pointer-events: none;
   }
 }
+
+/* a symbol small (the library's tiles, the toolbar): its strokes as thick as on the board, however
+   far it is scaled down (an Arduino to a tile) */
+@layer components {
+  .symbol-icon .w * {
+    vector-effect: non-scaling-stroke;
+  }
+}
