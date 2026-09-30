@@ -180,6 +180,7 @@ class Notebook:
                 c.outputs, c.execution = [], None
             elif isinstance(c, SchematicCell):
                 c.results, c.problems, c.stale = None, None, False
+                c.extra.pop("frequency", None)  # the Bode plot (∿)
         return self
 
     # ------------------------------------------------------------------ writing

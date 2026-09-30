@@ -221,8 +221,14 @@ export function SchematicCell({
   const [generated, setGenerated] = useState<string | null>(null);
   const [error, setError] = useState<Failure | null>(null);
   const [busy, setBusy] = useState(false);
-  // the Bode plot, of the drawing it was made for (another drawing since: dimmed, the button lit again)
-  const [bode, setBode] = useState<{ of: SchematicData; out: { svg: string } | { error: Failure } } | null>(null);
+  // the Bode plot is kept in the cell (``frequency``); why the last one could not be made, here
+  const [bodeError, setBodeError] = useState<Failure | null>(null);
+  /** A new drawing: what runs made of the old one is out of date. */
+  const changed = (schematic: SchematicData): Partial<Cell> => ({
+    schematic,
+    ...(cell.results ? { stale: true } : {}),
+    ...(cell.frequency ? { frequency: { ...cell.frequency, stale: true } } : {}),
+  });
   const live = useLive(cell.schematic);
   const running = live.status === "running" || live.status === "paused";
   const timed = inTimeOnly(cell.schematic); // only in time: the bolt runs it
@@ -393,7 +399,7 @@ export function SchematicCell({
     setError(null);
     writtenFor.current = back.schematic;
     setGenerated(source); // applied: the code in the editor is what the drawing is now
-    update({ schematic: back.schematic, ...(cell.results ? { stale: true } : {}) });
+    update(changed(back.schematic));
     return back.schematic;
   };
 
@@ -440,7 +446,9 @@ export function SchematicCell({
   const frequency = () =>
     withDrawing(async (schematic) => {
       await kernel.ready;
-      setBode({ of: schematic, out: await kernel.frequency(schematic) });
+      const out = await kernel.frequency(schematic);
+      setBodeError("error" in out ? out.error : null);
+      if ("svg" in out) update({ frequency: { svg: out.svg } });
     });
   const runInTime = () => (running ? live.stop() : withDrawing((schematic) => live.start(schematic)));
   // Shift+Enter in the code: what the circuit can do — solved, or (only in time) run
@@ -553,7 +561,7 @@ export function SchematicCell({
     <RunButton run={solve} eager running={solving || busy} done={done || empty} label={t("schematic.run")} />
   );
   // ∿ the frequency response: a circuit solved on paper with a capacitor or an inductor in it
-  const bodeDone = bode !== null && bode.of === cell.schematic;
+  const bodeDone = !!cell.frequency && !cell.frequency.stale && !bodeError;
   const bodeButton = !timed && cell.schematic.elements.some((e) => e.kind === "capacitor" || e.kind === "inductor") && (
     <RunButton run={frequency} running={busy} done={bodeDone} icon={<Wave />} label={t("schematic.frequency")} />
   );
@@ -620,7 +628,7 @@ export function SchematicCell({
       corner={inBoard ? actions : undefined}
       topRight={inBoard ? fullButton : undefined}
       value={cell.schematic}
-      onChange={(schematic) => update({ schematic, ...(cell.results ? { stale: true } : {}) })}
+      onChange={(schematic) => update(changed(schematic))}
       library={library}
       results={running ? live.frame?.results : cell.stale ? undefined : cell.results}
       live={
@@ -875,17 +883,18 @@ export function SchematicCell({
           onClose={() => setSaving(false)}
         />
       )}
-      {bode &&
-        ("svg" in bode.out ? (
+      {bodeError ? (
+        <FailureBox failure={bodeError} kind="error" />
+      ) : (
+        cell.frequency && (
           // SVG produced by our own renderer (electro.plot), from this drawing
           <div
             data-output="svg"
-            className={cn("overflow-x-auto [&_svg]:max-w-full [&_svg]:h-auto", !bodeDone && "opacity-50")}
-            dangerouslySetInnerHTML={{ __html: bode.out.svg }}
+            className={cn("overflow-x-auto [&_svg]:max-w-full [&_svg]:h-auto", cell.frequency.stale && "opacity-50")}
+            dangerouslySetInnerHTML={{ __html: cell.frequency.svg }}
           />
-        ) : (
-          <FailureBox failure={bode.out.error} kind="error" />
-        ))}
+        )
+      )}
       {cell.results && Object.keys(cell.results).length > 0 && (
         <ResultsTable results={cell.results} stale={!!cell.stale} />
       )}

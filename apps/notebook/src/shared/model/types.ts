@@ -96,6 +96,7 @@ export type Cell =
       results?: Record<string, ElementResult>; // from the last run
       problems?: Problem[]; // why the last run could not find everything
       stale?: boolean; // the drawing changed since the last run
+      frequency?: { svg: string; stale?: boolean }; // the last Bode plot (∿), and whether the drawing changed since
       view?: SchematicView; // which side of the cell is shown
     };
 

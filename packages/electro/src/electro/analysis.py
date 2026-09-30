@@ -155,6 +155,19 @@ class Response:
                 out[n].append(p)
         return out
 
+    def cutoffs(self, name: str | None = None) -> list[float]:
+        """Where ``name``'s gain (by default the first output's) is 3 dB below its peak, in Hz: a
+        low-pass filter's corner, a band-pass filter's two edges. Between samples, on the log scale."""
+        gain = self.gain_db[name or next(iter(self.values))]
+        edge = max(gain) - 3.0103  # half the power
+        out = []
+        for k in range(1, len(gain)):
+            a, b = gain[k - 1] - edge, gain[k] - edge
+            if a * b < 0:
+                t = a / (a - b)
+                out.append(10 ** (math.log10(self.f[k - 1]) + t * (math.log10(self.f[k]) - math.log10(self.f[k - 1]))))
+        return out
+
     def __repr__(self):
         return "\n".join(f"{n}: H(jω) = {h}" for n, h in self.H.items())
 

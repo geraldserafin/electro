@@ -240,6 +240,14 @@ class BodePlot:
                     f'<text class="muted" x="{x:.1f}" y="{y0 + PANEL + 15}" text-anchor="middle">{_hz(d)}</text>'
                 )
             parts.append(f'<text class="muted" x="{LEFT - 6}" y="{y0 - 8}" text-anchor="end">{unit}</text>')
+            if unit == "dB":  # the −3 dB corners of the first output, marked and named
+                for fc in r.cutoffs():
+                    x = sx(fc)
+                    parts.append(
+                        f'<line class="axis" x1="{x:.1f}" x2="{x:.1f}" y1="{y0}" y2="{y0 + PANEL}" stroke-dasharray="4 3"/>'
+                        f'<text x="{x + 4:.1f}" y="{y0 + PANEL - 6}">f<tspan class="sub" dy="3">g</tspan>'
+                        f'<tspan dy="-3"> = {_hz(fc)}Hz</tspan></text>'
+                    )
             for k, n in enumerate(names):
                 path = " ".join(f"{sx(a):.1f},{sy(b):.1f}" for a, b in zip(f, series[n]))
                 parts.append(

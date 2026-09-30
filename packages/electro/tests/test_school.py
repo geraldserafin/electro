@@ -110,6 +110,8 @@ def test_bode_rc_low_pass():
     assert gain[fc] == pytest.approx(-3, abs=0.1) and phase[fc] == pytest.approx(-45, abs=1)
     assert gain[at(1e5)] - gain[at(1e4)] == pytest.approx(-20, abs=0.5)  # −20 dB a decade
     assert "<polyline" in r._repr_svg_()
+    [corner] = r.cutoffs()
+    assert corner == pytest.approx(1 / (2 * 3.14159265 * 1e-3), rel=0.01) and "160Hz" in r._repr_svg_()
 
 
 def test_bode_outputs_by_default():
