@@ -294,6 +294,12 @@ def _close(c: ct.Close, frame: Frame, ctx: _Context) -> Block:
 def layout(circuit: ct.Circuit, *, orientation: str | None = None) -> Schematic:
     """Place ``circuit`` on the grid. ``orientation``: "horizontal" or "vertical"
     (default: vertical for parallel branches, like on a whiteboard)."""
+    if isinstance(circuit, ct.Net):  # a netlist (from SPICE, say): series and parallel where it can be
+        from electro.codegen import tidy
+
+        tidied = tidy(circuit)
+        if (tidied.dom, tidied.cod) == (0, 0):  # closed, as the netlist was (else its open ends are lost)
+            circuit = tidied
     if orientation is None:
         orientation = "vertical" if isinstance(circuit, ct.Par) else "horizontal"
     frame = {"horizontal": Frame(RIGHT, DOWN), "vertical": Frame(UP, RIGHT)}[orientation]

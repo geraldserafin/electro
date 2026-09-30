@@ -100,6 +100,7 @@ from .devices import (
 from .issues import Issue
 from .sim import Trace, simulate
 from .solver import Ambiguous, CircuitError, Contradiction, Diagnosis, I, MissingData, P, Solution, U, V, solve
+from .spice import from_spice, to_spice
 from .values import fmt, parse
 
 __all__ = [
@@ -150,6 +151,8 @@ __all__ = [
     "blackbox",
     "bode",
     "code",
+    "from_spice",
+    "to_spice",
     "equivalent",
     "resistance",
     "sweep",

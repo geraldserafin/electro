@@ -113,7 +113,7 @@ def _parallel_step(edges) -> bool:
 
 
 def _has_source(e) -> bool:
-    return any(isinstance(leaf.component, (comp.VoltageSource, comp.CurrentSource)) for leaf in e.leaves())
+    return any(getattr(leaf.component, "active", False) for leaf in e.leaves())  # any source, a sine's too
 
 
 def _against(e) -> int:
@@ -206,14 +206,16 @@ def code(circuit: Circuit, name: str = "uklad") -> str:
                     first = with_source[0] if with_source else expr.parts[0]
                     rest = [p for p in expr.parts if p is not first]
                     load = rest[0] if len(rest) == 1 else _Parallel(rest)
-                    expr, v = _Series([first, load.reversed()]), u
+                    # the named nodes where the source's branch meets the load (the loop's join, and across)
+                    ends = [[_Node(n)] if n in named else [] for n in (u, v)]
+                    expr, v = _Series([*ends[0], first, *ends[1], load.reversed()]), u
             expr = _nicest(expr)
             if u == v and isinstance(expr, _Series):  # a loop: start it at a source, like on paper
                 k = next(
                     (
                         i
                         for i, p in enumerate(expr.parts)
-                        if isinstance(p, _Leaf) and isinstance(p.component, (comp.VoltageSource, comp.CurrentSource))
+                        if isinstance(p, _Leaf) and getattr(p.component, "active", False)
                     ),
                     0,
                 )
@@ -232,3 +234,13 @@ def code(circuit: Circuit, name: str = "uklad") -> str:
         for (c, nodes), label in zip(parts, written)
     ]
     return f"{name} = net(\n" + "\n".join(rows) + "\n)"
+
+
+def tidy(circuit: Circuit) -> Circuit:
+    """The same circuit with ``+`` and ``|`` wherever it can have them (as ``code()`` prints it): a
+    ``net(...)`` that is series and parallel after all, ready to be laid out."""
+    import electro
+
+    scope = vars(electro).copy()
+    exec(code(circuit, "_tidy"), scope)
+    return scope["_tidy"]

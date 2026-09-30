@@ -108,6 +108,14 @@ def test_simulate_a_sine_source_with_phasors():
     assert out["problems"] == [] and out["results"]["R_1"]["I"] == "2 A ∠ 90°"
 
 
+def test_a_spice_netlist_in_the_code_view():
+    source = 'uklad = from_spice("""* rc\nV1 in 0 SIN(0 1 1k)\nR1 in out 1k\nC1 out 0 100n\nD1 out 0 1N4148\n""")'
+    out = json.loads(kernel.from_code(source, "uklad"))
+    elements = {e["id"]: e for e in out["schematic"]["elements"]}
+    assert elements["C1"]["value"] == "100n" and elements["D1"]["text"] == "1N4148"
+    assert {e["text"] for e in elements.values() if e["kind"] == "label"} == {"in", "out"}
+
+
 def test_frequency_of_a_drawing():
     from electro import Capacitor, Resistor, VoltageSource, loop
     from electro_schematic import layout

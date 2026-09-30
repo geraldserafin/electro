@@ -241,6 +241,13 @@ class WrongNodeCount(Issue, TypeError):
 
 
 @issue
+class NoSpice(Issue, ValueError):
+    """``element`` has no SPICE counterpart here (or no number for its value)."""
+
+    element: str
+
+
+@issue
 class NotLinear(Issue, ValueError):
     """blackbox() works for linear circuits only."""
 

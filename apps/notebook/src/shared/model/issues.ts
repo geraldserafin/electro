@@ -91,6 +91,7 @@ export type Issue =
   | { type: "CloseNeedsNToN" | "NotAPort"; shape: string }
   | { type: "WrongNodeCount"; part: string; terminals: number; nodes: string[] }
   | { type: "NotLinear" | "NoThevenin" }
+  | { type: "NoSpice"; element: string }
   // in time (electro.sim)
   | { type: "NeedsSimulation" | "NotSimulated" | "ValueNeeded"; label: Tex }
   | { type: "NoConvergence"; time: number }

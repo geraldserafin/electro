@@ -90,6 +90,7 @@ export const pl = {
       "Symulacja utknęła w chwili t = {{time}} s: nawet w bardzo małych krokach nie da się znaleźć stanu obwodu.",
     NoSuchInput: "Nic w obwodzie nie nazywa się {{name}}. Można ustawiać: {{available}}.",
     NotLinear: "blackbox działa tylko dla obwodów liniowych.",
+    NoSpice: "{{element}} nie ma odpowiednika w SPICE (albo nie ma liczbowej wartości).",
     NotAPort: "equivalent() wymaga obwodu 1 → 1 albo 0 → 1 (względem masy), dostałem {{shape}}.",
     NoThevenin: "Obwód jest rozwarty między zaciskami ($R_{th} = \\infty$) — nie ma zastępczego Thévenina.",
     CannotLayOut:
@@ -206,6 +207,7 @@ export const en: typeof pl = {
       "The simulation got stuck at t = {{time}} s: even in tiny steps the circuit's state cannot be found.",
     NoSuchInput: "Nothing in the circuit is called {{name}}. What can be set: {{available}}.",
     NotLinear: "blackbox works for linear circuits only.",
+    NoSpice: "{{element}} has no SPICE counterpart (or no number for its value).",
     NotAPort: "equivalent() needs a 1 → 1 circuit, or 0 → 1 (against ground), got {{shape}}.",
     NoThevenin: "The circuit is open between its terminals ($R_{th} = \\infty$) — it has no Thévenin equivalent.",
     CannotLayOut:
