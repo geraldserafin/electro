@@ -143,7 +143,7 @@ diff -ruN a/src/pico/i_video.c b/src/pico/i_video.c
 +// Without scanvideo (whose PIO and DMA scan a VGA picture out): a timer on core 1 starts a frame,
 +// and its scanlines are handed out one after another as scanvideo would, each sent to the LCD by DMA.
 +#ifndef EMU_LCD_FPS
-+#define EMU_LCD_FPS 30
++#define EMU_LCD_FPS 35 // (the game's tics a second: the renderer renders as fast as frames go out, a tic each)
 +#endif
 +#define EMU_LCD_DMA 10
 +static scanvideo_scanline_buffer_t emu_buffers[2];
@@ -199,7 +199,7 @@ diff -ruN a/src/pico/i_video.c b/src/pico/i_video.c
 +// the last one is still going out; the emulator is slow, and every scanline sent costs it
 +static bool emu_tick(repeating_timer_t *t) {
 +    static int idle;
-+    if (emu_line >= SCREENHEIGHT && (sem_available(&render_frame_ready) || ++idle >= 4)) {
++    if (emu_line >= SCREENHEIGHT && (sem_available(&render_frame_ready) || ++idle >= EMU_LCD_FPS / 8)) {
 +        idle = 0;
 +        emu_frame++;
 +        emu_which = 0;

@@ -34,7 +34,7 @@ export interface LiveFrame {
   looks: Record<string, Record<string, number>>; // runner.ts: Frame.looks
   screens: Record<string, Screen>; // each LCD (parallel or on I²C)
   oleds: Record<string, OledData>; // each OLED
-  tfts: Record<string, TftData>; // each colour TFT (a picture only when it changed)
+  tfts: Record<string, TftData & { pictures: Pictures }>; // each colour TFT, how lit, and where its pictures come from
   results: Record<string, ElementResult>; // readings next to the elements
   behind: boolean; // the simulation cannot keep up: time runs slower than asked
 }
@@ -48,6 +48,30 @@ export type SketchState =
   | { kind: "unavailable" | "signedOut" | "unreachable" };
 
 export const SPEEDS = [1, 0.1, 0.01, 0.001];
+
+/** The TFTs' pictures as the worker sends them (apart from the frames): each drawn at once where it is watched. */
+class Pictures {
+  private last = new Map<string, Uint8ClampedArray>();
+  private drawers = new Map<string, (image: Uint8ClampedArray) => void>();
+
+  put(id: string, image: Uint8ClampedArray) {
+    this.last.set(id, image);
+    this.drawers.get(id)?.(image);
+  }
+
+  watch(id: string, draw: (image: Uint8ClampedArray) => void) {
+    this.drawers.set(id, draw);
+    const last = this.last.get(id);
+    if (last) draw(last);
+    return () => {
+      if (this.drawers.get(id) === draw) this.drawers.delete(id);
+    };
+  }
+
+  clear() {
+    this.last.clear();
+  }
+}
 
 /** A Pico's flash image as the server sends it (base64) → bytes. (Here, not in pico.ts: the emulator
  *  itself — rp2040js, the boot ROM — is the worker's alone.) */
@@ -101,6 +125,7 @@ export function useLive(schematic: SchematicData) {
   statusRef.current = status;
   const sound = useRef(new Sound());
   const serialText = useRef("");
+  const pictures = useRef(new Pictures());
 
   const tell = (request: Request) => worker.current?.postMessage(request);
 
@@ -111,7 +136,8 @@ export function useLive(schematic: SchematicData) {
     const { voltages } = f;
     const on = (node: string | null) => (node === null ? null : voltages[node] ?? null);
     setFrame({
-      t: f.t, voltages, leds: f.leds, looks: f.looks, screens: f.screens, oleds: f.oleds, tfts: f.tfts, results: f.results, behind,
+      t: f.t, voltages, leds: f.leds, looks: f.looks, screens: f.screens, oleds: f.oleds, results: f.results, behind,
+      tfts: Object.fromEntries(Object.entries(f.tfts).map(([id, d]) => [id, { ...d, pictures: pictures.current }])),
       scale: Math.max(1, ...Object.values(voltages).map(Math.abs)),
       wires: c.wires.map(on),
       pins: Object.fromEntries(Object.entries(c.pins).map(([id, nodes]) => [id, nodes.map(on)])),
@@ -196,12 +222,14 @@ export function useLive(schematic: SchematicData) {
       halt();
       circuit.current = compiled;
       built.current = structure(latest.current);
+      pictures.current.clear();
       const w = new Worker(new URL("./sim.worker.ts", import.meta.url), { type: "module" });
       worker.current = w;
       w.onmessage = (event: MessageEvent<Reply>) => {
         if (worker.current !== w) return;
         const r = event.data;
         if (r.type === "frame") received(r.frame, r.behind);
+        else if (r.type === "pictures") for (const [id, image] of Object.entries(r.pictures)) pictures.current.put(id, image);
         else {
           setError(r.message.includes("NoConvergence") && r.time !== null
             ? { data: r.message, issue: { type: "NoConvergence", time: r.time } } : { data: r.message });

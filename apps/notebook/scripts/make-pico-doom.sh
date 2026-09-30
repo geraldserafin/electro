@@ -7,7 +7,8 @@
 # BSD-3), with pondahai/rp2040-doom-ili9341's files over it (the LCD instead of VGA, eight buttons on
 # GP2–GP9 and GP28), and pico-doom.patch over those — ours, for the emulator:
 #   - EMU_LCD: no scanvideo (its PIO and DMA would scan a VGA picture out, the costliest thing to
-#     emulate): a timer on core 1 sends a frame when one is rendered, a scanline at a time by DMA to SPI;
+#     emulate): a timer on core 1 sends a frame when one is rendered, a scanline at a time by DMA to SPI —
+#     35 a second, the game's tics (the renderer renders a frame for each one that goes out);
 #     the screen cleared in one transaction (not CS toggled for each pixel: each toggle a circuit event);
 #   - no sound, no music (I²S by PIO, likewise);
 #   - no melt between screens (its frames would come too slowly, and the game waits for it to end);

@@ -49,7 +49,7 @@ export interface Frame {
   looks: Record<string, Record<string, number>>;
   screens: Record<string, Screen>; // each LCD (parallel or on I²C)
   oleds: Record<string, OledData>;
-  tfts: Record<string, TftData>; // each colour TFT (its picture only when it changed)
+  tfts: Record<string, TftData>; // each colour TFT, how lit (its pictures come apart: Runner.pictures)
   results: Record<string, ElementResult>; // readings next to the elements
   sounds: { id: string; frequency: number | null; volume: number }[]; // each buzzer, in the circuit's time
   traces: ScopeTrace[]; // the scope's, then the meter's
@@ -201,6 +201,16 @@ export class Runner {
         trace.v.splice(0, old);
       }
     }
+  }
+
+  /** The colour TFTs' new pictures (Ili9341.picture: each frame whole, or ``anyway`` as it is), by id. */
+  pictures(anyway: boolean): Record<string, Uint8ClampedArray> | null {
+    let pictures: Record<string, Uint8ClampedArray> | null = null;
+    for (const [id, d] of this.tfts) {
+      const image = d.picture(anyway);
+      if (image) (pictures ??= {})[id] = image;
+    }
+    return pictures;
   }
 
   /** What the board shows now; the averages (glow, sound) are over the time since the last frame. */

@@ -29,23 +29,40 @@ describe("an ILI9341", () => {
     send(0x2a, 0, 10, 0, 11); // columns 10–11 (x, landscape)
     send(0x2b, 0, 20, 0, 20); // page 20 (y)
     send(0x2c, 0xf8, 0x00, 0x00, 0x1f); // red, then blue
-    const { image, shown } = tft.data();
-    expect(shown).toBe(true);
+    expect(tft.data().shown).toBe(true);
+    expect(tft.picture(false)).toBeNull(); // (a small window, not a frame drawn whole: only when asked anyway)
+    const image = tft.picture(true);
     expect(at(image!, 10, 20)).toEqual([255, 0, 0]);
     expect(at(image!, 11, 20)).toEqual([0, 0, 255]);
     expect(at(image!, 12, 20)).toEqual([0, 0, 0]);
-    expect(tft.data().image).toBeNull(); // nothing new since
+    expect(tft.picture(true)).toBeNull(); // nothing new since
+  });
+
+  test("a frame written whole (Doom's 320 × 200 window): its picture as it was then, not the next half written", () => {
+    const tft = new Ili9341("TFT_1"), { send } = wired(tft);
+    send(0x11); send(0x29); send(0x36, 0x28);
+    send(0x2a, 0, 0, 0x01, 0x3f); // columns 0–319
+    send(0x2b, 0, 20, 0, 219); // pages 20–219
+    const pixels = (hi: number, count: number) => { for (let i = 0; i < count; i++) { tft.transmit(hi); tft.transmit(0); } };
+    send(0x2c);
+    pixels(0xf8, 320 * 200); // red, the whole frame
+    send(0x2c);
+    pixels(0x07, 320 * 100); // green, half the next
+    expect(at(tft.picture(false)!, 0, 20)).toEqual([255, 0, 0]);
+    expect(tft.picture(true)).toBeNull(); // (the next one half written: not yet, even asked anyway)
+    pixels(0x07, 320 * 100);
+    expect(at(tft.picture(false)!, 0, 219)).toEqual([0, 227, 0]);
   });
 
   test("RGB order (BGR clear) swaps red and blue; CS high: not its bytes; RESET: asleep again", () => {
     const tft = new Ili9341("TFT_1"), { lines, send } = wired(tft);
     send(0x11); send(0x29); send(0x36, 0x20); send(0x2a, 0, 0, 0, 0); send(0x2b, 0, 0, 0, 0);
     send(0x2c, 0xf8, 0x00);
-    expect(at(tft.data().image!, 0, 0)).toEqual([0, 0, 255]);
+    expect(at(tft.picture(true)!, 0, 0)).toEqual([0, 0, 255]);
     lines.selected = false;
     send(0x2c, 0x07, 0xe0); // (green, to someone else)
     lines.selected = true;
-    expect(tft.data().image).toBeNull();
+    expect(tft.picture(true)).toBeNull();
     lines.reset = true;
     tft.transmit(0);
     lines.reset = false;
@@ -87,12 +104,12 @@ test("Doom on a Pico, the TFT on its SPI0: the title screen comes up", () => {
   let picture: Uint8ClampedArray | null = null;
   for (let t = 0.1; t <= 2.0 && !picture; t += 0.1) {
     runner.advanceTo(t, 1e-3);
-    const tft = runner.frame().tfts.TFT_1;
-    if (tft?.shown && tft.backlight > 0.9 && tft.image) {
+    const tft = runner.frame().tfts.TFT_1, image = runner.pictures(false)?.TFT_1;
+    if (tft?.shown && tft.backlight > 0.9 && image) {
       // the title: mostly the red of its hellish sky (not the black it was cleared to)
       let red = 0;
-      for (let i = 0; i < WIDTH * HEIGHT; i++) if (tft.image[i * 4] > 120 && tft.image[i * 4 + 2] < 90) red++;
-      if (red > WIDTH * HEIGHT * 0.2) picture = tft.image;
+      for (let i = 0; i < WIDTH * HEIGHT; i++) if (image[i * 4] > 120 && image[i * 4 + 2] < 90) red++;
+      if (red > WIDTH * HEIGHT * 0.2) picture = image;
     }
   }
   expect(picture).not.toBeNull();

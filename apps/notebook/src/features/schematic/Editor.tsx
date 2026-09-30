@@ -674,7 +674,7 @@ export function SchematicEditor({
             <OledScreen key={`oled${e.id}`} screen={live.oleds[e.id]} at={[e.at[0] * G, e.at[1] * G]} rotation={e.rotation} />
           ))}
           {live && value.elements.filter((e) => e.kind === "ili9341" && live.tfts[e.id]).map((e) => (
-            <TftScreen key={`tft${e.id}`} screen={live.tfts[e.id]} at={[e.at[0] * G, e.at[1] * G]} rotation={e.rotation} />
+            <TftScreen key={`tft${e.id}`} id={e.id} screen={live.tfts[e.id]} at={[e.at[0] * G, e.at[1] * G]} rotation={e.rotation} />
           ))}
           {openPinPoints.map(([x, y]) => (
             <circle key={`o${x},${y}`} className="open-pin" cx={x * G} cy={y * G} r="3.5">

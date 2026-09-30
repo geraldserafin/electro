@@ -17,25 +17,37 @@ export type Request =
 
 export type Reply =
   | { type: "frame"; frame: Frame; behind: boolean }
+  | { type: "pictures"; pictures: Record<string, Uint8ClampedArray> } // the TFTs' (their buffers handed over, not copied)
   | { type: "error"; message: string; time: number | null };
 
 const BUDGET = 25; // ms of computing at a time, then the messages waiting are taken
 const REST = 4; // ms to wait when it keeps up
 const FRAME = 33; // ms between frames sent
+// the TFTs' pictures apart from the frames: as soon as one is drawn whole (Doom: up to 35 a second, more than
+// the frames), at most one each PICTURE ms; with each frame too, whole or not (a program drawing in small windows)
+const PICTURE = 14;
 const LAG = 0.05; // s (of the page's time) behind before it says so
 
 let runner: Runner | null = null;
 let running = false, visible = true, speed = 1;
-let last = 0, sent = 0, behindSince: number | null = null;
+let last = 0, sent = 0, pictured = 0, behindSince: number | null = null;
 let waiting = false; // a tick is scheduled
 const STEER = 250; // ms between telling the runner how busy it is
 let steered = 0, busyMs = 0; // since when, and how much of it computing
 
-const post = (reply: Reply) => self.postMessage(reply);
+const post = (reply: Reply, transfer: Transferable[] = []) => self.postMessage(reply, transfer);
+const picture = (now: number, anyway = false) => {
+  if (!runner || (!anyway && now - pictured < PICTURE)) return;
+  const pictures = runner.pictures(anyway);
+  if (!pictures) return;
+  pictured = now;
+  post({ type: "pictures", pictures }, Object.values(pictures).map((p) => p.buffer));
+};
 const send = (now: number) => {
   if (!runner) return;
   sent = now;
   post({ type: "frame", frame: runner.frame(), behind: behindSince !== null && now - behindSince > LAG * 1000 });
+  picture(now, true);
 };
 
 // a tick right away when behind (a MessageChannel: setTimeout would wait at least 4 ms), else after a rest
@@ -61,6 +73,7 @@ function tick() {
     while (sim.t < target - 1e-15) {
       runner.advanceTo(Math.min(target, sim.t + dtMax * 4), dtMax);
       const at = performance.now();
+      if (visible) picture(at);
       if (visible && at - sent >= FRAME) send(at); // (on time, not only as a tick ends)
       if (at - now > BUDGET) break;
     }
@@ -79,6 +92,7 @@ function tick() {
   }
   if (!lagging) behindSince = null;
   else behindSince ??= now;
+  if (visible) picture(performance.now());
   if (visible && performance.now() - sent >= FRAME) send(performance.now());
   schedule(lagging);
 }
