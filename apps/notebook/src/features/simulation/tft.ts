@@ -38,7 +38,8 @@ export class Ili9341 {
   private pages = [0, ROWS - 1];
   private column = 0;
   private page = 0;
-  private pixel: number[] = []; // the bytes of a pixel so far
+  private pixel = 0; // the bytes of a pixel so far, and how many (a pixel comes byte by byte: no array for it)
+  private have = 0;
   private wasReset = false;
   private dirty = true;
   private rgba = new Uint8ClampedArray(WIDTH * HEIGHT * 4);
@@ -78,7 +79,7 @@ export class Ili9341 {
   private begin(command: number) {
     this.command = command;
     this.params = [];
-    this.pixel = [];
+    this.have = 0;
     switch (command) {
       case 0x01: this.hardwareReset(); break; // SWRESET
       case 0x10: this.sleeping = true; this.dirty = true; break; // SLPIN
@@ -101,17 +102,13 @@ export class Ili9341 {
   }
 
   private write(byte: number) {
+    this.pixel = (this.pixel << 8) | byte;
+    if (++this.have < (this.bits === 16 ? 2 : 3)) return;
     const px = this.pixel;
-    px.push(byte);
-    let value: number;
-    if (this.bits === 16) {
-      if (px.length < 2) return;
-      value = (px[0] << 8) | px[1];
-    } else {
-      if (px.length < 3) return;
-      value = ((px[0] >> 3) << 11) | ((px[1] >> 2) << 5) | (px[2] >> 3); // 6-6-6, top bits of each byte
-    }
-    this.pixel = [];
+    const value = this.bits === 16 ? px & 0xffff
+      : (((px >> 19) & 31) << 11) | (((px >> 10) & 63) << 5) | ((px >> 3) & 31); // 6-6-6: the top bits of each byte
+    this.pixel = 0;
+    this.have = 0;
     const exchanged = (this.madctl & 0x20) !== 0;
     let col = exchanged ? this.page : this.column, row = exchanged ? this.column : this.page;
     if (this.madctl & 0x40) col = COLUMNS - 1 - col; // MX

@@ -83,96 +83,74 @@ export class Interpolator {
     this.update();
   }
 
+  // (ours) update() and writeback() on the control registers' bits directly: the same as decoding them into
+  // InterpolatorConfig and back (what the fork does, costly on every access — Doom's texture mapping makes
+  // many), field for field
   update() {
-    const N = this.index;
-    this.ctrl0Config.decode(this.ctrl0);
-    this.ctrl1Config.decode(this.ctrl1);
-    const ctrl0 = this.ctrl0Config;
-    const ctrl1 = this.ctrl1Config;
+    const N = this.index, c0 = this.ctrl0, c1 = this.ctrl1;
+    const do_clamp = N == 1 && !!((c0 >>> 22) & 1);
+    const do_blend = N == 0 && !!((c0 >>> 21) & 1);
+    const shift0 = c0 & 31, lsb0 = (c0 >>> 5) & 31, msb0 = (c0 >>> 10) & 31, signed0 = !!((c0 >>> 15) & 1);
+    const shift1 = c1 & 31, lsb1 = (c1 >>> 5) & 31, msb1 = (c1 >>> 10) & 31, signed1 = !!((c1 >>> 15) & 1);
+    const forceMSB = (c0 >>> 19) & 3;
 
-    const do_clamp = ctrl0.clamp && N == 1;
-    const do_blend = ctrl0.blend && N == 0;
+    const input0 = s32((c0 >>> 16) & 1 ? this.accum1 : this.accum0);
+    const input1 = s32((c1 >>> 16) & 1 ? this.accum0 : this.accum1);
 
-    ctrl0.clamp = do_clamp;
-    ctrl0.blend = do_blend;
-    ctrl1.clamp = false;
-    ctrl1.blend = false;
-    ctrl1.overf0 = false;
-    ctrl1.overf1 = false;
-    ctrl1.overf = false;
+    const msbmask0 = msb0 == 31 ? 0xffffffff : (1 << (msb0 + 1)) - 1;
+    const msbmask1 = msb1 == 31 ? 0xffffffff : (1 << (msb1 + 1)) - 1;
+    const mask0 = msbmask0 & ~((1 << lsb0) - 1);
+    const mask1 = msbmask1 & ~((1 << lsb1) - 1);
 
-    const input0 = s32(ctrl0.crossInput ? this.accum1 : this.accum0);
-    const input1 = s32(ctrl1.crossInput ? this.accum0 : this.accum1);
+    const uresult0 = (input0 >>> shift0) & mask0;
+    const uresult1 = (input1 >>> shift1) & mask1;
 
-    const msbmask0 = ctrl0.maskMSB == 31 ? 0xffffffff : (1 << (ctrl0.maskMSB + 1)) - 1;
-    const msbmask1 = ctrl1.maskMSB == 31 ? 0xffffffff : (1 << (ctrl1.maskMSB + 1)) - 1;
-    const mask0 = msbmask0 & ~((1 << ctrl0.maskLSB) - 1);
-    const mask1 = msbmask1 & ~((1 << ctrl1.maskLSB) - 1);
-
-    const uresult0 = (input0 >>> ctrl0.shift) & mask0;
-    const uresult1 = (input1 >>> ctrl1.shift) & mask1;
-
-    const overf0 = Boolean((input0 >>> ctrl0.shift) & ~msbmask0);
-    const overf1 = Boolean((input1 >>> ctrl1.shift) & ~msbmask1);
+    const overf0 = Boolean((input0 >>> shift0) & ~msbmask0);
+    const overf1 = Boolean((input1 >>> shift1) & ~msbmask1);
     const overf = overf0 || overf1;
 
-    const sextmask0 = uresult0 & (1 << ctrl0.maskMSB) ? -1 << ctrl0.maskMSB : 0;
-    const sextmask1 = uresult1 & (1 << ctrl1.maskMSB) ? -1 << ctrl1.maskMSB : 0;
+    const sextmask0 = uresult0 & (1 << msb0) ? -1 << msb0 : 0;
+    const sextmask1 = uresult1 & (1 << msb1) ? -1 << msb1 : 0;
 
-    const sresult0 = uresult0 | sextmask0;
-    const sresult1 = uresult1 | sextmask1;
+    const result0 = signed0 ? uresult0 | sextmask0 : uresult0;
+    const result1 = signed1 ? uresult1 | sextmask1 : uresult1;
 
-    const result0 = ctrl0.signed ? sresult0 : uresult0;
-    const result1 = ctrl1.signed ? sresult1 : uresult1;
-
-    const addresult0 = this.base0 + (ctrl0.addRaw ? input0 : result0);
-    const addresult1 = this.base1 + (ctrl1.addRaw ? input1 : result1);
+    const addresult0 = this.base0 + ((c0 >>> 18) & 1 ? input0 : result0);
+    const addresult1 = this.base1 + ((c1 >>> 18) & 1 ? input1 : result1);
     const addresult2 = this.base2 + result0 + (do_blend ? 0 : result1);
 
-    const uclamp0 =
-      u32(result0) < u32(this.base0)
-        ? this.base0
-        : u32(result0) > u32(this.base1)
-        ? this.base1
-        : result0;
-    const sclamp0 =
-      s32(result0) < s32(this.base0)
-        ? this.base0
-        : s32(result0) > s32(this.base1)
-        ? this.base1
-        : result0;
-    const clamp0 = ctrl0.signed ? sclamp0 : uclamp0;
-
+    let clamp0 = 0;
+    if (do_clamp) {
+      clamp0 = signed0
+        ? s32(result0) < s32(this.base0) ? this.base0 : s32(result0) > s32(this.base1) ? this.base1 : result0
+        : u32(result0) < u32(this.base0) ? this.base0 : u32(result0) > u32(this.base1) ? this.base1 : result0;
+    }
     const alpha1 = result1 & 0xff;
-    const ublend1 =
-      u32(this.base0) + (Math.floor((alpha1 * (u32(this.base1) - u32(this.base0))) / 256) | 0);
-    const sblend1 =
-      s32(this.base0) + (Math.floor((alpha1 * (s32(this.base1) - s32(this.base0))) / 256) | 0);
-    const blend1 = ctrl1.signed ? sblend1 : ublend1;
+    let blend1 = 0;
+    if (do_blend) {
+      blend1 = signed1
+        ? s32(this.base0) + (Math.floor((alpha1 * (s32(this.base1) - s32(this.base0))) / 256) | 0)
+        : u32(this.base0) + (Math.floor((alpha1 * (u32(this.base1) - u32(this.base0))) / 256) | 0);
+    }
 
     this.smresult0 = u32(result0);
     this.smresult1 = u32(result1);
-    this.result0 = u32(
-      do_blend ? alpha1 : (do_clamp ? clamp0 : addresult0) | (ctrl0.forceMSB << 28)
-    );
-    this.result1 = u32((do_blend ? blend1 : addresult1) | (ctrl0.forceMSB << 28));
+    this.result0 = u32(do_blend ? alpha1 : (do_clamp ? clamp0 : addresult0) | (forceMSB << 28));
+    this.result1 = u32((do_blend ? blend1 : addresult1) | (forceMSB << 28));
     this.result2 = u32(addresult2);
 
-    ctrl0.overf0 = overf0;
-    ctrl0.overf1 = overf1;
-    ctrl0.overf = overf;
-    this.ctrl0 = ctrl0.toUint32();
-    this.ctrl1 = ctrl1.toUint32();
+    // as toUint32() writes them back: bits 0–20 kept, CLAMP and BLEND as they apply to this lane, the
+    // overflows (lane 1's cleared); nothing above bit 25
+    this.ctrl0 = (c0 & 0x1fffff) | (Number(do_blend) << 21) | (Number(do_clamp) << 22) |
+      (Number(overf0) << 23) | (Number(overf1) << 24) | (Number(overf) << 25);
+    this.ctrl1 = c1 & 0x1fffff;
   }
 
   writeback() {
-    this.ctrl0Config.decode(this.ctrl0);
-    this.ctrl1Config.decode(this.ctrl1);
-    const ctrl0 = this.ctrl0Config;
-    const ctrl1 = this.ctrl1Config;
-
-    this.accum0 = u32(ctrl0.crossResult ? this.result1 : this.result0);
-    this.accum1 = u32(ctrl1.crossResult ? this.result0 : this.result1);
+    const cross0 = (this.ctrl0 >>> 17) & 1, cross1 = (this.ctrl1 >>> 17) & 1; // CROSS_RESULT
+    const r0 = this.result0, r1 = this.result1;
+    this.accum0 = u32(cross0 ? r1 : r0);
+    this.accum1 = u32(cross1 ? r0 : r1);
 
     this.update();
   }

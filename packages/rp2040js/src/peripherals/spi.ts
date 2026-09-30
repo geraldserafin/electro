@@ -72,6 +72,12 @@ export class RPSPI<ChipType extends IRPChip = IRPChip>
 
   // User provided callbacks
   onTransmit: (value: number) => void = () => this.completeTransmit(0);
+  /**
+   * (ours) Set, each byte written goes to it at once — sent in no time, nothing driving MISO back (a 0 into
+   * the RX FIFO) — without the TX FIFO's round and the requests' updates it would take (a display fed by DMA
+   * gets its every byte so; onTransmit is then not called).
+   */
+  sink: ((value: number) => void) | null = null;
 
   private busy = false;
   private control0 = 0;
@@ -244,6 +250,17 @@ export class RPSPI<ChipType extends IRPChip = IRPChip>
         this.control1 = value;
         return;
       case SSPDR:
+        if (this.sink && this.txFIFO.empty && !this.busy) {
+          this.sink(value & ((1 << this.dataBits) - 1));
+          if (!this.rxFIFO.full) {
+            this.rxFIFO.push(0);
+            this.fifosUpdated();
+          } else if (!(this.intRaw & SSPRORINTR)) {
+            this.intRaw |= SSPRORINTR;
+            this.checkInterrupts();
+          }
+          return;
+        }
         if (!this.txFIFO.full) {
           // decoded with respect to SSPCR0.DSS
           this.txFIFO.push(value & ((1 << this.dataBits) - 1));

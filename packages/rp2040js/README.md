@@ -14,7 +14,13 @@ and the bootroms). Ours, besides `src/index.ts`:
   (arduino-pico runs at 200 MHz, and its PWM and PIO dividers count on it), clk_peri is what the UARTs and
   SPIs divide;
 - `src/utils/load-firmware.ts`: loading a file by its path needs Node — the notebook sets the flash itself;
-- `src/peripherals/pio.ts`: its timer handle typed `ReturnType<typeof setTimeout>`, not `NodeJS.Timeout`.
+- `src/peripherals/pio.ts`: its timer handle typed `ReturnType<typeof setTimeout>`, not `NodeJS.Timeout`;
+- `src/jit.ts`: a block translator — the Thumb code up to a branch made one JavaScript function, with the
+  interpreter's semantics (checked against it in the notebook's jit.test.ts), about ten times faster; for it,
+  `RP2040.codePages` and `onCodeWrite` (a write to RAM with translated code in it forgets that code);
+- for speed, the same behaviour: DMA transfers in bursts while the request stays up (`dma.ts`), an SPI's
+  `sink` taking each byte at once (`spi.ts`), the interpolators working on the control bits directly
+  (`interpolator.ts`), `findPeripheral` on an array (`rp2040.ts`).
 
 The code wants `useDefineForClassFields: false` (its field initializers use constructor parameters):
 tsconfig.json has it, and Vite and esbuild read it from there; so does the notebook's, whose `tsc` checks it.

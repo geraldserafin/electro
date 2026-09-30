@@ -4,10 +4,12 @@
 // too), Serial1 its UART0; Wire is I²C0 on GP4 (SDA) and GP5 (SCL), as arduino-pico has them; its two
 // SPIs hand their bytes to the devices on them (spi.ts).
 //
-// When the program keeps both cores busy (Doom) the emulator cannot keep up with a real one: then the
-// cores run as if clocked slower (``pace``) — the circuit's time, the timers, PWM, the UARTs keep
-// theirs, only fewer instructions fit in a second — rather than everything falling behind.
-import { ConsoleLogger, GPIOPinState, I2CMode, LogLevel, RP2040, USBCDC } from "@electro/rp2040js";
+// The cores run their code translated to JavaScript a block at a time (jit.ts), each block compiled once.
+// When the program keeps both cores busy (Doom) the emulator may still not keep up with a real one: then the
+// cores run as if clocked slower (``pace``, steered by how busy the worker is) — the circuit's time, the
+// timers, PWM, the UARTs keep theirs, only fewer instructions fit in a second — rather than everything
+// falling behind.
+import { BlockJit, ConsoleLogger, GPIOPinState, I2CMode, LogLevel, RP2040, USBCDC } from "@electro/rp2040js";
 import type { Chip, Mode, PinChange } from "./chip";
 import { Bus } from "./i2c";
 import { Spi } from "./spi";
@@ -17,10 +19,8 @@ const PINS = [...Array.from({ length: 23 }, (_, i) => i), 26, 27, 28];
 const LED = 25; // on the board, not a pin
 // an input reads LOW below 0.8 V and HIGH above 2.0 V; in between it keeps what it read (Schmitt trigger)
 const LOW_BELOW = 0.8, HIGH_ABOVE = 2.0, VDD = 3.3;
-// the share of the page's time the cores may take (the circuit, the rest of the page need theirs), and
-// how much of the circuit's time is measured before the pace is set again
-const SHARE = 0.7, WINDOW = 0.1;
-const SLOWEST = 0.01;
+// steer(): the worker busier than BUSY, or behind, the cores slow down; less busy than IDLE, they speed up
+const BUSY = 0.92, IDLE = 0.8, SLOWEST = 0.01;
 
 const MODE: Record<GPIOPinState, Mode> = {
   [GPIOPinState.Low]: "low", [GPIOPinState.High]: "high", [GPIOPinState.Input]: "input",
@@ -41,7 +41,7 @@ export class Pico implements Chip {
   led = false;
   /** How fast the cores run, of their clock: 1 while the emulator keeps up. */
   pace = 1;
-  /** Whether the pace follows how long the runs take (a test sets it false: its runs need not keep up). */
+  /** Whether steer() sets the pace (a test sets it false: its runs need not keep up). */
   adaptive = true;
   private mcu = new RP2040();
   private changes: PinChange[] = [];
@@ -49,13 +49,14 @@ export class Pico implements Chip {
   private high = new Uint8Array(30); // each GPIO driven high now (kept by its listener: asked for every SPI byte)
   private cdc: USBCDC;
   private decoder = new TextDecoder();
-  private measured = { wall: 0, time: 0 }; // ms taken, s run, since the pace was last set
+  private jits: [BlockJit, BlockJit];
 
   constructor(image: Uint8Array) {
     const mcu = this.mcu;
     mcu.logger = new ConsoleLogger(LogLevel.Error);
     mcu.flash.set(image);
     mcu.reset(); // the bootrom starts it from the flash
+    this.jits = [new BlockJit(mcu.core[0]), new BlockJit(mcu.core[1])];
     for (const i of PINS) {
       this.high[i] = mcu.gpio[i].value === GPIOPinState.High ? 1 : 0;
       mcu.gpio[i].addListener((state) => {
@@ -78,12 +79,7 @@ export class Pico implements Chip {
       new Spi(["GP2", "GP6", "GP18", "GP22"], ["GP3", "GP7", "GP19"]),
       new Spi(["GP10", "GP14", "GP26"], ["GP11", "GP15", "GP27"]),
     ];
-    mcu.spi.forEach((port, n) => {
-      port.onTransmit = (value) => {
-        this.spi[n].transmit(value);
-        port.completeTransmit(0); // (nothing drives MISO back)
-      };
-    });
+    mcu.spi.forEach((port, n) => (port.sink = (value) => this.spi[n].transmit(value))); // (at once: nothing drives MISO back)
   }
 
   get time(): number {
@@ -111,10 +107,13 @@ export class Pico implements Chip {
     return () => high[i] === 1;
   }
 
-  /** Run the program up to ``time`` (s since reset); both cores asleep (WFE, WFI), the clock jumps to what wakes them. */
+  /**
+   * Run the program up to ``time`` (s since reset): core 0 a block, core 1 as far (asleep, a core only
+   * keeps up with the other); both asleep (WFE, WFI), the clock jumps to what wakes them.
+   */
   runUntil(time: number) {
-    const mcu = this.mcu, clock = mcu.clock, [core0, core1] = mcu.core;
-    const end = time * 1e9, from = clock.nanos, started = performance.now();
+    const mcu = this.mcu, clock = mcu.clock, [core0, core1] = mcu.core, [jit0, jit1] = this.jits;
+    const end = time * 1e9;
     const nanosPerCycle = 1e9 / (mcu.clkSys * this.pace);
     while (clock.nanos < end) {
       if (core0.waiting && core1.waiting) {
@@ -122,23 +121,32 @@ export class Pico implements Chip {
         clock.tick(alarm > 0 ? Math.min(alarm, end - clock.nanos) : end - clock.nanos);
         continue;
       }
-      const cycles = mcu.stepCores();
+      const start = core0.cycles;
+      mcu.currentCore = 0; // (the SIO, the PPB: each core its own)
+      if (core0.waiting) core0.cycles = Math.max(core0.cycles, core1.cycles) + 1;
+      else jit0.step();
+      mcu.currentCore = 1;
+      while (core1.cycles < core0.cycles) {
+        if (core1.waiting) {
+          core1.cycles = core0.cycles;
+          break;
+        }
+        jit1.step();
+      }
+      const cycles = core0.cycles - start;
       if (mcu.pioActiveSmCount) mcu.stepPios(cycles);
       clock.tick(cycles * nanosPerCycle);
     }
-    if (this.adaptive) this.adapt(performance.now() - started, (clock.nanos - from) / 1e9);
   }
 
-  /** After a run of ``wall`` ms for ``time`` s: slower if it took more than its share of the time, faster (up to the clock) if less. */
-  private adapt(wall: number, time: number) {
-    const m = this.measured;
-    m.wall += wall;
-    m.time += time;
-    if (m.time < WINDOW) return;
-    const share = m.wall / 1000 / m.time; // of real time, at the pace it ran
-    const wanted = Math.min(1, Math.max(SLOWEST, (this.pace * SHARE) / Math.max(share, 1e-6)));
-    this.pace = Math.min(1, this.pace * 0.5 + wanted * 0.5);
-    this.measured = { wall: 0, time: 0 };
+  /**
+   * How busy the worker has been (the share of its time it computed) and whether it fell behind: the cores
+   * slower for it, or faster while it has time to spare (up to their clock). Every quarter of a second or so.
+   */
+  steer(busy: number, behind: boolean) {
+    if (!this.adaptive) return;
+    if (behind || busy > BUSY) this.pace = Math.max(SLOWEST, this.pace * (behind ? 0.85 : 0.95));
+    else if (busy < IDLE) this.pace = Math.min(1, this.pace * 1.1);
   }
 
   /** What the circuit puts on a pin: for digitalRead(), and on GP26–GP28 for analogRead(). */

@@ -28,6 +28,8 @@ let runner: Runner | null = null;
 let running = false, visible = true, speed = 1;
 let last = 0, sent = 0, behindSince: number | null = null;
 let waiting = false; // a tick is scheduled
+const STEER = 250; // ms between telling the runner how busy it is
+let steered = 0, busyMs = 0; // since when, and how much of it computing
 
 const post = (reply: Reply) => self.postMessage(reply);
 const send = (now: number) => {
@@ -67,6 +69,12 @@ function tick() {
     return;
   }
   const lagging = sim.t < target - 1e-12;
+  busyMs += performance.now() - now;
+  if (now - steered >= STEER) {
+    if (steered) runner.steer(busyMs / (now - steered), lagging);
+    steered = now;
+    busyMs = 0;
+  }
   if (!lagging) behindSince = null;
   else behindSince ??= now;
   if (visible && now - sent >= FRAME) send(now);

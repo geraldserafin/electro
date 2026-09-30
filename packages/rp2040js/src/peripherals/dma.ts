@@ -55,6 +55,8 @@ enum TREQ {
 }
 
 // Per-channel registers
+const BURST = 1024; // (ours) transfers in one go at most, while the request stays up
+
 const CHn_READ_ADDR = 0x000; // DMA Channel n Read Address pointer
 const CHn_WRITE_ADDR = 0x004; // DMA Channel n Write Address pointer
 const CHn_TRANS_COUNT = 0x008; // DMA Channel n Transfer Count
@@ -203,6 +205,9 @@ export class RPDMAChannel<ChipType extends IRPChip = IRPChip> implements AlarmCa
 
   fire() {
     const { ctrl, dataSize, ringMask } = this;
+    // (ours) while the peripheral's request stays up — an SPI takes a byte at once, as the notebook completes
+    // it — the next transfers follow in the same go, not an alarm each (up to BURST: others get their turn)
+    for (let burst = 1; ; burst++) {
     switch (this.transferKind) {
       case TransferKind.Direct16:
         this.transfer16();
@@ -235,6 +240,7 @@ export class RPDMAChannel<ChipType extends IRPChip = IRPChip> implements AlarmCa
     }
     this.transCount--;
     if (this.transCount > 0) {
+      if (burst < BURST && this.treqValue !== TREQ.Permanent && this.dma.dreq[this.treqValue]) continue;
       this.scheduleTransfer();
     } else {
       this.ctrl &= ~BUSY;
@@ -248,6 +254,8 @@ export class RPDMAChannel<ChipType extends IRPChip = IRPChip> implements AlarmCa
       if (this.chainTo !== this.index && this.chainTo < this.dma.channels.length) {
         this.dma.channels[this.chainTo].start();
       }
+    }
+    return;
     }
   }
 

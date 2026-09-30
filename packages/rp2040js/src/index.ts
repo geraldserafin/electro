@@ -5,3 +5,4 @@ export { USBCDC } from "./usb/cdc";
 export { I2CMode } from "./peripherals/i2c";
 export { ConsoleLogger, LogLevel } from "./utils/logging";
 
+export { BlockJit } from "./jit";

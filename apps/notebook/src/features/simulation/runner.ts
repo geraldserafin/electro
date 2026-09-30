@@ -147,6 +147,11 @@ export class Runner {
     this.setParts(this.parts); // (a new LCD takes its trimmer)
   }
 
+  /** How busy the worker is, whether it is behind: the Picos' cores slow down or speed up (Pico.steer). */
+  steer(busy: number, behind: boolean) {
+    for (const b of this.session.boards) if (b.chip instanceof Pico) b.chip.steer(busy, behind);
+  }
+
   /** Text typed into the serial monitor: to every Arduino's Serial.read(). */
   send(text: string) {
     for (const board of this.session.boards) board.chip.send(text);

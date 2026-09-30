@@ -56,6 +56,9 @@ export class RP2040 implements IRPChip {
   readonly bootrom = new Uint32Array(4 * KB);
   readonly sram = new Uint8Array(264 * KB);
   readonly sramView = new DataView(this.sram.buffer);
+  // (ours) the RAM's 256-byte pages with translated code in them (jit.ts), and what to do when one is written
+  readonly codePages = new Uint8Array((264 * KB) >> 8);
+  onCodeWrite: (offset: number) => void = () => {};
   readonly flash = new Uint8Array(16 * MB);
   readonly flash16 = new Uint16Array(this.flash.buffer);
   readonly flashView = new DataView(this.flash.buffer);
@@ -294,8 +297,17 @@ export class RP2040 implements IRPChip {
     }
   }
 
+  // (ours) the peripherals by address >>> 14, in an array (the object above, keyed so sparsely, is a dictionary)
+  private peripheralTable: Peripheral[] | null = null;
+
   findPeripheral(address: Uint32): Peripheral {
-    return this.peripherals[(address >>> 14) << 2];
+    let table = this.peripheralTable;
+    if (!table) {
+      table = this.peripheralTable = [];
+      for (const key of Object.keys(this.peripherals)) table[Number(key) >> 2] = this.peripherals[Number(key)];
+      for (let i = 0; i < table.length; i++) table[i] ??= undefined as unknown as Peripheral; // (no holes)
+    }
+    return table[address >>> 14];
   }
 
   /** We assume the address is 16-bit aligned */
@@ -339,6 +351,7 @@ export class RP2040 implements IRPChip {
       this.flashView.setUint32(address - FLASH_START_ADDRESS, value, true);
     } else if (address >= RAM_START_ADDRESS && address < RAM_START_ADDRESS + this.sram.length) {
       this.sramView.setUint32(address - RAM_START_ADDRESS, value, true);
+      if (this.codePages[(address - RAM_START_ADDRESS) >>> 8]) this.onCodeWrite(address - RAM_START_ADDRESS);
     } else if (
       address >= DPRAM_START_ADDRESS &&
       address < DPRAM_START_ADDRESS + this.usbDPRAM.length
@@ -365,6 +378,7 @@ export class RP2040 implements IRPChip {
   writeUint8(address: Uint32, value: Uint32) {
     if (address >= RAM_START_ADDRESS && address < RAM_START_ADDRESS + this.sram.length) {
       this.sram[address - RAM_START_ADDRESS] = value;
+      if (this.codePages[(address - RAM_START_ADDRESS) >>> 8]) this.onCodeWrite(address - RAM_START_ADDRESS);
       return;
     }
 
@@ -401,6 +415,7 @@ export class RP2040 implements IRPChip {
 
     if (address >= RAM_START_ADDRESS && address < RAM_START_ADDRESS + this.sram.length) {
       this.sramView.setUint16(address - RAM_START_ADDRESS, value, true);
+      if (this.codePages[(address - RAM_START_ADDRESS) >>> 8]) this.onCodeWrite(address - RAM_START_ADDRESS);
       return;
     }
 
