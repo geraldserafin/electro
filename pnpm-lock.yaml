@@ -37,6 +37,9 @@ importers:
       '@electro/notes-api':
         specifier: workspace:*
         version: link:../../packages/notes-api
+      '@electro/rp2040js':
+        specifier: workspace:*
+        version: link:../../packages/rp2040js
       '@lezer/highlight':
         specifier: 1.2.4
         version: 1.2.4
@@ -97,9 +100,6 @@ importers:
       remark-parse:
         specifier: ^11.0.0
         version: 11.0.0
-      rp2040js:
-        specifier: ^1.4.0
-        version: 1.4.0
       scheduler:
         specifier: ^0.28.0
         version: 0.28.0
@@ -195,6 +195,12 @@ importers:
       effect:
         specifier: 3.22.2
         version: 3.22.2
+    devDependencies:
+      typescript:
+        specifier: ^7.0.2
+        version: 7.0.2
+
+  packages/rp2040js:
     devDependencies:
       typescript:
         specifier: ^7.0.2
@@ -2102,10 +2108,6 @@ packages:
     resolution: {integrity: sha512-qpSwIyz0jHQq5qXBTNxFmE6664rJ7O+4TvPFOiOaBSrz8IOHc1koKKSqTM2H6u1UG1+TveuC6vaDHKXFOvb1Kw==}
     engines: {node: ^20.19.0 || >=22.12.0}
     hasBin: true
-
-  rp2040js@1.4.0:
-    resolution: {integrity: sha512-knEMw0SRP9JPVLvhhYB3rjP4gLQhcWs9UOXKvxFU9Rn5eWvmlPzObMhEjfeLZ6H8FGepd6ZtMAYzGEtCaB9qYg==}
-    engines: {node: '>=18.0.0'}
 
   scheduler@0.28.0:
     resolution: {integrity: sha512-juorfCmIkIw8tT+p5BXSm6PJjQF/ycEYmKyzURCIt/RaZIhL+PulbQ9Yu2z1HdOJDdqDTlxA1+xKBmHXJsczAw==}
@@ -4263,8 +4265,6 @@ snapshots:
       '@rolldown/binding-openharmony-arm64': 1.2.11
       '@rolldown/binding-win32-arm64-msvc': 1.2.11
       '@rolldown/binding-win32-x64-msvc': 1.2.11
-
-  rp2040js@1.4.0: {}
 
   scheduler@0.28.0: {}
 

@@ -70,6 +70,8 @@ KINDS: dict[str, Kind] = {
     "lcd1602_i2c": Kind(((0, 0), (0, 1), (0, 2), (0, 3)), dev.LCD1602I2C),  # GND, VCC, SDA, SCL down its left
     "ssd1306": Kind(((0, 0), (1, 0), (2, 0), (3, 0)), dev.SSD1306),  # GND, VCC, SCL, SDA on top
     "ds1307": Kind(((0, 0), (0, 1), (0, 2), (0, 3)), dev.DS1307),  # GND, VCC, SDA, SCL down its left
+    # on SPI: VCC, GND, CS, RESET, DC, MOSI, SCK, LED, MISO down its left, as the module's header has them
+    "ili9341": Kind(tuple((0, i) for i in range(9)), dev.ILI9341),
     "switch": Kind(TWO_PINS, dev.Switch),
     "button": Kind(TWO_PINS, dev.Button),
     "potentiometer": Kind(((0, 0), (4, 0), (2, -2)), dev.Potentiometer),  # a, b, wiper

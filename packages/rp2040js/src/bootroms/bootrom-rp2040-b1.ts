@@ -1,7 +1,5 @@
-// The RP2040's boot ROM (revision B1), which the Pico's firmware calls into (memcpy, floating point, flash).
-// From wokwi/rp2040js (demo/bootrom.ts), built from github.com/raspberrypi/pico-bootrom — BSD-3-Clause,
-// Copyright (c) 2020 Raspberry Pi (Trading) Ltd.; its floating-point library (mufplib) is Mark Owen's, licensed
-// separately (see that repository's LICENSE.TXT).
+// RP2040 bootrom binary, built from https://github.com/raspberrypi/pico-bootrom
+// revision: B1 (00a4a19114195e20fb817bdfbca1165e157eef37)
 
 export const bootromB1 = new Uint32Array([
   0x20041f00, 0x000000ef, 0x00000035, 0x00000031, 0x0201754d, 0x00c8007a, 0x0000001d, 0x88022300,

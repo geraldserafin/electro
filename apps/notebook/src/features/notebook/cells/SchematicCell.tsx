@@ -367,7 +367,7 @@ export function SchematicCell({ cell, update, library, simulate, running: solvin
       library={library}
       results={running ? live.frame?.results : cell.stale ? undefined : cell.results}
       live={running && live.frame ? {
-        wires: live.frame.wires, pins: live.frame.pins, scale: live.frame.scale, leds: live.frame.leds, looks: live.frame.looks, screens: live.frame.screens, oleds: live.frame.oleds, pressed: pressedIds,
+        wires: live.frame.wires, pins: live.frame.pins, scale: live.frame.scale, leds: live.frame.leds, looks: live.frame.looks, screens: live.frame.screens, oleds: live.frame.oleds, tfts: live.frame.tfts, pressed: pressedIds,
         onPress: press,
       } : undefined}
       // the bolt runs a circuit that only works in time; one that can also be solved has its own

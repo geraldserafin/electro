@@ -146,6 +146,7 @@ export function Inspector({ element, taken, onChange, onRename, onRotate, onRemo
         </Section>
       )}
       {!live && ["lcd1602_i2c", "ssd1306", "ds1307"].includes(element.kind) && <p className={hint}>{t("inspector.i2cHint")}</p>}
+      {!live && element.kind === "ili9341" && <p className={hint}>{t("inspector.spiHint")}</p>}
       {!live && element.kind === "ds1307" && <p className={hint}>{t("inspector.clockHint")}</p>}
       {!live && element.kind === "servo" && <p className={hint}>{t("inspector.servoHint")}</p>}
       {!live && (element.kind === "buzzer" || element.kind === "passive_buzzer") && <p className={hint}>{t(`inspector.${element.kind === "buzzer" ? "buzzerHint" : "passiveBuzzerHint"}`)}</p>}

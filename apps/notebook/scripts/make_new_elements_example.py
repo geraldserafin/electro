@@ -99,6 +99,7 @@ BODIES = {
     "arduino": (1, 17, 1, 7), "servo": (1, 5, -1, 3), "seven_segment": (0, 4, 1, 5), "rgb_led": (1, 3, -1, 5),
     "lcd1602": (0, 15, 1, 6), "ultrasonic": (-2, 5, -2, 3), "lcd1602_i2c": (1, 18, -2, 4), "ssd1306": (-4, 7, 1, 8),
     "ds1307": (1, 6, -2, 4), "potentiometer": (1, 3, -1, 0), "passive_buzzer": (1, 3, -1, 0), "pico": (1, 7, -2, 16),
+    "ili9341": (1, 21, -3, 12),
 }
 BEND = 4  # a bend costs as much as this many squares of wire
 
@@ -615,7 +616,7 @@ trzeba być zalogowanym; emulowany jest jeden rdzeń. Na nim gra: korytarze licz
 
 Sterowanie: przyciski mają przypisane klawisze — **kliknij schemat** (żeby miał fokus) i graj **strzałkami**,
 **spacja** strzela i zaczyna grę. Można też trzymać przyciski myszką albo w zakładce **Regulacja**.
-To nie jest prawdziwy Doom: ten potrzebowałby dwóch rdzeni po 270 MHz i obrazu VGA z PIO.
+To jeszcze nie prawdziwy Doom — ten jest niżej.
 """)
 GAME = (Path(__file__).parent.parent / "src/features/simulation/fixtures/hell.pico.ino").read_text()
 d = Drawing()
@@ -633,12 +634,51 @@ d.connect({
 })
 d.cell("pico_gra")
 
+# ------------------------------------------------------------------ 11. Pico: the real Doom
+
+md("""
+## 11. Prawdziwy DOOM na Pico
+Tym razem **prawdziwy Doom** — shareware'owy DOOM1.WAD, epizod pierwszy — na emulowanym RP2040: oba rdzenie,
+obraz przez SPI na kolorowym wyświetlaczu **TFT 320×240** (ILI9341: SCK GP18, MOSI GP19, CS GP17, DC GP20,
+RESET GP21, podświetlenie GP22). To nie szkic, tylko gotowy obraz flasha, jak plik UF2 przeciągnięty na płytkę:
+pierwsza linia programu płytki, `// firmware: /pico/doom.bin`, mówi, skąd go wziąć (port
+[kilograham/rp2040-doom](https://github.com/kilograham/rp2040-doom), wyświetlacz z
+[pondahai/rp2040-doom-ili9341](https://github.com/pondahai/rp2040-doom-ili9341); bez dźwięku).
+
+Emulator nie nadąża za prawdziwym Pico, więc rdzenie liczą wolniej — ile, widać przy płytce (**PICO_1 · 20 MHz**):
+gra toczy się w normalnym tempie, tylko klatek jest mniej, jak na bardzo słabym komputerze.
+Po chwili ekran tytułowy i demo; **kliknij schemat** i graj z klawiatury: **Enter** — menu i wybór
+(New Game), **strzałki** — ruch, **Ctrl** — strzał, **spacja** — otwieranie drzwi, **Esc** — menu.
+""")
+DOOM = """// firmware: /pico/doom.bin
+// Prawdziwy DOOM (shareware, epizod 1) — gotowy obraz flasha zamiast szkicu: kilograham/rp2040-doom
+// z wyświetlaczem ILI9341 (pondahai/rp2040-doom-ili9341); jak powstaje: scripts/make-pico-doom.sh.
+// TFT: SCK GP18, MOSI GP19, CS GP17, DC GP20, RESET GP21, podświetlenie GP22.
+// Przyciski do GND: ↑ GP9, ↓ GP5, ← GP8, → GP6, strzał GP3, użyj GP2, Enter GP4, menu GP28.
+"""
+d = Drawing()
+d.add("PICO_1", "pico", (0, 0), 0, None, DOOM)
+d.add("TFT_1", "ili9341", (16, 6), 0)
+keys = {"GP9": "ArrowUp", "GP5": "ArrowDown", "GP8": "ArrowLeft", "GP6": "ArrowRight",
+        "GP3": "Control", "GP2": "Space", "GP4": "Enter", "GP28": "Escape"}
+for k, (pin, key) in enumerate(keys.items()):
+    d.add(f"B_{k + 1}", "button", (-4 - 3 * k, 19), 90, None, key)
+tft = {"3V3": 0, "GND": 1, "cs": 2, "rst": 3, "dc": 4, "mosi": 5, "sck": 6, "bl": 7}
+d.connect({
+    "cs": [PI("GP17"), ("TFT_1", tft["cs"])], "rst": [PI("GP21"), ("TFT_1", tft["rst"])], "dc": [PI("GP20"), ("TFT_1", tft["dc"])],
+    "mosi": [PI("GP19"), ("TFT_1", tft["mosi"])], "sck": [PI("GP18"), ("TFT_1", tft["sck"])], "bl": [PI("GP22"), ("TFT_1", tft["bl"])],
+    **{f"key_{pin}": [PI(pin), (f"B_{k + 1}", 0)] for k, pin in enumerate(keys)},
+    "3V3": [PI("3V3"), ("TFT_1", tft["3V3"])],
+    "GND": [PI("GND"), ("TFT_1", tft["GND"]), *[(f"B_{k + 1}", 1) for k in range(len(keys))]],
+})
+d.cell("pico_doom")
+
 md("""
 ## W kodzie
 Każdy z tych elementów jest też w Pythonie — `code()` zapisze schemat jako kod:
 `Photoresistor(10000, lux=100)`, `Thermistor(10000, temperature=25)`, `Zener(5.1)`, `NMOS()`, `VCVS(10)`,
 `Servo()`, `Buzzer()`, `PassiveBuzzer()`, `RGBLED()`, `SevenSegment()`, `LCD1602()`, `Ultrasonic(distance=80)`,
-`LCD1602I2C()`, `SSD1306()`, `DS1307()`, `Pico()`.
+`LCD1602I2C()`, `SSD1306()`, `ILI9341()`, `DS1307()`, `Pico()`.
 """)
 code("""
 code(czujniki)

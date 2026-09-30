@@ -1,6 +1,6 @@
 // A circuit running in time, with everything the page makes of it: the Arduinos' chips (session.ts),
-// the LEDs' glow, the buzzers, servos, LCDs, HC-SR04s and I²C modules (peripherals.ts, lcd.ts,
-// i2c.ts), the scope's samples. No React and no DOM: it runs in a worker (sim.worker.ts), off the
+// the LEDs' glow, the buzzers, servos, LCDs, HC-SR04s, I²C modules and SPI displays (peripherals.ts,
+// lcd.ts, i2c.ts, spi.ts), the scope's samples. No React and no DOM: it runs in a worker (sim.worker.ts), off the
 // page's thread, and hands over what the board shows as plain data (frame()).
 import type { ElementResult } from "@/shared/model/types";
 import { i2cParts } from "@/shared/model/i2c";
@@ -12,6 +12,8 @@ import { buzzing, heard, listen, ping, servoing, sonar, turn, watch, type Buzzin
 import { Uno } from "./arduino";
 import { Pico } from "./pico";
 import { Session } from "./session";
+import { spiDevicesOn } from "./spi";
+import type { Ili9341, TftData } from "./tft";
 
 /** A board's program, compiled: an Uno's (Intel HEX), a Pico's (its flash image). */
 export type Firmware = { board: "uno"; hex: string } | { board: "pico"; image: Uint8Array };
@@ -47,6 +49,7 @@ export interface Frame {
   looks: Record<string, Record<string, number>>;
   screens: Record<string, Screen>; // each LCD (parallel or on I²C)
   oleds: Record<string, OledData>;
+  tfts: Record<string, TftData>; // each colour TFT (its picture only when it changed)
   results: Record<string, ElementResult>; // readings next to the elements
   sounds: { id: string; frequency: number | null; volume: number }[]; // each buzzer, in the circuit's time
   traces: ScopeTrace[]; // the scope's, then the meter's
@@ -82,6 +85,7 @@ export class Runner {
   private sonars: Sonar[];
   // the I²C modules, by id: kept across a new sketch (the display keeps what it showed, as a real one does)
   private modules = new Map<string, Device>();
+  private tfts = new Map<string, Ili9341>(); // the SPI displays, by id (kept so too)
   // each LED channel's charge since the last frame (id:channel): its glow is the average current, so PWM dims it
   private glow = { since: 0, last: 0, charge: new Map<string, number>() };
   private history = new Map<string, ScopeTrace>();
@@ -139,6 +143,7 @@ export class Runner {
       this.serial = (this.serial + c).slice(-4000);
     };
     board.chip.i2c.devices = modulesOn(s, board, Object.fromEntries(this.parts.map((e) => [e.id, e.text])), this.modules);
+    spiDevicesOn(s, board, this.tfts);
     this.setParts(this.parts); // (a new LCD takes its trimmer)
   }
 
@@ -229,6 +234,8 @@ export class Runner {
         oleds[id] = { path: on ? pixelPath(rows) : "", on, contrast };
       }
     }
+    const tfts: Record<string, TftData> = {};
+    for (const [id, d] of this.tfts) tfts[id] = d.data();
     const results: Record<string, ElementResult> = {};
     for (const [id, q] of Object.entries(c.program.parts)) {
       const current = q.I ?? q.I_C ?? q.I_D ?? q.I_5V;
@@ -242,12 +249,17 @@ export class Runner {
         reversed: I !== null && I < 0,
       };
     }
+    // a Pico the emulator cannot keep up with: its cores' clock as they run now, by its label
+    for (const b of this.session.boards) {
+      if (!(b.chip instanceof Pico) || b.chip.pace > 0.98) continue;
+      results[b.label] = { value: `${Math.round(b.chip.frequency / 1e6)} MHz`, solved: true, U: null, I: null, P: null, reversed: false };
+    }
     this.glow = { since: sim.t, last: sim.t, charge: new Map() };
     const trace = (name: string) => this.history.get(name) ?? { name, t: [], v: [] };
     const serial = this.serial;
     this.serial = "";
     return {
-      t: sim.t, voltages, leds, looks, screens, oleds, results, sounds, serial,
+      t: sim.t, voltages, leds, looks, screens, oleds, tfts, results, sounds, serial,
       traces: [...this.shown.scope, ...this.shown.probe].map(trace),
     };
   }

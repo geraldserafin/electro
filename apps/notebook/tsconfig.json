@@ -9,6 +9,7 @@
     "noEmit": true,
     "skipLibCheck": true,
     "isolatedModules": true,
+    "useDefineForClassFields": false, // (@electro/rp2040js's field initializers use its constructors' parameters)
     "resolveJsonModule": true,
     "types": ["vite/client"],
     "paths": { "@/*": ["./src/*"] }

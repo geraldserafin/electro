@@ -17,6 +17,7 @@ import { Inspector, type Selection } from "./Inspector";
 import { LcdScreen, type LcdScreenData } from "./LcdScreen";
 import { LibraryPanel } from "./LibraryPanel";
 import { OledScreen, type OledScreenData } from "./OledScreen";
+import { TftScreen, type TftScreenData } from "./TftScreen";
 import {
   KINDS, attach, bounds, defaultText, defaultValue, elbow, keyName, inBox, moveGroup, isComponent, isConnectionPoint, junctions,
   ledColor, nextId, moveSegment, openPins, pins, rotatedAbout, same, simplify, updateElement,
@@ -47,6 +48,7 @@ export interface LiveView {
   looks: Record<string, Record<string, number>>; // what else each element shows (useLive's LiveFrame.looks)
   screens: Record<string, LcdScreenData>; // what each LCD shows
   oleds: Record<string, OledScreenData>; // what each OLED shows
+  tfts: Record<string, TftScreenData>; // what each colour TFT shows
   pressed: string[]; // buttons held down
   onPress: (id: string, down: boolean) => void;
 }
@@ -670,6 +672,9 @@ export function SchematicEditor({
           ))}
           {live && value.elements.filter((e) => e.kind === "ssd1306" && live.oleds[e.id]).map((e) => (
             <OledScreen key={`oled${e.id}`} screen={live.oleds[e.id]} at={[e.at[0] * G, e.at[1] * G]} rotation={e.rotation} />
+          ))}
+          {live && value.elements.filter((e) => e.kind === "ili9341" && live.tfts[e.id]).map((e) => (
+            <TftScreen key={`tft${e.id}`} screen={live.tfts[e.id]} at={[e.at[0] * G, e.at[1] * G]} rotation={e.rotation} />
           ))}
           {openPinPoints.map(([x, y]) => (
             <circle key={`o${x},${y}`} className="open-pin" cx={x * G} cy={y * G} r="3.5">

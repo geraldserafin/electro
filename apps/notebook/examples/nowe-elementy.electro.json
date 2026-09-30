@@ -1,26 +1,26 @@
 {
  "format": "electro-notebook",
  "version": 2,
- "id": "74a3925c97d4f257",
+ "id": "11f14a7db9f7597a",
  "title": "Nowe elementy",
- "created": "2026-09-29T23:19:18+00:00",
- "modified": "2026-09-29T23:19:18+00:00",
+ "created": "2026-09-30T00:58:02+00:00",
+ "modified": "2026-09-30T00:58:02+00:00",
  "settings": {
   "codeInPdf": true
  },
  "cells": [
   {
-   "id": "715f3e0e",
+   "id": "da0cc6d3",
    "type": "markdown",
    "source": "Przegląd elementów dodanych ostatnio. Schematy uruchamiasz przyciskiem **▶ Symuluj w czasie** pod każdym\nz nich: przewody zmieniają kolor z napięciem, a oscyloskop pod schematem pokazuje przebiegi. Czujniki\n(fotorezystor, termistor, czujnik odległości) mają w czasie symulacji suwak — kliknij element.\nSzkice Arduino kompilują się w przeglądarce; biblioteki `Servo`, `LiquidCrystal`, `LiquidCrystal_I2C`,\n`Adafruit_SSD1306` i `RTClib` są dostępne od razu."
   },
   {
-   "id": "22800e81",
+   "id": "90e24701",
    "type": "markdown",
    "source": "## 1. Źródła zmienne w czasie\n**Źródło sinusoidalne** (amplituda i częstotliwość) na filtrze RC: przy częstotliwości granicznej\n$f_g = \\frac{1}{2\\pi RC} \\approx 48$ Hz na kondensatorze zostaje $\\frac{1}{\\sqrt 2}$ amplitudy, opóźnione.\nPorównaj na oscyloskopie `V_we` i `V_wy`."
   },
   {
-   "id": "41da9ff9",
+   "id": "485686cb",
    "type": "schematic",
    "name": "filtr",
    "schematic": {
@@ -142,12 +142,12 @@
    }
   },
   {
-   "id": "ef6db105",
+   "id": "944a364d",
    "type": "markdown",
    "source": "**Generator prostokąta** (poziom, częstotliwość, wypełnienie): 2 Hz z wypełnieniem 25 % — dioda błyska\nkrótko dwa razy na sekundę. Zmień wypełnienie suwakiem w panelu źródła."
   },
   {
-   "id": "9379b646",
+   "id": "ff673ac5",
    "type": "schematic",
    "name": "migacz_prostokat",
    "schematic": {
@@ -247,23 +247,23 @@
    }
   },
   {
-   "id": "b7cf254d",
+   "id": "3a2efb28",
    "type": "markdown",
    "source": "W kodzie: `SineSource(amplituda, frequency=…)`, `SquareSource(poziom, frequency=…, duty=…)`."
   },
   {
-   "id": "cc85cf2e",
+   "id": "37e50e73",
    "type": "code",
    "source": "przebieg = simulate(filtr, t=0.1)\nprzebieg.plot(\"V_we\", \"V_wy\")",
    "outputs": []
   },
   {
-   "id": "71467537",
+   "id": "bb6bc323",
    "type": "markdown",
    "source": "## 2. Dioda Zenera — stabilizator napięcia\nZener 5,1 V w kierunku zaporowym trzyma napięcie na obciążeniu, choć zasilanie jest wyższe; nadmiar\nodkłada się na $R_1$. W symulacji woltomierz pokazuje ok. 5,1 V — zmień napięcie $E_1$ albo obciążenie $R_2$."
   },
   {
-   "id": "586e64dd",
+   "id": "66eed7e4",
    "type": "schematic",
    "name": "stabilizator",
    "schematic": {
@@ -453,23 +453,23 @@
    }
   },
   {
-   "id": "a6caad7f",
+   "id": "de851824",
    "type": "markdown",
    "source": "Ogranicznik: sinus 10 V obcięty z góry do 5,1 V (przebicie), z dołu do ok. −0,7 V (przewodzenie)."
   },
   {
-   "id": "017a6a0b",
+   "id": "6a3d2a33",
    "type": "code",
    "source": "ogranicznik = net(\n    (SineSource(10, frequency=50), \"GND\", \"we\"),\n    (Resistor(1000), \"we\", \"wy\"),\n    (Zener(5.1), \"GND\", \"wy\"),\n)\nsimulate(ogranicznik, t=0.04).plot(\"V_we\", \"V_wy\")",
    "outputs": []
   },
   {
-   "id": "f9d8d3cf",
+   "id": "2a06bf0c",
    "type": "markdown",
    "source": "## 3. MOSFET jako klucz\nProstokąt 1 Hz na bramce tranzystora N-MOSFET: powyżej napięcia progowego (2 V) kanał przewodzi\n(ok. 0,7 Ω) i dioda świeci. Bramka pobiera prąd tylko przy przeładowaniu swojej pojemności — zobacz `I_Q_1_G`\nna mierniku. W kodzie: `NMOS()`, `PMOS()` — bramka, dren, źródło."
   },
   {
-   "id": "eb5c7a11",
+   "id": "735f3ac6",
    "type": "schematic",
    "name": "klucz",
    "schematic": {
@@ -626,12 +626,12 @@
    }
   },
   {
-   "id": "923b8b9c",
+   "id": "a4a23e90",
    "type": "markdown",
    "source": "## 4. Źródła sterowane — na papierze, krok po kroku\nWzmacniacz napięciowy jako **źródło napięcia sterowane napięciem** ($\\mu = 10$): lewa para zacisków\nmierzy napięcie, prawa jest źródłem. Uruchom komórkę przyciskiem ▶ — to obwód liniowy, więc solver\nrozwiązuje go na papierze."
   },
   {
-   "id": "dd0795ca",
+   "id": "673c830d",
    "type": "schematic",
    "name": "wzmacniacz",
    "schematic": {
@@ -747,23 +747,23 @@
    }
   },
   {
-   "id": "1a2fa9ea",
+   "id": "baf76392",
    "type": "markdown",
    "source": "Źródło prądu sterowane prądem jako model tranzystora: prąd bazy płynie przez gałąź pomiarową (ze strzałką),\nkolektor to źródło $\\beta \\cdot I_b$. Z pomiaru napięcia na $R_2$ solver wyznacza $\\beta$."
   },
   {
-   "id": "29bfb749",
+   "id": "61b77dca",
    "type": "code",
    "source": "stopien = net(\n    (VoltageSource(\"10m\"), \"GND\", \"we\"),\n    (Resistor(1000), \"we\", \"b\"),       # r_be\n    (CCCS(), \"b\", \"GND\", \"GND\", \"c\"),  # β · I_b\n    (Resistor(2000), \"c\", \"GND\"),\n)\nsol = stopien.solve(U_R_2=2, find=\"CCCS_1\")\nsteps(sol)",
    "outputs": []
   },
   {
-   "id": "1bb5e298",
+   "id": "d631c085",
    "type": "markdown",
    "source": "## 5. Czujniki: światło i temperatura\nDzielniki z **fotorezystorem** (10 kΩ przy 10 lx) i **termistorem NTC** (10 kΩ przy 25 °C). Na papierze\nliczą się przy świetle i temperaturze ustawionych w panelu; w symulacji zmieniasz je suwakiem, a woltomierze\nnadążają. Ciemniej — większy opór fotorezystora; cieplej — mniejszy termistora."
   },
   {
-   "id": "8dd3e5c4",
+   "id": "13ebc681",
    "type": "schematic",
    "name": "czujniki",
    "schematic": {
@@ -963,12 +963,12 @@
    }
   },
   {
-   "id": "642e1c9c",
+   "id": "a2541378",
    "type": "markdown",
    "source": "## 6. Arduino: serwo i buzzer\nPotencjometr na A0 ustawia kąt serwa (biblioteka `Servo`: impulsy 0,54–2,4 ms na D9), a buzzer pasywny\nna D6 gra `tone()` tym wyższy, im dalej suwak. Buzzer słychać — na pasku symulacji jest przycisk wyciszenia."
   },
   {
-   "id": "3a7d3a62",
+   "id": "b2853039",
    "type": "schematic",
    "name": "serwo",
    "schematic": {
@@ -1188,12 +1188,12 @@
    }
   },
   {
-   "id": "37e48bfe",
+   "id": "497282fd",
    "type": "markdown",
    "source": "## 7. Wyświetlacz 7-segmentowy i dioda RGB\nLicznik 0–9 na wyświetlaczu ze wspólną katodą (segmenty a–g na D2–D8, każdy przez swój rezystor 220 Ω:\nok. 12 mA na segment, więc każda cyfra świeci tak samo jasno — z jednym wspólnym rezystorem na katodzie prąd\ndzieliłby się między zapalone segmenty i „8” byłaby ciemniejsza niż „1”), a dioda RGB płynnie zmienia kolor\n(PWM na D9–D11)."
   },
   {
-   "id": "e5736bd5",
+   "id": "e7c8afc7",
    "type": "schematic",
    "name": "licznik",
    "schematic": {
@@ -1804,12 +1804,12 @@
    }
   },
   {
-   "id": "09278c25",
+   "id": "ab07174b",
    "type": "markdown",
    "source": "## 8. Czujnik odległości HC-SR04 i wyświetlacz LCD 16×2\nSzkic co chwilę wysyła impuls na TRIG (10 µs), mierzy `pulseIn()` długość echa (58 µs na centymetr) i pisze\nodległość na LCD (biblioteka `LiquidCrystal`, tryb 4-bitowy: RS, E, D4–D7). Przesuń przeszkodę suwakiem\nczujnika. Kontrast ustawia potencjometr na V0, jak w prawdziwym układzie — pokręć nim w czasie symulacji\n(kliknij go albo zakładka **Regulacja**): za mało i znaki znikają, za dużo i wychodzą ciemne kratki.\nRW jest przy masie (tylko zapis); podświetlenie to dioda między A i K, przez rezystor."
   },
   {
-   "id": "8a53b6b3",
+   "id": "89061336",
    "type": "schematic",
    "name": "odleglosc",
    "schematic": {
@@ -2260,12 +2260,12 @@
    }
   },
   {
-   "id": "11c93f30",
+   "id": "8dfab3b2",
    "type": "markdown",
    "source": "## 9. I²C: zegar, OLED i LCD z konwerterem\nTrzy moduły na jednej magistrali: SDA do A4, SCL do A5. Zegar **DS1307** startuje od czasu na\nTwoim komputerze; **OLED** 128×64 (`Adafruit_SSD1306`, adres 0x3C) pokazuje godzinę dużymi cyframi,\na **LCD z konwerterem PCF8574** (`LiquidCrystal_I2C`, 0x27) datę. Adres modułu zmienisz w jego panelu —\nwtedy szkic go nie znajdzie, jak w prawdziwym układzie."
   },
   {
-   "id": "caa94167",
+   "id": "f6e349c2",
    "type": "schematic",
    "name": "zegar",
    "schematic": {
@@ -2597,12 +2597,12 @@
    }
   },
   {
-   "id": "0319174a",
+   "id": "18700a44",
    "type": "markdown",
-   "source": "## 10. Raspberry Pi Pico: strzelanka w stylu Dooma\nDruga płytka: **Raspberry Pi Pico** (RP2040, logika 3,3 V). Szkic kompiluje serwer (rdzeń arduino-pico), więc\ntrzeba być zalogowanym; emulowany jest jeden rdzeń. Na nim gra: korytarze liczone metodą rzucania promieni\n(jak w Wolfensteinie 3D), ściany cieniowane ditheringiem, demony jako sprite'y — na OLED-zie 128×64 przez I²C\n(GP4 SDA, GP5 SCL), z buzzerem na GP15.\n\nSterowanie: przyciski mają przypisane klawisze — **kliknij schemat** (żeby miał fokus) i graj **strzałkami**,\n**spacja** strzela i zaczyna grę. Można też trzymać przyciski myszką albo w zakładce **Regulacja**.\nTo nie jest prawdziwy Doom: ten potrzebowałby dwóch rdzeni po 270 MHz i obrazu VGA z PIO."
+   "source": "## 10. Raspberry Pi Pico: strzelanka w stylu Dooma\nDruga płytka: **Raspberry Pi Pico** (RP2040, logika 3,3 V). Szkic kompiluje serwer (rdzeń arduino-pico), więc\ntrzeba być zalogowanym; emulowany jest jeden rdzeń. Na nim gra: korytarze liczone metodą rzucania promieni\n(jak w Wolfensteinie 3D), ściany cieniowane ditheringiem, demony jako sprite'y — na OLED-zie 128×64 przez I²C\n(GP4 SDA, GP5 SCL), z buzzerem na GP15.\n\nSterowanie: przyciski mają przypisane klawisze — **kliknij schemat** (żeby miał fokus) i graj **strzałkami**,\n**spacja** strzela i zaczyna grę. Można też trzymać przyciski myszką albo w zakładce **Regulacja**.\nTo jeszcze nie prawdziwy Doom — ten jest niżej."
   },
   {
-   "id": "3619e99c",
+   "id": "375541cd",
    "type": "schematic",
    "name": "pico_gra",
    "schematic": {
@@ -2982,12 +2982,511 @@
    }
   },
   {
-   "id": "00f53262",
+   "id": "f77a0e8e",
    "type": "markdown",
-   "source": "## W kodzie\nKażdy z tych elementów jest też w Pythonie — `code()` zapisze schemat jako kod:\n`Photoresistor(10000, lux=100)`, `Thermistor(10000, temperature=25)`, `Zener(5.1)`, `NMOS()`, `VCVS(10)`,\n`Servo()`, `Buzzer()`, `PassiveBuzzer()`, `RGBLED()`, `SevenSegment()`, `LCD1602()`, `Ultrasonic(distance=80)`,\n`LCD1602I2C()`, `SSD1306()`, `DS1307()`, `Pico()`."
+   "source": "## 11. Prawdziwy DOOM na Pico\nTym razem **prawdziwy Doom** — shareware'owy DOOM1.WAD, epizod pierwszy — na emulowanym RP2040: oba rdzenie,\nobraz przez SPI na kolorowym wyświetlaczu **TFT 320×240** (ILI9341: SCK GP18, MOSI GP19, CS GP17, DC GP20,\nRESET GP21, podświetlenie GP22). To nie szkic, tylko gotowy obraz flasha, jak plik UF2 przeciągnięty na płytkę:\npierwsza linia programu płytki, `// firmware: /pico/doom.bin`, mówi, skąd go wziąć (port\n[kilograham/rp2040-doom](https://github.com/kilograham/rp2040-doom), wyświetlacz z\n[pondahai/rp2040-doom-ili9341](https://github.com/pondahai/rp2040-doom-ili9341); bez dźwięku).\n\nEmulator nie nadąża za prawdziwym Pico, więc rdzenie liczą wolniej — ile, widać przy płytce (**PICO_1 · 20 MHz**):\ngra toczy się w normalnym tempie, tylko klatek jest mniej, jak na bardzo słabym komputerze.\nPo chwili ekran tytułowy i demo; **kliknij schemat** i graj z klawiatury: **Enter** — menu i wybór\n(New Game), **strzałki** — ruch, **Ctrl** — strzał, **spacja** — otwieranie drzwi, **Esc** — menu."
   },
   {
-   "id": "188e5420",
+   "id": "1a590598",
+   "type": "schematic",
+   "name": "pico_doom",
+   "schematic": {
+    "version": 1,
+    "elements": [
+     {
+      "id": "PICO_1",
+      "kind": "pico",
+      "at": [
+       29,
+       7
+      ],
+      "rotation": 0,
+      "value": null,
+      "text": "// firmware: /pico/doom.bin\n// Prawdziwy DOOM (shareware, epizod 1) — gotowy obraz flasha zamiast szkicu: kilograham/rp2040-doom\n// z wyświetlaczem ILI9341 (pondahai/rp2040-doom-ili9341); jak powstaje: scripts/make-pico-doom.sh.\n// TFT: SCK GP18, MOSI GP19, CS GP17, DC GP20, RESET GP21, podświetlenie GP22.\n// Przyciski do GND: ↑ GP9, ↓ GP5, ← GP8, → GP6, strzał GP3, użyj GP2, Enter GP4, menu GP28.\n"
+     },
+     {
+      "id": "TFT_1",
+      "kind": "ili9341",
+      "at": [
+       45,
+       13
+      ],
+      "rotation": 0,
+      "value": null,
+      "text": null
+     },
+     {
+      "id": "B_1",
+      "kind": "button",
+      "at": [
+       25,
+       26
+      ],
+      "rotation": 90,
+      "value": null,
+      "text": "ArrowUp"
+     },
+     {
+      "id": "B_2",
+      "kind": "button",
+      "at": [
+       22,
+       26
+      ],
+      "rotation": 90,
+      "value": null,
+      "text": "ArrowDown"
+     },
+     {
+      "id": "B_3",
+      "kind": "button",
+      "at": [
+       19,
+       26
+      ],
+      "rotation": 90,
+      "value": null,
+      "text": "ArrowLeft"
+     },
+     {
+      "id": "B_4",
+      "kind": "button",
+      "at": [
+       16,
+       26
+      ],
+      "rotation": 90,
+      "value": null,
+      "text": "ArrowRight"
+     },
+     {
+      "id": "B_5",
+      "kind": "button",
+      "at": [
+       13,
+       26
+      ],
+      "rotation": 90,
+      "value": null,
+      "text": "Control"
+     },
+     {
+      "id": "B_6",
+      "kind": "button",
+      "at": [
+       10,
+       26
+      ],
+      "rotation": 90,
+      "value": null,
+      "text": "Space"
+     },
+     {
+      "id": "B_7",
+      "kind": "button",
+      "at": [
+       7,
+       26
+      ],
+      "rotation": 90,
+      "value": null,
+      "text": "Enter"
+     },
+     {
+      "id": "B_8",
+      "kind": "button",
+      "at": [
+       4,
+       26
+      ],
+      "rotation": 90,
+      "value": null,
+      "text": "Escape"
+     }
+    ],
+    "wires": [
+     {
+      "points": [
+       [
+        45,
+        16
+       ],
+       [
+        37,
+        16
+       ]
+      ]
+     },
+     {
+      "points": [
+       [
+        45,
+        17
+       ],
+       [
+        37,
+        17
+       ]
+      ]
+     },
+     {
+      "points": [
+       [
+        45,
+        18
+       ],
+       [
+        37,
+        18
+       ]
+      ]
+     },
+     {
+      "points": [
+       [
+        45,
+        19
+       ],
+       [
+        37,
+        19
+       ]
+      ]
+     },
+     {
+      "points": [
+       [
+        45,
+        20
+       ],
+       [
+        38,
+        20
+       ],
+       [
+        38,
+        15
+       ],
+       [
+        37,
+        15
+       ]
+      ]
+     },
+     {
+      "points": [
+       [
+        45,
+        13
+       ],
+       [
+        45,
+        8
+       ],
+       [
+        37,
+        8
+       ]
+      ]
+     },
+     {
+      "points": [
+       [
+        45,
+        15
+       ],
+       [
+        39,
+        15
+       ],
+       [
+        39,
+        21
+       ],
+       [
+        37,
+        21
+       ]
+      ]
+     },
+     {
+      "points": [
+       [
+        25,
+        26
+       ],
+       [
+        25,
+        16
+       ],
+       [
+        29,
+        16
+       ]
+      ]
+     },
+     {
+      "points": [
+       [
+        22,
+        26
+       ],
+       [
+        22,
+        12
+       ],
+       [
+        29,
+        12
+       ]
+      ]
+     },
+     {
+      "points": [
+       [
+        19,
+        26
+       ],
+       [
+        19,
+        15
+       ],
+       [
+        29,
+        15
+       ]
+      ]
+     },
+     {
+      "points": [
+       [
+        16,
+        26
+       ],
+       [
+        16,
+        13
+       ],
+       [
+        29,
+        13
+       ]
+      ]
+     },
+     {
+      "points": [
+       [
+        13,
+        26
+       ],
+       [
+        13,
+        10
+       ],
+       [
+        29,
+        10
+       ]
+      ]
+     },
+     {
+      "points": [
+       [
+        10,
+        26
+       ],
+       [
+        10,
+        9
+       ],
+       [
+        29,
+        9
+       ]
+      ]
+     },
+     {
+      "points": [
+       [
+        7,
+        26
+       ],
+       [
+        7,
+        11
+       ],
+       [
+        29,
+        11
+       ]
+      ]
+     },
+     {
+      "points": [
+       [
+        4,
+        26
+       ],
+       [
+        4,
+        24
+       ],
+       [
+        40,
+        24
+       ],
+       [
+        40,
+        11
+       ],
+       [
+        37,
+        11
+       ]
+      ]
+     },
+     {
+      "points": [
+       [
+        45,
+        14
+       ],
+       [
+        41,
+        14
+       ]
+      ]
+     },
+     {
+      "points": [
+       [
+        41,
+        14
+       ],
+       [
+        38,
+        14
+       ],
+       [
+        38,
+        9
+       ],
+       [
+        37,
+        9
+       ]
+      ]
+     },
+     {
+      "points": [
+       [
+        25,
+        30
+       ],
+       [
+        41,
+        30
+       ],
+       [
+        41,
+        14
+       ]
+      ]
+     },
+     {
+      "points": [
+       [
+        22,
+        30
+       ],
+       [
+        25,
+        30
+       ]
+      ]
+     },
+     {
+      "points": [
+       [
+        19,
+        30
+       ],
+       [
+        22,
+        30
+       ]
+      ]
+     },
+     {
+      "points": [
+       [
+        16,
+        30
+       ],
+       [
+        19,
+        30
+       ]
+      ]
+     },
+     {
+      "points": [
+       [
+        13,
+        30
+       ],
+       [
+        16,
+        30
+       ]
+      ]
+     },
+     {
+      "points": [
+       [
+        10,
+        30
+       ],
+       [
+        13,
+        30
+       ]
+      ]
+     },
+     {
+      "points": [
+       [
+        7,
+        30
+       ],
+       [
+        10,
+        30
+       ]
+      ]
+     },
+     {
+      "points": [
+       [
+        4,
+        30
+       ],
+       [
+        7,
+        30
+       ]
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "id": "163a6315",
+   "type": "markdown",
+   "source": "## W kodzie\nKażdy z tych elementów jest też w Pythonie — `code()` zapisze schemat jako kod:\n`Photoresistor(10000, lux=100)`, `Thermistor(10000, temperature=25)`, `Zener(5.1)`, `NMOS()`, `VCVS(10)`,\n`Servo()`, `Buzzer()`, `PassiveBuzzer()`, `RGBLED()`, `SevenSegment()`, `LCD1602()`, `Ultrasonic(distance=80)`,\n`LCD1602I2C()`, `SSD1306()`, `ILI9341()`, `DS1307()`, `Pico()`."
+  },
+  {
+   "id": "8d459db6",
    "type": "code",
    "source": "code(czujniki)",
    "outputs": []

@@ -1,0 +1,17 @@
+{
+  "name": "@electro/rp2040js",
+  "private": true,
+  "version": "0.1.0",
+  "description": "RP2040 emulator, both cores: src/ is github.com/c1570/rp2040js (a fork of wokwi/rp2040js) at af0114c, the files an RP2040 needs",
+  "type": "module",
+  "license": "MIT",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "typescript": "^7.0.2"
+  }
+}

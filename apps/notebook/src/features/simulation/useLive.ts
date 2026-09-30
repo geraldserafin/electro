@@ -14,6 +14,8 @@ import { compileSketch } from "./atoms";
 import { compiler } from "./compiler";
 import type { LiveCircuit } from "./engine";
 import type { Firmware, Frame, OledData, Part, ScopeTrace } from "./runner";
+import type { TftData } from "./tft";
+import { fetchFirmware, firmwareFile } from "./firmware";
 import type { Reply, Request } from "./sim.worker";
 import { Sound, wake } from "./sound";
 import type { Screen } from "./lcd";
@@ -32,6 +34,7 @@ export interface LiveFrame {
   looks: Record<string, Record<string, number>>; // runner.ts: Frame.looks
   screens: Record<string, Screen>; // each LCD (parallel or on I²C)
   oleds: Record<string, OledData>; // each OLED
+  tfts: Record<string, TftData>; // each colour TFT (a picture only when it changed)
   results: Record<string, ElementResult>; // readings next to the elements
   behind: boolean; // the simulation cannot keep up: time runs slower than asked
 }
@@ -39,7 +42,7 @@ export interface LiveFrame {
 /** An Arduino's sketch as it goes to the chip: compiling, running, or what the compiler said. */
 export type SketchState =
   | { kind: "compiling" }
-  | { kind: "running"; sketch: string; where: "page" | "server" } // where it was compiled
+  | { kind: "running"; sketch: string; where: "page" | "server" | "file" } // where it was compiled (a file: given whole)
   | { kind: "failed"; output: string }
   | { kind: "tooBig"; size: number; flash: number }
   | { kind: "unavailable" | "signedOut" | "unreachable" };
@@ -108,7 +111,7 @@ export function useLive(schematic: SchematicData) {
     const { voltages } = f;
     const on = (node: string | null) => (node === null ? null : voltages[node] ?? null);
     setFrame({
-      t: f.t, voltages, leds: f.leds, looks: f.looks, screens: f.screens, oleds: f.oleds, results: f.results, behind,
+      t: f.t, voltages, leds: f.leds, looks: f.looks, screens: f.screens, oleds: f.oleds, tfts: f.tfts, results: f.results, behind,
       scale: Math.max(1, ...Object.values(voltages).map(Math.abs)),
       wires: c.wires.map(on),
       pins: Object.fromEntries(Object.entries(c.pins).map(([id, nodes]) => [id, nodes.map(on)])),
@@ -131,10 +134,19 @@ export function useLive(schematic: SchematicData) {
     const sketch = element.text ?? "";
     const board = element.kind === "pico" ? "pico" : "uno";
     setSketches((all) => ({ ...all, [id]: { kind: "compiling" } }));
-    const run = (firmware: Firmware, where: "page" | "server") => {
+    const run = (firmware: Firmware, where: "page" | "server" | "file") => {
       w.postMessage({ type: "attach", id, firmware } satisfies Request);
       setSketches((all) => ({ ...all, [id]: { kind: "running", sketch, where } }));
     };
+    // a Pico's program given whole: the file its text names
+    const file = board === "pico" ? firmwareFile(sketch) : null;
+    if (file) {
+      const image = await fetchFirmware(file).catch((e: unknown) => String(e instanceof Error ? e.message : e));
+      if (worker.current !== w) return;
+      if (typeof image === "string") setSketches((all) => ({ ...all, [id]: { kind: "failed", output: image } }));
+      else run({ board: "pico", image }, "file");
+      return;
+    }
     // an Uno's in the page first, the server only if the page's compiler could not be loaded; a Pico's
     // on the server (the page's compiler is AVR's)
     const local = board === "uno" ? await compiler.compile(sketch).catch(() => null) : null;

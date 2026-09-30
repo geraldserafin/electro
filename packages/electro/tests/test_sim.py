@@ -293,3 +293,15 @@ def test_pico_drives_its_pins_at_3v3_and_supplies_both_rails():
     assert dark["I_LED_1"] == pytest.approx(0, abs=1e-6)
     rail = net((Pico(), *board, "vbus", "v33", "GND"), (Resistor(1000), "v33", "GND"))
     assert rail.solve()["R_1"].I == pytest.approx(3.3e-3)  # on paper: the 3V3 rail
+
+
+def test_ili9341_loads_the_3v3_rail_and_its_backlight_pin():
+    from electro import ILI9341, Pico
+    wired = {"GP17": "cs", "GP18": "sck", "GP19": "mosi", "GP20": "dc", "GP21": "rst", "GP22": "bl"}
+    board = [wired.get(p, f"free_{p}") for p in Pico.PINS]
+    tft = net((Pico(), *board, "vbus", "v33", "GND"), (ILI9341(), "v33", "GND", "cs", "rst", "dc", "mosi", "sck", "bl", "miso"))
+    assert "ILI9341()" in code(tft)
+    solved = tft.solve()  # on paper: the pins float, the module takes its load off the 3V3 rail
+    assert solved["TFT_1"].I == pytest.approx(3.3 / 150)
+    lit = simulate(tft, t=1e-4, inputs={"PICO_1.GP22": "high"}).at(1e-4)
+    assert lit["V_bl"] == pytest.approx(3.3 * 1000 / 1040, rel=1e-3)  # the pin's 40 Ω, the backlight driver's 1 kΩ

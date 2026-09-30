@@ -2,7 +2,7 @@
 // and after a run what was found (the solved value, I and U).
 import { memo, useId, useLayoutEffect, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent } from "react";
 import type { ElementData, ElementResult, Point, SymbolLibrary, WireData } from "@/shared/model/types";
-import { hasValue, isComponent, isWaveSource, keyLabel, kindInfo, pins, rotate, waveLabel } from "./model";
+import { hasValue, isBoard, isComponent, isWaveSource, keyLabel, kindInfo, pins, rotate, waveLabel } from "./model";
 
 /**
  * Where an element is grabbed: all of it as drawn (its body is not just its strokes — a module's
@@ -142,7 +142,7 @@ function ElementView_({ element: e, library, wires, result, selected, closed, li
   const chip = kindInfo(e.kind)?.group === "chips" || ps.length > 4;
   const vars = look && Object.fromEntries(Object.entries(look).map(([k, v]) => [`--${k}`, Math.round(v * 100) / 100])) as CSSProperties;
   const label = result?.solved && result.value
-    ? (e.kind === "hole" ? `${e.id}: ${result.value}` : `${e.id} = ${result.value}`)
+    ? (e.kind === "hole" ? `${e.id}: ${result.value}` : isBoard(e.kind) ? `${e.id} · ${result.value}` : `${e.id} = ${result.value}`) // (a board: its clock, slowed)
     : label_(e);
   const readings = result && !chip
     ? [result.I && `I = ${result.I} ${ARROW[e.rotation][result.reversed ? 1 : 0]}`, result.U && `U = ${result.U}`].filter(Boolean) as string[]

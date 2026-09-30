@@ -548,6 +548,27 @@ class SSD1306(I2CModule):
     ADDRESSES = (0x3C, 0x3D)
 
 
+class ILI9341(NoValue):
+    """A 2.8" 320×240 colour TFT on SPI (an ILI9341: Adafruit_ILI9341), its pins as the module has them:
+    ``vcc``, ``gnd``, ``cs``, ``reset``, ``dc``, ``mosi``, ``sck``, ``led`` (the backlight), ``miso``.
+    What it shows the page emulates, from the bytes of the SPI whose SCK and MOSI it is wired to (a
+    Pico's); electrically its logic a load across the supply, the inputs high resistances, the
+    backlight's driver a load on ``led``."""
+
+    prefix = "TFT"
+    left, right = ("vcc", "gnd", "cs", "reset", "dc", "mosi", "sck", "led", "miso"), ()
+    R_LOAD, R_IN, R_LED = 150, 1000000, 1000  # Ω (whole: exact on paper): 22 mA from 3.3 V; an input; 3.3 mA
+
+    def build(self, label, V, param, ctx):
+        U, I = sp.Symbol(f"U_{label}"), sp.Symbol(f"I_{label}")
+        name = DeviceModel(sp.Symbol(label))
+        loads = {pin: (V[pin] - V["gnd"]) / (self.R_LED if pin == "led" else self.R_IN)
+                 for pin in ("cs", "reset", "dc", "mosi", "sck", "led", "miso")}
+        laws = [Law(U - (V["vcc"] - V["gnd"]), name, "kvl"), Law(U - self.R_LOAD * I, name)]
+        inflow = loads | {"vcc": I, "gnd": -I - sum(loads.values())}
+        return Model(inflow, laws, {"U": U, "I": I})
+
+
 class DS1307(I2CModule):
     """A real-time clock (a DS1307: RTClib), at 0x68; it starts at the page's time."""
 

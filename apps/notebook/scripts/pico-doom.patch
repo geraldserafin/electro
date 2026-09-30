@@ -1,0 +1,267 @@
+diff -ruN a/CMakeLists.txt b/CMakeLists.txt
+--- a/CMakeLists.txt	2026-09-30 02:49:44
++++ b/CMakeLists.txt	2026-09-30 01:39:02
+@@ -2,7 +2,7 @@
+ 
+ cmake_minimum_required(VERSION 3.12)
+ 
+-include(prebuilt_tools.cmake)
++#include(prebuilt_tools.cmake)
+ 
+ # Pull in SDK (must be before project)
+ if (PICO_SDK_PATH)
+diff -ruN a/src/CMakeLists.txt b/src/CMakeLists.txt
+--- a/src/CMakeLists.txt	2026-09-30 02:49:44
++++ b/src/CMakeLists.txt	2026-09-30 01:39:02
+@@ -472,7 +472,7 @@
+ #dahai rp2040-retro-loader 的 app linker script。指到別的路徑就改這個 cache
+ # 變數，設成空字串則不套用(獨立 BOOTSEL 燒錄版)。位址須與載入器的
+ # common/boot_map.h 及下面的 TINY_WAD_ADDR 保持一致。
+-set(RETRO_LOADER_LD "C:/Users/Dell/Documents/GitHub/rp2040-retro-loader/app/memmap_app.ld"
++set(RETRO_LOADER_LD ""
+         CACHE STRING "rp2040-retro-loader app linker script (empty = standalone build)")
+ 
+ function(add_doom_tiny SUFFIX RENDER_LIB)
+diff -ruN a/src/doom/d_main.c b/src/doom/d_main.c
+--- a/src/doom/d_main.c	2026-09-30 02:49:44
++++ b/src/doom/d_main.c	2026-09-30 03:11:07
+@@ -211,7 +211,11 @@
+ #endif
+ 
+     // save the current screen if about to wipe
++#if EMU_LCD
++    if (false) // no melt: in the emulator its frames come too slowly, and the game waits for it to end
++#else
+     if (gamestate != wipegamestate)
++#endif
+     {
+ 	wipe = true;
+ #if !DOOM_TINY
+diff -ruN a/src/i_oplmusic.c b/src/i_oplmusic.c
+--- a/src/i_oplmusic.c	2026-09-30 02:49:44
++++ b/src/i_oplmusic.c	2026-09-30 01:54:50
+@@ -1802,6 +1802,9 @@
+ 
+ static boolean I_OPL_InitMusic(void)
+ {
++#if EMU_LCD
++    return false; // (no sound: see I_Pico_InitSound)
++#endif
+ #if !DOOM_TINY
+     const char *dmxoption;
+     opl_init_result_t chip_type;
+diff -ruN a/src/pd_render.cpp b/src/pd_render.cpp
+--- a/src/pd_render.cpp	2026-09-30 02:49:44
++++ b/src/pd_render.cpp	2026-09-30 02:03:12
+@@ -2603,7 +2603,7 @@
+ #endif
+     // these were only clipped as they were inserted (so may be more obscured)
+     reclip_fuzz_columns();
+-#if PICO_ON_DEVICE
++#if PICO_ON_DEVICE && !EMU_LCD // (no sound to keep up: sem_acquire_blocking sleeps till it is released)
+ //    gpio_put(22, 1);
+     while (!sem_available(&display_frame_freed)) {
+         I_UpdateSound();
+@@ -2966,22 +2966,34 @@
+ #if PICO_ON_DEVICE
+     sem_acquire_blocking(&core1_wake);
+ #if USE_CORE1_FOR_FLATS
++#if EMU_LCD
++    sem_acquire_blocking(&core1_do_flats);
++#else
+     while (!sem_acquire_timeout_ms(&core1_do_flats, 1)) {
+         SafeUpdateSound();
+     }
++#endif
+     interp_in_use = true;
+     draw_visplanes(core1_fr_list);
+     interp_in_use = false;
+ #if USE_CORE1_FOR_REGULAR
++#if EMU_LCD
++    sem_acquire_blocking(&core1_do_regular);
++#else
+     while (!sem_acquire_timeout_ms(&core1_do_regular, 1)) {
+         SafeUpdateSound();
+     }
++#endif
+     draw_regular_columns(1);
+ #endif
+ #endif
++#if EMU_LCD
++    sem_acquire_blocking(&core0_done);
++#else
+     while (!sem_acquire_timeout_ms(&core0_done, 1)) {
+         SafeUpdateSound();
+     }
++#endif
+ #endif
+     sem_release(&core1_done);
+ }
+diff -ruN a/src/pico/CMakeLists.txt b/src/pico/CMakeLists.txt
+--- a/src/pico/CMakeLists.txt	2026-09-30 02:49:44
++++ b/src/pico/CMakeLists.txt	2026-09-30 01:51:24
+@@ -66,8 +66,8 @@
+ set(SD_MOSI "11" CACHE STRING "Select the Master Out Slave In GPIO pin for the SD card")
+ set(SD_MISO "12" CACHE STRING "Select the Master In Slave Out GPIO pin for the SD card")
+ 
+-#set(LCD_CONTROLLER "ILI9341" CACHE STRING "Select the LCD controller type")
+-set(LCD_CONTROLLER "ST7789" CACHE STRING "Select the LCD controller type")
++set(LCD_CONTROLLER "ILI9341" CACHE STRING "Select the LCD controller type")
++#set(LCD_CONTROLLER "ST7789" CACHE STRING "Select the LCD controller type")
+ 
+ set(LCD_SPI "spi0")
+ set(LCD_DC "20")
+@@ -92,6 +92,7 @@
+ message("LCD RST             : ${LCD_RST}")
+ message("LCD BL              : ${LCD_BL}")
+ message("LCD MISO            : ${LCD_MISO}")
++target_compile_definitions(common_pico INTERFACE EMU_LCD=1)
+ target_compile_definitions(common_pico INTERFACE
+     SDCARD_SPI_BUS=${SD_SPI}
+     SDCARD_PIN_SPI0_CS=${SD_CS}
+diff -ruN a/src/pico/i_picosound.c b/src/pico/i_picosound.c
+--- a/src/pico/i_picosound.c	2026-09-30 02:49:44
++++ b/src/pico/i_picosound.c	2026-09-30 01:51:24
+@@ -676,6 +676,9 @@
+ 
+ static boolean I_Pico_InitSound(boolean _use_sfx_prefix)
+ {
++#if EMU_LCD
++    return false; // (no I2S: its PIO would cost the emulator more than all the rest)
++#endif
+     int i;
+     use_sfx_prefix = _use_sfx_prefix;
+ #if 1 // AUDIO_I2S or AUDIO_PWM
+diff -ruN a/src/pico/i_video.c b/src/pico/i_video.c
+--- a/src/pico/i_video.c	2026-09-30 02:49:44
++++ b/src/pico/i_video.c	2026-09-30 03:07:28
+@@ -68,6 +68,31 @@
+ #include "magc.h"
+ static int display_dma_channel;
+ 
++#if EMU_LCD
++// Without scanvideo (whose PIO and DMA scan a VGA picture out): a timer on core 1 starts a frame,
++// and its scanlines are handed out one after another as scanvideo would, each sent to the LCD by DMA.
++#ifndef EMU_LCD_FPS
++#define EMU_LCD_FPS 30
++#endif
++#define EMU_LCD_DMA 10
++static scanvideo_scanline_buffer_t emu_buffers[2];
++static uint32_t emu_data[2][SCREENWIDTH / 2 + 8];
++static volatile uint32_t emu_frame;
++static volatile int emu_line = SCREENHEIGHT;
++static int emu_which;
++static scanvideo_scanline_buffer_t *emu_begin(void) {
++    if (emu_line >= SCREENHEIGHT) return NULL;
++    scanvideo_scanline_buffer_t *b = &emu_buffers[emu_which];
++    b->data = emu_data[emu_which];
++    b->data_max = count_of(emu_data[0]);
++    b->scanline_id = (emu_frame << 16) | emu_line;
++    return b;
++}
++#define scanvideo_begin_scanline_generation(block) emu_begin()
++#define scanvideo_begin_scanline_generation_linked(n, block) emu_begin()
++#define scanvideo_end_scanline_generation(b) (emu_line++)
++#endif
++
+ #define YELLOW_SUBMARINE 0
+ #define SUPPORT_TEXT 1
+ #if SUPPORT_TEXT
+@@ -1072,7 +1097,7 @@
+             new_frame_stuff();
+         //dahai
+         gpio_xor_mask(1<<LED_PIN);
+-            if(frame % 60 == 0){
++            if(EMU_LCD || frame % 60 == 0){
+                 #ifdef ILI9341
+                 ili9341_infones_frame_timing_register_init();
+                 #endif
+@@ -1156,7 +1181,13 @@
+         // }
+         // // spi_write_blocking(DISPLAY_SPI_PORT, scanline_buffer, 2*SCREENWIDTH);
+         
++#if EMU_LCD
++        dma_channel_wait_for_finish_blocking(EMU_LCD_DMA);
++        dma_channel_transfer_from_buffer_now(EMU_LCD_DMA, (uint8_t *)&(buffer->data[2])+1, 2*SCREENWIDTH);
++        emu_which ^= 1;
++#else
+         spi_write_blocking(DISPLAY_SPI_PORT, (uint8_t *)&(buffer->data[2])+1, 2*SCREENWIDTH);
++#endif
+ 
+         // dma_channel_set_trans_count(display_dma_channel, SCREENWIDTH*sizeof(uint16_t), false);
+         // dma_channel_set_read_addr(display_dma_channel, /*(uint8_t *)*/scanline_buffer, true);   
+@@ -1203,8 +1234,38 @@
+ }
+ #endif
+ 
++#if EMU_LCD
++// a frame goes out when one is rendered (and now and then anyway, for wipes and still screens) — unless
++// the last one is still going out; the emulator is slow, and every scanline sent costs it
++static bool emu_tick(repeating_timer_t *t) {
++    static int idle;
++    if (emu_line >= SCREENHEIGHT && (sem_available(&render_frame_ready) || ++idle >= 4)) {
++        idle = 0;
++        emu_frame++;
++        emu_which = 0;
++        emu_line = 0;
++        irq_set_pending(LOW_PRIO_IRQ);
++    }
++    return true;
++}
++#endif
++
+ //static semaphore_t init_sem;
+ static void core1() {
++#if EMU_LCD
++    dma_channel_claim(EMU_LCD_DMA);
++    dma_channel_config c = dma_channel_get_default_config(EMU_LCD_DMA);
++    channel_config_set_transfer_data_size(&c, DMA_SIZE_8);
++    channel_config_set_dreq(&c, spi_get_dreq(DISPLAY_SPI_PORT, true));
++    dma_channel_configure(EMU_LCD_DMA, &c, &spi_get_hw(DISPLAY_SPI_PORT)->dr, NULL, 0, false);
++    irq_set_exclusive_handler(LOW_PRIO_IRQ, fill_scanlines);
++    irq_set_enabled(LOW_PRIO_IRQ, true);
++    static repeating_timer_t timer;
++    alarm_pool_t *pool = alarm_pool_create(2, 4); // (its alarms on this core)
++    alarm_pool_add_repeating_timer_us(pool, -1000000 / EMU_LCD_FPS, emu_tick, NULL, &timer);
++    sem_release(&core1_launch);
++    while (true) pd_core1_loop();
++#endif
+ #if !PICO_ON_DEVICE
+     void simulate_video_pio_video_doom(const uint32_t *dma_data, uint32_t dma_data_size,
+                                        uint16_t *pixel_buffer, int32_t max_pixels, int32_t expected_width, bool overlay);
+@@ -1433,12 +1494,23 @@
+ void display_clear()
+ {
+ #ifdef ILI9341
++#if EMU_LCD
++    // one transaction, a line at a time (not CS toggled for every pixel: each toggle is an event the
++    // emulated circuit steps to)
+     display_set_address(0,0,320-1,240-1);
++    static const uint8_t black[2 * 320];
++    gpio_put(DISPLAY_PIN_DC, 1);
++    gpio_put(DISPLAY_PIN_CS, 0);
++    for (int y = 0; y < 240; y++) spi_write_blocking(DISPLAY_SPI_PORT, black, sizeof black);
++    gpio_put(DISPLAY_PIN_CS, 1);
++#else
++    display_set_address(0,0,320-1,240-1);
+     BYTE pixel[2]={0x00,0x00};
+     for(int i=0;i<320*240;i+=1){
+         display_write_data(pixel,2);
+     }
+ #endif
++#endif
+ #ifdef ST7789
+     display_set_address(0,0,160-1,128-1);
+     BYTE pixel[2]={0x00,0x00};
+@@ -1457,6 +1529,11 @@
+         uint8_t command;
+         uint8_t data[4];
+         int x=0;
++#if EMU_LCD
++        // the last scanline sent, before DC goes low for the window
++        dma_channel_wait_for_finish_blocking(EMU_LCD_DMA);
++        while (spi_is_busy(DISPLAY_SPI_PORT)) tight_loop_contents();
++#endif
+ 
+ 
+ 

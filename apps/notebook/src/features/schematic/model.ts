@@ -58,6 +58,7 @@ export const KINDS = [
   { kind: "lcd1602", prefix: "LCD", group: "peripherals", live: true },
   { kind: "lcd1602_i2c", prefix: "LCD", group: "peripherals" },
   { kind: "ssd1306", prefix: "OLED", group: "peripherals" },
+  { kind: "ili9341", prefix: "TFT", group: "peripherals" },
   { kind: "ds1307", prefix: "RTC", group: "peripherals" },
 ] as const satisfies readonly KindInfo[];
 

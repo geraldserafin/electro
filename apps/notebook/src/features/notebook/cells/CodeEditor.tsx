@@ -22,7 +22,7 @@ function electro(t: TFunction<"notebook">): Completion[] {
   return [
     ...(["Resistor", "Capacitor", "Inductor", "VoltageSource", "CurrentSource", "SineSource", "SquareSource", "VCVS", "VCCS", "CCVS", "CCCS", "Ammeter", "Voltmeter", "Hole", "OpAmp",
       "LED", "RGBLED", "SevenSegment", "Diode", "Zener", "Photoresistor", "Thermistor",
-      "Buzzer", "PassiveBuzzer", "Servo", "Ultrasonic", "LCD1602", "LCD1602I2C", "SSD1306", "DS1307", "Switch", "Button", "Potentiometer", "NPN", "PNP", "NMOS", "PMOS", "Timer555", "Arduino", "Pico"] as const)
+      "Buzzer", "PassiveBuzzer", "Servo", "Ultrasonic", "LCD1602", "LCD1602I2C", "SSD1306", "ILI9341", "DS1307", "Switch", "Button", "Potentiometer", "NPN", "PNP", "NMOS", "PMOS", "Timer555", "Arduino", "Pico"] as const)
       .map((c) => doc(c, hint(c))),
     doc("simulate", hint("simulate"), "function"),
     ...["loop", "net", "series", "parallel", "shunt", "supply", "node"].map((f) => doc(f, hint("circuit"), "function")),

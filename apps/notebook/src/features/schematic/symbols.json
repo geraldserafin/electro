@@ -616,6 +616,49 @@
    "letter": null,
    "upright": false
   },
+  "ili9341": {
+   "pins": [
+    [
+     0,
+     0
+    ],
+    [
+     0,
+     20
+    ],
+    [
+     0,
+     40
+    ],
+    [
+     0,
+     60
+    ],
+    [
+     0,
+     80
+    ],
+    [
+     0,
+     100
+    ],
+    [
+     0,
+     120
+    ],
+    [
+     0,
+     140
+    ],
+    [
+     0,
+     160
+    ]
+   ],
+   "svg": "<path d=\"M0 0H20M0 20H20M0 40H20M0 60H20M0 80H20M0 100H20M0 120H20M0 140H20M0 160H20\"/><rect x=\"20\" y=\"-50\" width=\"400\" height=\"280\" rx=\"6\"/><rect x=\"66\" y=\"-30\" width=\"320\" height=\"240\"/><g class=\"pins\"><text x=\"26\" y=\"4\">VCC</text><text x=\"26\" y=\"24\">GND</text><text x=\"26\" y=\"44\">CS</text><text x=\"26\" y=\"64\">RESET</text><text x=\"26\" y=\"84\">DC</text><text x=\"26\" y=\"104\">MOSI</text><text x=\"26\" y=\"124\">SCK</text><text x=\"26\" y=\"144\">LED</text><text x=\"26\" y=\"164\">MISO</text></g>",
+   "letter": null,
+   "upright": false
+  },
   "switch": {
    "pins": [
     [
