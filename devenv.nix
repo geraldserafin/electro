@@ -67,7 +67,7 @@ in
     notebook.exec = "cd ${notebook} && pnpm exec vite --port 5190 --strictPort";
     notes-server = {
       # the first time: the Arduino core for compiling sketches, and the libraries the notebook offers (downloaded once)
-      exec = "(arduino-cli core list | grep -q arduino:avr || arduino-cli core install arduino:avr); (arduino-cli lib list | grep -q '^Servo ' || arduino-cli lib install Servo); (arduino-cli lib list | grep -q '^LiquidCrystal ' || arduino-cli lib install LiquidCrystal); (arduino-cli lib list | grep -q '^RTClib ' || arduino-cli lib install 'LiquidCrystal I2C' 'Adafruit SSD1306' RTClib); (arduino-cli core list | grep -q rp2040:rp2040 || (arduino-cli core update-index --additional-urls ${picoCore} && arduino-cli core install rp2040:rp2040 --additional-urls ${picoCore})); cd ${root}/apps/server && PORT=5191 pnpm dev";
+      exec = "(arduino-cli core list | grep -q arduino:avr || arduino-cli core install arduino:avr); (arduino-cli lib list | grep -q '^Servo ' || arduino-cli lib install Servo); (arduino-cli lib list | grep -q '^LiquidCrystal ' || arduino-cli lib install LiquidCrystal); (arduino-cli lib list | grep -q '^RTClib ' || arduino-cli lib install 'LiquidCrystal I2C' 'Adafruit SSD1306' RTClib); (arduino-cli lib list | grep -q '^Adafruit ILI9341 ' || arduino-cli lib install 'Adafruit ILI9341'); (arduino-cli core list | grep -q rp2040:rp2040 || (arduino-cli core update-index --additional-urls ${picoCore} && arduino-cli core install rp2040:rp2040 --additional-urls ${picoCore})); cd ${root}/apps/server && PORT=5191 pnpm dev";
       after = [ "devenv:processes:postgres" ];
     };
   };

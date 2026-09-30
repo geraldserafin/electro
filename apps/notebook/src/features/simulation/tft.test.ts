@@ -125,3 +125,20 @@ test("Doom on a Pico, the TFT on its SPI0: the title screen comes up", () => {
   }
   expect(picture).not.toBeNull();
 }, 120_000);
+
+test("Adafruit_ILI9341 on a Pico (fixtures/tft.pico.ino): the screen filled, a rectangle, words", () => {
+  const circuit = JSON.parse(readFileSync(new URL("./fixtures/tft.live.json", import.meta.url), "utf8"));
+  const runner = new Runner(circuit, []);
+  runner.attach("PICO_1", { board: "pico", image: new Uint8Array(readFileSync(new URL("./fixtures/tft.pico.bin", import.meta.url))) });
+  (runner.session.boards[0].chip as Pico).adaptive = false;
+  runner.advanceTo(1.0, 1e-3);
+  // (the last picture: the first taken is the frame written whole — the red screen — the rest comes after, as the worker takes it)
+  let image: Uint8ClampedArray | undefined;
+  for (let p = runner.pictures(true)?.TFT_1; p; p = runner.pictures(true)?.TFT_1) image = p;
+  expect(runner.frame().tfts.TFT_1).toMatchObject({ shown: true, backlight: 1 });
+  expect(at(image!, 10, 10)).toEqual([0, 0, 255]); // (the blue rectangle, top left: landscape, setRotation(1))
+  expect(at(image!, 300, 220)).toEqual([255, 0, 0]);
+  let white = 0;
+  for (let y = 130; y < 154; y++) for (let x = 170; x < 242; x++) if (at(image!, x, y).every((c) => c === 255)) white++;
+  expect(white).toBeGreaterThan(100); // "Hej!"
+}, 60_000);
