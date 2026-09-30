@@ -127,7 +127,7 @@ export function FolderPage() {
             onProblem={setProblem}
           />
         ) : (
-          <ul className="grid grid-cols-[repeat(auto-fill,212px)] gap-x-6 gap-y-7 max-sm:grid-cols-[repeat(2,212px)] max-sm:justify-between max-sm:gap-x-4 max-sm:[zoom:0.74]">
+          <ul className="grid w-full grid-cols-[repeat(auto-fill,minmax(180px,1fr))] gap-x-6 gap-y-7 max-sm:grid-cols-2 max-sm:gap-x-4 max-sm:gap-y-5">
             <CardSkeletons />
           </ul>
         )}

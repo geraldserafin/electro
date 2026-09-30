@@ -283,9 +283,9 @@ function Page({ item }: { item: Shared }) {
   return (
     <span
       className="grid overflow-hidden rounded-md bg-white shadow-lift"
-      style={{ width: PAGE, aspectRatio: "794 / 1123" }}
+      style={{ width: PAGE, maxWidth: "100%", aspectRatio: "794 / 1123" }}
     >
-      {item.preview && <PagePreview preview={item.preview} library={library} width={PAGE} />}
+      {item.preview && <PagePreview preview={item.preview} library={library} />}
     </span>
   );
 }
@@ -305,7 +305,7 @@ function FolderPicture({ item }: { item: Shared }) {
           className="grid overflow-hidden rounded-[4px] bg-white shadow-island"
           style={{ width: MINI, aspectRatio: "794 / 1123" }}
         >
-          <PagePreview preview={preview} library={library} width={MINI} />
+          <PagePreview preview={preview} library={library} />
         </span>
       ))}
     </span>

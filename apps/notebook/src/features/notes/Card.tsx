@@ -20,10 +20,10 @@ import { PagePreview } from "./PagePreview";
 
 // the card: a link (a note) or a button (an example), alike
 const open = "group/open grid content-start gap-0.5 text-left";
-// the page: A4's proportions, 212px wide
+// the page: A4's proportions, as wide as the grid's column
 const thumb =
-  "grid place-items-center w-53 aspect-[794/1123] overflow-hidden rounded-md mb-2 transition-[box-shadow,transform] duration-120 group-focus-visible/open:outline-2 group-focus-visible/open:outline-offset-2 group-focus-visible/open:outline-accent";
-const title = "text-[15px] max-sm:text-[19px] font-medium truncate max-w-53"; // (on a phone the grid is smaller: zoom)
+  "grid place-items-center w-full aspect-[794/1123] overflow-hidden rounded-md mb-2 transition-[box-shadow,transform] duration-120 group-focus-visible/open:outline-2 group-focus-visible/open:outline-offset-2 group-focus-visible/open:outline-accent";
+const title = "text-[15px] font-medium truncate";
 
 /** A card: a link to the note (or a button, for an example), with actions under "⋯". */
 export function Card({
@@ -69,12 +69,15 @@ export function Card({
         </span>
       )}
       <span className={title}>{name}</span>
-      {meta && <span className="text-[13px] max-sm:text-[17px] text-muted">{meta}</span>}
+      {meta && <span className="text-[13px] text-muted">{meta}</span>}
     </>
   );
   return (
     <li
-      className={cn("appear group relative grid rounded-lg", target && "outline-2 outline-offset-4 outline-accent")}
+      className={cn(
+        "appear group relative grid min-w-0 rounded-lg",
+        target && "outline-2 outline-offset-4 outline-accent",
+      )}
       data-id={id}
       ref={ref}
       style={{ "--i": Math.min(index, 12) } as CSSProperties}
@@ -153,7 +156,7 @@ export function NewCard({
     return () => window.removeEventListener("keydown", esc);
   }, [menu, close]);
   return (
-    <li className="relative grid" ref={ref}>
+    <li className="relative grid min-w-0" ref={ref}>
       <button
         className={cn("group", open)}
         onClick={choices ? () => setMenu(!menu) : onClick}

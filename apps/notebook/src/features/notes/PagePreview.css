@@ -18,8 +18,7 @@
     min-height: 1123px;
     padding: 68px 60px;
     box-sizing: border-box;
-    transform: scale(0.267);
-    transform-origin: top left; /* 212 / 794 */
+    transform-origin: top left; /* scaled to its box: PagePreview.tsx */
     background: #fff;
     color: var(--text);
     font-size: 15px;
