@@ -1014,6 +1014,8 @@ export function SchematicEditor({
         />
       ) : viewOnly ? null : (
         <Toolbar
+          // (a phone: the top right corner is the full screen button's — the tools from the left, short of it)
+          className={topRight ? "max-sm:left-3 max-sm:translate-x-0 max-sm:max-w-[calc(100%-80px)]" : undefined}
           current={tool}
           libraryOpen={libraryOpen}
           library={library}

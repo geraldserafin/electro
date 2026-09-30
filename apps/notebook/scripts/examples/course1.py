@@ -56,7 +56,7 @@ Wystarczy jedna przerwa — i prąd nie płynie nigdzie. Tak działa każdy wył
 Poniżej jest latarka: bateria $E_1$ (6 V), łącznik $S_1$ i żarówka $H_1$. Kreska z trzema poziomymi
 liniami na dole to **masa** — umówiony punkt odniesienia, „zero” napięcia.
 
-**Spróbuj:** kliknij ⚡ **Symuluj w czasie** w rogu schematu, a potem kliknij łącznik $S_1$. Żarówka
+**Spróbuj:** kliknij ⚡ (symulacja w czasie), a potem kliknij łącznik $S_1$. Żarówka
 gaśnie i zapala się, a kolor przewodów pokazuje napięcie: zielony to plus, szary to zero.
 """)
     L.drawing("latarka", flashlight(), solve=True, live=True)

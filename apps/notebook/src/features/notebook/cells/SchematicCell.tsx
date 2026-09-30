@@ -22,7 +22,6 @@ import {
 } from "@/features/schematic";
 import {
   carriesFiles,
-  LiveControls,
   ProbePanel,
   SimPanel,
   SketchEditor,
@@ -425,16 +424,20 @@ export function SchematicCell({
     setLayout(next);
   };
 
-  const run = async () => {
-    if (timed && running) return live.stop();
+  /** The drawing as it is (the code typed applied first), to ``go`` with; nothing when the code has an error. */
+  const withDrawing = async (go: (schematic: SchematicData) => void) => {
     setBusy(true);
     try {
       const schematic = await applied();
-      if (schematic) timed ? live.start(schematic) : simulate(schematic);
+      if (schematic) go(schematic);
     } finally {
       setBusy(false);
     }
   };
+  const solve = () => withDrawing(simulate);
+  const runInTime = () => (running ? live.stop() : withDrawing((schematic) => live.start(schematic)));
+  // Shift+Enter in the code: what the circuit can do — solved, or (only in time) run
+  const run = () => (timed ? runInTime() : solve());
 
   // ------------------------------------------------------------------ dragging a tab
 
@@ -536,22 +539,38 @@ export function SchematicCell({
     !timed && !cell.stale && cell.problems?.length && cell.problems !== dismissed ? (
       <Problems problems={cell.problems} below={!inBoard} compact onDismiss={() => setDismissed(cell.problems)} />
     ) : null;
-  // the bolt: solves the circuit — or runs (and stops) one that only works in time
-  const runButton = (
+  // two ways to run it: ▶ solves it once (the currents and voltages, in the table) — not a circuit that
+  // only works in time; ⚡ runs it in time (and stops it), whenever it can be
+  const inTime = !empty && (timed || canRunInTime(cell.schematic));
+  const solveButton = !timed && (
+    <RunButton run={solve} eager running={solving || busy} done={done || empty} label={t("schematic.run")} />
+  );
+  const liveButton = inTime && (
     <RunButton
-      run={run}
-      eager
-      icon={timed && running ? <Stop /> : <Flash />}
-      running={timed ? live.status === "starting" : solving || busy}
-      done={timed ? empty : done || empty}
-      label={timed ? (running ? ts("controls.stop") : ts("controls.startTitle")) : t("schematic.run")}
+      run={runInTime}
+      eager={timed || running}
+      icon={running ? <Stop /> : <Flash />}
+      running={live.status === "starting"}
+      label={running ? ts("controls.stop") : ts("controls.startTitle")}
     />
+  );
+  const fullButton = (
+    <button
+      className={cn(barButton, "[&_svg]:size-4", inBoard && "size-9 text-fg")}
+      onClick={() => setFull(!full)}
+      title={full ? t("schematic.exitFull") : t("schematic.full")}
+      aria-label={t("schematic.full")}
+    >
+      {full ? <Shrink /> : <Expand />}
+    </button>
   );
   const actions = (
     <>
       {problems}
-      {runButton}
-      {!running && (
+      {solveButton}
+      {liveButton}
+      {/* (a phone, in the notebook: nothing edited there, no component made) */}
+      {!running && !compact && (
         <button
           className={cn(barButton, "[&_svg]:size-4")}
           onClick={() => setSaving(true)}
@@ -561,14 +580,8 @@ export function SchematicCell({
           <ComponentIcon />
         </button>
       )}
-      <button
-        className={cn(barButton, "[&_svg]:size-4")}
-        onClick={() => setFull(!full)}
-        title={full ? t("schematic.exitFull") : t("schematic.full")}
-        aria-label={t("schematic.full")}
-      >
-        {full ? <Shrink /> : <Expand />}
-      </button>
+      {/* (on the board: in its top right corner, apart) */}
+      {!inBoard && fullButton}
     </>
   );
 
@@ -592,6 +605,7 @@ export function SchematicCell({
       bare
       viewOnly={compact}
       corner={inBoard ? actions : undefined}
+      topRight={inBoard ? fullButton : undefined}
       value={cell.schematic}
       onChange={(schematic) => update({ schematic, ...(cell.results ? { stale: true } : {}) })}
       library={library}
@@ -612,10 +626,6 @@ export function SchematicCell({
             }
           : undefined
       }
-      // the bolt runs a circuit that only works in time; one that can also be solved has its own
-      // way to run in time, here
-      // (not offered when it cannot run: a hole in it, a value not given)
-      below={empty || running || timed || !canRunInTime(cell.schematic) ? undefined : <LiveControls live={live} />}
       camera={camera}
       autoFocus={focusBoard.current}
       // the meter, while it runs: what an element or a wire is doing

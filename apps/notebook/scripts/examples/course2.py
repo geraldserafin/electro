@@ -242,7 +242,7 @@ def lesson04():
 # Symulacja w czasie
 
 Diody, tranzystory, układy scalone i płytki nie są liniowe — takie obwody liczy się **w czasie**, krok po
-kroku, jak w prawdziwym symulatorze. Przycisk ⚡ **Symuluj w czasie** nad schematem uruchamia obwód:
+kroku, jak w prawdziwym symulatorze. Przycisk ⚡ przy schemacie uruchamia obwód w czasie:
 
 - **przewody** mają kolor napięcia (zielony — dodatnie, czerwony — ujemne, szary — zero),
 - **diody i żarówki** świecą, **silniki** się kręcą, **buzzery** grają (jest przycisk wyciszenia),
