@@ -54,7 +54,7 @@ pins = {"PICO_1": [wiring.get(pin) for pin in Pico.PINS] + ["vbus", "v33", "GND"
 (here / "pico.live.json").write_text(json.dumps({"program": program, "wires": [], "pins": pins}) + "\n")
 print(here / "pico.live.json")
 
-# Doom's wiring (make-pico-doom.sh): an ILI9341 on SPI0 — SCK GP18, MOSI GP19, CS GP17, DC GP20, RESET GP21,
+# Doom's wiring (github.com/geraldserafin/electro-doom): an ILI9341 on SPI0 — SCK GP18, MOSI GP19, CS GP17, DC GP20, RESET GP21,
 # the backlight GP22 — powered from the Pico's 3V3; the buttons' pins left open (their pull-ups: released)
 wiring = {"GP17": "cs", "GP18": "sck", "GP19": "mosi", "GP20": "dc", "GP21": "rst", "GP22": "bl"}
 board = [wiring.get(pin, f"free_{pin}") for pin in Pico.PINS] + ["vbus", "v33", "GND"]

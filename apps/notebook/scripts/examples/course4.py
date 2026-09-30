@@ -73,9 +73,10 @@ Tak, ten Doom: shareware'owy DOOM1.WAD z 1993 roku, epizod pierwszy, na emulowan
 Obwód jest gotowy — brakuje programu. Doom to nie szkic, tylko gotowy obraz pamięci flash, taki jak
 plik UF2 przeciągany na prawdziwe Pico:
 
-1. **Zbuduj go**: w repozytorium Electro `apps/notebook/scripts/make-pico-doom.sh doom.bin` (potrzebne git
-   i nix). Skrypt bierze port [kilograham/rp2040-doom](https://github.com/kilograham/rp2040-doom), wyświetlacz
-   z [pondahai/rp2040-doom-ili9341](https://github.com/pondahai/rp2040-doom-ili9341) i małą łatkę pod
+1. **Pobierz go**: [doom.bin](https://github.com/geraldserafin/electro-doom/releases/download/doom/doom.bin)
+   z [geraldserafin/electro-doom](https://github.com/geraldserafin/electro-doom). Tam jest też skrypt, który
+   zbuduje go od zera: port [kilograham/rp2040-doom](https://github.com/kilograham/rp2040-doom), wyświetlacz
+   z [pondahai/rp2040-doom-ili9341](https://github.com/pondahai/rp2040-doom-ili9341) i mała łatka pod
    emulator (bez dźwięku, klatki przez DMA).
 2. **Wgraj go**: zaznacz płytkę i kliknij **Wgraj plik .uf2 / .bin** — albo po prostu upuść plik na płytkę.
    Plik zapisze się razem z notatkami, a pierwsza linia programu płytki będzie na niego wskazywać.
@@ -86,7 +87,7 @@ plik UF2 przeciągany na prawdziwe Pico:
 Gdy komputer nie nadąża, rdzenie zwalniają — o ile, widać przy płytce (np. **PICO_1 · 150 MHz**).
 """
 
-DOOM_SKETCH = """// Tu przyjdzie Doom: zbuduj doom.bin (apps/notebook/scripts/make-pico-doom.sh) i wgraj go —
+DOOM_SKETCH = """// Tu przyjdzie Doom: pobierz doom.bin (github.com/geraldserafin/electro-doom, Releases) i wgraj go —
 // zaznacz płytkę → „Wgraj plik .uf2 / .bin” albo upuść plik na płytkę. Ten szkic zostanie pod linią z plikiem.
 // TFT: SCK GP18, MOSI GP19, CS GP17, DC GP20, RESET GP21, podświetlenie GP22.
 // Przyciski do GND: ↑ GP9, ↓ GP5, ← GP8, → GP6, strzał GP3, użyj GP2, Enter GP4, menu GP28.

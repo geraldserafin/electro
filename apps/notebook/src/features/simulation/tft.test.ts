@@ -1,5 +1,5 @@
 // The ILI9341 as Adafruit_ILI9341 and Doom drive it, a firmware file's flash, and Doom itself on a Pico
-// in a circuit (fixtures/tft.live.json; fixtures/doom.bin, built by make-pico-doom.sh).
+// in a circuit (fixtures/tft.live.json; fixtures/doom.bin, built by github.com/geraldserafin/electro-doom).
 import { readFileSync } from "node:fs";
 import { describe, expect, test } from "vitest";
 import { firmwareFile, firmwareUrl, flashOf, uf2Flash, withFirmware } from "./firmware";

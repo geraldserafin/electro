@@ -2,7 +2,7 @@
 // file — "// firmware: /api/firmware/<id>/doom.uf2" — a UF2 (as one drags onto a Pico in BOOTSEL mode) or
 // a raw flash image (.bin): one the user uploaded (kept in their vault on GitHub, features/vault),
 // or at any other address. For programs no sketch makes: Doom
-// (scripts/make-pico-doom.sh).
+// (github.com/geraldserafin/electro-doom).
 
 import { apiFetch } from "@/features/vault";
 
