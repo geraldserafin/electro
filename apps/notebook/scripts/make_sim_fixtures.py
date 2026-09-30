@@ -6,7 +6,23 @@ in devenv shell) after changing how electro compiles a circuit in time.
 import json
 from pathlib import Path
 
-from electro import DS1307, ILI9341, LCD1602I2C, LED, SSD1306, Arduino, Pico, Potentiometer, Resistor, Ultrasonic, net
+from electro import (
+    DS1307,
+    ILI9341,
+    LCD1602I2C,
+    LED,
+    SSD1306,
+    Arduino,
+    Capacitor,
+    Pico,
+    Potentiometer,
+    Resistor,
+    Ultrasonic,
+    ground,
+    net,
+    shunt,
+    supply,
+)
 from electro.devices import ARDUINO_PINS
 from electro.sim import compile_sim
 
@@ -66,3 +82,11 @@ pins = {
 }
 (here / "tft.live.json").write_text(json.dumps({"program": program, "wires": [], "pins": pins}) + "\n")
 print(here / "tft.live.json")
+
+# a stress test (engine.test.ts): 40 RC stages, 80 elements and 205 unknowns, charged from 5 V
+ladder = supply(5)
+for _ in range(40):
+    ladder = ladder + Resistor(100) + shunt(Capacitor("1u"))
+ladder = ladder + Resistor(100) + ground
+(here / "ladder.live.json").write_text(compile_sim(ladder).to_json() + "\n")
+print(here / "ladder.live.json")
