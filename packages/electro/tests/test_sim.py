@@ -17,7 +17,10 @@ from electro import (
     Button,
     Buzzer,
     Capacitor,
+    Counter,
+    DFlipFlop,
     Inductor,
+    JKFlipFlop,
     PassiveBuzzer,
     Photoresistor,
     Potentiometer,
@@ -415,3 +418,30 @@ def test_spectrum_of_a_square_wave():
     for n in (1, 3, 5):
         assert at(100 * n) == pytest.approx(2 / (math.pi * n), rel=0.02)
     assert at(200) < 0.01 and at(400) < 0.01
+
+
+CLOCK = (SquareSource(5, frequency=1000), "GND", "CLK")  # rising edges at 0, 1, 2, … ms
+
+
+def test_counter_counts_rising_edges_and_resets():
+    loads = [(Resistor("10k"), f"Q{k}", "GND") for k in range(4)]
+    c = net(CLOCK, (Resistor(1), "RST", "GND"), (Counter(), "CLK", "RST", "Q0", "Q1", "Q2", "Q3"), *loads)
+    trace = simulate(c, t=0.0055)
+    assert trace["U_U_1_count"][-1] == 6
+    assert [round(trace.at(0.0055)[f"V_Q{k}"]) for k in range(4)] == [0, 5, 5, 0]  # 6 = 0b0110
+    held = net(CLOCK, (VoltageSource(5), "GND", "RST"), (Counter(), "CLK", "RST", "Q0", "Q1", "Q2", "Q3"), *loads)
+    assert simulate(held, t=0.0055)["U_U_1_count"][-1] == 0
+
+
+def test_jk_flip_flop_toggles_with_both_high():
+    c = net(CLOCK, (VoltageSource(5), "GND", "H"), (JKFlipFlop(), "H", "CLK", "H", "Q", "NQ"))
+    trace = simulate(c, t=0.0045)
+    assert [round(trace.at(t)["V_Q"]) for t in (0.0005, 0.0015, 0.0025, 0.0035)] == [5, 0, 5, 0]
+    assert round(trace.at(0.0015)["V_NQ"]) == 5
+
+
+def test_d_flip_flop_takes_d_on_the_edge_only():
+    c = net(CLOCK, (SquareSource(5, frequency=300), "GND", "D"), (DFlipFlop(), "D", "CLK", "Q", "NQ"))
+    trace = simulate(c, t=0.01)
+    # D is high until 1.67 ms: the edges at 0 and 1 ms give 1, the one at 2 ms gives 0
+    assert [round(trace.at(t)["V_Q"]) for t in (0.0005, 0.0015, 0.0025)] == [5, 5, 0]

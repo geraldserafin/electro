@@ -97,6 +97,10 @@ KINDS: dict[str, Kind] = {
     "or_gate": Kind(((0, 0), (0, 2), (4, 1)), dev.OR),
     "nor_gate": Kind(((0, 0), (0, 2), (4, 1)), dev.NOR),
     "xor_gate": Kind(((0, 0), (0, 2), (4, 1)), dev.XOR),
+    # flip-flops and a counter: the inputs on the left (the clock marked), the outputs on the right
+    "dff": Kind(((0, 0), (0, 2), (4, 0), (4, 2)), dev.DFlipFlop),  # d, clk, q, nq
+    "jkff": Kind(((0, 0), (0, 2), (0, 4), (4, 0), (4, 4)), dev.JKFlipFlop),  # j, clk, k, q, nq
+    "counter": Kind(((0, 0), (0, 3), (4, 0), (4, 1), (4, 2), (4, 3)), dev.Counter),  # clk, reset, q0…q3
     "switch": Kind(TWO_PINS, dev.Switch),
     "button": Kind(TWO_PINS, dev.Button),
     "potentiometer": Kind(((0, 0), (4, 0), (2, -2)), dev.Potentiometer),  # a, b, wiper

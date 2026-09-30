@@ -846,6 +846,86 @@ class XOR(AND):
         return a + b - 2 * a * b
 
 
+# ------------------------------------------------------------------ flip-flops and a counter
+
+
+class FlipFlop(NoValue):
+    """An edge-triggered flip-flop (74HC), powered like a ``Gate``: inputs read 1 above half the
+    supply; on each rising edge of ``clk`` the state takes ``next(...)`` of the inputs as they are;
+    the outputs ``q`` and ``nq`` are sources of ``VDD`` or 0 V behind ``R_OUT``."""
+
+    prefix = "U"
+    right = ("q", "nq")
+    VDD, R_OUT = Gate.VDD, Gate.R_OUT
+    inputs: tuple[str, ...] = ()  # besides clk
+
+    def next(self, q, *levels):
+        raise NotImplementedError
+
+    def build(self, label, V, param, ctx):
+        _paper_only(label, ctx)
+        level = lambda v: sp.Piecewise((1, v > self.VDD / 2), (0, True))  # noqa: E731
+        q, clk = sp.Symbol(f"{label}_q"), sp.Symbol(f"{label}_clk")
+        u = sp.Symbol(f"U_{label}_q")
+        rising = sp.And(V["clk"] > self.VDD / 2, clk < sp.Rational(1, 2))
+        inflow = {p: GMIN * V[p] for p in self.left}
+        inflow |= {"q": (V["q"] - self.VDD * q) / self.R_OUT, "nq": (V["nq"] - self.VDD * (1 - q)) / self.R_OUT}
+        model = Model(inflow, [Law(u - self.VDD * q, DeviceModel(sp.Symbol(label)))], {"U_q": u})
+        after = self.next(q, *(level(V[p]) for p in self.inputs))
+        model.states[q] = (sp.Piecewise((after, rising), (q, True)), 0.0, None)
+        model.states[clk] = (level(V["clk"]), 0.0, None)
+        return model
+
+
+class DFlipFlop(FlipFlop):
+    """D flip-flop (a half of a 74HC74): on a rising edge q takes d."""
+
+    left = ("d", "clk")
+    inputs = ("d",)
+
+    def next(self, q, d):
+        return d
+
+
+class JKFlipFlop(FlipFlop):
+    """JK flip-flop (74HC109-like): on a rising edge j sets, k resets, both toggle, neither holds.
+    With j and k tied together it is a T flip-flop."""
+
+    left = ("j", "clk", "k")
+    inputs = ("j", "k")
+
+    def next(self, q, j, k):
+        return j * (1 - q) + (1 - k) * q
+
+
+class Counter(NoValue):
+    """A 4-bit synchronous binary counter (74HC161 without its load and enable): one up on each
+    rising edge of ``clk``, 15 then 0; ``q0`` the lowest bit. ``reset`` high holds it at 0."""
+
+    prefix = "U"
+    left, right = ("clk", "reset"), ("q0", "q1", "q2", "q3")
+    VDD, R_OUT = Gate.VDD, Gate.R_OUT
+
+    def build(self, label, V, param, ctx):
+        _paper_only(label, ctx)
+        level = lambda v: sp.Piecewise((1, v > self.VDD / 2), (0, True))  # noqa: E731
+        bits = [sp.Symbol(f"{label}_q{k}") for k in range(4)]
+        clk = sp.Symbol(f"{label}_clk")
+        rising = sp.Piecewise((1, sp.And(V["clk"] > self.VDD / 2, clk < sp.Rational(1, 2))), (0, True))
+        keep = 1 - level(V["reset"])
+        count = sp.Symbol(f"U_{label}_count")
+        laws = [Law(count - sum(b * 2**k for k, b in enumerate(bits)), DeviceModel(sp.Symbol(label)))]
+        inflow = {"clk": GMIN * V["clk"], "reset": GMIN * V["reset"]}
+        inflow |= {f"q{k}": (V[f"q{k}"] - self.VDD * b) / self.R_OUT for k, b in enumerate(bits)}
+        model = Model(inflow, laws, {"count": count})
+        carry = rising  # a bit toggles when every lower one is 1
+        for b in bits:
+            model.states[b] = (keep * (b + carry - 2 * b * carry), 0.0, None)
+            carry = carry * b
+        model.states[clk] = (level(V["clk"]), 0.0, None)
+        return model
+
+
 # ------------------------------------------------------------------ transistors
 
 

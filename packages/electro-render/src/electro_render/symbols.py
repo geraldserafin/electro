@@ -162,6 +162,17 @@ SYMBOLS: dict[str, str] = {
     '<g class="pins"><text x="68" y="6" text-anchor="end">NC</text><text x="106" y="27">NO</text><text x="86" y="76">COM</text></g>',
     "not_gate": '<path d="M0 0H22M60 0H80"/><rect x="22" y="-16" width="28" height="32"/><circle cx="54" r="4"/>'
     '<text class="chip" x="36" y="5" text-anchor="middle">1</text>',
+    # flip-flops and a counter: a box, the clock input marked with a wedge, Q̄ the inverted output
+    "dff": '<path d="M0 0H16M0 40H16M64 0H80M64 40H80"/><rect x="16" y="-16" width="48" height="72"/>'
+    '<path d="M16 33L24 40L16 47"/><g class="pins"><text x="20" y="4">D</text><text x="60" y="4" text-anchor="end">Q</text>'
+    '<text x="60" y="44" text-anchor="end">Q̄</text></g>',
+    "jkff": '<path d="M0 0H16M0 40H16M0 80H16M64 0H80M64 80H80"/><rect x="16" y="-16" width="48" height="112"/>'
+    '<path d="M16 33L24 40L16 47"/><g class="pins"><text x="20" y="4">J</text><text x="20" y="84">K</text>'
+    '<text x="60" y="4" text-anchor="end">Q</text><text x="60" y="84" text-anchor="end">Q̄</text></g>',
+    "counter": '<path d="M0 0H16M0 60H16M64 0H80M64 20H80M64 40H80M64 60H80"/><rect x="16" y="-16" width="48" height="92"/>'
+    '<path d="M16 -7L24 0L16 7"/><g class="pins"><text x="20" y="64">R</text><text x="60" y="4" text-anchor="end">Q0</text>'
+    '<text x="60" y="24" text-anchor="end">Q1</text><text x="60" y="44" text-anchor="end">Q2</text>'
+    '<text x="60" y="64" text-anchor="end">Q3</text></g>',
     "and_gate": '<path d="M0 0H16M0 40H16"/><rect x="16" y="-12" width="36" height="64"/><path d="M52 20H80"/><text class="chip" x="34" y="25" text-anchor="middle">&amp;</text>',
     "nand_gate": '<path d="M0 0H16M0 40H16"/><rect x="16" y="-12" width="36" height="64"/><circle cx="56" cy="20" r="4"/><path d="M60 20H80"/><text class="chip" x="34" y="25" text-anchor="middle">&amp;</text>',
     "or_gate": '<path d="M0 0H16M0 40H16"/><rect x="16" y="-12" width="36" height="64"/><path d="M52 20H80"/><text class="chip" x="34" y="25" text-anchor="middle">≥1</text>',

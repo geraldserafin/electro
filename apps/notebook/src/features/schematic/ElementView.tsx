@@ -129,6 +129,8 @@ function leads(kind: string, symbolPins: number[][]): number[][] {
       [0, 0],
       [0, 27],
     ]; // its ends: the body's gradient
+  if (kind === "dff" || kind === "jkff" || kind === "counter")
+    return symbolPins.map(([x]) => (x === 0 ? [16, 0] : [-16, 0]));
   const xs = symbolPins.map((p) => p[0]),
     ys = symbolPins.map((p) => p[1]);
   return symbolPins.map(([x, y]) =>
