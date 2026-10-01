@@ -183,6 +183,20 @@ class BadValue(Issue, ValueError):
 
 
 @issue
+class BadExpression(Issue, ValueError):
+    """Text that is not an expression of quantities (examples of ones that are: 'I_R_1', 'U_C_1 / E_1')."""
+
+    expression: str
+
+
+@issue
+class BadName(Issue, ValueError):
+    """A label or a node name with more than letters, digits and _ in it (R1, V_out, 3)."""
+
+    name: str
+
+
+@issue
 class NotAValue(Issue, TypeError):
     """An object of a type no value is made of."""
 

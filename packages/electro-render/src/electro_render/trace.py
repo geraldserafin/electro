@@ -28,7 +28,7 @@ def _unit(unit: str) -> str:
 
 def value(v, unit: str = "") -> str:
     """A value with its unit, in engineering notation: ``500\\,\\mathrm{mA}``."""
-    v = sp.sympify(v)
+    v = sp.sympify(v, strict=True)
     if v.free_symbols:
         return expr(v) + (_unit(unit) if unit else "")
     text = fmt(v, unit)
@@ -45,7 +45,7 @@ def value_text(text: str) -> str:
 
 def expr(e, values: dict | None = None) -> str:
     """LaTeX of an expression; with ``values``, known symbols are shown as numbers."""
-    e = sp.sympify(e)
+    e = sp.sympify(e, strict=True)
     names = {s: name(s.name) for s in e.free_symbols}
     for s, v in (values or {}).items():
         if s in names and v.is_number and v.is_real:

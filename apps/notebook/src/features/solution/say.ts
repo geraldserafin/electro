@@ -97,6 +97,10 @@ export function sayer(t: TFunction<"solution">, lang: string) {
         return t("issue.NoSuchElement", { label: code(i.label), available: maths(i.available) });
       case "DuplicateLabel":
         return t("issue.DuplicateLabel", { label: math(i.label) });
+      case "BadExpression":
+        return t("issue.BadExpression", { expression: code(i.expression) });
+      case "BadName":
+        return t("issue.BadName", { name: code(i.name) });
       case "BadValue":
       case "NotAValue":
       case "NotACircuit":

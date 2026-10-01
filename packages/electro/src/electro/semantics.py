@@ -7,6 +7,7 @@ and currents. Laws: component laws, ``U = ΔV`` and Kirchhoff's current law per 
 
 from __future__ import annotations
 
+import re
 from collections import Counter
 from dataclasses import dataclass, field
 
@@ -14,7 +15,7 @@ import sympy as sp
 
 from .circuit import GROUND, Circuit, Netlist
 from .components import Component, Context, Law, Model
-from .issues import DuplicateLabel, NoSuchElement, NoSuchQuantity
+from .issues import BadName, DuplicateLabel, NoSuchElement, NoSuchQuantity
 from .reasons import KirchhoffCurrent, Terminal
 from .values import UNKNOWN
 
@@ -75,8 +76,16 @@ def _loose(name: str) -> str:
     return name.replace("_", "")
 
 
+def _named(name: str, *, label: bool) -> str:
+    """A label (an identifier: R1, V_out) or a node name (also 3, as SPICE has them): nothing else
+    gets into the symbols, the code generated from them or the formulas drawn (no injection)."""
+    if not isinstance(name, str) or not (name.isidentifier() if label else re.fullmatch(r"\w+", name)):
+        raise BadName(str(name))
+    return name
+
+
 def _labels(parts) -> list[str]:
-    explicit = [c.label for c, _ in parts if c.label]
+    explicit = [_named(c.label, label=True) for c, _ in parts if c.label]
     dupes = [name for name, n in Counter(explicit).items() if n > 1]
     if dupes:
         raise DuplicateLabel(sp.Symbol(dupes[0]))
@@ -96,7 +105,7 @@ def _labels(parts) -> list[str]:
 
 
 def _node_names(net: Netlist) -> list[str]:
-    named = dict(net.labels)
+    named = {n: _named(name, label=False) for n, name in net.labels}
     taken, k, out = set(named.values()), 0, []
     for n in range(net.size):
         if n in named:

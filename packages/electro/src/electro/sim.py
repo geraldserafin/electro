@@ -129,7 +129,7 @@ class _Py(PythonCodePrinter):
 def _code(targets: list[tuple[str, sp.Expr]], xs: list[sp.Symbol], ps: list[sp.Symbol]) -> dict[str, str]:
     """``target = expr`` statements in Python and JavaScript, common subexpressions computed once."""
     rename = {s: sp.Symbol(f"x{i}") for i, s in enumerate(xs)} | {s: sp.Symbol(f"p{i}") for i, s in enumerate(ps)}
-    exprs = [sp.sympify(e).xreplace(rename) for _, e in targets]
+    exprs = [sp.sympify(e, strict=True).xreplace(rename) for _, e in targets]
     common, reduced = sp.cse(exprs, symbols=sp.numbered_symbols("t"))
     used = set().union(*(e.free_symbols for e in reduced), *(e.free_symbols for _, e in common)) if exprs else set()
     loads = [
@@ -214,7 +214,9 @@ def compile_sim(circuit: Circuit) -> Program:
     flowing: list[tuple[str, sp.Expr]] = []
     flows: dict[str, list[int]] = {}
     for label, placed in system.parts.items():
-        currents = [sp.sympify(placed.model.inflow.get(t, 0)).xreplace(known) for t in placed.component.terminals]
+        currents = [
+            sp.sympify(placed.model.inflow.get(t, 0), strict=True).xreplace(known) for t in placed.component.terminals
+        ]
         if any(c.free_symbols - allowed for c in currents):
             continue  # (not all of it is known here: no dots through it)
         flows[label] = list(range(len(flowing), len(flowing) + len(currents)))

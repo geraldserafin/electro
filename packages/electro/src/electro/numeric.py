@@ -16,6 +16,7 @@ from .components import Context
 from .issues import NoSystemSolution, NotLinear, Undetermined
 from .semantics import compile_circuit
 from .solver import _resolve
+from .values import expression
 
 
 class LinearSystem:
@@ -55,7 +56,7 @@ class LinearSystem:
 
     def value(self, expr, x: dict[sp.Symbol, complex], values=()) -> complex:
         """A quantity (``"V_A"``, ``"I_R_1"``, ``"U_C_1 / E_1"``) at a solution ``x`` from ``solve``."""
-        e = _resolve(sp.sympify(expr), self.system) if isinstance(expr, str) else expr
+        e = _resolve(expression(expr), self.system) if isinstance(expr, str) else expr
         e = e.xreplace(dict(zip(self.params, values))).xreplace(self.known).xreplace(x)
         return complex(e)
 

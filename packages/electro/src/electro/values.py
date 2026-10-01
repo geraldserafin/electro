@@ -2,13 +2,14 @@
 
 from __future__ import annotations
 
+import ast
 import re
 from decimal import Decimal
 from fractions import Fraction
 
 import sympy as sp
 
-from .issues import BadValue, NotAValue
+from .issues import BadExpression, BadValue, NotAValue
 
 PREFIXES = {
     "p": sp.Rational(1, 10**12),
@@ -87,7 +88,7 @@ def to_text(value) -> str | None:
     """Inverse of ``parse`` for storage (e.g. JSON): exact, and readable where possible."""
     if value is None or value is UNKNOWN:
         return None
-    value = sp.sympify(value)
+    value = parse(value) if isinstance(value, str) else sp.sympify(value, strict=True)
     if isinstance(value, sp.Symbol):
         return value.name
     if isinstance(value, sp.Rational) and not isinstance(value, sp.Integer):
@@ -136,7 +137,7 @@ def fmt(value, unit: str = "") -> str:
     """Human-friendly engineering notation: 0.5 -> '500 mA', 4700 -> '4.7 kΩ'."""
     if value is None:
         return "—"
-    value = sp.nsimplify(value) if isinstance(value, (int, float)) else sp.sympify(value)
+    value = sp.nsimplify(value) if isinstance(value, (int, float)) else sp.sympify(value, strict=True)
     if value.free_symbols:
         text = sp.sstr(sp.simplify(value))
         return f"{text} {unit}".strip() if unit else text
@@ -147,3 +148,43 @@ def fmt(value, unit: str = "") -> str:
 
     magnitude, phase = cmath.polar(value)
     return f"{_eng_real(magnitude, unit)} ∠ {phase * 180 / cmath.pi:.4g}°"
+
+
+_FUNCTIONS = {"sqrt": sp.sqrt, "abs": sp.Abs, "exp": sp.exp, "log": sp.log, "sin": sp.sin, "cos": sp.cos,
+              "tan": sp.tan, "atan": sp.atan, "re": sp.re, "im": sp.im, "arg": sp.arg}  # fmt: skip
+_OPERATORS = {ast.Add: sp.Add, ast.Sub: lambda a, b: a - b, ast.Mult: sp.Mul, ast.Div: lambda a, b: a / b}
+
+
+def expression(text: str) -> sp.Expr:
+    """``"U_C_1 / E_1"``, ``"sqrt(P_R_1 * R_1)"`` → a sympy expression of plain symbols, read without
+    ``eval``: only names, numbers, + − · / ** and a few functions (sympify would run any Python)."""
+
+    def walk(node):
+        match node:
+            case ast.Name(id="pi"):
+                return sp.pi
+            case ast.Name(id=name):
+                return sp.Symbol(name)
+            case ast.Constant(value=bool()):
+                raise BadExpression(text)
+            case ast.Constant(value=int() | float() | complex() as number):
+                return parse(number)
+            case ast.UnaryOp(op=ast.USub(), operand=x):
+                return -walk(x)
+            case ast.UnaryOp(op=ast.UAdd(), operand=x):
+                return walk(x)
+            case ast.BinOp(op=ast.Pow(), left=a, right=ast.Constant(value=int() | float() as n)) if abs(n) <= 10:
+                return walk(a) ** parse(n)
+            case ast.BinOp(op=op, left=a, right=b) if type(op) in _OPERATORS:
+                return _OPERATORS[type(op)](walk(a), walk(b))
+            case ast.Call(func=ast.Name(id=name), args=[x], keywords=[]) if name in _FUNCTIONS:
+                return _FUNCTIONS[name](walk(x))
+        raise BadExpression(text)
+
+    if not isinstance(text, str) or len(text) > 500:
+        raise BadExpression(str(text)[:500])
+    try:
+        tree = ast.parse(text.strip(), mode="eval")
+    except (SyntaxError, RecursionError, MemoryError):
+        raise BadExpression(text) from None
+    return walk(tree.body)

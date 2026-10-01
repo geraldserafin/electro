@@ -74,6 +74,9 @@ export const pl = {
     DuplicateLabel: "Etykieta {{label}} użyta więcej niż raz w obwodzie.",
     BadValue: "Nie rozumiem wartości {{value}}. Przykłady: `10`, `4.7`, `'4.7k'`, `'4k7'`, `'0,5 A'`, `'R'` (symbol).",
     NotAValue: "Niepoprawna wartość: {{value}}.",
+    BadExpression:
+      "Nie rozumiem wyrażenia {{expression}}. Przykłady: `'I_R_1'`, `'U_C_1 / E_1'`, `'sqrt(P_R_1 * R_1)'`.",
+    BadName: "Nazwa {{name}} może mieć tylko litery, cyfry i _ (np. `R1`, `V_out`).",
     NotACircuit: "Oczekiwano obwodu, dostałem {{value}}.",
     SeriesMismatch:
       "Nie mogę połączyć szeregowo {{left}} z {{right}}: {{outputs}} zacisk(ów) wyjściowych vs {{inputs}} wejściowych.",
@@ -189,6 +192,9 @@ export const en: typeof pl = {
     NoSuchQuantity: "There is no quantity {{name}} in this circuit. Available: {{available}}.",
     NoSuchElement: "There is no element {{label}}. Elements: {{available}}.",
     DuplicateLabel: "The label {{label}} is used more than once in the circuit.",
+    BadExpression:
+      "The expression {{expression}} is not understood. Examples: `'I_R_1'`, `'U_C_1 / E_1'`, `'sqrt(P_R_1 * R_1)'`.",
+    BadName: "The name {{name}} may have only letters, digits and _ (e.g. `R1`, `V_out`).",
     BadValue:
       "The value {{value}} is not understood. Examples: `10`, `4.7`, `'4.7k'`, `'4k7'`, `'0,5 A'`, `'R'` (a symbol).",
     NotAValue: "Not a value: {{value}}.",

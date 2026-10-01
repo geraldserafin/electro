@@ -89,7 +89,7 @@ class Thevenin:
     Z: sp.Expr
 
     def __repr__(self):
-        unit = "Ω" if not sp.sympify(self.Z).has(sp.I) else "Ω (Z)"
+        unit = "Ω" if not sp.sympify(self.Z, strict=True).has(sp.I) else "Ω (Z)"
         return f"E_th = {fmt(self.E, 'V')}, R_th = {fmt(self.Z, unit)}"
 
 

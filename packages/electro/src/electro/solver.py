@@ -36,7 +36,7 @@ from .issues import (
 )
 from .reasons import Given
 from .semantics import KIND_ORDER, Placed, System, compile_circuit
-from .values import fmt, parse
+from .values import expression, fmt, parse
 
 # --------------------------------------------------------------------------- references
 
@@ -232,7 +232,7 @@ class Solution:
 
     def __call__(self, expr):
         """Evaluate any expression of references, e.g. ``sol(U("R1") / I("R1"))``."""
-        expr = _resolve(sp.sympify(expr), self.system)
+        expr = _resolve(expression(expr) if isinstance(expr, str) else sp.sympify(expr, strict=True), self.system)
         result = sp.simplify(expr.xreplace(self.values))
         unknown = result.free_symbols & set(self.missing)
         if unknown:
@@ -316,7 +316,10 @@ def _given_laws(equations, given, system) -> list[Law]:
     items: list[tuple[sp.Expr, sp.Expr]] = []
     for eq in equations:
         if isinstance(eq, dict):
-            items += [(sp.sympify(k) if not isinstance(k, str) else sp.Symbol(k), parse(v)) for k, v in eq.items()]
+            items += [
+                (sp.sympify(k, strict=True) if not isinstance(k, str) else sp.Symbol(k), parse(v))
+                for k, v in eq.items()
+            ]
         elif isinstance(eq, sp.Equality):
             items.append((eq.lhs, eq.rhs))
         else:

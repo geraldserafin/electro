@@ -36,7 +36,7 @@ def to_spice(c: Circuit, title: str = "electro") -> str:
         def ref(letter: str, plain=plain) -> str:  # R_1 → R1 (not RR1), E_1 → VE1
             return plain if plain[:1].upper() == letter else letter + plain
 
-        if x.has_value and sp.sympify(x.value).free_symbols:  # unknown, or a symbol: SPICE takes numbers
+        if x.has_value and sp.sympify(x.value, strict=True).free_symbols:  # unknown, or a symbol: SPICE takes numbers
             raise NoSpice(label)
         value = x.value if x.has_value else None
         if isinstance(x, dev.SquareSource):

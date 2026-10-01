@@ -85,6 +85,8 @@ export type Issue =
   | { type: "NoSuchElement"; label: string; available: Tex[] }
   | { type: "DuplicateLabel"; label: Tex }
   | { type: "BadValue" | "NotAValue" | "NotACircuit"; value: string }
+  | { type: "BadExpression"; expression: string }
+  | { type: "BadName"; name: string }
   | { type: "SeriesMismatch"; left: string; right: string; outputs: number; inputs: number }
   | { type: "ParallelMismatch"; first: string; first_shape: string; other: string; other_shape: string }
   | { type: "ShuntNeedsOneToOne"; part: string; shape: string }
