@@ -70,8 +70,12 @@ export function LibraryPanel({
     <Panel
       role="complementary"
       aria-label={t("library.label")}
-      className="top-15 left-3 bottom-16 z-6 w-80 max-w-[calc(100%-24px)] gap-3"
+      // (a phone: a sheet from the bottom, as an element's panel)
+      className="top-15 left-3 bottom-16 z-6 w-80 max-w-[calc(100%-24px)] gap-3 animate-panel-in motion-reduce:animate-none
+                 max-sm:top-auto max-sm:inset-x-0 max-sm:bottom-0 max-sm:w-auto max-sm:max-w-none max-sm:h-[75%] max-sm:pt-2
+                 max-sm:rounded-b-none max-sm:shadow-[0_-4px_16px_rgb(0_0_0/0.12)] max-sm:animate-sheet-in"
     >
+      <span aria-hidden className="hidden max-sm:block flex-none self-center w-9 h-1 rounded-full bg-line" />
       <PanelHead caption={t("library.title")} onClose={() => onClose()} closeLabel={t("library.closeTitle")} />
       <label
         className="flex flex-none items-center gap-2 px-2.5 h-9 rounded-lg bg-hover text-faint

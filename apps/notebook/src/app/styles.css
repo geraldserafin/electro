@@ -127,6 +127,23 @@
   }
 }
 
+/* a board's panel coming in: on a phone a sheet sliding up from the bottom, else coming forward */
+@theme {
+  --animate-sheet-in: sheet-in 0.28s cubic-bezier(0.2, 0.9, 0.25, 1) both;
+  --animate-panel-in: panel-in 0.18s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  @keyframes sheet-in {
+    from {
+      transform: translateY(100%);
+    }
+  }
+  @keyframes panel-in {
+    from {
+      opacity: 0;
+      transform: translateY(6px) scale(0.98);
+    }
+  }
+}
+
 /* a dialog coming forward, and going back: its panel, its backdrop leaving */
 @theme {
   --animate-dialog-in: dialog-in 0.22s cubic-bezier(0.2, 0.8, 0.2, 1) both;

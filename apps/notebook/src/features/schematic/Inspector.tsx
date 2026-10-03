@@ -2,7 +2,7 @@
 // label, its value (or a meter's reading), what to do with it. Running: only what works as an input (a
 // potentiometer's position, a sensor's reading). (A wire or many things selected: no panel — the keys,
 // or the bin beside, do what there is to do.)
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { cn } from "@/shared/lib/cn";
 import type { ElementData } from "@/shared/model/types";
@@ -19,8 +19,8 @@ export type Selection =
 
 // (a phone: a sheet from the bottom, the drawing above it in view)
 const place =
-  "top-15 right-3 w-66 max-h-[calc(100%-8rem)] overflow-y-auto text-[14px] " +
-  "max-sm:top-auto max-sm:inset-x-0 max-sm:bottom-0 max-sm:z-6 max-sm:w-auto max-sm:max-h-[45%] max-sm:rounded-b-none max-sm:pt-2 max-sm:shadow-[0_-4px_16px_rgb(0_0_0/0.12)]";
+  "top-15 right-3 w-66 max-h-[calc(100%-8rem)] overflow-y-auto text-[14px] animate-panel-in motion-reduce:animate-none " +
+  "max-sm:top-auto max-sm:inset-x-0 max-sm:bottom-0 max-sm:z-6 max-sm:w-auto max-sm:max-h-[45%] max-sm:rounded-b-none max-sm:pt-2 max-sm:shadow-[0_-4px_16px_rgb(0_0_0/0.12)] max-sm:animate-sheet-in";
 
 export function Inspector({
   element,
@@ -41,6 +41,7 @@ export function Inspector({
 }) {
   const { t } = useTranslation("schematic");
   const [id, setId] = useState(element?.id ?? "");
+  useEffect(() => setId(element?.id ?? ""), [element?.id]); // (another one picked: the panel stays, its label anew)
   if (!element) return null;
   const info = kindInfo(element.kind);
   const valueName = info?.meter

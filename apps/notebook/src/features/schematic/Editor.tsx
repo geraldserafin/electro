@@ -210,6 +210,16 @@ export function SchematicEditor({
     viewRef,
     kept: camera,
     inUse: active || full,
+    // (an element selected: two fingers turning it turn it, a quarter at a time)
+    onTwist: (dir) => !live && !viewOnly && rotateSelected(dir),
+    // (two fingers: the drawing as it was before the first one touched it — no drag, no wire, no box)
+    onPinch: () => {
+      const g = held.current;
+      held.current = null;
+      setGesture(null);
+      if (g && "snapshot" in g && g.moved) onChange(g.snapshot);
+      pan.current = null;
+    },
   });
   const { commit, undo, redo } = useHistory(value, onChange);
   const pan = useRef<{ x: number; y: number; cam: Camera; moved: boolean; click: boolean; k: number } | null>(null);
@@ -269,9 +279,10 @@ export function SchematicEditor({
    * off their wires (shown red, reconnect by dragging); after 180° they land back on the
    * same wire ends, swapped — the element is simply reversed (e.g. a source's polarity).
    */
-  const rotateSelected = () => {
+  /** A quarter turn, clockwise (or back, ``-1``). */
+  const rotateSelected = (dir: 1 | -1 = 1) => {
     if (!selectedElement) return;
-    const rotation = (selectedElement.rotation + 90) % 360;
+    const rotation = (selectedElement.rotation + 360 + 90 * dir) % 360;
     const at = rotatedAbout(selectedElement, library, rotation);
     commit({
       ...value,
@@ -1067,7 +1078,6 @@ export function SchematicEditor({
         )}
       {(live ? isAdjustable(selectedKind ?? "") && !probed : !viewOnly && selectedElement && inspect) && (
         <Inspector
-          key={selectedElement?.id}
           element={selectedElement}
           live={!!live}
           taken={value.elements.map((e) => e.id)}
@@ -1077,7 +1087,7 @@ export function SchematicEditor({
             commit({ ...value, elements: value.elements.map((e) => (e.id === selectedElement.id ? { ...e, id } : e)) });
             setSelection({ type: "element", id });
           }}
-          onRotate={rotateSelected}
+          onRotate={() => rotateSelected()}
           onRemove={removeSelected}
         />
       )}

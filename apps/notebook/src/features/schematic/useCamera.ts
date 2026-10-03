@@ -22,6 +22,8 @@ export function useCamera({
   kept,
   inUse,
   inset = 0,
+  onTwist,
+  onPinch,
 }: {
   value: SchematicData;
   library: SymbolLibrary;
@@ -29,6 +31,8 @@ export function useCamera({
   kept?: { current: Camera | null }; // where the view was: kept there while the editor is away
   inUse: boolean; // the board was clicked (or is full screen): the wheel pans it, not the page
   inset?: number; // px of the board's top under a bar laid over it: "fit" centres in what is left
+  onTwist?: (dir: 1 | -1) => void; // two fingers turned a quarter turn (past an eighth; 1: clockwise)
+  onPinch?: () => void; // a second finger down: what the first one began is not to be (a drag, a wire)
 }) {
   const G = library.grid;
   const [cam, setCam] = useState<Camera>(() => kept?.current ?? startCamera(value, library));
@@ -123,22 +127,34 @@ export function useCamera({
   // Caught on the way down (capture): the board's own handlers do not see the second finger
   const camNow = useRef(cam);
   camNow.current = cam;
+  const twist = useRef(onTwist);
+  twist.current = onTwist;
+  const pinchStart = useRef(onPinch);
+  pinchStart.current = onPinch;
   useEffect(() => {
     const el = viewRef.current;
     if (!el) return;
     const touches = new Map<number, { x: number; y: number }>();
-    let pinch: { d: number; x: number; y: number; cam: Camera } | null = null;
+    let pinch: { d: number; x: number; y: number; a: number; cam: Camera } | null = null;
     let pinched = false; // till the last finger is up: the one left does not pan from where it started
     const between = () => {
       const [a, b] = [...touches.values()];
-      return { d: Math.hypot(a.x - b.x, a.y - b.y) || 1, x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
+      return {
+        d: Math.hypot(a.x - b.x, a.y - b.y) || 1,
+        x: (a.x + b.x) / 2,
+        y: (a.y + b.y) / 2,
+        a: Math.atan2(b.y - a.y, b.x - a.x), // the line between them: turned, a twist
+      };
     };
     const down = (event: PointerEvent) => {
       if (event.pointerType !== "touch") return;
       touches.set(event.pointerId, { x: event.clientX, y: event.clientY });
       if (touches.size < 2) return;
       event.stopPropagation();
-      if (touches.size === 2) pinch = { ...between(), cam: camNow.current };
+      if (touches.size === 2) {
+        pinch = { ...between(), cam: camNow.current };
+        pinchStart.current?.();
+      }
       pinched = true;
     };
     const move = (event: PointerEvent) => {
@@ -147,6 +163,13 @@ export function useCamera({
       if (pinched) event.stopPropagation();
       if (!pinch || touches.size !== 2) return;
       const now = between();
+      // turned past an eighth of a turn: a quarter turn that way (the next one another quarter on)
+      const turned = Math.atan2(Math.sin(now.a - pinch.a), Math.cos(now.a - pinch.a));
+      if (Math.abs(turned) >= Math.PI / 4) {
+        const dir = turned > 0 ? 1 : -1;
+        pinch.a += (dir * Math.PI) / 2;
+        twist.current?.(dir);
+      }
       const rect = el.getBoundingClientRect();
       const k = screenScale();
       const { cam: from } = pinch;
