@@ -184,7 +184,7 @@ export function SchematicEditor({
       : library;
   const [selection, setSelection] = useState<Selection>(null);
   const [cursor, setCursor] = useState<Point | null>(null);
-  // a tap selects (a finger: the element's panel on the next tap, not over the board at once)
+  // a tap selects (a finger: the element's panel only from its ⋯, not over the board at once)
   const [inspect, setInspect] = useState(true);
   // the segment of a wire (not selected) under the pointer: a wire starts from it — its point shown
   const [over, setOver] = useState<{ wire: number; index: number } | null>(null);
@@ -464,8 +464,8 @@ export function SchematicEditor({
         moved: false,
       });
     else {
-      // a finger: its panel once it is tapped again (the first tap only picks it)
-      setInspect(event.pointerType !== "touch" || (selection?.type === "element" && selection.id === e.id));
+      // a finger only picks it (its panel from its own buttons' ⋯)
+      setInspect(event.pointerType !== "touch");
       setSelection({ type: "element", id: e.id });
       begin({ type: "move", id: e.id, start: toDrawing(event), origin: e.at, snapshot: value, moved: false });
     }
@@ -598,12 +598,12 @@ export function SchematicEditor({
     // a wire: from something to something (a pin, a wire) — let go on nothing, there is none
     const end = toGrid(event);
     if (g.type === "wire" && !same(end, g.from) && isConnectionPoint(value, library, end)) addWire(wireTo(g, end));
-    // a tap: what it was on, selected (an element as a tap on it: a finger's panel on the second)
+    // a tap: what it was on, selected (an element as a tap on it)
     if (g.type === "wire" && same(end, g.from)) {
       const tap = g.tap;
       if ("wire" in tap) setSelection({ type: "wire", index: tap.wire });
       else {
-        setInspect(event.pointerType !== "touch" || (selection?.type === "element" && selection.id === tap.id));
+        setInspect(event.pointerType !== "touch");
         setSelection({ type: "element", id: tap.id });
       }
     }
