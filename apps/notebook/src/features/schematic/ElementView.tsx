@@ -220,11 +220,21 @@ const ARROW_NAME: Record<number, [number, number, "middle" | "start" | "end"]> =
  *  way it points, its name beside it. */
 function ArrowView({ element: e, library, selected, result, onPointerDown }: Props) {
   const G = library.grid;
-  const length = arrowLength(e) * G;
-  const gap = e.between ? 9 : 0;
-  const [hx, hy] = rotate([length, 0], e.rotation);
-  const [x, y] = [e.at[0] * G, e.at[1] * G];
-  const [dx, dy, anchor] = ARROW_NAME[e.rotation] ?? ARROW_NAME[0]!;
+  // between two points of the circuit (a voltage across them): from one to the other, at any angle, short
+  // of both — a mark, not a wire between them; else along its rotation, as long as set
+  const ends = e.between?.length === 2 ? e.between : null;
+  const [x, y] = ends ? [ends[0]![0] * G, ends[0]![1] * G] : [e.at[0] * G, e.at[1] * G];
+  const [hx, hy] = ends
+    ? [(ends[1]![0] - ends[0]![0]) * G, (ends[1]![1] - ends[0]![1]) * G]
+    : rotate([arrowLength(e) * G, 0], e.rotation);
+  const length = Math.hypot(hx, hy) || 1;
+  const angle = ends ? (Math.atan2(hy, hx) * 180) / Math.PI : e.rotation;
+  const gap = ends ? 9 : 0;
+  // its name on its left as it points (above one pointing right)
+  const [lx, ly] = [hy / length, -hx / length];
+  const [dx, dy, anchor] = ends
+    ? ([lx * 10, ly * 10 + 4, lx < -0.3 ? "end" : lx > 0.3 ? "start" : "middle"] as const)
+    : (ARROW_NAME[e.rotation] ?? ARROW_NAME[0]!);
   const box = { x: Math.min(x, x + hx), y: Math.min(y, y + hy), width: Math.abs(hx), height: Math.abs(hy) };
   return (
     <g
@@ -239,9 +249,8 @@ function ArrowView({ element: e, library, selected, result, onPointerDown }: Pro
       )}
       <g
         className="w"
-        transform={`translate(${x} ${y}) rotate(${e.rotation})`}
+        transform={`translate(${x} ${y}) rotate(${angle})`}
         dangerouslySetInnerHTML={{
-          // (between two terminals: short of them at both ends — a mark, not a wire between them)
           __html: `<path d="M${gap} 0H${length - gap - 7}"/><path class="fill" d="M${length - gap} 0l-9 -4.5v9z"/>`,
         }}
       />

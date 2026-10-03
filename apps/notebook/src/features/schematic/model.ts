@@ -232,6 +232,7 @@ export const inTheWay = (sch: SchematicData): WireData[] => [
   ...sch.elements
     .filter((e) => isArrow(e.kind))
     .map((e) => {
+      if (e.between?.length === 2) return { points: [e.between[0]!, e.between[1]!] };
       const [dx, dy] = rotate([arrowLength(e), 0], e.rotation);
       return { points: [e.at, [e.at[0] + dx, e.at[1] + dy] as Point] };
     }),

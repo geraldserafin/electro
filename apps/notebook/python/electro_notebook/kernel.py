@@ -181,10 +181,8 @@ def _potentials(sch: Schematic):
     import sympy as sp
     from electro.circuit import GROUND
 
-    names = sch.node_names()
-
     def potential(p):
-        name = names.get(tuple(p))
+        name = sch.node_at(tuple(p))
         return sp.Integer(0) if name in (None, GROUND) else sp.Symbol(f"V_{name}")
 
     return potential
@@ -206,7 +204,7 @@ def simulate(schematic_json: str, data: str = "") -> str:
     with warnings.catch_warnings(record=True) as caught:
         warnings.simplefilter("always")
         try:
-            # a voltage between two terminals, given: V_head − V_tail = its value
+            # a voltage between two points, given: V_head − V_tail = its value
             between = sch.voltages()
             potential = _potentials(sch) if between else None
             equations = [
@@ -253,7 +251,7 @@ def simulate(schematic_json: str, data: str = "") -> str:
                 "P": None,
                 "reversed": False,
             }
-    # a voltage arrow between two terminals: what it comes to (or was given)
+    # a voltage arrow between two points: what it comes to (or was given)
     for a, tail, head in between:
         v = solution(potential(head) - potential(tail))
         if v is not None and v.is_number:
@@ -438,6 +436,8 @@ def from_drawing(drawing_json: str, strict: bool = False) -> str:
         if scale > 1:
             for el in data["elements"] + arrows:
                 el["at"] = [[float(x) * scale, float(y) * scale] for x, y in el["at"]]
+                if el.get("between"):
+                    el["between"] = [[float(x) * scale, float(y) * scale] for x, y in el["between"]]
             data["wires"] = [
                 [[float(x) * scale, float(y) * scale] for x, y in polyline(w)] for w in data.get("wires") or []
             ]
@@ -462,7 +462,7 @@ def from_drawing(drawing_json: str, strict: bool = False) -> str:
                     str(el.get("text") or ""),
                     str(el["of"]) if el.get("of") else None,
                     length if el["kind"] == "voltage_arrow" else None,
-                    [str(x) for x in el["between"]][:2] if el.get("between") else None,
+                    [list(point(q)) for q in el["between"]][:2] if el.get("between") else None,
                 )
             )
         for el in data["elements"]:

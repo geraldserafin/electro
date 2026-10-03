@@ -13,7 +13,7 @@ export interface ElementData {
   text: string | null;
   of?: string | null; // an arrow's: the element whose current or voltage it is (its value then a given)
   span?: number | null; // a voltage arrow's length, grid units
-  between?: string[] | null; // a voltage arrow's between two terminals (ids): from the first to the second
+  between?: Point[] | null; // a voltage arrow's between two points of the circuit: its tail's, its head's
 }
 
 export interface WireData {

@@ -60,7 +60,7 @@ own circuit is split there: part a)'s text, its circuit, part b)'s text, its cir
 under a heading of its own before it (a "Task" whose circuit is the "Problem" above's): values the text gives
 that the picture does not show on the elements, unknowns null. Its arrows of currents and voltages
 (I_2 by R2, U_1 beside R1) drawn too, as the picture marks them, each "of" its element (a voltage between two
-open circles: "between" those terminals), with the value
+points: "between" them), with the value
 the problem gives for it (I_2 = 2 A) — and an arrow for a given the picture has none for (the voltage
 across R_5 = 125 V: a voltage arrow by R5), so the run button solves the problem. A drawing that is not a circuit, a page's
 header or footer: left out. Do all of it — every page to its end.
@@ -127,7 +127,7 @@ it is checked against that part of the picture, and mended, before it comes back
                 value: { type: "string" },
                 text: { type: "string" },
                 of: { type: "string" },
-                between: { type: "array", items: { type: "string" } },
+                between: { type: "array", items: { type: "array", items: { type: "number" } } },
                 nodes: { type: "array", items: { type: "string" } },
                 at: { type: "array", items: { type: "array", items: { type: "number" } } },
               },

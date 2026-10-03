@@ -367,9 +367,3 @@ export const NewChat = () => (
     <path d="M12 20h8M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z" />
   </Icon>
 );
-export const TerminalIcon = () => (
-  <Icon>
-    <path d="M2.5 12h6M15.5 12h6" />
-    <circle cx="12" cy="12" r="3.5" />
-  </Icon>
-);

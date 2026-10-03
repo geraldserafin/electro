@@ -250,7 +250,7 @@ class Element:
     )
     of: str | None = None  # an arrow's: the element whose current or voltage it is
     span: int | None = None  # a voltage arrow's: its length in grid units
-    between: list[str] | None = None  # a voltage arrow's between two terminals (ids): from the first to the second
+    between: list | None = None  # a voltage arrow's between two points of the drawing ([[x, y], [x, y]]): tail, head
 
     def __post_init__(self):
         self.at = tuple(self.at)
@@ -536,15 +536,24 @@ class Schematic:
         return out
 
     def voltages(self) -> list[tuple[Element, Point, Point]]:
-        """Its voltage arrows between two terminals: each, the point it is from (its tail's terminal) and
-        the one it points to (its head's) — the voltage V_head − V_tail."""
-        by_id = {e.id: e for e in self.elements}
-        out = []
-        for a in self.elements:
-            ends = [by_id.get(i) for i in (a.between or [])] if a.kind == "voltage_arrow" else []
-            if len(ends) == 2 and all(ends):
-                out.append((a, ends[0].pins()[0], ends[1].pins()[0]))
-        return out
+        """Its voltage arrows between two points (on wires or pins): each, the point it is from (its tail)
+        and the one it points to (its head) — the voltage V_head − V_tail."""
+        return [
+            (a, tuple(a.between[0]), tuple(a.between[1]))
+            for a in self.elements
+            if a.kind == "voltage_arrow" and a.between and len(a.between) == 2
+        ]
+
+    def node_at(self, p: Point) -> str | None:
+        """The name of the node ``p`` is on in ``to_circuit()`` (a pin, a wire's point or anywhere along it);
+        None: on nothing."""
+        names = self.node_names()
+        if p in names:
+            return names[p]
+        for w in self.wires:
+            if any(on_segment(p, a, b) for a, b in w.segments()):
+                return names.get(w.points[0])
+        return None
 
     def given(self) -> dict[str, str]:
         """What its arrows and net labels give (those with a value): the solver's data, ``{"U_R5": "125"}``."""

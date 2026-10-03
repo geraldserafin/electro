@@ -98,7 +98,6 @@ export const pl = {
     moveSegment: "Przeciągnij, żeby przesunąć ten odcinek",
     openPin: "Niepodłączony zacisk",
     drawWire: "Przeciągnij do innego zacisku albo przewodu, żeby je połączyć",
-    addTerminal: "Zacisk tutaj — przeciągnij z niego do innego, żeby dać napięcie między nimi",
   },
   view: {
     back: "Wróć do schematu",
@@ -345,7 +344,6 @@ export const en: typeof pl = {
     moveSegment: "Drag to move this segment",
     openPin: "Unconnected pin",
     drawWire: "Drag to another pin or wire to connect them",
-    addTerminal: "A terminal here — drag from it to another for the voltage between them",
   },
   view: {
     back: "Back to the schematic",

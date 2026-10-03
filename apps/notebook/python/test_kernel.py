@@ -365,21 +365,19 @@ def test_a_net_labels_value_is_its_nodes_potential_given_and_one_without_shows_i
     assert got["L1"]["value"] == "8 V" and got["L1"]["solved"]  # what the node came to
 
 
-def test_a_voltage_between_two_terminals_given_and_one_without_shows_it():
-    # E (unknown) with Rw 2 inside, terminals T1 (top) and T2 (bottom), a load of 18 outside them
+def test_a_voltage_between_two_points_given_and_one_without_shows_it():
+    # E (unknown) with Rw 2 inside, a load of 18 outside; U between the two wires' middles (6, 0), (6, 12)
     drawing = {
         "elements": [
             {"id": "E1", "kind": "voltage_source", "value": None, "nodes": ["0", "a"], "at": [[0, 12], [0, 8]]},
             {"id": "Rw", "kind": "resistor", "value": "2", "nodes": ["a", "T"], "at": [[0, 8], [0, 0]]},
-            {"id": "T1", "kind": "terminal", "nodes": ["T"], "at": [[4, 0]]},
-            {"id": "T2", "kind": "terminal", "nodes": ["0"], "at": [[4, 12]]},
             {"id": "R1", "kind": "resistor", "value": "18", "nodes": ["T", "0"], "at": [[10, 0], [10, 12]]},
         ],
         "wires": [[[0, 0], [10, 0]], [[0, 12], [10, 12]]],
     }
     sch = json.loads(kernel.from_drawing(json.dumps(drawing)))["schematic"]
     arrow = {"id": "U1", "kind": "voltage_arrow", "at": [6, 12], "rotation": 270, "value": "90", "text": "U"}
-    sch["elements"].append({**arrow, "between": ["T2", "T1"], "span": 12})
+    sch["elements"].append({**arrow, "between": [[6, 12], [6, 0]]})
     got = json.loads(kernel.simulate(json.dumps(sch)))["results"]
     assert got["E1"]["value"] == "100 V" and got["E1"]["solved"]  # U = 90 V on 18 Ω: 5 A, E = 90 + 5·2
     assert got["U1"]["value"] == "90 V" and not got["U1"]["solved"]
