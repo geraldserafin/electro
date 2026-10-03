@@ -78,13 +78,7 @@ export function FolderPage() {
       </Islands>
       {sharing && here && <ShareDialog item={here.folder} onClose={() => setSharing(false)} />}
       <div className="mx-auto max-w-310 px-8 max-sm:px-4 pt-21 pb-24">
-        {here && (
-          <Breadcrumbs
-            path={here.path}
-            current={here.folder.name || t("untitled")}
-            onDrop={(card, into) => void moveTo(card, into)}
-          />
-        )}
+        {here && <Breadcrumbs path={here.path} onDrop={(card, into) => void moveTo(card, into)} />}
         <div className="flex items-center gap-3 mb-5">
           {editing && here ? (
             <input

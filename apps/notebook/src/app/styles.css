@@ -59,6 +59,7 @@
   --color-board: var(--board);
   --color-island: var(--island);
   --color-white: #fff;
+  --color-scrim: var(--scrim);
 
   --font-sans: var(--sans);
   --font-mono: var(--mono);
@@ -121,6 +122,30 @@
   --animate-fade-in: fade-in 0.15s ease both;
   @keyframes fade-in {
     from {
+      opacity: 0;
+    }
+  }
+}
+
+/* a dialog coming forward, and going back: its panel, its backdrop leaving */
+@theme {
+  --animate-dialog-in: dialog-in 0.22s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  --animate-dialog-out: dialog-out 0.14s ease-in both;
+  --animate-fade-out: fade-out 0.14s ease-in both;
+  @keyframes dialog-in {
+    from {
+      opacity: 0;
+      transform: translateY(10px) scale(0.97);
+    }
+  }
+  @keyframes dialog-out {
+    to {
+      opacity: 0;
+      transform: translateY(6px) scale(0.98);
+    }
+  }
+  @keyframes fade-out {
+    to {
       opacity: 0;
     }
   }

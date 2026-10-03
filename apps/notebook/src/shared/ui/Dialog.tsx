@@ -1,6 +1,13 @@
-// A dialog over the page, dimmed behind it: a click beside it or Esc closes it.
-import { type ReactNode, useEffect } from "react";
+// A dialog over the page, the page dimmed and blurred behind it: it comes forward, and goes back
+// (a click beside it, Esc, or useDialogClose: closed once it has gone).
+import { createContext, type ReactNode, useCallback, useContext, useEffect, useState } from "react";
 import { cn } from "@/shared/lib/cn";
+
+const Closing = createContext<() => void>(() => {});
+/** Closing the dialog this is in, as a click beside it does: after it has gone back. */
+export const useDialogClose = () => useContext(Closing);
+
+const still = () => matchMedia("(prefers-reduced-motion: reduce)").matches;
 
 export function Dialog({
   label,
@@ -13,25 +20,38 @@ export function Dialog({
   className?: string;
   children: ReactNode;
 }) {
+  const [leaving, setLeaving] = useState(false);
+  const close = useCallback(() => (still() ? onClose() : setLeaving(true)), [onClose]);
   useEffect(() => {
-    const esc = (e: KeyboardEvent) => e.key === "Escape" && onClose();
+    const esc = (e: KeyboardEvent) => e.key === "Escape" && close();
     window.addEventListener("keydown", esc);
     return () => window.removeEventListener("keydown", esc);
-  }, [onClose]);
+  }, [close]);
   return (
-    <div className="fixed inset-0 z-100 grid place-items-center bg-black/25 p-4" onClick={onClose} data-keep-focus>
+    <Closing.Provider value={close}>
       <div
-        role="dialog"
-        aria-modal
-        aria-label={label}
         className={cn(
-          "grid gap-2 w-full max-w-110 max-h-[80vh] p-4 rounded-xl border border-line bg-paper shadow-menu",
-          className,
+          "fixed inset-0 z-100 grid place-items-center bg-scrim backdrop-blur-[3px] p-4",
+          leaving ? "animate-fade-out" : "animate-fade-in",
         )}
-        onClick={(e) => e.stopPropagation()}
+        onClick={close}
+        data-keep-focus
       >
-        {children}
+        <div
+          role="dialog"
+          aria-modal
+          aria-label={label}
+          className={cn(
+            "grid gap-2 w-full max-w-110 max-h-[80vh] p-4 rounded-xl border border-line bg-paper shadow-menu",
+            leaving ? "animate-dialog-out" : "animate-dialog-in",
+            className,
+          )}
+          onClick={(e) => e.stopPropagation()}
+          onAnimationEnd={(e) => leaving && e.target === e.currentTarget && onClose()}
+        >
+          {children}
+        </div>
       </div>
-    </div>
+    </Closing.Provider>
   );
 }

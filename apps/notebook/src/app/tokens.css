@@ -10,6 +10,7 @@
   --code-bg: #f7f7f7;
   --accent: #1a73e8;
   --accent-soft: #e8f0fe;
+  --scrim: rgb(16 20 28 / 0.42); /* behind a dialog */
   --ok: #188038;
   --danger: #d93025;
   --warn-bg: #fef7e0;
@@ -62,6 +63,7 @@
   --code-bg: #262729;
   --accent: #8ab4f8;
   --accent-soft: #1f2a3c;
+  --scrim: rgb(0 0 0 / 0.6);
   --ok: #81c995;
   --danger: #f28b82;
   --warn-bg: #3a2e12;

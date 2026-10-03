@@ -1,5 +1,5 @@
-// The way up to where the user is: the home screen, the folders above, this one. Something being
-// dragged may be dropped onto a folder above (to move it up there).
+// The way up to where the user is: the home screen, the folders above (not this one: its name is the
+// title under them). Something being dragged may be dropped onto a folder above (to move it up there).
 import type { Crumb, ItemCard } from "@electro/notes-api";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -10,11 +10,9 @@ import { dragging } from "./drag";
 
 export function Breadcrumbs({
   path,
-  current,
   onDrop,
 }: {
   path: readonly Crumb[]; // from the top down (the home screen is always first)
-  current: string;
   onDrop?: (card: ItemCard, into: string | null) => void;
 }) {
   const { t } = useTranslation("library");
@@ -25,7 +23,7 @@ export function Breadcrumbs({
   ];
   return (
     <nav aria-label={t("folder.path")} className="flex flex-wrap items-center gap-1 mb-1 text-[14px] text-muted">
-      {crumbs.map((c) => (
+      {crumbs.map((c, i) => (
         <span key={c.id ?? "home"} className="flex items-center gap-1">
           <Link
             to={c.to}
@@ -49,12 +47,9 @@ export function Breadcrumbs({
           >
             {c.name}
           </Link>
-          <span aria-hidden>›</span>
+          {i < crumbs.length - 1 && <span aria-hidden>›</span>}
         </span>
       ))}
-      <span className="px-1.5 text-fg" aria-current="page">
-        {current}
-      </span>
     </nav>
   );
 }

@@ -4,6 +4,8 @@ import { type ClassValue, clsx } from "clsx";
 import { extendTailwindMerge } from "tailwind-merge";
 
 // our own tokens tailwind-merge cannot know from Tailwind's defaults (styles.css's @theme)
-const twMerge = extendTailwindMerge({ extend: { theme: { animate: ["blink", "rise", "fade-in"] } } });
+const twMerge = extendTailwindMerge({
+  extend: { theme: { animate: ["blink", "rise", "fade-in", "fade-out", "dialog-in", "dialog-out"] } },
+});
 
 export const cn = (...classes: ClassValue[]) => twMerge(clsx(classes));
