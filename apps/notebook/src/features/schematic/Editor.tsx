@@ -18,7 +18,7 @@ import {
 import { useTranslation } from "react-i18next";
 import { cn } from "@/shared/lib/cn";
 import type { ElementData, ElementResult, Point, SchematicData, SymbolLibrary } from "@/shared/model/types";
-import { More, Rotate, Target, Trash } from "@/shared/ui/icons";
+import { More, Rotate, TagIcon, Target, Trash } from "@/shared/ui/icons";
 import { isAdjustable } from "./Adjusters";
 import { BoardButton, BoardIsland, board, boardIsland, islandButton } from "./Board";
 import { CurrentDots } from "./CurrentDots";
@@ -187,7 +187,9 @@ export function SchematicEditor({
   const [cursor, setCursor] = useState<Point | null>(null);
   // a tap selects (a finger: the element's panel only from its ⋯, not over the board at once)
   const [inspect, setInspect] = useState(true);
-  const [locked, setLocked] = useState(false); // the tool stays (the lock): an element placed again and again
+  const [locked, setLocked] = useState(false);
+  // where a wire was tapped: its node to name there (a net label)
+  const [spot, setSpot] = useState<Point | null>(null); // the tool stays (the lock): an element placed again and again
   // the segment of a wire (not selected) under the pointer: a wire starts from it — its point shown
   const [over, setOver] = useState<{ wire: number; index: number } | null>(null);
   const [gesture, setGesture] = useState<Gesture | null>(null);
@@ -294,6 +296,26 @@ export function SchematicEditor({
       ...value,
       elements: value.elements.map((e) => (e.id === selectedElement.id ? { ...e, rotation, at } : e)),
     });
+  };
+
+  /** The tapped wire's node named: a net label where it was tapped (one there already: that one), its
+   *  panel open — its name, its potential. */
+  const nameNode = () => {
+    if (!spot) return;
+    const there = value.elements.find((e) => e.kind === "label" && same(e.at, spot));
+    if (there) {
+      setSelection({ type: "element", id: there.id });
+      setInspect(true);
+      return;
+    }
+    const names = new Set(value.elements.filter((e) => e.kind === "label").map((e) => e.text));
+    const text = "ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("").find((c) => !names.has(c)) ?? "N";
+    const id = nextId(value, "label");
+    // (on the wire's middle: the wire split there, so it is joined)
+    const label: ElementData = { id, kind: "label", at: spot, rotation: 0, value: null, text };
+    commit(attach({ ...value, elements: [...value.elements, label] }, library, id));
+    setSelection({ type: "element", id });
+    setInspect(true);
   };
 
   const removeSelected = () => {
@@ -610,8 +632,10 @@ export function SchematicEditor({
     // a tap: what it was on, selected (an element as a tap on it)
     if (g.type === "wire" && same(end, g.from)) {
       const tap = g.tap;
-      if ("wire" in tap) setSelection({ type: "wire", index: tap.wire });
-      else {
+      if ("wire" in tap) {
+        setSelection({ type: "wire", index: tap.wire });
+        setSpot(g.from);
+      } else {
         setInspect(event.pointerType !== "touch");
         setSelection({ type: "element", id: tap.id });
       }
@@ -1094,6 +1118,16 @@ export function SchematicEditor({
         !phone &&
         (selection?.type === "wire" || selection?.type === "group" || (selection?.type === "element" && !inspect)) && (
           <BoardIsland stays className="top-15 right-3">
+            {selection?.type === "wire" && spot && (
+              <BoardButton
+                className={islandButton()}
+                onClick={nameNode}
+                title={t("drawing.nameNode")}
+                aria-label={t("drawing.nameNode")}
+              >
+                <TagIcon />
+              </BoardButton>
+            )}
             <BoardButton
               className={cn(islandButton(), "hover:bg-err-bg hover:text-danger")}
               onClick={removeSelected}
@@ -1156,6 +1190,16 @@ export function SchematicEditor({
         {/* a phone: what is selected, its own buttons — turned, away, its whole panel */}
         {phone && !live && !viewOnly && selection && !(selectedElement && inspect) && (
           <BoardIsland stays className="static gap-1 [&_button]:size-9">
+            {selection.type === "wire" && spot && (
+              <BoardButton
+                className={islandButton()}
+                onClick={nameNode}
+                title={t("drawing.nameNode")}
+                aria-label={t("drawing.nameNode")}
+              >
+                <TagIcon />
+              </BoardButton>
+            )}
             {selectedElement && (
               <BoardButton
                 className={islandButton()}

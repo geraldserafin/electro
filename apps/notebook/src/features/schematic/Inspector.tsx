@@ -104,6 +104,34 @@ export function Inspector({
           </span>
         </Section>
       )}
+      {!live && (element.kind === "label" || element.kind === "port") && (
+        <Section label={t(element.kind === "port" ? "inspector.port" : "inspector.node")}>
+          <input
+            className={field}
+            value={element.text ?? ""}
+            spellCheck={false}
+            aria-label={t(element.kind === "port" ? "inspector.port" : "inspector.node")}
+            onChange={(e) => onChange({ text: e.target.value })}
+          />
+        </Section>
+      )}
+      {/* a net label: its node's potential, against ground — given (the solver's), or empty */}
+      {!live && element.kind === "label" && (
+        <Section label={t("inspector.potential")}>
+          <span className="relative block">
+            <input
+              className={cn(field, "pr-8.5")}
+              value={element.value ?? ""}
+              inputMode="decimal"
+              spellCheck={false}
+              placeholder="?"
+              aria-label={t("inspector.potential")}
+              onChange={(e) => onChange({ value: e.target.value.trim() === "" ? null : e.target.value })}
+            />
+            <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted pointer-events-none">V</span>
+          </span>
+        </Section>
+      )}
       {isAdjustable(element.kind) && (
         <Section label={t("inspector.adjust")}>
           <Adjusters element={element} onChange={onChange} />

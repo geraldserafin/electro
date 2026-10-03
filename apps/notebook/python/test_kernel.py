@@ -343,3 +343,23 @@ def test_an_arrows_value_is_given_and_one_without_shows_what_it_comes_to():
     assert results["u"]["value"] == "18 V"  # (to R1's left end, the higher one)
     steps = [{"id": "s", "label": "E", "unit": "V", "value": "U_E"}]
     assert json.loads(kernel.task_values(json.dumps(sch), json.dumps(steps)))["values"]["s"]["value"] == 54
+
+
+def test_a_net_labels_value_is_its_nodes_potential_given_and_one_without_shows_it():
+    drawing = {
+        "elements": [
+            {"id": "E1", "kind": "voltage_source", "value": None, "nodes": ["0", "T"], "at": [[0, 8], [0, 0]]},
+            {"id": "R1", "kind": "resistor", "value": "10", "nodes": ["T", "A"], "at": [[0, 0], [6, 0]]},
+            {"id": "R2", "kind": "resistor", "value": "20", "nodes": ["A", "0"], "at": [[6, 0], [6, 8]]},
+        ],
+        "wires": [[[6, 8], [0, 8]]],
+    }
+    sch = json.loads(kernel.from_drawing(json.dumps(drawing)))["schematic"]
+    sch["elements"].append({"id": "L1", "kind": "label", "at": [6, 0], "rotation": 0, "value": "4", "text": "A"})
+    got = json.loads(kernel.simulate(json.dumps(sch)))["results"]
+    assert got["E1"]["value"] == "6 V" and got["E1"]["solved"]  # V_A = 4 V given: E found from it
+    assert got["L1"] == {**got["L1"], "value": "4 V", "solved": False}
+    sch["elements"][-1]["value"] = None
+    sch["elements"][0]["value"] = "12"
+    got = json.loads(kernel.simulate(json.dumps(sch)))["results"]
+    assert got["L1"]["value"] == "8 V" and got["L1"]["solved"]  # what the node came to

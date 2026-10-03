@@ -330,8 +330,13 @@ function ElementView_({ element: e, library, wires, result, selected, closed, li
   const vars =
     look &&
     (Object.fromEntries(Object.entries(look).map(([k, v]) => [`--${k}`, Math.round(v * 100) / 100])) as CSSProperties);
-  const label =
-    result?.solved && result.value
+  // a net label: its node's name, and its potential — given, or what it came to
+  const potential =
+    e.kind === "label" &&
+    (e.value?.trim() ? `${e.value.trim()}${/\d$/.test(e.value.trim()) ? " V" : ""}` : result?.value);
+  const label = potential
+    ? `${e.text ?? ""} = ${potential}`
+    : result?.solved && result.value && e.kind !== "label"
       ? e.kind === "hole"
         ? `${e.id}: ${result.value}`
         : isBoard(e.kind)
@@ -400,7 +405,11 @@ function ElementView_({ element: e, library, wires, result, selected, closed, li
       )}
       {label &&
         (e.kind === "label" || e.kind === "port" ? (
-          <text x={e.kind === "port" ? cx + 8 : cx + 4} y={e.kind === "port" ? cy - 9 : cy - 6} className="node">
+          <text
+            x={e.kind === "port" ? cx + 8 : cx + 4}
+            y={e.kind === "port" ? cy - 9 : cy - 6}
+            className={`node ${e.kind === "label" && !e.value?.trim() && result ? "solved" : ""}`}
+          >
             {label}
           </text>
         ) : symbol.box && e.rotation === 0 ? (

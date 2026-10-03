@@ -152,6 +152,7 @@
   .canvas .label .sub {
     font-size: 10px;
   }
+  .canvas .node.solved,
   .canvas .label.solved {
     fill: var(--accent);
     font-weight: 600;

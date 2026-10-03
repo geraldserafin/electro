@@ -230,6 +230,24 @@ def simulate(schematic_json: str, data: str = "") -> str:
                 "P": None,
                 "reversed": False,
             }
+    # a net label: its node's potential (given, or what it came to)
+    for e in sch.elements:
+        if e.kind != "label" or not e.text:
+            continue
+        try:
+            v = solution.V(e.text)
+        except Exception:  # noqa: BLE001 — not a node of the circuit (a label on nothing): none
+            continue
+        if v is not None and v.is_number:
+            given = bool(e.value and e.value.strip())
+            results[e.id] = {
+                "value": fmt(v, "V"),
+                "solved": not given,
+                "U": None,
+                "I": None,
+                "P": None,
+                "reversed": False,
+            }
     problems = [_problem("warning", w.message) for w in caught]
     return json.dumps({"results": results, "problems": problems}, ensure_ascii=False)
 

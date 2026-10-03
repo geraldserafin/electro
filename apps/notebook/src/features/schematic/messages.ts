@@ -97,6 +97,7 @@ export const pl = {
     moveSegment: "Przeciągnij, żeby przesunąć ten odcinek",
     openPin: "Niepodłączony zacisk",
     drawWire: "Przeciągnij do innego zacisku albo przewodu, żeby je połączyć",
+    nameNode: "Nazwij węzeł i podaj jego potencjał",
   },
   view: {
     back: "Wróć do schematu",
@@ -151,6 +152,7 @@ export const pl = {
     valueHint: "Puste — niewiadoma. Litera — symbol.",
     readingHint: "Pomiar z zadania. Puste — solver go policzy.",
     node: "Nazwa węzła",
+    potential: "Potencjał (względem masy)",
     arrowName: "Oznaczenie",
     arrowLength: "Długość (kratki)",
     arrowOf: "Dotyczy",
@@ -341,6 +343,7 @@ export const en: typeof pl = {
     moveSegment: "Drag to move this segment",
     openPin: "Unconnected pin",
     drawWire: "Drag to another pin or wire to connect them",
+    nameNode: "Name the node and give its potential",
   },
   view: {
     back: "Back to the schematic",
@@ -395,6 +398,7 @@ export const en: typeof pl = {
     valueHint: "Empty — an unknown. A letter — a symbol.",
     readingHint: "A measurement from the task. Empty — the solver finds it.",
     node: "Node name",
+    potential: "Potential (against ground)",
     arrowName: "Name",
     arrowLength: "Length (squares)",
     arrowOf: "Of",

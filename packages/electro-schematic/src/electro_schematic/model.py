@@ -534,7 +534,7 @@ class Schematic:
         return out
 
     def given(self) -> dict[str, str]:
-        """What its arrows give (those with a value): the solver's data, ``{"U_R5": "125"}``."""
+        """What its arrows and net labels give (those with a value): the solver's data, ``{"U_R5": "125"}``."""
         out = {}
         for a, of, sign in self.arrows():
             if a.value and a.value.strip():
@@ -542,6 +542,10 @@ class Schematic:
                 if sign < 0:
                     value = value[1:] if value.startswith("-") else f"-{value}"
                 out[f"{'I' if a.kind == 'current_arrow' else 'U'}_{of.id}"] = value
+        # a net label's value: its node's potential (against ground), ``{"V_A": "4"}``
+        for e in self.elements:
+            if e.kind == "label" and e.text and e.value and e.value.strip():
+                out[f"V_{e.text}"] = e.value.strip()
         return out
 
     @classmethod

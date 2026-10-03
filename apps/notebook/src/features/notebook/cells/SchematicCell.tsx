@@ -771,7 +771,10 @@ export function SchematicCell({
                   // (the arrows' own: on the drawing only — the elements they are of have a row)
                   results={Object.fromEntries(
                     Object.entries(cell.results).filter(
-                      ([id]) => !cell.schematic.elements.some((e) => e.id === id && e.kind.endsWith("_arrow")),
+                      ([id]) =>
+                        !cell.schematic.elements.some(
+                          (e) => e.id === id && (e.kind.endsWith("_arrow") || e.kind === "label"),
+                        ),
                     ),
                   )}
                   stale={!!cell.stale}
