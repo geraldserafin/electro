@@ -14,6 +14,7 @@ export interface ElementData {
   of?: string | null; // an arrow's: the element whose current or voltage it is (its value then a given)
   span?: number | null; // a voltage arrow's length, grid units
   between?: Point[] | null; // a voltage arrow's between two points of the circuit: its tail's, its head's
+  flip?: boolean | null; // its label on the other side than it would be
 }
 
 export interface WireData {

@@ -329,13 +329,15 @@ function ElementView_({ element: e, library, wires, result, selected, closed, li
     );
   // …and always when it would not fit on the canvas (which starts at 0, 0): cut-off text is
   // worse than text over a wire (the text has a halo)
-  const flip = vertical
+  // (its own say, the other side: e.flip)
+  const auto = vertical
     ? cx - 20 - labelWidth < 0 ||
       (crosses(cx - 20 - labelWidth, cx - 20, cy - 8, cy + 8) &&
         !crosses(cx + 20, cx + 20 + labelWidth, cy - 8, cy + 8))
     : cy - 32 < 0 ||
       (crosses(cx - labelWidth / 2, cx + labelWidth / 2, cy - 32, cy - 16) &&
         !crosses(cx - labelWidth / 2, cx + labelWidth / 2, cy + 16, cy + 32));
+  const flip = e.flip ? !auto : auto;
   // a 555, an Arduino, a display: the label beside the box, top right; no readings (its pins tell)
   const chip = kindInfo(e.kind)?.group === "chips" || ps.length > 4 || e.kind === "part";
   const vars =

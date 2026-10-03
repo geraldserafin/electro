@@ -385,3 +385,27 @@ def test_a_voltage_between_two_points_given_and_one_without_shows_it():
     sch["elements"][0]["value"] = "50"
     got = json.loads(kernel.simulate(json.dumps(sch)))["results"]
     assert got["U1"]["value"] == "45 V" and got["U1"]["solved"]  # what it came to: 50 · 18/20
+
+
+def test_a_current_arrow_on_a_wire_is_the_current_of_the_element_it_leads_to():
+    # E 12 — R1 10 — R2 20 in a loop: an arrow on the wire from R1 to R2, pointing to R2 (and back)
+    drawing = {
+        "elements": [
+            {"id": "E1", "kind": "voltage_source", "value": "12", "nodes": ["0", "T"], "at": [[0, 8], [0, 0]]},
+            {"id": "R1", "kind": "resistor", "value": "10", "nodes": ["T", "A"], "at": [[0, 0], [6, 0]]},
+            {"id": "R2", "kind": "resistor", "value": "20", "nodes": ["A", "0"], "at": [[10, 0], [10, 8]]},
+        ],
+        "wires": [[[6, 0], [10, 0]], [[10, 8], [0, 8]]],
+    }
+    sch = json.loads(kernel.from_drawing(json.dumps(drawing)))["schematic"]
+    arrow = {"id": "I1", "kind": "current_arrow", "at": [7, 0], "rotation": 0, "value": None, "text": "I"}
+    sch["elements"].append(arrow)
+    got = json.loads(kernel.simulate(json.dumps(sch)))["results"]
+    assert got["I1"]["value"] == "400 mA"  # along the current, toward R2
+    sch["elements"][-1] = {**arrow, "at": [8, 0], "rotation": 180}
+    got = json.loads(kernel.simulate(json.dumps(sch)))["results"]
+    assert got["I1"]["value"] == "-400 mA"  # against it
+    sch["elements"][-1] = {**arrow, "value": "1"}  # given: 1 A that way, E unknown
+    sch["elements"][0]["value"] = None
+    got = json.loads(kernel.simulate(json.dumps(sch)))["results"]
+    assert got["E1"]["value"] == "30 V" and got["E1"]["solved"]

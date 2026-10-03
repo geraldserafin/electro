@@ -73,15 +73,43 @@ export function Inspector({
       </h3>
       {!live && isComponent(element.kind) && (
         <Section label={t("inspector.id")}>
-          <input
-            className={field}
-            value={id}
-            spellCheck={false}
-            aria-label={t("inspector.id")}
-            onChange={(e) => setId(e.target.value)}
-            onBlur={commitId}
-            onKeyDown={(e) => e.key === "Enter" && commitId()}
-          />
+          <span className="relative block">
+            <input
+              className={cn(field, "pr-10")}
+              value={id}
+              spellCheck={false}
+              aria-label={t("inspector.id")}
+              onChange={(e) => setId(e.target.value)}
+              onBlur={commitId}
+              onKeyDown={(e) => e.key === "Enter" && commitId()}
+            />
+            {/* its label on the other side of it */}
+            <button
+              type="button"
+              className={cn(
+                "absolute right-1 top-1/2 -translate-y-1/2 grid place-items-center size-7 rounded-md text-muted hover:bg-selected hover:text-fg",
+                element.flip && "text-accent",
+              )}
+              aria-pressed={!!element.flip}
+              title={t("inspector.flipLabel")}
+              aria-label={t("inspector.flipLabel")}
+              onClick={() => onChange({ flip: element.flip ? null : true })}
+            >
+              <svg
+                viewBox="0 0 24 24"
+                width={16}
+                height={16}
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.8"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                aria-hidden="true"
+              >
+                <path d="M7 4v16M7 4L4 7M7 4l3 3M17 20V4M17 20l-3-3M17 20l3-3" />
+              </svg>
+            </button>
+          </span>
         </Section>
       )}
       {!live && hasValue(element.kind) && (
@@ -127,7 +155,7 @@ export function Inspector({
           />
         </Section>
       )}
-      {!live && isArrow(element.kind) && (element.of || element.between) && (
+      {!live && isArrow(element.kind) && (
         <Section label={t("inspector.arrowValue")}>
           <span className="relative block">
             <input

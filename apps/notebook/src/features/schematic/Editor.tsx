@@ -46,6 +46,7 @@ import {
   moveGroup,
   moveSegment,
   nextId,
+  onSegment,
   openPins,
   pins,
   rotatedAbout,
@@ -146,7 +147,8 @@ let clipboard: SchematicData | null = null;
 
 /** Where a new element's first pin goes so that its middle lands on ``p`` (on the grid). */
 function placedAt(kind: string, p: Point, lib: SymbolLibrary): Point {
-  const ps = lib.kinds[kind]?.pins ?? [[0, 0]];
+  const ps = lib.kinds[kind]?.pins;
+  if (!ps?.length) return p; // (an arrow: no pins — its tail where it was clicked)
   const mid = (i: 0 | 1) => Math.round(ps.reduce((s, q) => s + q[i], 0) / ps.length / lib.grid);
   return [p[0] - mid(0), p[1] - mid(1)];
 }
@@ -399,7 +401,17 @@ export function SchematicEditor({
             id: nextId(value, tool.kind),
             kind: tool.kind,
             at: placedAt(tool.kind, p, library),
-            rotation: 0,
+            // a current's arrow on a wire: along it (turned back with R)
+            rotation:
+              tool.kind === "current_arrow" &&
+              value.wires.some((w) =>
+                w.points.slice(1).some((q, i) => {
+                  const a = w.points[i]!;
+                  return a[0] === q[0] && (onSegment(p, a, q) || same(p, a) || same(p, q));
+                }),
+              )
+                ? 90
+                : 0,
             value: defaultValue(tool.kind),
             text: defaultText(tool.kind),
           };
