@@ -1382,7 +1382,7 @@
   },
   "current_arrow": {
    "pins": [],
-   "svg": "<path d=\"M0 0H13\"/><path class=\"fill\" d=\"M20 0l-9 -4.5v9z\"/>",
+   "svg": "<path d=\"M0 0H20\"/><path class=\"fill\" d=\"M16 0l-12 -3.5v7z\"/>",
    "letter": null,
    "upright": false
   },

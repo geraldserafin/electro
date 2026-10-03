@@ -185,7 +185,7 @@ SYMBOLS: dict[str, str] = {
     "port": '<path d="M0 0L-6 -6V-16H6V-6Z"/>',
     "part": "",  # drawn from its definition: part_symbol()
     # as arrow_symbol() draws them (a voltage's as long as set: this its default)
-    "current_arrow": '<path d="M0 0H13"/><path class="fill" d="M20 0l-9 -4.5v9z"/>',
+    "current_arrow": '<path d="M0 0H20"/><path class="fill" d="M16 0l-12 -3.5v7z"/>',  # a flat head on a wire
     "voltage_arrow": '<path d="M0 0H73"/><path class="fill" d="M80 0l-9 -4.5v9z"/>',
 }
 
