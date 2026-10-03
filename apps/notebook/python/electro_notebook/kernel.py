@@ -176,16 +176,12 @@ def _parse_data(text: str) -> dict[str, str]:
     return given
 
 
-def _potentials(sch: Schematic):
-    """A point of the drawing → its node's potential (a symbol, V_<node>; ground: 0)."""
+def _givens(marks) -> list:
+    """Its marks given a value (an arrow's, a point's, a loop's): each an equation for the solver."""
     import sympy as sp
-    from electro.circuit import GROUND
+    from electro.values import parse
 
-    def potential(p):
-        name = sch.node_at(tuple(p))
-        return sp.Integer(0) if name in (None, GROUND) else sp.Symbol(f"V_{name}")
-
-    return potential
+    return [sp.Eq(q, parse(e.value.strip())) for e, q in marks if e.value and e.value.strip()]
 
 
 def simulate(schematic_json: str, data: str = "") -> str:
@@ -195,30 +191,17 @@ def simulate(schematic_json: str, data: str = "") -> str:
     ``results`` go on the drawing and in the table under it; ``problems`` behind the warning
     button on the board (``text`` instead of ``issue`` for an error that is not ours).
     """
-    import sympy as sp
     from electro.components import notation
-    from electro.values import UNKNOWN, fmt, parse
+    from electro.values import UNKNOWN, fmt
 
     sch = Schematic.from_json(schematic_json)
     results: dict[str, dict] = {}
     with warnings.catch_warnings(record=True) as caught:
         warnings.simplefilter("always")
         try:
-            # a voltage between two points, given: V_head − V_tail = its value
-            between = sch.voltages()
-            terminals = [e for e in sch.elements if e.kind == "terminal"]
-            potential = _potentials(sch) if between or terminals else None
-            equations = [
-                sp.Eq(potential(head) - potential(tail), parse(a.value.strip()))
-                for a, tail, head in between
-                if a.value and a.value.strip()
-            ] + [
-                # a terminal's value: its point's potential, against ground
-                sp.Eq(potential(t.at), parse(t.value.strip()))
-                for t in terminals
-                if t.value and t.value.strip()
-            ]
-            solution = sch.to_circuit().solve(*equations, **{**sch.given(), **_parse_data(data)})
+            # what it marks (arrows, points, loops), given: the solver's data
+            marks = sch.quantities()
+            solution = sch.to_circuit().solve(*_givens(marks), **_parse_data(data))
         except (Issue, ValueError, KeyError) as err:
             return json.dumps({"results": {}, "problems": [_problem("error", err)]}, ensure_ascii=False)
     for label in solution.system.parts:
@@ -240,62 +223,16 @@ def simulate(schematic_json: str, data: str = "") -> str:
             "P": fmt(r.P, "W") if r.P is not None and not r.P.has(sp_I) else None,
             "reversed": sign < 0,  # the current really flows from the second pin to the first
         }
-    # an arrow of an element's current or voltage: what it comes to, the arrow's way
-    for arrow, of, sign in sch.arrows():
-        r = results.get(of.id)
-        q = r and r.get("I" if arrow.kind == "current_arrow" else "U")
-        if q is None:
-            continue
-        found = solution[of.id]
-        amount = found.I if arrow.kind == "current_arrow" else found.U
-        if amount is not None and amount.is_number:
-            results[arrow.id] = {
-                "value": fmt(sign * amount, "A" if arrow.kind == "current_arrow" else "V"),
-                "solved": not (arrow.value and arrow.value.strip()),
-                "U": None,
-                "I": None,
-                "P": None,
-                "reversed": False,
-            }
-    # a voltage arrow between two points: what it comes to (or was given)
-    for a, tail, head in between:
-        v = solution(potential(head) - potential(tail))
-        if v is not None and v.is_number:
-            given = bool(a.value and a.value.strip())
-            results[a.id] = {
-                "value": fmt(v, "V"),
-                "solved": not given,
-                "U": None,
-                "I": None,
-                "P": None,
-                "reversed": False,
-            }
-    # a terminal: its point's potential (given, or what it came to)
-    for t in terminals:
-        v = solution(potential(t.at))
-        if v is not None and v.is_number:
-            given = bool(t.value and t.value.strip())
-            results[t.id] = {
-                "value": fmt(v, "V"),
-                "solved": not given,
-                "U": None,
-                "I": None,
-                "P": None,
-                "reversed": False,
-            }
-    # a net label: its node's potential (given, or what it came to)
-    for e in sch.elements:
-        if e.kind != "label" or not e.text:
-            continue
+    # what it marks: what that comes to (or was given)
+    for e, q in marks:
         try:
-            v = solution.V(e.text)
-        except Exception:  # noqa: BLE001 — not a node of the circuit (a label on nothing): none
+            v = solution(q)
+        except Exception:  # noqa: BLE001 — not found by this circuit (a label on nothing): none
             continue
         if v is not None and v.is_number:
-            given = bool(e.value and e.value.strip())
             results[e.id] = {
-                "value": fmt(v, "V"),
-                "solved": not given,
+                "value": fmt(v, "A" if e.kind in ("current_arrow", "mesh_current") else "V"),
+                "solved": not (e.value and e.value.strip()),
                 "U": None,
                 "I": None,
                 "P": None,
@@ -346,10 +283,10 @@ def spread(schematic_json: str, tol: float = 0.05) -> str:
         return json.dumps({"error": _error(err)}, ensure_ascii=False)
 
 
-def _task_values(circuit, steps: list[dict], given: dict | None = None) -> dict[str, dict]:
+def _task_values(circuit, steps: list[dict], given: list | None = None) -> dict[str, dict]:
     """Each step's value (its ``value``: a quantity or an expression of them) on ``circuit`` with
-    ``given`` (its arrows' data): ``{"value": number}``, an AC one as its amplitude, or ``{"error": {...}}``."""
-    solution = circuit.solve(**(given or {}))
+    ``given`` (its marks' equations): ``{"value": number}``, an AC one as its amplitude, or ``{"error": {...}}``."""
+    solution = circuit.solve(*(given or []))
     out: dict[str, dict] = {}
     for step in steps:
         try:
@@ -366,7 +303,7 @@ def task_values(schematic_json: str, steps_json: str) -> str:
     ``{"values": {step: {"value": x} | {"error": ...}}}`` or ``{"error": {...}}`` (the circuit)."""
     try:
         sch = Schematic.from_json(schematic_json)
-        values = _task_values(sch.to_circuit(), json.loads(steps_json), sch.given())
+        values = _task_values(sch.to_circuit(), json.loads(steps_json), _givens(sch.quantities()))
         return json.dumps({"values": values}, ensure_ascii=False)
     except Exception as err:  # noqa: BLE001 — shown by the task
         return json.dumps({"error": _error(err)}, ensure_ascii=False)
@@ -397,7 +334,7 @@ def from_drawing(drawing_json: str, strict: bool = False) -> str:
     ``{"schematic": ...}`` or ``{"error": {...}}``."""
     from electro.issues import BadName, WrongNodeCount
     from electro_schematic.issues import UnknownKind
-    from electro_schematic.model import ARROWS, KINDS, Element, Wire, on_segment
+    from electro_schematic.model import KINDS, MARKS, Element, Wire, on_segment
 
     def point(p) -> tuple[int, int]:
         x, y = p
@@ -423,8 +360,8 @@ def from_drawing(drawing_json: str, strict: bool = False) -> str:
             if not str(el.get("id")).isidentifier():
                 raise BadName(str(el.get("id")))
         # its arrows (a current's, a voltage's: from tail to head, a name) apart: they measure nothing
-        arrows = [el for el in data["elements"] if el.get("kind") in ARROWS]
-        data["elements"] = [el for el in data["elements"] if el.get("kind") not in ARROWS]
+        arrows = [el for el in data["elements"] if el.get("kind") in MARKS]
+        data["elements"] = [el for el in data["elements"] if el.get("kind") not in MARKS]
         # drawn too small (a resistor 2 units long): the whole drawing scaled up, its shape kept
         spans = [
             max(abs(float(a[0]) - float(b[0])), abs(float(a[1]) - float(b[1])))
@@ -464,13 +401,26 @@ def from_drawing(drawing_json: str, strict: bool = False) -> str:
         wires: list[list[tuple[int, int]]] = []
         terminals: list[tuple[str, int, str, tuple[int, int]]] = []  # element, terminal, node, point
         for el in arrows:  # along its longer side, from its tail; a voltage's as long as drawn
+            given = el.get("value")
+            if el["kind"] == "mesh_current":  # a loop's: at a point inside it, clockwise unless flipped
+                elements.append(
+                    Element(
+                        str(el["id"]),
+                        "mesh_current",
+                        point(el["at"][0]),
+                        0,
+                        _readable(str(given)) if given not in (None, "") else None,
+                        str(el.get("text") or ""),
+                        flip=True if el.get("flip") else None,
+                    )
+                )
+                continue
             (x1, y1), (x2, y2) = (point(p) for p in el["at"][:2])
             dx, dy = x2 - x1, y2 - y1
             d = ((dx > 0) - (dx < 0), 0) if abs(dx) >= abs(dy) else (0, (dy > 0) - (dy < 0))
             if d == (0, 0):
                 raise ValueError(f"{el['id']}: its tail and head on one point")
             length = max(abs(dx), abs(dy))
-            given = el.get("value")
             elements.append(
                 Element(
                     str(el["id"]),

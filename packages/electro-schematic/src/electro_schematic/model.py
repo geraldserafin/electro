@@ -136,10 +136,13 @@ KINDS: dict[str, Kind] = {
     # an arrow's ``of``: the element whose current (voltage) it is — then its ``value``, if any, a given
     # of the problem (the solver's data: I_R2 = 2), and with none the solved one shown by it
     "current_arrow": Kind(()),
+    "mesh_current": Kind(()),  # in a loop (``at``): its current around it
     "voltage_arrow": Kind(()),  # ``span``: its length in grid units (4, an element's, by default)
 }
 
 ARROWS = ("current_arrow", "voltage_arrow")
+# a loop's current (a mesh current): a round arrow inside it, clockwise (``flip``: the other way)
+MARKS = (*ARROWS, "mesh_current")
 
 
 def arrow_length(e: Element) -> int:
@@ -298,6 +301,11 @@ class Wire:
         return list(zip(self.points, self.points[1:]))
 
 
+def _unique(points: list[Point]) -> list[Point]:
+    """A polyline's points without one repeated straight after itself."""
+    return [p for k, p in enumerate(points) if not k or p != points[k - 1]]
+
+
 def on_segment(p: Point, a: Point, b: Point) -> bool:
     """Is ``p`` strictly inside the axis-aligned segment ``a``–``b``?"""
     (x, y), (x1, y1), (x2, y2) = p, a, b
@@ -380,6 +388,13 @@ class Schematic:
                 for j, v in enumerate(self.wires):
                     if j != i and (end in v.points or any(on_segment(end, a, b) for a, b in v.segments())):
                         union(("wire", i), ("wire", j))
+        # a terminal (a point a voltage is at) is on whatever wire it lies on, a corner or the middle too
+        for e in self.elements:
+            if e.kind == "terminal":
+                (p,) = e.pins()
+                for i, w in enumerate(self.wires):
+                    if p in w.points or any(on_segment(p, a, b) for a, b in w.segments()):
+                        union(("wire", i), pin_at[p][0])
         by_label: dict[str, object] = {}
         for e in self.elements:
             name = "GND" if e.kind == "ground" else e.text if e.kind in ("label", "port") else None
@@ -529,125 +544,251 @@ class Schematic:
     def to_json(self) -> str:
         return json.dumps(self.to_dict(), ensure_ascii=False)
 
-    def arrows(self) -> list[tuple[Element, Element, int]]:
-        """Its arrows that are an element's current or voltage: each, that element, how (``arrow_sign``).
-        A current's arrow on a wire, of nothing said: the current of the element that wire leads to (with
-        nothing branching off on the way), into it or out of it as the arrow points."""
+    def quantities(self) -> list[tuple[Element, object]]:
+        """What each of its marks is a quantity of, as an expression of the solver's symbols (``I_R1``,
+        ``U_R1``, ``V_A``): a voltage arrow between two points V_head − V_tail; an arrow of an element
+        (``of``) its current or voltage, as it points; a current's arrow on a wire the current along it
+        (``current_along``); a loop's arrow its mesh current (``mesh_current``); a terminal's or a net
+        label's its point's potential, against ground. Marks that say nothing (on no wire, wires in a
+        loop) are left out."""
+        import sympy as sp
+
+        names = self.node_names()
+
+        def potential(p) -> object:
+            name = self.node_at(tuple(p), names)
+            return sp.Integer(0) if name in (None, ct.GROUND) else sp.Symbol(f"V_{name}")
+
+        def currents(terms: dict[str, int]) -> object:
+            return sp.Add(*(k * sp.Symbol(f"I_{id}") for id, k in terms.items()))
+
         by_id = {e.id: e for e in self.elements}
         out = []
         for a in self.elements:
-            if a.kind not in ARROWS:
-                continue
-            of = by_id.get(a.of or "")
-            if of is None and a.kind == "current_arrow" and not a.between:
-                found = self._led_to(a)
-                if found:
-                    out.append((a, *found))
-                continue
-            sign = arrow_sign(a, of) if of is not None and KINDS[of.kind].component is not None else None
-            if sign is not None:
-                out.append((a, of, sign))
+            if a.kind == "voltage_arrow" and a.between and len(a.between) == 2:
+                tail, head = a.between
+                out.append((a, potential(head) - potential(tail)))
+            elif a.kind in ARROWS and a.of:
+                of = by_id.get(a.of)
+                sign = arrow_sign(a, of) if of is not None and KINDS[of.kind].component is not None else None
+                if sign is not None:
+                    out.append((a, sign * sp.Symbol(f"{'I' if a.kind == 'current_arrow' else 'U'}_{of.id}")))
+            elif a.kind == "current_arrow" and not a.between:
+                terms = self.current_along(a.at, rotate((1, 0), a.rotation))
+                if terms is not None:
+                    out.append((a, currents(terms)))
+            elif a.kind == "mesh_current":
+                terms = self.mesh_current(a.at)
+                if terms is not None:
+                    out.append((a, (-1 if a.flip else 1) * currents(terms)))
+            elif a.kind == "terminal" or (a.kind == "label" and a.text):
+                out.append((a, potential(a.at)))
         return out
 
-    def _led_to(self, arrow: Element) -> tuple[Element, int] | None:
-        """The two-pin element a current arrow's wire leads to — along that wire, and on through wires
-        that only go on from its end — nearest first: it, and 1 when the arrow's current is the element's
-        own (a → b), −1 when the other way. None: on no wire, or it branches both ways first."""
-        dx, dy = rotate((1, 0), arrow.rotation)
-        tail = arrow.at
-        head = (tail[0] + dx, tail[1] + dy)
-        pins_at: dict[Point, list[tuple[Element, int]]] = {}
-        for e in self.elements:
-            if KINDS[e.kind].component is not None or e.kind == "part":
-                for k, p in enumerate(e.pins()):
-                    pins_at.setdefault(p, []).append((e, k))
+    def current_along(self, at: Point, step: Point) -> dict[str, int] | None:
+        """The current along a wire at ``at``, the way ``step`` (a unit step along it). By Kirchhoff's
+        current law what flows on into the node beyond is what leaves that node through its elements:
+        ``{id: ±1}`` — 1 for an element it goes into by its first pin (an element's own current, I_id, is
+        from its first pin to its second), −1 by its second. None: no wire there; the wire's two sides
+        joined some other way too (wires in a loop: no one current there); or an element of more pins
+        than two beyond it."""
+        head = (at[0] + step[0], at[1] + step[1])
 
-        def touching(p: Point, but: int) -> list[int]:
-            return [
-                j
-                for j, w in enumerate(self.wires)
-                if j != but and (p in w.points or any(on_segment(p, a, b) for a, b in w.segments()))
-            ]
+        def on(p, a, b):
+            return p in (a, b) or on_segment(p, a, b)
 
-        def on(w: Wire, p: Point) -> int | None:
-            """The segment of ``w`` that ``p`` is on (its ends too)."""
-            for k, (a, b) in enumerate(w.segments()):
-                if p in (a, b) or on_segment(p, a, b):
-                    return k
+        found = next(
+            (
+                (i, k)
+                for i, w in enumerate(self.wires)
+                for k, (a, b) in enumerate(w.segments())
+                if on(at, a, b) and on(head, a, b)
+            ),
+            None,
+        )
+        if found is None:
             return None
-
-        found = []
-        for i, w in enumerate(self.wires):
-            k = on(w, tail)
-            if k is None or on(w, head) is None:
-                continue
-            pts = w.points
-            along = dx * (pts[k + 1][0] - pts[k][0]) + dy * (pts[k + 1][1] - pts[k][1])
-            if not along:  # (across the wire: it says nothing of it)
-                continue
-            for forward in (True, False):  # toward the wire's last point, or its first
-                toward = (along > 0) == forward  # the arrow points that way
-                length, wire, end = 0, i, pts[-1] if forward else pts[0]
-                length += sum(abs(a[0] - b[0]) + abs(a[1] - b[1]) for a, b in self.wires[wire].segments())
-                for _ in range(len(self.wires)):
-                    here = pins_at.get(end, [])
-                    others = touching(end, wire)
-                    if len(here) == 1 and not others:
-                        e, pin = here[0]
-                        if len(e.pins()) == 2:
-                            found.append((length, e, (1 if pin == 0 else -1) * (1 if toward else -1)))
-                        break
-                    # a wire only going on from its end: along it
-                    if (
-                        here
-                        or len(others) != 1
-                        or end not in (self.wires[others[0]].points[0], self.wires[others[0]].points[-1])
-                    ):
-                        break
-                    wire = others[0]
-                    v = self.wires[wire].points
-                    end = v[-1] if v[0] == end else v[0]
-                    length += sum(abs(a[0] - b[0]) + abs(a[1] - b[1]) for a, b in self.wires[wire].segments())
-            break
-        if not found:
-            return None
-        _, e, sign = min(found, key=lambda f: f[0])
-        return e, sign
-
-    def voltages(self) -> list[tuple[Element, Point, Point]]:
-        """Its voltage arrows between two points (on wires or pins): each, the point it is from (its tail)
-        and the one it points to (its head) — the voltage V_head − V_tail."""
-        return [
-            (a, tuple(a.between[0]), tuple(a.between[1]))
-            for a in self.elements
-            if a.kind == "voltage_arrow" and a.between and len(a.between) == 2
+        i, k = found
+        w = self.wires[i]
+        # the wire cut there, between the two: its two pieces
+        a, b = w.points[k], w.points[k + 1]
+        first, second = (at, head) if (b[0] - a[0]) * step[0] + (b[1] - a[1]) * step[1] > 0 else (head, at)
+        pieces = [
+            Wire(ps)
+            for ps in (_unique([*w.points[: k + 1], first]), _unique([second, *w.points[k + 1 :]]))
+            if len(ps) > 1
         ]
+        nodes = Schematic(self.elements, [*self.wires[:i], *pieces, *self.wires[i + 1 :]], self.parts).nodes()
+        if at not in nodes:
+            return {}  # a wire's loose end: nothing flows
+        beyond = nodes[head]
+        if nodes[at] == beyond:
+            return None
+        out: dict[str, int] = {}
+        for e in self.elements:
+            if KINDS[e.kind].component is None and e.kind != "part":
+                continue
+            ps = e.pins()
+            for k, p in enumerate(ps):
+                if nodes.get(p) == beyond:
+                    if len(ps) != 2 or e.kind == "part":
+                        return None
+                    out[e.id] = out.get(e.id, 0) + (1 if k == 0 else -1)
+        return {id: k for id, k in out.items() if k}
 
-    def node_at(self, p: Point) -> str | None:
+    def mesh_current(self, at: Point) -> dict[str, int] | None:
+        """The mesh current of the loop ``at`` is in — the smallest one drawn around it — clockwise (on
+        screen): ``{id: ±1}`` as ``current_along``. Each loop's current is the one around the loop next to
+        it (out of the drawing: none) and the current of what is between them, the way it goes around:
+        found so from outside in. None: in no loop, wires crossing (no loops to tell), or only through
+        what has no one current (wires in a loop, an element of more pins) to get there."""
+        import math
+
+        plane = self._plane()
+        if plane is None:
+            return None
+        half = [(u, v, tag) for u, v, tag in plane] + [(v, u, tag) for u, v, tag in plane]
+        n = len(plane)
+        twin = [(h + n) % (2 * n) for h in range(2 * n)]
+        out: dict = {}
+        for h, (u, _, _) in enumerate(half):
+            out.setdefault(u, []).append(h)
+        for u, hs in out.items():
+            hs.sort(key=lambda h: math.atan2(half[h][1][1] - u[1], half[h][1][0] - u[0]))
+        nxt = []
+        for h, (_, v, _) in enumerate(half):
+            hs = out[v]
+            nxt.append(hs[(hs.index(twin[h]) - 1) % len(hs)])
+        # the faces: their half-edges, and their area (positive: clockwise on screen)
+        face_of = [-1] * (2 * n)
+        faces = []
+        for h in range(2 * n):
+            if face_of[h] >= 0:
+                continue
+            face, g = [], h
+            while face_of[g] < 0:
+                face_of[g] = len(faces)
+                face.append(g)
+                g = nxt[g]
+            area = sum(half[g][0][0] * half[g][1][1] - half[g][1][0] * half[g][0][1] for g in face) / 2
+            faces.append((face, area))
+        if not faces:
+            return None
+        outer_sign = math.copysign(1, max(faces, key=lambda f: abs(f[1]))[1])
+        bounded = [i for i, (_, area) in enumerate(faces) if area and math.copysign(1, area) != outer_sign]
+
+        def inside(face) -> bool:
+            crossings = 0
+            for g in face:
+                (x1, y1), (x2, y2) = half[g][0], half[g][1]
+                if (y1 > at[1]) != (y2 > at[1]) and at[0] < x1 + (at[1] - y1) * (x2 - x1) / (y2 - y1):
+                    crossings += 1
+            return crossings % 2 == 1
+
+        around = [i for i in bounded if inside(faces[i][0])]
+        if not around:
+            return None
+        target = min(around, key=lambda i: abs(faces[i][1]))
+        sense = -int(outer_sign)  # 1: a bounded face's half-edges go clockwise
+
+        def along(h) -> dict[str, int] | None:
+            u, v, tag = half[h]
+            if tag is None:
+                return None
+            if tag[0] == "element":
+                first = self.element(tag[1]).pins()[0]
+                return {tag[1]: 1 if u == first else -1}
+            return self.current_along(u, ((v[0] > u[0]) - (v[0] < u[0]), (v[1] > u[1]) - (v[1] < u[1])))
+
+        known: dict[int, dict[str, int]] = {i: {} for i in range(len(faces)) if i not in bounded}
+        queue = list(known)
+        while queue and target not in known:
+            f = queue.pop(0)
+            for h in faces[f][0]:
+                g = face_of[twin[h]]
+                if g in known:
+                    continue
+                current = along(twin[h])
+                if current is None:
+                    continue
+                total = dict(known[f])
+                for id, k in current.items():
+                    total[id] = total.get(id, 0) + sense * k
+                known[g] = {id: k for id, k in total.items() if k}
+                queue.append(g)
+        return known.get(target)
+
+    def _plane(self) -> list[tuple] | None:
+        """The drawing as a plane graph, its edges ``(u, v, tag)``: a wire's stretches between the points
+        something is at (its corners and ends, pins, other wires' ends), tag ``("wire",)``; each two-pin
+        element's body, from its first pin to its second, ``("element", id)``; an element of more pins,
+        each pin to its middle, tag None (no one current there). None: wires crossing (not a plane)."""
+        points = {p for w in self.wires for p in w.points} | {p for e in self.elements for p in e.pins()}
+        segments = [s for w in self.wires for s in w.segments()]
+        for a, b in segments:
+            for c, d in segments:
+                if a[1] == b[1] and c[0] == d[0]:  # one across, one down: crossing inside both
+                    if on_segment((c[0], a[1]), a, b) and on_segment((c[0], a[1]), c, d):
+                        return None
+        edges = set()
+        for a, b in segments:
+            on = sorted(
+                (p for p in points if p in (a, b) or on_segment(p, a, b)),
+                key=lambda p: abs(p[0] - a[0]) + abs(p[1] - a[1]),
+            )
+            for p, q in zip(on, on[1:]):
+                edges.add((min(p, q), max(p, q), ("wire",)))
+        for e in self.elements:
+            if KINDS[e.kind].component is None and e.kind != "part":
+                continue
+            ps = e.pins()
+            if len(ps) == 2 and e.kind != "part":
+                edges.add((ps[0], ps[1], ("element", e.id)))
+            elif len(ps) > 1:
+                middle = (sum(p[0] for p in ps) / len(ps), sum(p[1] for p in ps) / len(ps))
+                edges.update((p, middle, None) for p in ps)
+        return sorted(edges, key=str)
+
+    def beside(self, arrow: Element) -> Point:
+        """How far a voltage arrow between two points is drawn off its line (grid units): one square to the
+        side its name is on (its left as it points; ``flip``: its right) when it would lie on what it is
+        across — a two-pin element's body, a wire along it — as a book draws U_1 by R_1; else (0, 0)."""
+        if arrow.kind != "voltage_arrow" or not arrow.between or len(arrow.between) != 2:
+            return (0, 0)
+        a, b = (tuple(p) for p in arrow.between)
+        if a[0] != b[0] and a[1] != b[1]:
+            return (0, 0)
+
+        def on(p):
+            return p in (a, b) or on_segment(p, a, b)
+
+        def along(c, d) -> bool:
+            k = 1 if a[1] == b[1] else 0  # the coordinate they share (a row: y)
+            if not (c[k] == d[k] == a[k]):
+                return False
+            j = 1 - k
+            return min(max(a[j], b[j]), max(c[j], d[j])) > max(min(a[j], b[j]), min(c[j], d[j]))
+
+        across = any(
+            KINDS[e.kind].component is not None and len(ps := e.pins()) == 2 and all(on(p) for p in ps)
+            for e in self.elements
+        ) or any(along(c, d) for w in self.wires for c, d in w.segments())
+        if not across:
+            return (0, 0)
+        dx, dy = (b[0] > a[0]) - (b[0] < a[0]), (b[1] > a[1]) - (b[1] < a[1])
+        side = -1 if arrow.flip else 1
+        return (side * dy, -side * dx)
+
+    def node_at(self, p: Point, names: dict[Point, str] | None = None) -> str | None:
         """The name of the node ``p`` is on in ``to_circuit()`` (a pin, a wire's point or anywhere along it);
         None: on nothing."""
-        names = self.node_names()
+        names = self.node_names() if names is None else names
         if p in names:
             return names[p]
         for w in self.wires:
             if any(on_segment(p, a, b) for a, b in w.segments()):
                 return names.get(w.points[0])
         return None
-
-    def given(self) -> dict[str, str]:
-        """What its arrows and net labels give (those with a value): the solver's data, ``{"U_R5": "125"}``."""
-        out = {}
-        for a, of, sign in self.arrows():
-            if a.value and a.value.strip():
-                value = a.value.strip()
-                if sign < 0:
-                    value = value[1:] if value.startswith("-") else f"-{value}"
-                out[f"{'I' if a.kind == 'current_arrow' else 'U'}_{of.id}"] = value
-        # a net label's value: its node's potential (against ground), ``{"V_A": "4"}``
-        for e in self.elements:
-            if e.kind == "label" and e.text and e.value and e.value.strip():
-                out[f"V_{e.text}"] = e.value.strip()
-        return out
 
     @classmethod
     def from_dict(cls, data: dict) -> Schematic:

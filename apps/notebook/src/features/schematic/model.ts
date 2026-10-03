@@ -49,6 +49,7 @@ export const KINDS = [
   // what a drawing marks, not of the circuit (electro_schematic: ARROWS): a current, a voltage
   { kind: "current_arrow", prefix: "I", group: "connections" },
   { kind: "voltage_arrow", prefix: "U", group: "connections" },
+  { kind: "mesh_current", prefix: "M", group: "connections" }, // a loop's current: round, inside it
   { kind: "hole", prefix: "X", group: "other" },
   { kind: "opamp", prefix: "OA", group: "other" },
   { kind: "switch", prefix: "S", group: "controls" },
@@ -225,19 +226,73 @@ export const canRunInTime = (sch: SchematicData) =>
     (e) => e.kind !== "hole" && (!hasValue(e.kind) || kindInfo(e.kind)?.meter || (e.value ?? "").trim() !== ""),
   );
 export const isComponent = (kind: string) =>
-  !["ground", "label", "terminal", "port", "current_arrow", "voltage_arrow"].includes(kind);
-/** What an element's label keeps off: the wires, and the arrows (each as a wire from its tail to its head). */
-export const inTheWay = (sch: SchematicData): WireData[] => [
-  ...sch.wires,
-  ...sch.elements
-    .filter((e) => isArrow(e.kind))
-    .map((e) => {
-      if (e.between?.length === 2) return { points: [e.between[0]!, e.between[1]!] };
-      const [dx, dy] = rotate([arrowLength(e), 0], e.rotation);
-      return { points: [e.at, [e.at[0] + dx, e.at[1] + dy] as Point] };
-    }),
-];
+  !["ground", "label", "terminal", "port", "current_arrow", "voltage_arrow", "mesh_current"].includes(kind);
+/** What an element's label keeps off: the wires, and the arrows (each as a wire from its tail to its head,
+ *  where it is drawn: one beside what it is across, beside it). */
+export const inTheWay = (sch: SchematicData, lib: SymbolLibrary): WireData[] => {
+  const aside = besides(sch, lib);
+  return [
+    ...sch.wires,
+    ...sch.elements
+      .filter((e) => isArrow(e.kind))
+      .map((e) => {
+        if (e.between?.length === 2) {
+          const [a, b] = [e.between[0]!, e.between[1]!];
+          const [nx, ny] = aside.has(e.id) ? beside(e) : [0, 0];
+          return { points: [[a[0] + nx, a[1] + ny] as Point, [b[0] + nx, b[1] + ny] as Point] };
+        }
+        const [dx, dy] = rotate([arrowLength(e), 0], e.rotation);
+        return { points: [e.at, [e.at[0] + dx, e.at[1] + dy] as Point] };
+      }),
+  ];
+};
+
+/** Which voltage arrows between two points would lie on what they are across — an element's body, a
+ *  wire (from one of its pins to the other, along a wire): drawn beside it instead, as a book draws U_1
+ *  by R_1. */
+export function besides(sch: SchematicData, lib: SymbolLibrary): Set<string> {
+  const out = new Set<string>();
+  const on = (p: Point, a: Point, b: Point) => same(p, a) || same(p, b) || onSegment(p, a, b);
+  for (const e of sch.elements) {
+    if (e.kind !== "voltage_arrow" || e.between?.length !== 2) continue;
+    const [a, b] = [e.between[0]!, e.between[1]!];
+    if (a[0] !== b[0] && a[1] !== b[1]) continue; // (slanted: on nothing)
+    const across =
+      sch.elements.some((x) => {
+        const ps = isComponent(x.kind) ? pins(x, lib) : [];
+        return ps.length === 2 && ps.every((p) => on(p, a, b));
+      }) || sch.wires.some((w) => w.points.slice(1).some((q, i) => alongFor(a, b, w.points[i]!, q)));
+    if (across) out.add(e.id);
+  }
+  return out;
+}
+
+/** Do segments a–b and c–d lie along each other for a stretch (not only touch or cross)? */
+function alongFor(a: Point, b: Point, c: Point, d: Point): boolean {
+  const k = a[1] === b[1] ? 1 : 0; // the one coordinate they share (a row: y)
+  if (a[k] !== b[k] || c[k] !== d[k] || a[k] !== c[k]) return false;
+  const j = 1 - k;
+  return Math.min(Math.max(a[j], b[j]), Math.max(c[j], d[j])) > Math.max(Math.min(a[j], b[j]), Math.min(c[j], d[j]));
+}
+
+/** How far an arrow drawn beside what it is across is off it (grid units): one square, to the side its
+ *  name is on (its left as it points; ``flip``: its right). */
+export function beside(e: ElementData): Point {
+  const [a, b] = [e.between![0]!, e.between![1]!];
+  const [dx, dy] = [Math.sign(b[0] - a[0]), Math.sign(b[1] - a[1])];
+  const side = e.flip ? -1 : 1;
+  return [side * dy, side * -dx];
+}
 export const isArrow = (kind: string) => kind === "current_arrow" || kind === "voltage_arrow";
+/** A mark the other way round: an arrow from its head back to its tail, a loop's current the other way. */
+export function reversed(e: ElementData): Partial<ElementData> {
+  if (e.kind === "mesh_current") return { flip: e.flip ? null : true };
+  if (e.between?.length === 2) return { between: [e.between[1]!, e.between[0]!] };
+  const [dx, dy] = rotate([arrowLength(e), 0], e.rotation);
+  return { at: [e.at[0] + dx, e.at[1] + dy], rotation: (e.rotation + 180) % 360 };
+}
+/** What a drawing marks of its circuit, a quantity with a name and maybe a given value: an arrow, a loop's. */
+export const isMark = (kind: string) => isArrow(kind) || kind === "mesh_current";
 /** An arrow's length in grid units (electro_schematic.arrow_length): a current's 1, a voltage's as set. */
 export const arrowLength = (e: ElementData) =>
   e.kind === "current_arrow" ? 1 : Math.max(1, Math.min(40, Math.trunc(e.span ?? 4) || 4));
@@ -293,6 +348,58 @@ export function simplify(points: Point[]): Point[] {
  * Wires whose ends sat on a moved pin follow it. The last segment slides along with the
  * pin (as in CAD tools), so dragging never folds a wire back over itself or another wire.
  */
+/** What marks a point that moved goes with it: a voltage arrow's end, a terminal (not ``but`` those
+ *  moved themselves). */
+function follow(elements: ElementData[], moved: Map<string, Point>, ...but: string[]): ElementData[] {
+  const to = (p: Point) => moved.get(key(p)) ?? p;
+  return elements.map((e) =>
+    but.includes(e.id)
+      ? e
+      : e.between
+        ? { ...e, between: e.between.map(to) }
+        : e.kind === "terminal" && moved.has(key(e.at))
+          ? { ...e, at: to(e.at) }
+          : e,
+  );
+}
+
+/** A point a voltage is at (``from``: a terminal there, voltage arrows' ends) moved to ``to``: ``ends``
+ *  (an arrow's id, which end) go there; with ``terminal`` the terminal too — its wire whole again where it
+ *  was, split where it goes (one there already: that one). */
+export function movePoint(
+  sch: SchematicData,
+  lib: SymbolLibrary,
+  from: Point,
+  to: Point,
+  ends: [string, number][],
+  terminal: boolean,
+): SchematicData {
+  let next: SchematicData = {
+    ...sch,
+    elements: sch.elements.map((e) => {
+      const mine = ends.filter(([id]) => id === e.id).map(([, k]) => k);
+      return mine.length && e.between ? { ...e, between: e.between.map((p, k) => (mine.includes(k) ? to : p)) } : e;
+    }),
+  };
+  const t = terminal ? next.elements.find((e) => e.kind === "terminal" && same(e.at, from)) : undefined;
+  if (!t) return next;
+  next = joined({ ...next, elements: next.elements.filter((e) => e !== t) }, lib, from);
+  if (next.elements.some((e) => e.kind === "terminal" && same(e.at, to))) return next;
+  return attach({ ...next, elements: [...next.elements, { ...t, at: to }] }, lib, t.id);
+}
+
+/** Two wires meeting end to end at ``p`` with nothing else there: one wire again. */
+export function joined(sch: SchematicData, lib: SymbolLibrary, p: Point): SchematicData {
+  const ends = sch.wires.flatMap((w, i) => (same(w.points[0]!, p) || same(w.points.at(-1)!, p) ? [i] : []));
+  if (ends.length !== 2 || sch.elements.some((e) => pins(e, lib).some((q) => same(q, p)))) return sch;
+  if (sch.wires.some((w, i) => !ends.includes(i) && touchesWire(p, w))) return sch;
+  const [v, w] = ends.map((i) => sch.wires[i]!.points);
+  const into = same(v!.at(-1)!, p) ? v! : [...v!].reverse();
+  const on = same(w![0]!, p) ? w! : [...w!].reverse();
+  const points = simplify([...into, ...on]);
+  return { ...sch, wires: [...sch.wires.filter((_, i) => !ends.includes(i)), { points }] };
+}
+
 function drag(wires: WireData[], moved: Map<string, Point>): WireData[] {
   return wires.map((w) => {
     let pts = w.points;
@@ -331,7 +438,7 @@ export function moveGroup(
   const elements = sch.elements.map((e) => {
     if (!inGroup.has(e.id)) return e;
     pins(e, lib).forEach((p) => moved.set(key(p), shift(p)));
-    return { ...e, at: shift(e.at) };
+    return { ...e, at: shift(e.at), ...(e.between && { between: e.between.map(shift) }) };
   });
   const own = new Set(wireIndexes);
   // wires hanging on the group's own wires follow them too, not only those on its pins
@@ -350,7 +457,7 @@ export function moveGroup(
   );
   let next = 0;
   const wires = sch.wires.map((w, i) => (own.has(i) ? { points: w.points.map(shift) } : others[next++]));
-  return { ...sch, elements, wires };
+  return { ...sch, elements: follow(elements, moved, ...ids), wires };
 }
 
 /**
@@ -390,7 +497,11 @@ export function updateElement(
   const moved = new Map(before.map((p, i) => [key(p), after[i]] as const));
   return {
     ...sch,
-    elements: sch.elements.map((e) => (e.id === id ? updated : e)),
+    elements: follow(
+      sch.elements.map((e) => (e.id === id ? updated : e)),
+      moved,
+      id,
+    ),
     wires: drag(sch.wires, moved),
   };
 }
@@ -459,9 +570,12 @@ export function attach(sch: SchematicData, lib: SymbolLibrary, id: string): Sche
     wires = wires.flatMap((w) => {
       const ends = [w.points[0], w.points[w.points.length - 1]];
       if (ends.some((end) => own.some((q) => same(q, end)))) return [w];
-      for (let i = 0; i + 1 < w.points.length; i++)
+      for (let i = 0; i + 1 < w.points.length; i++) {
         if (onSegment(p, w.points[i], w.points[i + 1]))
           return [{ points: [...w.points.slice(0, i + 1), p] }, { points: [p, ...w.points.slice(i + 1)] }];
+        // on its corner (a wire joins by its ends only): split there too
+        if (i > 0 && same(p, w.points[i])) return [{ points: w.points.slice(0, i + 1) }, { points: w.points.slice(i) }];
+      }
       return [w];
     });
   }

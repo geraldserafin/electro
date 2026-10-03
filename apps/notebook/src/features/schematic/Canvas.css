@@ -110,6 +110,18 @@
   .canvas:not(.tool-select, .tool-hand) .pin-handle {
     pointer-events: none;
   }
+  /* a selected voltage arrow's ends: where it is hooked on, dragged elsewhere (a finger's: bigger to hit) */
+  .canvas .end-handle {
+    fill: var(--board);
+    stroke: var(--accent);
+    stroke-width: 2;
+    cursor: grab;
+  }
+  @media (pointer: coarse) {
+    .canvas .end-handle {
+      r: 9px;
+    }
+  }
   .canvas:is(.tool-select, .tool-hand) .segment-from {
     cursor: crosshair;
   }

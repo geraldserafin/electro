@@ -16,6 +16,7 @@ import {
   canRunInTime,
   inTimeOnly,
   isBoard,
+  isMark,
   PdfDrawing,
   SchematicEditor,
   updateElement,
@@ -773,8 +774,7 @@ export function SchematicCell({
                     Object.entries(cell.results).filter(
                       ([id]) =>
                         !cell.schematic.elements.some(
-                          (e) =>
-                            e.id === id && (e.kind.endsWith("_arrow") || e.kind === "label" || e.kind === "terminal"),
+                          (e) => e.id === id && (isMark(e.kind) || e.kind === "label" || e.kind === "terminal"),
                         ),
                     ),
                   )}

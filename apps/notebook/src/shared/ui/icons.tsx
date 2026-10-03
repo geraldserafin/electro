@@ -75,6 +75,12 @@ export const Rotate = () => (
     <path d="M20 4v5h-5" />
   </Icon>
 );
+export const Reverse = () => (
+  <Icon>
+    <path d="M4 8h16M16 4l4 4-4 4" />
+    <path d="M20 16H4M8 12l-4 4 4 4" />
+  </Icon>
+);
 export const Help = () => (
   <Icon>
     <circle cx="12" cy="12" r="9" />

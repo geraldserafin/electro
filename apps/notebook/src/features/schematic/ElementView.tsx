@@ -12,6 +12,7 @@ import {
 import type { ElementData, ElementResult, Point, SymbolLibrary, WireData } from "@/shared/model/types";
 import {
   arrowLength,
+  beside,
   hasValue,
   isArrow,
   isBoard,
@@ -162,6 +163,7 @@ type Props = {
   look?: Record<string, number>; // while simulating, what else it shows: its symbol's CSS variables (--a, --angle, …)
   live?: { pins: (number | null)[]; scale: number }; // running: its pins' voltages, the element coloured by them
   quiet?: boolean; // a terminal at a voltage arrow's end: no potential beside it
+  aside?: boolean; // a voltage arrow across an element (a wire): drawn beside it
   onPointerDown: (event: ReactPointerEvent, element: ElementData) => void;
 };
 
@@ -194,7 +196,14 @@ const sameColours = (a: Props["live"], b: Props["live"]) =>
  * 30 times a second, and most elements look just as they did (the same colours, the same readings).
  */
 export const ElementView = memo(
-  (props: Props) => (isArrow(props.element.kind) ? <ArrowView {...props} /> : <ElementView_ {...props} />),
+  (props: Props) =>
+    props.element.kind === "mesh_current" ? (
+      <MeshView {...props} />
+    ) : isArrow(props.element.kind) ? (
+      <ArrowView {...props} />
+    ) : (
+      <ElementView_ {...props} />
+    ),
   (a, b) =>
     a.element === b.element &&
     a.library === b.library &&
@@ -202,6 +211,7 @@ export const ElementView = memo(
     a.selected === b.selected &&
     a.closed === b.closed &&
     a.quiet === b.quiet &&
+    a.aside === b.aside &&
     (a.lit ?? 0) > 0.01 === (b.lit ?? 0) > 0.01 &&
     a.onPointerDown === b.onPointerDown &&
     sameResult(a.result, b.result) &&
@@ -220,12 +230,13 @@ const ARROW_NAME: Record<number, [number, number, "middle" | "start" | "end"]> =
 
 /** A current's or a voltage's arrow: a mark on the drawing (not of the circuit), from its tail the
  *  way it points, its name beside it. */
-function ArrowView({ element: e, library, selected, result, onPointerDown }: Props) {
+function ArrowView({ element: e, library, selected, result, aside, onPointerDown }: Props) {
   const G = library.grid;
+  const off = aside ? beside(e) : [0, 0];
   // between two points of the circuit (a voltage across them): from one to the other, at any angle, short
   // of both — a mark, not a wire between them; else along its rotation, as long as set
   const ends = e.between?.length === 2 ? e.between : null;
-  const [x, y] = ends ? [ends[0]![0] * G, ends[0]![1] * G] : [e.at[0] * G, e.at[1] * G];
+  const [x, y] = ends ? [(ends[0]![0] + off[0]!) * G, (ends[0]![1] + off[1]!) * G] : [e.at[0] * G, e.at[1] * G];
   const [hx, hy] = ends
     ? [(ends[1]![0] - ends[0]![0]) * G, (ends[1]![1] - ends[0]![1]) * G]
     : rotate([arrowLength(e) * G, 0], e.rotation);
@@ -264,20 +275,49 @@ function ArrowView({ element: e, library, selected, result, onPointerDown }: Pro
       {(e.text || result) && (
         // its name, and what it is: given (its value), or after a run what it came to
         <Label
-          text={[
-            e.text,
-            e.value?.trim()
-              ? `${e.value.trim()}${/\d$/.test(e.value.trim()) ? (e.kind === "current_arrow" ? " A" : " V") : ""}`
-              : result?.value,
-          ]
-            .filter(Boolean)
-            .join(" = ")}
+          text={markText(e, result)}
           x={x + hx / 2 + dx}
           y={y + hy / 2 + dy}
           anchor={anchor}
           solved={!e.value?.trim() && !!result}
         />
       )}
+    </g>
+  );
+}
+
+/** What a mark says: its name, and its value — given, or after a run what it came to. */
+const markText = (e: ElementData, result?: ElementResult) =>
+  [
+    e.text,
+    e.value?.trim()
+      ? `${e.value.trim()}${/\d$/.test(e.value.trim()) ? (e.kind === "voltage_arrow" ? " V" : " A") : ""}`
+      : result?.value,
+  ]
+    .filter(Boolean)
+    .join(" = ");
+
+/** A loop's current (a mesh current): a round arrow inside the loop, clockwise (``flip``: the other way),
+ *  its name and value beside it. */
+function MeshView({ element: e, library, selected, result, onPointerDown }: Props) {
+  const G = library.grid;
+  const [x, y] = [e.at[0] * G, e.at[1] * G];
+  const text = markText(e, result);
+  return (
+    <g
+      className={`element ${selected ? "selected" : ""}`}
+      data-id={e.id}
+      data-kind={e.kind}
+      onPointerDown={(event) => onPointerDown(event, e)}
+    >
+      <rect className="hit" x={x - 20} y={y - 20} width="40" height="40" />
+      {selected && <rect className="frame" x={x - 20} y={y - 20} width="40" height="40" rx="4" />}
+      <g
+        className="w"
+        transform={`translate(${x} ${y})${e.flip ? " scale(-1 1)" : ""}`}
+        dangerouslySetInnerHTML={{ __html: symbolOf(e, library).svg }}
+      />
+      {text && <Label text={text} x={x + 22} y={y + 4} anchor="start" solved={!e.value?.trim() && !!result} />}
     </g>
   );
 }

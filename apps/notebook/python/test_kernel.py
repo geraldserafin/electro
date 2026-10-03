@@ -411,6 +411,68 @@ def test_a_current_arrow_on_a_wire_is_the_current_of_the_element_it_leads_to():
     assert got["E1"]["value"] == "30 V" and got["E1"]["solved"]
 
 
+def test_a_current_arrow_between_two_junctions_is_the_current_on_beyond_it():
+    # E 12 — R1 10 — then R2, R3, R4 (20 each) side by side: an arrow on the top wire between R2 and R3,
+    # pointing right, carries R3's and R4's currents (Kirchhoff), 480 mA
+    drawing = {
+        "elements": [
+            {"id": "E1", "kind": "voltage_source", "value": "12", "nodes": ["0", "T"], "at": [[0, 8], [0, 0]]},
+            {"id": "R1", "kind": "resistor", "value": "10", "nodes": ["T", "A"], "at": [[0, 0], [6, 0]]},
+            {"id": "R2", "kind": "resistor", "value": "20", "nodes": ["A", "0"], "at": [[10, 0], [10, 8]]},
+            {"id": "R3", "kind": "resistor", "value": "20", "nodes": ["A", "0"], "at": [[14, 0], [14, 8]]},
+            {"id": "R4", "kind": "resistor", "value": "20", "nodes": ["A", "0"], "at": [[18, 0], [18, 8]]},
+        ],
+        "wires": [[[6, 0], [18, 0]], [[18, 8], [0, 8]]],
+    }
+    sch = json.loads(kernel.from_drawing(json.dumps(drawing)))["schematic"]
+    # (drawn too close: scaled twice up)
+    sch["elements"].append({"id": "I1", "kind": "current_arrow", "at": [22, 0], "rotation": 0, "text": "I"})
+    got = json.loads(kernel.simulate(json.dumps(sch)))["results"]
+    assert got["I1"]["value"] == "480 mA"
+
+
+def test_a_terminal_on_a_wires_corner_is_on_that_wire():
+    sch = {
+        "elements": [
+            {"id": "E1", "kind": "voltage_source", "at": [0, 4], "rotation": 270, "value": "6"},
+            {"id": "R1", "kind": "resistor", "at": [8, 0], "rotation": 90, "value": "12"},
+            {"id": "gnd1", "kind": "ground", "at": [0, 4]},
+            {"id": "T1", "kind": "terminal", "at": [8, 8]},
+        ],
+        "wires": [{"points": [[0, 0], [8, 0]]}, {"points": [[8, 4], [8, 8], [0, 8], [0, 4]]}],
+    }
+    got = json.loads(kernel.simulate(json.dumps(sch)))["results"]
+    assert got["T1"]["value"] == "0 V"
+
+
+def test_a_mesh_current_is_its_loops_current_around_clockwise():
+    # E 12 — R1 10, then R2 20 down the middle, R3 10 and R4 10 on the right: the left loop's current
+    # 600 mA, the right's 300 mA (both clockwise); the other way round, negative; given, a datum
+    drawing = {
+        "elements": [
+            {"id": "E1", "kind": "voltage_source", "value": "12", "nodes": ["0", "T"], "at": [[0, 8], [0, 0]]},
+            {"id": "R1", "kind": "resistor", "value": "10", "nodes": ["T", "A"], "at": [[0, 0], [6, 0]]},
+            {"id": "R2", "kind": "resistor", "value": "20", "nodes": ["A", "0"], "at": [[10, 0], [10, 8]]},
+            {"id": "R3", "kind": "resistor", "value": "10", "nodes": ["A", "B"], "at": [[10, 0], [16, 0]]},
+            {"id": "R4", "kind": "resistor", "value": "10", "nodes": ["B", "0"], "at": [[20, 0], [20, 8]]},
+        ],
+        "wires": [[[6, 0], [10, 0]], [[16, 0], [20, 0]], [[20, 8], [0, 8]]],
+    }
+    sch = json.loads(kernel.from_drawing(json.dumps(drawing)))["schematic"]
+    left = {"id": "M1", "kind": "mesh_current", "at": [5, 4], "rotation": 0, "text": "I_I"}
+    right = {"id": "M2", "kind": "mesh_current", "at": [15, 4], "rotation": 0, "text": "I_II"}
+    sch["elements"] += [left, right]
+    got = json.loads(kernel.simulate(json.dumps(sch)))["results"]
+    assert got["M1"]["value"] == "600 mA" and got["M2"]["value"] == "300 mA"
+    sch["elements"][-1] = {**right, "flip": True}
+    got = json.loads(kernel.simulate(json.dumps(sch)))["results"]
+    assert got["M2"]["value"] == "-300 mA"
+    sch["elements"][-1] = {**right, "value": "1"}  # given: E unknown
+    sch["elements"][0]["value"] = None
+    got = json.loads(kernel.simulate(json.dumps(sch)))["results"]
+    assert got["E1"]["value"] == "40 V" and got["E1"]["solved"]
+
+
 def test_a_terminals_value_is_its_points_potential_given_and_one_without_shows_it():
     drawing = {
         "elements": [

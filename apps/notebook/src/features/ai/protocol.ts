@@ -22,8 +22,12 @@ export const CIRCUIT_FORMAT = `ELEMENT: {"id": "R1", "kind": KIND, "value": "4.7
                                                      at or between; "at" one point; value: its potential
                                                      against ground, V, when given)
     current_arrow: []                               (a current's arrow as the picture marks it — on its wire, "of"
-                                                     not needed: the wire's element — I_2 by R2: "at" its tail
-                                                     and head on the wire, 1 apart, the way it points)
+                                                     not needed: the current along that wire, anywhere on it, even
+                                                     between two junctions — I_2 by R2: "at" its tail and head on
+                                                     the wire, 1 apart, the way it points)
+    mesh_current: []                                (a loop's current, the mesh method's I_I, I_II: a round arrow
+                                                     inside the loop — "at" one point inside it, clockwise unless
+                                                     "flip": true)
     voltage_arrow: []                               (a voltage's arrow beside what it is across, U_1 by R1: "at" its
                                                      tail and head, as long as drawn, the way it points — to "+")
   An arrow: "text" its name as the picture writes it, its subscript after _ ("I_2", "U_1", "U"); "of" the

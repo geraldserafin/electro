@@ -187,6 +187,8 @@ SYMBOLS: dict[str, str] = {
     # as arrow_symbol() draws them (a voltage's as long as set: this its default)
     "current_arrow": '<path d="M0 0H20"/><path class="fill" d="M16 0l-12 -3.5v7z"/>',  # a flat head on a wire
     "voltage_arrow": '<path d="M0 0H73"/><path class="fill" d="M80 0l-9 -4.5v9z"/>',
+    # a loop's current: round, clockwise, around where it is
+    "mesh_current": '<path d="M-11.3 -4.1A12 12 0 1 1 -2.1 11.8"/><path class="fill" d="M-7.4 9.5L-1.4 7.9L-2.8 15.8z"/>',
 }
 
 # IEEE Std 315's own (the rest as in IEC)

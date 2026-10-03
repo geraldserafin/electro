@@ -18,7 +18,7 @@ import {
 import { useTranslation } from "react-i18next";
 import { cn } from "@/shared/lib/cn";
 import type { ElementData, ElementResult, Point, SchematicData, SymbolLibrary } from "@/shared/model/types";
-import { More, Rotate, Target, Trash } from "@/shared/ui/icons";
+import { More, Reverse, Rotate, Target, Trash } from "@/shared/ui/icons";
 import { isAdjustable } from "./Adjusters";
 import { BoardButton, BoardIsland, board, boardIsland, islandButton } from "./Board";
 import { CurrentDots } from "./CurrentDots";
@@ -30,6 +30,7 @@ import { LcdScreen, type LcdScreenData } from "./LcdScreen";
 import { LibraryPanel, type MyPart } from "./LibraryPanel";
 import {
   attach,
+  besides,
   bounds,
   defaultText,
   defaultValue,
@@ -38,17 +39,20 @@ import {
   inTheWay,
   isComponent,
   isConnectionPoint,
+  isMark,
   junctions,
   KINDS,
   key,
   keyName,
   ledColor,
   moveGroup,
+  movePoint,
   moveSegment,
   nextId,
   onSegment,
   openPins,
   pins,
+  reversed,
   rotatedAbout,
   same,
   simplify,
@@ -64,10 +68,23 @@ import { useHistory } from "./useHistory";
 import { ScreenAndHelp, ZoomAndHistory } from "./ViewControls";
 import "./Canvas.css";
 
+// loops' currents' names, in turn: I_I, I_II, …
+const ROMAN = ["I", "II", "III", "IV", "V", "VI", "VII", "VIII", "IX", "X"];
+
 type Gesture =
   | { type: "move"; id: string; start: Point; origin: Point; snapshot: SchematicData; moved: boolean } // start: not rounded
   | { type: "wire"; from: Point; tap: { wire: number } | { id: string } } // tap: let go where it started, that is selected
   | { type: "arrow"; from: Point } // a voltage arrow stretched from a point of the circuit
+  // a point a voltage is at moved: arrows' ends (an arrow's: its end), the terminal there with them or not
+  | {
+      type: "point";
+      from: Point;
+      to: Point;
+      ends: [string, number][];
+      terminal: boolean;
+      snapshot: SchematicData;
+      moved: boolean;
+    }
   | { type: "segment"; wire: number; index: number; start: Point; snapshot: SchematicData; moved: boolean }
   | { type: "group"; ids: string[]; wires: number[]; start: Point; snapshot: SchematicData; moved: boolean }
   | { type: "box"; from: Point; to: Point }; // shift + drag on empty space, in drawing units (not rounded)
@@ -291,6 +308,11 @@ export function SchematicEditor({
   /** A quarter turn, clockwise (or back, ``-1``). */
   const rotateSelected = (dir: 1 | -1 = 1) => {
     if (!selectedElement) return;
+    // a mark: the other way round (an arrow along a wire, between two points, a loop's: turned, it says nothing)
+    if (isMark(selectedElement.kind)) {
+      commit(updateElement(value, library, selectedElement.id, reversed(selectedElement)));
+      return;
+    }
     const rotation = (selectedElement.rotation + 360 + 90 * dir) % 360;
     const at = rotatedAbout(selectedElement, library, rotation);
     commit({
@@ -445,7 +467,11 @@ export function SchematicEditor({
                 ? 90
                 : 0,
             value: defaultValue(tool.kind),
-            text: defaultText(tool.kind),
+            // a loop's current: the next of I_I, I_II, …
+            text:
+              tool.kind === "mesh_current"
+                ? `I_${ROMAN[value.elements.filter((e) => e.kind === "mesh_current").length] ?? "M"}`
+                : defaultText(tool.kind),
           };
       // right on one that is there (the same pins): that one, picked — not another over it
       const lib = withParts(symbols, next.parts);
@@ -552,9 +578,38 @@ export function SchematicEditor({
     if (!drawingTool || live || viewOnly || untapped(event)) return;
     event.stopPropagation();
     svgRef.current?.focus({ preventScroll: true });
-    begin({ type: "wire", from: pin, tap: { id: e.id } });
+    // a terminal selected: moved (the arrows' ends on it with it) — else a wire, or a voltage, from it
+    if (e.kind === "terminal" && selection?.type === "element" && selection.id === e.id) {
+      const ends = value.elements.flatMap((x) =>
+        (x.between ?? []).flatMap((p, k) => (same(p, pin) ? [[x.id, k] as [string, number]] : [])),
+      );
+      begin({ type: "point", from: pin, to: pin, ends, terminal: true, snapshot: value, moved: false });
+    } else begin({ type: "wire", from: pin, tap: { id: e.id } });
     svgRef.current?.setPointerCapture(event.pointerId);
   };
+
+  /** An end of the voltage arrow selected, pressed: moved to another point of the circuit — its terminal
+   *  with it, unless something else has it (another arrow's end, a name, a value). */
+  const onEndDown = (event: ReactPointerEvent, e: ElementData, k: number) => {
+    if (!drawingTool || live || viewOnly || !e.between) return;
+    event.stopPropagation();
+    svgRef.current?.focus({ preventScroll: true });
+    const from = e.between[k]!;
+    const t = value.elements.find((x) => x.kind === "terminal" && same(x.at, from));
+    const shared = value.elements.some((x) => x.id !== e.id && (x.between ?? []).some((p) => same(p, from)));
+    const terminal = !!t && !shared && !t.value?.trim() && !t.text;
+    begin({ type: "point", from, to: from, ends: [[e.id, k]], terminal, snapshot: value, moved: false });
+    svgRef.current?.setPointerCapture(event.pointerId);
+  };
+
+  /** Where a point being moved may go: onto the circuit (a pin, a wire), not onto another end of its arrows. */
+  const pointFits = (g: Extract<Gesture, { type: "point" }>, p: Point) =>
+    !same(p, g.from) &&
+    isConnectionPoint(g.snapshot, library, p) &&
+    g.ends.every(([id, k]) => {
+      const other = g.snapshot.elements.find((x) => x.id === id)?.between?.[1 - k];
+      return !other || !same(other, p);
+    });
 
   // The gesture and what it has drawn so far live in refs: pointer moves are rendered later than
   // they come (React gives them a lower priority), so by the time the pointer is let go the last
@@ -585,6 +640,14 @@ export function SchematicEditor({
       const now = (drawn.current ?? g.snapshot).elements.find((e) => e.id === g.id)!.at;
       // (its wires laid anew around what is in the way, as it goes)
       if (!same(at, now)) emit(g, relaid(g.snapshot, updateElement(g.snapshot, library, g.id, { at }), library, g.id));
+    }
+    if (g?.type === "point" && !same(p, g.to)) {
+      // (as it goes: its arrows' ends there; the terminal too, where it may go)
+      g.to = p;
+      emit(
+        g,
+        same(p, g.from) ? g.snapshot : movePoint(g.snapshot, library, g.from, p, g.ends, g.terminal && pointFits(g, p)),
+      );
     }
     if (g?.type === "box") {
       g.to = toDrawing(event);
@@ -654,6 +717,12 @@ export function SchematicEditor({
     if (!g) return;
     if (g.type === "move" && g.moved && now) commit(attach(now, library, g.id), g.snapshot);
     if ((g.type === "segment" || g.type === "group") && g.moved && now) commit(now, g.snapshot);
+    // a point moved: where it fits, there; else back where it was
+    if (g.type === "point" && g.moved) {
+      const end = toGrid(event);
+      if (pointFits(g, end)) commit(movePoint(g.snapshot, library, g.from, end, g.ends, g.terminal), g.snapshot);
+      else onChange(g.snapshot);
+    }
     if (g.type === "box") {
       // added to what was selected (shift is held for it)
       const box = inBox(value, library, g.from, g.to);
@@ -786,7 +855,8 @@ export function SchematicEditor({
   const junctionPoints = useMemo(() => junctions(value, library), [value, library]);
   // the points voltage arrows are between: their terminals say nothing themselves (the arrow does)
   const arrowEnds = useMemo(() => new Set(value.elements.flatMap((x) => (x.between ?? []).map(key))), [value.elements]);
-  const obstacles = useMemo(() => inTheWay(value), [value]); // (what labels keep off)
+  const obstacles = useMemo(() => inTheWay(value, library), [value, library]); // (what labels keep off)
+  const aside = useMemo(() => besides(value, library), [value, library]); // (voltages drawn beside)
   const openPinPoints = useMemo(() => openPins(value, library), [value, library]);
   const wiring = gesture?.type === "wire" || gesture?.type === "arrow";
   // (a terminal to another: the arrow it will be, straight)
@@ -1059,6 +1129,7 @@ export function SchematicEditor({
               live={live && { pins: live.pins[e.id] ?? [], scale: live.scale }}
               selected={picked(selection).ids.includes(e.id) || (probed?.type === "element" && probed.id === e.id)}
               quiet={e.kind === "terminal" && arrowEnds.has(key(e.at))}
+              aside={aside.has(e.id)}
               onPointerDown={onElementDownStable}
             />
           ))}
@@ -1120,6 +1191,21 @@ export function SchematicEditor({
                 </circle>
               )),
             )}
+          {/* the voltage arrow selected: its ends, where it is hooked on — dragged to another point */}
+          {selectedElement?.between?.length === 2 &&
+            drawingTool &&
+            !live &&
+            !viewOnly &&
+            selectedElement.between.map(([x, y], k) => (
+              <circle
+                key={`end${k}`}
+                className="end-handle"
+                cx={x * G}
+                cy={y * G}
+                r="5"
+                onPointerDown={(event) => onEndDown(event, selectedElement, k)}
+              />
+            ))}
           {preview && <polyline className="w draft" points={pointsOf(preview)} />}
           {gesture?.type === "box" && (
             <rect
@@ -1253,10 +1339,10 @@ export function SchematicEditor({
               <BoardButton
                 className={islandButton()}
                 onClick={() => rotateSelected()}
-                title={t("inspector.rotateTitle")}
-                aria-label={t("inspector.rotate")}
+                title={t(isMark(selectedElement.kind) ? "inspector.reverse" : "inspector.rotateTitle")}
+                aria-label={t(isMark(selectedElement.kind) ? "inspector.reverse" : "inspector.rotate")}
               >
-                <Rotate />
+                {isMark(selectedElement.kind) ? <Reverse /> : <Rotate />}
               </BoardButton>
             )}
             <BoardButton

@@ -128,6 +128,7 @@ it is checked against that part of the picture, and mended, before it comes back
                 text: { type: "string" },
                 of: { type: "string" },
                 between: { type: "array", items: { type: "array", items: { type: "number" } } },
+                flip: { type: "boolean" },
                 nodes: { type: "array", items: { type: "string" } },
                 at: { type: "array", items: { type: "array", items: { type: "number" } } },
               },

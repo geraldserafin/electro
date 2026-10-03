@@ -7,6 +7,7 @@ results below or right, current arrows pointing the way the current really flows
 
 from __future__ import annotations
 
+import math
 import re
 from collections import Counter
 from xml.sax.saxutils import escape
@@ -106,6 +107,20 @@ def _tspans(text: str) -> str:
 # --------------------------------------------------------------------------- drawing
 
 
+def _arrow_ends(sch: Schematic, e) -> tuple[tuple[float, float], tuple[float, float]]:
+    """An arrow's tail and head (px): between two points of the circuit short of both (beside what it is
+    across: ``Schematic.beside``), else from ``at`` as it points, as long as it is."""
+    if e.between and len(e.between) == 2:
+        ox, oy = sch.beside(e)
+        (ax, ay), (bx, by) = (((px + ox) * GRID, (py + oy) * GRID) for px, py in e.between)
+        d = math.hypot(bx - ax, by - ay) or 1
+        ux, uy = (bx - ax) / d * 9, (by - ay) / d * 9
+        return (ax + ux, ay + uy), (bx - ux, by - uy)
+    x, y = e.at[0] * GRID, e.at[1] * GRID
+    hx, hy = rotate((arrow_length(e) * GRID, 0), e.rotation)
+    return (x, y), (x + hx, y + hy)
+
+
 def _junctions(sch: Schematic) -> list[tuple[int, int]]:
     """Grid points where three or more connected wires/pins meet (same rules as Schematic.nodes)."""
     count: Counter = Counter()
@@ -201,25 +216,42 @@ def _draw(sch: Schematic, solution) -> Svg:
         ps = [(px * GRID, py * GRID) for px, py in e.pins()]
         obstacles += list(zip(ps, ps[1:]))
         if e.kind in MARKS:  # (an arrow: from its tail to its head)
-            hx, hy = rotate((arrow_length(e) * GRID, 0), e.rotation)
-            obstacles.append(((e.at[0] * GRID, e.at[1] * GRID), (e.at[0] * GRID + hx, e.at[1] * GRID + hy)))
+            (tx, ty), (hx, hy) = _arrow_ends(sch, e)
+            obstacles.append(((tx, ty), (hx, hy)))
 
     placed: list[tuple] = []  # boxes of texts already on the page
     for e in sch.elements:
         x, y = e.at[0] * GRID, e.at[1] * GRID
-        if e.kind in MARKS:  # an arrow: its name on its left as it points (above one pointing right)
-            length = arrow_length(e) * GRID
-            canvas.items.append(
-                f'<g class="w" transform="translate({x:g} {y:g}) rotate({e.rotation})">{arrow_symbol(length)}</g>'
-            )
-            hx, hy = rotate((length, 0), e.rotation)
-            canvas.grow(x, y)
-            canvas.grow(x + hx, y + hy)
-            side = {0: UP, 90: RIGHT, 180: DOWN, 270: LEFT}[e.rotation]
-            unit = "A" if e.kind == "current_arrow" else "V"
+        if e.kind == "mesh_current" or e.kind in MARKS:
             given = e.value and e.value.strip()
+            unit = "V" if e.kind == "voltage_arrow" else "A"
             name = f"{e.text or ''} = {given}{' ' + unit if given[-1:].isdigit() else ''}" if given else e.text or ""
-            canvas.text(x + hx / 2, y + hy / 2, side, [(name, "label")])
+        if e.kind == "mesh_current":  # a loop's current: round, clockwise (flip: the other way), named beside
+            flip = " scale(-1 1)" if e.flip else ""
+            canvas.items.append(f'<g class="w" transform="translate({x:g} {y:g}){flip}">{symbol(e.kind)}</g>')
+            canvas.grow(x - 16, y - 16)
+            canvas.grow(x + 16, y + 16)
+            canvas.text(x + 18, y, RIGHT, [(name, "label")])
+            continue
+        if e.kind in MARKS:  # an arrow: its name on its left as it points (above one pointing right)
+            (tx, ty), (hx, hy) = _arrow_ends(sch, e)
+            length = math.hypot(hx - tx, hy - ty) or 1
+            angle = math.degrees(math.atan2(hy - ty, hx - tx))
+            # a current's on its wire: a head only (the wire is its line)
+            body = (
+                f'<path class="fill" d="M{length / 2 + 6:g} 0l-12 -3.5v7z"/>'
+                if e.kind == "current_arrow" and not e.between
+                else arrow_symbol(length)
+            )
+            canvas.items.append(f'<g class="w" transform="translate({tx:g} {ty:g}) rotate({angle:g})">{body}</g>')
+            canvas.grow(tx, ty)
+            canvas.grow(hx, hy)
+            # its left as it points, the nearest of the four sides (flip: its right)
+            nx, ny = (hy - ty) / length, -(hx - tx) / length
+            if e.flip:
+                nx, ny = -nx, -ny
+            side = max((UP, DOWN, LEFT, RIGHT), key=lambda d: d[0] * nx + d[1] * ny)
+            canvas.text((tx + hx) / 2, (ty + hy) / 2, side, [(name, "label")])
             continue
         rotation = 0 if e.kind in UPRIGHT else e.rotation
         state = " closed" if e.kind in ("switch", "button") and e.text == "closed" else ""

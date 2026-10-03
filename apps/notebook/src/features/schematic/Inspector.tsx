@@ -6,10 +6,10 @@ import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { cn } from "@/shared/lib/cn";
 import type { ElementData } from "@/shared/model/types";
-import { Rotate, Trash } from "@/shared/ui/icons";
+import { Reverse, Rotate, Trash } from "@/shared/ui/icons";
 import { Adjusters, isAdjustable } from "./Adjusters";
 import { useKinds } from "./kinds";
-import { hasValue, isArrow, isComponent, isControlled, kindInfo } from "./model";
+import { hasValue, isComponent, isControlled, isMark, kindInfo, reversed } from "./model";
 import { field, Panel, Section, Tile } from "./Panel";
 
 export type Selection =
@@ -150,8 +150,9 @@ export function Inspector({
           />
         </Section>
       )}
-      {/* an arrow: its name (U, I_2), the amount it is — given (the solver's), or empty: what it comes to */}
-      {!live && isArrow(element.kind) && (
+      {/* a mark: its name (U, I_2), the amount it is — given (the solver's), or empty: what it comes to (a
+          loop's: its name beside it, its flip its way round) */}
+      {!live && isMark(element.kind) && (
         <Section label={t("inspector.arrowName")}>
           <span className="relative block">
             <input
@@ -161,11 +162,11 @@ export function Inspector({
               aria-label={t("inspector.arrowName")}
               onChange={(e) => onChange({ text: e.target.value })}
             />
-            <Flip element={element} onChange={onChange} />
+            {element.kind !== "mesh_current" && <Flip element={element} onChange={onChange} />}
           </span>
         </Section>
       )}
-      {!live && isArrow(element.kind) && (
+      {!live && isMark(element.kind) && (
         <Section label={t("inspector.arrowValue")}>
           <span className="relative block">
             <input
@@ -178,7 +179,7 @@ export function Inspector({
               onChange={(e) => onChange({ value: e.target.value.trim() === "" ? null : e.target.value })}
             />
             <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted pointer-events-none">
-              {element.kind === "current_arrow" ? "A" : "V"}
+              {element.kind === "voltage_arrow" ? "V" : "A"}
             </span>
           </span>
         </Section>
@@ -226,9 +227,19 @@ export function Inspector({
       {!live && (
         <Section label={t("inspector.actions")}>
           <div className="flex gap-1.5">
-            <Tile onClick={onRotate} title={t("inspector.rotateTitle")} aria-label={t("inspector.rotate")}>
-              <Rotate />
-            </Tile>
+            {isMark(element.kind) ? (
+              <Tile
+                onClick={() => onChange(reversed(element))}
+                title={t("inspector.reverse")}
+                aria-label={t("inspector.reverse")}
+              >
+                <Reverse />
+              </Tile>
+            ) : (
+              <Tile onClick={onRotate} title={t("inspector.rotateTitle")} aria-label={t("inspector.rotate")}>
+                <Rotate />
+              </Tile>
+            )}
             <Tile
               className="hover:bg-err-bg hover:text-danger"
               onClick={onRemove}
