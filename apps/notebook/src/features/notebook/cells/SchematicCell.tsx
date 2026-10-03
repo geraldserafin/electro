@@ -582,7 +582,7 @@ export function SchematicCell({
   const runButton = (
     <RunButton
       run={run}
-      quiet
+      eager // (the one to press: primary, as the note's own run)
       icon={running ? <Stop /> : undefined}
       running={solving || busy || live.status === "starting"}
       done={!running && (empty || (done && !inTime))}
