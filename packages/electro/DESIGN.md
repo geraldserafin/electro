@@ -82,7 +82,11 @@ Składnia ta sama, zmienia się tylko to, **nad czym** są relacje (pierścień 
 - Przykład (RC, E = 10 V, R = 1 kΩ, C = 100 µF): kartka U_C = 10 V; symulacja 0 → 3,9 → 6,3 →
   8,6 → 9,93 V (t = 0; 0,05; 0,1; 0,2; 0,5 s) — dąży do kartki.
 
-### 1.6 Gdzie teoria się sypie (żeby jej nie przecenić)
+### 1.6 Czego teoria sama nie załatwia (żeby jej nie przecenić)
+
+Żadna z tych rzeczy nie jest wyjątkiem w systemie — każdy element podlega temu samemu mechanizmowi
+(F16, §9.2). To są granice tego, co analiza może *odpowiedzieć*, i trzeba je mówić w wyniku.
+
 
 - Funktor stanów ustalonych daje **równowagi, nie granice**: oscylator ma równowagę, do której
   symulacja nigdy nie dojdzie. Stabilność to osobna własność, nie wynika z kategorii.
@@ -90,8 +94,12 @@ Składnia ta sama, zmienia się tylko to, **nad czym** są relacje (pierścień 
   złożenia ≠ złożenie dyskretyzacji.
 - Elementy nieliniowe (dioda): relacje dalej się składają, ale przestają być liniowe — tracimy
   rachunek macierzowy, nie kategorię. DC dla nich to i tak iteracja (Newton) do punktu stałego.
-- Arduino, 555, przerzutniki: stan dyskretny + ciągły (systemy hybrydowe) — poza relacjami
-  liniowymi; teoria dla nich to np. snopy czasowe (Schultz–Spivak–Vasilakopoulou).
+- Arduino, 555, przerzutniki: stan dyskretny + ciągły (systemy hybrydowe). W systemie to zwykłe
+  elementy — relacje z `Pre` (pamięć) zamiast albo obok `D` (§9.2). Teoria takich układów to np.
+  snopy czasowe (Schultz–Spivak–Vasilakopoulou); dla nas: równowaga może być niejedna (przerzutnik)
+  albo żadna (działający program), co analiza DC mówi w wyniku.
+- Całość zakłada **elementy skupione** (obwód mały wobec długości fali — wtedy działają prawa
+  Kirchhoffa). Co to łamie (linie, anteny), wchodzi jako element z `Delay`.
 
 ### 1.7 Co z tego wynika w praktyce
 
@@ -137,7 +145,7 @@ Każdy fakt to coś, co w rzeczywistości jest osobnym pojęciem — więc w kod
 | F12 | **Wynik ma wspólny interfejs** — rozwiązanie, przebieg i charakterystyka odpowiadają na to samo pytanie, różni się wymiar odpowiedzi. | `result(sought)` → liczba / funkcja t / funkcja ω. |
 | F13 | **Własny komponent to nazwana wartość** (jak `let`). | Zwykły `Circuit` przypisany do nazwy; szablon wielokrotnego użytku = funkcja zwracająca `Circuit` (świeże węzły na każde wywołanie). |
 | F14 | **Wartości mają jednostki.** `R_1 = 5 V` to błąd. | Sprawdzane przy budowie `Problem`. |
-| F16 | **Minimalny i ogólny rdzeń.** Prawa rządzące obwodem (sklejanie → Kirchhoff) nie zależą od elementów; element to tylko jego relacja U–I, zapisana raz w czasie (`D` = d/dt). Nawet w systemie z samym rezystorem dodanie kondensatora to dopisanie jednej definicji. Analizy różnią się tylko interpretacją `D` (DC: 0, AC: jω, krok: różnica wsteczna). | §9.2: `two_terminal(…, law=…)`; analiza = `interpret(law, analysis)`. |
+| F16 | **Minimalny i ogólny rdzeń, bez wyjątków.** Prawa obwodu (sklejanie → Kirchhoff) nie zależą od elementów. Element to relacja między sygnałami na końcówkach i swoim stanem, zapisana raz w czasie słownikiem `D`, `Pre`, `Delay`, `when` i czystymi funkcjami. Rezystor, kondensator, dioda, przerzutnik, Arduino, linia transmisyjna — ten sam mechanizm. Dodanie elementu = jedna definicja; analiza = interpretacja słownika czasu. | §9.2: `two_terminal(…)`, `element(…)`; analiza = `interpret(law, analysis)`. |
 | F15 | **Składanie nie jest przemienne.** `a >> b ≠ b >> a` (inny brzeg, inny kierunek). Równoległe naprawdę jest przemienne. Uwaga: `R1 >> R2` i `R2 >> R1` to różne obwody (węzeł środkowy gdzie indziej), ale z zacisków zachowują się tak samo (R₁+R₂) — przemienność na poziomie zachowania, nie struktury. Biblioteka opisuje strukturę. | `>>` zamiast `+` (patrz §4). |
 
 ## 3. Typy
@@ -246,15 +254,16 @@ bridge = (a >> E1 >> R1 >> b) @ (b >> R2 >> a) @ (b >> R3 >> E2 >> a)   # dwa oc
    Arność `n → m` sprawdzana przy budowie (Python nie ma typów zależnych), reszta statycznie.
 9. **Efekt jest jeden i jawny: świeża tożsamość.** `Node()` i nowy element przydzielają nową tożsamość
    (w Haskellu: monada świeżych nazw). Trzymamy to tylko tam — reszta czysta.
-10. **Minimalny rdzeń (F16).** Nowy element = jego prawo i nic więcej; nowa analiza = interpretacja
-    `D` i nic więcej. Jeśli dodanie czegoś wymaga zmian w kilku miejscach, to błąd projektu.
+10. **Minimalny rdzeń bez wyjątków (F16).** Nowy element = jego relacja i nic więcej; nowa analiza =
+    interpretacja słownika czasu i nic więcej. Żadnych specjalnych rodzajów elementów. Jeśli dodanie
+    czegoś wymaga zmian w kilku miejscach albo osobnej ścieżki, to błąd projektu.
 
 ## 6. Przegląd obecnego kodu (`src/electro`, ~5800 linii)
 
 | problem | gdzie | kierunek |
 |---|---|---|
 | Elementy zmienne: wartość w konstruktorze, `Parts._use` robi `setattr`, `circuit(**data)` musi kopiować obiekt i czyścić `netlist` z cache'u | `components.py:102`, `:166`, `circuit.py` (`__call__`) | element bez wartości, frozen; dane w `Problem` |
-| Prawa elementów przez dziedziczenie i metodę `build(self, label, V, param, ctx) -> Model` — każdy element sam rozpatruje DC/AC/krok; `Model` to zmienny dataclass z mutowalnymi domyślnymi słownikami | `components.py`, `devices.py` | element = jedna relacja U–I z `D`, analizy interpretują `D` (F16, §9.2) |
+| Prawa elementów przez dziedziczenie i metodę `build(self, label, V, param, ctx) -> Model` — każdy element sam rozpatruje DC/AC/krok; `Model` to zmienny dataclass z mutowalnymi domyślnymi słownikami | `components.py`, `devices.py` | element = jedna relacja w czasie, analizy interpretują słownik czasu (F16, §9.2) |
 | Wielkie imperatywne `compile_netlist`: akumuluje listy i słowniki, w środku własny union-find | `semantics.py:122` | rozbić na małe funkcje: węzły → potencjały → prawa elementów → KCL → odniesienia |
 | Union-find trzy razy | `circuit.py` (`glue`), `semantics.py` (odniesienia), `electro_schematic/model.py` (`nodes`) | jedna funkcja `components(pairs) -> partition` |
 | Etykiety: automatyczne nadawanie (`_labels`) i „luźne” dopasowanie (`"R1"` znajduje `R_1`) — ukryta magia na napisach | `semantics.py:87`, `System.symbol` | tożsamość elementu (F7); nazwy parametrów jawne |
@@ -360,70 +369,108 @@ r1 | r2                  # równolegle
 r1 @ r2                  # obok siebie (2 → 2)
 ```
 
-### 9.2 Element: jedno prawo w czasie, analizy go tylko interpretują
+### 9.2 Element: jedna relacja w czasie, analizy ją tylko interpretują
 
-Rdzeń wie tylko o sklejaniu węzłów (KCL/KVL wynikają z niego) i o tym, że element to **relacja
-między napięciem a prądem na jego końcówkach**, zapisana raz, w czasie, z operatorem pochodnej `D`.
-Nic więcej. Kondensator dopisuje się jedną definicją — żadna analiza ani reszta biblioteki o nim
-nie wie (F16).
+Rdzeń wie tylko o sklejaniu węzłów (KCL/KVL wynikają z niego) i o tym, że **element to relacja
+między sygnałami na jego końcówkach (U, I każdej) i jego stanem wewnętrznym**, zapisana raz, w czasie.
+Nic więcej. Żadnych furtek ani „specjalnych” rodzajów: rezystor, kondensator, dioda, przerzutnik,
+Arduino i linia transmisyjna to ten sam mechanizm (F16).
+
+**Słownik czasu** — całość tego, czym relacja może mówić o czasie:
+
+| operator | znaczenie | kto go używa |
+|---|---|---|
+| `D(x)` | pochodna po czasie (zmiana ciągła) | kondensator, cewka |
+| `Pre(x)` | wartość tuż przed chwilą obecną (pamięć) | przerzutnik, licznik, rejestr, stan procesora |
+| `Delay(x, τ)` | wartość sprzed τ | linia transmisyjna, element opóźniający |
+| `when(c, a, b)` | warunek | logika, zbocze (`rising(x) = x > próg ∧ Pre(x) ≤ próg`) |
+| czyste funkcje | dowolne, także nieliniowe i „nieprzezroczyste” | dioda (`exp`), tranzystor, krok procesora |
+
+**Elementy** — każdy to jedna definicja:
 
 ```python
-# cały rdzeń elementów dwukońcówkowych: nazwa, jednostka, symetria, prawo
-def two_terminal(name: str, prefix: str, unit: Unit, law: Law2, symmetric: bool = True) -> Kind: ...
-
-# Law2 = (U, I, parametr) -> wyrażenie równe zero; D(x) to pochodna po czasie
+# dwukońcówkowe: (U, I, parametr) -> wyrażenie = 0
 Resistor  = two_terminal("resistor",  "R", OHM,   lambda U, I, R: U - R * I)
 Capacitor = two_terminal("capacitor", "C", FARAD, lambda U, I, C: I - C * D(U))
 Inductor  = two_terminal("inductor",  "L", HENRY, lambda U, I, L: U - L * D(I))
-VoltageSource = two_terminal("voltage_source", "E", VOLT,   lambda U, I, E: U - E, symmetric=False)
-CurrentSource = two_terminal("current_source", "J", AMPERE, lambda U, I, J: I - J, symmetric=False)
+Diode     = two_terminal("diode",     "D", None,
+                         lambda U, I, d: I - d.I_S * (exp(U / (d.n * V_T)) - 1), symmetric=False)
+VoltageSource = two_terminal("voltage_source", "E", VOLT, lambda U, I, E: U - E, symmetric=False)
+
+# dowolne: końcówki, stan, relacja (lista wyrażeń = 0)
+DFlipFlop = element(
+    "d_flip_flop", "FF", ports=("d", "clk", "q"), state=("s",),
+    law=lambda p, s: [
+        s.s - when(rising(p.clk.V), p.d.V > V_HIGH / 2, Pre(s.s)),   # zapamiętaj d na zboczu zegara
+        p.q.V - V_HIGH * s.s,                                         # wyjście
+        p.d.I, p.clk.I,                                               # wejścia nie pobierają prądu
+    ],
+)
+
+Arduino = element(
+    "arduino", "ARD", ports=ARDUINO_PINS, state=("cpu",),
+    law=lambda p, s, firmware: [
+        # stan procesora: na takcie zegara krok emulatora, poza nim bez zmian
+        s.cpu - when(tick(F_CPU), mcu_step(firmware, Pre(s.cpu), read_pins(p)), Pre(s.cpu)),
+        # każdy pin: to, co procesor na nim ustawia (wyjście / wejście z podciąganiem / wysoka impedancja)
+        *(pin_law(p[k], drive(s.cpu, k)) for k in ARDUINO_PINS),
+    ],
+)
+
+TransmissionLine = element(          # bezstratna linia: fale biegnące, opóźnienie τ, impedancja Z₀
+    "line", "TL", ports=("a", "b"), state=(),
+    law=lambda p, _, line: [
+        p.a.V + line.Z0 * p.a.I - Delay(p.b.V - line.Z0 * p.b.I, line.tau),
+        p.b.V + line.Z0 * p.b.I - Delay(p.a.V - line.Z0 * p.a.I, line.tau),
+    ],
+)
 ```
+
+`mcu_step(firmware, state, inputs) -> state` to czysta funkcja (emulator procesora) — dla rdzenia
+zwykła nieprzezroczysta funkcja w relacji. **Program to dana**, nie struktura:
+`given={arduino: firmware}` — tak jak wartość rezystora (F10).
 
 Rodzaj wywołany z nazwą daje element: `Resistor("R_1")` → `Element(kind=Resistor, name="R_1")`
 (niezmienny, tożsamość = obiekt — §9.3).
 
-Analiza to interpretacja `D` — jedna funkcja na analizę, nie gałąź w każdym elemencie:
+**Analiza = interpretacja słownika czasu** — jedna funkcja na analizę, nie gałąź w każdym elemencie:
+
+| analiza | `D(x)` | `Pre(x)` | `Delay(x, τ)` | wynik |
+|---|---|---|---|---|
+| `Step(dt)` — symulacja | (x − x⁻)/dt | wartość z poprzedniego kroku | wartość sprzed τ z historii | przebieg |
+| `DC` — równowaga | 0 | x | x | relacja równowag (może mieć wiele rozwiązań albo żadnego) |
+| `AC(ω)` — mały sygnał wokół równowagi | jω·x | x | e^(−jωτ)·x | charakterystyka |
 
 ```python
 @dataclass(frozen=True)
-class DC: ...                     # D(x) → 0           (kondensator: przerwa, cewka: zwarcie — wychodzi samo)
+class DC: ...
 
 @dataclass(frozen=True)
 class AC:
-    omega: sp.Expr                # D(x) → jω·x        (impedancje 1/(jωC), jωL — wychodzą same)
+    omega: sp.Expr
+    around: Solution | None = None     # punkt pracy (nieliniowe: linearyzacja wychodzi z prawa sama)
 
 @dataclass(frozen=True)
 class Step:
-    dt: sp.Symbol                 # D(x) → (x − x⁻)/dt (krok wstecz; co trzeba pamiętać między
-                                  #  krokami, wynika z tego, czego pochodna występuje)
+    dt: sp.Symbol
 
 Analysis = DC | AC | Step
 
-
-def interpret(law: sp.Expr, analysis: Analysis) -> tuple[sp.Expr, States]:
-    """Prawo elementu w danej analizie: każde D(x) zastąpione, plus stan do zapamiętania (Step)."""
-    match analysis:
-        case DC():          return law.replace(D, lambda x: 0), {}
-        case AC(omega):     return law.replace(D, lambda x: sp.I * omega * x), {}
-        case Step(dt):      ...   # D(x) → (x − x_prev)/dt, x_prev do stanu
+def interpret(law: Relation, analysis: Analysis) -> tuple[Relation, Memory]:
+    """Relacja elementu w danej analizie: operatory czasu zastąpione; co pamiętać między krokami."""
 ```
 
 Co z tego wynika:
 
-- **Nowy element = jedna linijka** (prawo). Kartka, fazory, Bode, symulacja działają od razu.
-- **Nowa analiza = jedna funkcja** (interpretacja `D`). Działa od razu dla każdego elementu.
-- **Kroki rozwiązania** (`steps`) biorą uzasadnienie z prawa elementu: „prawo R_1”, a nazwę prawa
-  (Ohm) z jego definicji — bez osobnej klasy powodu na każdy element.
-
-Granice (uczciwie):
-
-- **Elementy wielokońcówkowe** (transformator, wzmacniacz, tranzystor): to samo, tylko relacja na
-  kilku parach (U, I): `multi_terminal(..., law=lambda U, I, p: [...])`.
-- **Nieliniowe** (dioda: `I − I_S·(exp(U/(n·V_T)) − 1)`): prawo zapisuje się tak samo. DC liczy je
-  Newtonem; AC wymaga linearyzacji w punkcie pracy — da się ją wyprowadzić automatycznie z prawa
-  (pochodna po U), więc też bez dopisywania czegokolwiek w elemencie.
-- **Elementy ze stanem dyskretnym** (Arduino, przerzutnik, 555): nie są relacją U–I z `D`. Dla nich
-  osobna, jawna furtka — rodzaj z własną funkcją kroku. To jedyny wyjątek od „jedno prawo”.
+- **Nowy element = jedna definicja** (relacja). Kartka, fazory, Bode, symulacja działają od razu.
+- **Nowa analiza = jedna interpretacja słownika czasu.** Działa od razu dla każdego elementu.
+- **Odpowiedzi analiz są uczciwe, a nie wyjątkami.** Przerzutnik w DC ma dwie równowagi (pamięć —
+  tak jest naprawdę); działające Arduino zwykle nie ma równowagi (program się wykonuje) — `solve`
+  mówi to w wyniku, a symulacja liczy przebieg. To fakty o elemencie, nie dziury w systemie.
+- **Kroki rozwiązania** biorą uzasadnienie z relacji elementu („prawo R_1”, nazwa prawa z definicji).
+- Jedyne założenie całości to założenie teorii obwodów: **elementy skupione** (obwód mały wobec
+  długości fali, więc działają prawa Kirchhoffa). Co go łamie (linie, anteny), wchodzi jako element
+  z `Delay` — dalej bez wyjątków.
 
 ### 9.3 Obwód: niezmienne drzewo, operatory jako cukier
 
