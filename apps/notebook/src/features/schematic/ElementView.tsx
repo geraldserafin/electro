@@ -221,6 +221,7 @@ const ARROW_NAME: Record<number, [number, number, "middle" | "start" | "end"]> =
 function ArrowView({ element: e, library, selected, result, onPointerDown }: Props) {
   const G = library.grid;
   const length = arrowLength(e) * G;
+  const gap = e.between ? 9 : 0;
   const [hx, hy] = rotate([length, 0], e.rotation);
   const [x, y] = [e.at[0] * G, e.at[1] * G];
   const [dx, dy, anchor] = ARROW_NAME[e.rotation] ?? ARROW_NAME[0]!;
@@ -240,7 +241,8 @@ function ArrowView({ element: e, library, selected, result, onPointerDown }: Pro
         className="w"
         transform={`translate(${x} ${y}) rotate(${e.rotation})`}
         dangerouslySetInnerHTML={{
-          __html: `<path d="M0 0H${length - 7}"/><path class="fill" d="M${length} 0l-9 -4.5v9z"/>`,
+          // (between two terminals: short of them at both ends — a mark, not a wire between them)
+          __html: `<path d="M${gap} 0H${length - gap - 7}"/><path class="fill" d="M${length - gap} 0l-9 -4.5v9z"/>`,
         }}
       />
       {(e.text || result) && (

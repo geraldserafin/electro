@@ -9,7 +9,7 @@ import type { ElementData } from "@/shared/model/types";
 import { Rotate, Trash } from "@/shared/ui/icons";
 import { Adjusters, isAdjustable } from "./Adjusters";
 import { useKinds } from "./kinds";
-import { hasValue, isComponent, isControlled, kindInfo } from "./model";
+import { hasValue, isArrow, isComponent, isControlled, kindInfo } from "./model";
 import { field, Panel, Section, Tile } from "./Panel";
 
 export type Selection =
@@ -113,6 +113,36 @@ export function Inspector({
             aria-label={t(element.kind === "port" ? "inspector.port" : "inspector.node")}
             onChange={(e) => onChange({ text: e.target.value })}
           />
+        </Section>
+      )}
+      {/* an arrow: its name (U, I_2), the amount it is — given (the solver's), or empty: what it comes to */}
+      {!live && isArrow(element.kind) && (
+        <Section label={t("inspector.arrowName")}>
+          <input
+            className={field}
+            value={element.text ?? ""}
+            spellCheck={false}
+            aria-label={t("inspector.arrowName")}
+            onChange={(e) => onChange({ text: e.target.value })}
+          />
+        </Section>
+      )}
+      {!live && isArrow(element.kind) && (element.of || element.between) && (
+        <Section label={t("inspector.arrowValue")}>
+          <span className="relative block">
+            <input
+              className={cn(field, "pr-8.5")}
+              value={element.value ?? ""}
+              inputMode="decimal"
+              spellCheck={false}
+              placeholder="?"
+              aria-label={t("inspector.arrowValue")}
+              onChange={(e) => onChange({ value: e.target.value.trim() === "" ? null : e.target.value })}
+            />
+            <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted pointer-events-none">
+              {element.kind === "current_arrow" ? "A" : "V"}
+            </span>
+          </span>
         </Section>
       )}
       {/* a net label: its node's potential, against ground — given (the solver's), or empty */}

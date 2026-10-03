@@ -250,6 +250,7 @@ class Element:
     )
     of: str | None = None  # an arrow's: the element whose current or voltage it is
     span: int | None = None  # a voltage arrow's: its length in grid units
+    between: list[str] | None = None  # a voltage arrow's between two terminals (ids): from the first to the second
 
     def __post_init__(self):
         self.at = tuple(self.at)
@@ -511,7 +512,8 @@ class Schematic:
         out = {
             "version": 1,
             "elements": [
-                {k: v for k, v in asdict(e).items() if v is not None or k not in ("of", "span")} for e in self.elements
+                {k: v for k, v in asdict(e).items() if v is not None or k not in ("of", "span", "between")}
+                for e in self.elements
             ],
             "wires": [{"points": [list(p) for p in w.points]} for w in self.wires],
         }
@@ -531,6 +533,17 @@ class Schematic:
             sign = arrow_sign(a, of) if of is not None and KINDS[of.kind].component is not None else None
             if sign is not None:
                 out.append((a, of, sign))
+        return out
+
+    def voltages(self) -> list[tuple[Element, Point, Point]]:
+        """Its voltage arrows between two terminals: each, the point it is from (its tail's terminal) and
+        the one it points to (its head's) — the voltage V_head − V_tail."""
+        by_id = {e.id: e for e in self.elements}
+        out = []
+        for a in self.elements:
+            ends = [by_id.get(i) for i in (a.between or [])] if a.kind == "voltage_arrow" else []
+            if len(ends) == 2 and all(ends):
+                out.append((a, ends[0].pins()[0], ends[1].pins()[0]))
         return out
 
     def given(self) -> dict[str, str]:

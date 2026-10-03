@@ -176,6 +176,20 @@ def _parse_data(text: str) -> dict[str, str]:
     return given
 
 
+def _potentials(sch: Schematic):
+    """A point of the drawing → its node's potential (a symbol, V_<node>; ground: 0)."""
+    import sympy as sp
+    from electro.circuit import GROUND
+
+    names = sch.node_names()
+
+    def potential(p):
+        name = names.get(tuple(p))
+        return sp.Integer(0) if name in (None, GROUND) else sp.Symbol(f"V_{name}")
+
+    return potential
+
+
 def simulate(schematic_json: str, data: str = "") -> str:
     """The run button of a schematic cell: solve the drawing and report every element's values.
 
@@ -183,15 +197,24 @@ def simulate(schematic_json: str, data: str = "") -> str:
     ``results`` go on the drawing and in the table under it; ``problems`` behind the warning
     button on the board (``text`` instead of ``issue`` for an error that is not ours).
     """
+    import sympy as sp
     from electro.components import notation
-    from electro.values import UNKNOWN, fmt
+    from electro.values import UNKNOWN, fmt, parse
 
     sch = Schematic.from_json(schematic_json)
     results: dict[str, dict] = {}
     with warnings.catch_warnings(record=True) as caught:
         warnings.simplefilter("always")
         try:
-            solution = sch.to_circuit().solve(**{**sch.given(), **_parse_data(data)})
+            # a voltage between two terminals, given: V_head − V_tail = its value
+            between = sch.voltages()
+            potential = _potentials(sch) if between else None
+            equations = [
+                sp.Eq(potential(head) - potential(tail), parse(a.value.strip()))
+                for a, tail, head in between
+                if a.value and a.value.strip()
+            ]
+            solution = sch.to_circuit().solve(*equations, **{**sch.given(), **_parse_data(data)})
         except (Issue, ValueError, KeyError) as err:
             return json.dumps({"results": {}, "problems": [_problem("error", err)]}, ensure_ascii=False)
     for label in solution.system.parts:
@@ -225,6 +248,19 @@ def simulate(schematic_json: str, data: str = "") -> str:
             results[arrow.id] = {
                 "value": fmt(sign * amount, "A" if arrow.kind == "current_arrow" else "V"),
                 "solved": not (arrow.value and arrow.value.strip()),
+                "U": None,
+                "I": None,
+                "P": None,
+                "reversed": False,
+            }
+    # a voltage arrow between two terminals: what it comes to (or was given)
+    for a, tail, head in between:
+        v = solution(potential(head) - potential(tail))
+        if v is not None and v.is_number:
+            given = bool(a.value and a.value.strip())
+            results[a.id] = {
+                "value": fmt(v, "V"),
+                "solved": not given,
                 "U": None,
                 "I": None,
                 "P": None,
@@ -426,6 +462,7 @@ def from_drawing(drawing_json: str, strict: bool = False) -> str:
                     str(el.get("text") or ""),
                     str(el["of"]) if el.get("of") else None,
                     length if el["kind"] == "voltage_arrow" else None,
+                    [str(x) for x in el["between"]][:2] if el.get("between") else None,
                 )
             )
         for el in data["elements"]:

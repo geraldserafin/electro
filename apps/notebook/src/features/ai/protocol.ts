@@ -25,7 +25,10 @@ export const CIRCUIT_FORMAT = `ELEMENT: {"id": "R1", "kind": KIND, "value": "4.7
     voltage_arrow: []                               (a voltage's arrow beside what it is across, U_1 by R1: "at" its
                                                      tail and head, as long as drawn, the way it points — to "+")
   An arrow: "text" its name as the picture writes it, its subscript after _ ("I_2", "U_1", "U"); "of" the
-  element whose current or voltage it is ("R2"; null for one across several, as U across a divider); "value"
+  element whose current or voltage it is ("R2"); a voltage across several (a source's terminals, a divider):
+  "between" two terminals' ids instead, from the one at its tail to the one its head points to
+  (["T2", "T1"]: V_T1 − V_T2), each a terminal where the picture has an open circle (or a point to mark);
+  "value"
   the amount the problem gives for it ("2" for I_2 = 2 A; null when not given — the solver shows it). A given
   is the solver's data: a problem's measured current or voltage of an element ("the voltage across R_5 is
   125 V") goes on its arrow — one the picture has, else one you add beside that element. Arrows are marks,

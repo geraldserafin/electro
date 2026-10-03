@@ -16,6 +16,7 @@ export const pl = {
     voltmeter: { name: "Woltomierz", words: "miernik napiecie" },
     ground: { name: "Masa", words: "GND ziemia uziemienie" },
     label: { name: "Etykieta węzła", words: "nazwa wezla net label" },
+    terminal: { name: "Zacisk", words: "zacisk kolko koniec otwarty napiecie miedzy terminal" },
     current_arrow: { name: "Strzałka prądu", words: "prad oznaczenie zwrot kierunek I" },
     voltage_arrow: { name: "Strzałka napięcia", words: "napiecie oznaczenie spadek zwrot U" },
     port: { name: "Wyprowadzenie", words: "pin port wejscie wyjscie komponent wlasny zacisk" },
@@ -97,7 +98,7 @@ export const pl = {
     moveSegment: "Przeciągnij, żeby przesunąć ten odcinek",
     openPin: "Niepodłączony zacisk",
     drawWire: "Przeciągnij do innego zacisku albo przewodu, żeby je połączyć",
-    nameNode: "Nazwij węzeł i podaj jego potencjał",
+    addTerminal: "Zacisk tutaj — przeciągnij z niego do innego, żeby dać napięcie między nimi",
   },
   view: {
     back: "Wróć do schematu",
@@ -262,6 +263,7 @@ export const en: typeof pl = {
     voltmeter: { name: "Voltmeter", words: "meter voltage" },
     ground: { name: "Ground", words: "GND earth" },
     label: { name: "Net label", words: "node name net label" },
+    terminal: { name: "Terminal", words: "terminal open circle end voltage between" },
     current_arrow: { name: "Current arrow", words: "current mark direction I" },
     voltage_arrow: { name: "Voltage arrow", words: "voltage drop mark direction U" },
     port: { name: "Port", words: "pin input output own component terminal" },
@@ -343,7 +345,7 @@ export const en: typeof pl = {
     moveSegment: "Drag to move this segment",
     openPin: "Unconnected pin",
     drawWire: "Drag to another pin or wire to connect them",
-    nameNode: "Name the node and give its potential",
+    addTerminal: "A terminal here — drag from it to another for the voltage between them",
   },
   view: {
     back: "Back to the schematic",

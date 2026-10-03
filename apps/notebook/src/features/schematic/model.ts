@@ -45,6 +45,7 @@ export const KINDS = [
   { kind: "ground", prefix: "gnd", group: "connections" },
   { kind: "label", prefix: "lbl", group: "connections" },
   { kind: "port", prefix: "pin", group: "connections" },
+  { kind: "terminal", prefix: "T", group: "connections" }, // an open circle: a point a voltage is between
   // what a drawing marks, not of the circuit (electro_schematic: ARROWS): a current, a voltage
   { kind: "current_arrow", prefix: "I", group: "connections" },
   { kind: "voltage_arrow", prefix: "U", group: "connections" },
@@ -427,7 +428,11 @@ export function connections(sch: SchematicData, lib: SymbolLibrary): Map<string,
 
 /** Grid points where three or more wires/pins meet (drawn as dots). */
 export function junctions(sch: SchematicData, lib: SymbolLibrary): Point[] {
-  return [...connections(sch, lib).entries()].filter(([, n]) => n >= 3).map(([k]) => k.split(",").map(Number) as Point);
+  // (a terminal on a wire: its own open circle, no dot over it)
+  const terminals = new Set(sch.elements.filter((e) => e.kind === "terminal").map((e) => key(e.at)));
+  return [...connections(sch, lib).entries()]
+    .filter(([k, n]) => n >= 3 && !terminals.has(k))
+    .map(([k]) => k.split(",").map(Number) as Point);
 }
 
 /** Pins with nothing attached (shown in red, so it is obvious what is not connected yet). */

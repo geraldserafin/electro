@@ -18,7 +18,7 @@ import {
 import { useTranslation } from "react-i18next";
 import { cn } from "@/shared/lib/cn";
 import type { ElementData, ElementResult, Point, SchematicData, SymbolLibrary } from "@/shared/model/types";
-import { More, Rotate, TagIcon, Target, Trash } from "@/shared/ui/icons";
+import { More, Rotate, Target, TerminalIcon, Trash } from "@/shared/ui/icons";
 import { isAdjustable } from "./Adjusters";
 import { BoardButton, BoardIsland, board, boardIsland, islandButton } from "./Board";
 import { CurrentDots } from "./CurrentDots";
@@ -48,6 +48,7 @@ import {
   nextId,
   openPins,
   pins,
+  rotate,
   rotatedAbout,
   same,
   simplify,
@@ -298,25 +299,42 @@ export function SchematicEditor({
     });
   };
 
-  /** The tapped wire's node named: a net label where it was tapped (one there already: that one), its
-   *  panel open — its name, its potential. */
-  const nameNode = () => {
+  /** A terminal where the wire was tapped (an open circle, as a picture's): what a voltage is between —
+   *  dragged from one to another. One there already: that one. */
+  const addTerminal = () => {
     if (!spot) return;
-    const there = value.elements.find((e) => e.kind === "label" && same(e.at, spot));
-    if (there) {
-      setSelection({ type: "element", id: there.id });
-      setInspect(true);
-      return;
-    }
-    const names = new Set(value.elements.filter((e) => e.kind === "label").map((e) => e.text));
-    const text = "ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("").find((c) => !names.has(c)) ?? "N";
-    const id = nextId(value, "label");
+    const there = value.elements.find((e) => e.kind === "terminal" && same(e.at, spot));
+    const id = there?.id ?? nextId(value, "terminal");
     // (on the wire's middle: the wire split there, so it is joined)
-    const label: ElementData = { id, kind: "label", at: spot, rotation: 0, value: null, text };
-    commit(attach({ ...value, elements: [...value.elements, label] }, library, id));
+    if (!there) {
+      const terminal: ElementData = { id, kind: "terminal", at: spot, rotation: 0, value: null, text: null };
+      commit(attach({ ...value, elements: [...value.elements, terminal] }, library, id));
+    }
     setSelection({ type: "element", id });
-    setInspect(true);
   };
+
+  /** From terminal ``from`` to terminal ``to``: the voltage between them, an arrow along the longer way
+   *  from the first's point (its head at the second's: V_to − V_from). */
+  const voltageArrow = (from: ElementData, to: ElementData): ElementData | null => {
+    const [a, b] = [from.at, to.at];
+    const [dx, dy] = [b[0] - a[0], b[1] - a[1]];
+    const span = Math.max(Math.abs(dx), Math.abs(dy));
+    if (!span) return null;
+    const rotation = Math.abs(dx) >= Math.abs(dy) ? (dx > 0 ? 0 : 180) : dy > 0 ? 90 : 270;
+    return {
+      id: nextId(value, "voltage_arrow"),
+      kind: "voltage_arrow",
+      at: a,
+      rotation,
+      value: null,
+      text: "U",
+      span,
+      between: [from.id, to.id],
+    };
+  };
+  /** The terminal (not ``but``) whose point is ``p``. */
+  const terminalAt = (p: Point, but?: string) =>
+    value.elements.find((e) => e.kind === "terminal" && e.id !== but && same(e.at, p));
 
   const removeSelected = () => {
     const { ids, wires } = picked(selection);
@@ -628,7 +646,16 @@ export function SchematicEditor({
     }
     // a wire: from something to something (a pin, a wire) — let go on nothing, there is none
     const end = toGrid(event);
-    if (g.type === "wire" && !same(end, g.from) && isConnectionPoint(value, library, end)) addWire(wireTo(g, end));
+    // from a terminal to another: the voltage between them (an arrow), not a wire
+    const fromTerminal = g.type === "wire" && "id" in g.tap ? terminalAt(g.from) : undefined;
+    const toTerminal = fromTerminal && terminalAt(end, fromTerminal.id);
+    const arrow = fromTerminal && toTerminal && voltageArrow(fromTerminal, toTerminal);
+    if (arrow) {
+      commit({ ...value, elements: [...value.elements, arrow] });
+      setSelection({ type: "element", id: arrow.id });
+      setInspect(event.pointerType !== "touch");
+    } else if (g.type === "wire" && !same(end, g.from) && isConnectionPoint(value, library, end))
+      addWire(wireTo(g, end));
     // a tap: what it was on, selected (an element as a tap on it)
     if (g.type === "wire" && same(end, g.from)) {
       const tap = g.tap;
@@ -730,7 +757,24 @@ export function SchematicEditor({
   const obstacles = useMemo(() => inTheWay(value), [value]); // (what labels keep off)
   const openPinPoints = useMemo(() => openPins(value, library), [value, library]);
   const wiring = gesture?.type === "wire";
-  const preview: Point[] | null = cursor && gesture?.type === "wire" ? wireTo(gesture, cursor) : null;
+  // (a terminal to another: the arrow it will be, straight)
+  const toward = (() => {
+    if (!cursor || gesture?.type !== "wire" || !("id" in gesture.tap)) return null;
+    const from = terminalAt(gesture.from);
+    const to = from && terminalAt(cursor, from.id);
+    return from && to ? voltageArrow(from, to) : null;
+  })();
+  const preview: Point[] | null = toward
+    ? [
+        toward.at,
+        [
+          toward.at[0] + rotate([toward.span!, 0], toward.rotation)[0],
+          toward.at[1] + rotate([toward.span!, 0], toward.rotation)[1],
+        ],
+      ]
+    : cursor && gesture?.type === "wire"
+      ? wireTo(gesture, cursor)
+      : null;
   const snap = wiring && cursor && isConnectionPoint(value, library, cursor) ? cursor : null;
   const pointsOf = (ps: Point[]) => ps.map(([x, y]) => `${x * G},${y * G}`).join(" ");
   // running: a junction's dot takes the colour of the wires meeting there
@@ -1036,7 +1080,8 @@ export function SchematicEditor({
             </circle>
           ))}
           {value.elements
-            .filter((e) => isComponent(e.kind))
+            // (a terminal: dragged from, a wire or the voltage to another terminal)
+            .filter((e) => isComponent(e.kind) || e.kind === "terminal")
             .flatMap((e) =>
               pins(e, library).map(([x, y], i) => (
                 <circle
@@ -1121,11 +1166,11 @@ export function SchematicEditor({
             {selection?.type === "wire" && spot && (
               <BoardButton
                 className={islandButton()}
-                onClick={nameNode}
-                title={t("drawing.nameNode")}
-                aria-label={t("drawing.nameNode")}
+                onClick={addTerminal}
+                title={t("drawing.addTerminal")}
+                aria-label={t("drawing.addTerminal")}
               >
-                <TagIcon />
+                <TerminalIcon />
               </BoardButton>
             )}
             <BoardButton
@@ -1193,11 +1238,11 @@ export function SchematicEditor({
             {selection.type === "wire" && spot && (
               <BoardButton
                 className={islandButton()}
-                onClick={nameNode}
-                title={t("drawing.nameNode")}
-                aria-label={t("drawing.nameNode")}
+                onClick={addTerminal}
+                title={t("drawing.addTerminal")}
+                aria-label={t("drawing.addTerminal")}
               >
-                <TagIcon />
+                <TerminalIcon />
               </BoardButton>
             )}
             {selectedElement && (
