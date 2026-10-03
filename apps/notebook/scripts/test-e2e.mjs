@@ -139,7 +139,9 @@ try {
 
   // the run button of a schematic: values on the drawing and a table; the ammeter's reading (0) is the datum
   const bridge = page.locator('[data-cell="schematic"]').first();
-  const runBridge = bridge.getByRole("button", { name: "Policz prądy i napięcia (Shift+Enter w kodzie)" });
+  const runBridge = bridge.getByRole("button", {
+    name: "Uruchom: prądy i napięcia, a gdy się da — symulacja w czasie (Shift+Enter w kodzie)",
+  });
   const reading = async (value) => {
     await bridge.locator('[data-board] .canvas .element[data-id="A_1"]').click();
     await bridge.getByRole("group", { name: "Właściwości" }).locator("input").nth(1).fill(value);
@@ -267,7 +269,11 @@ try {
     await bridge.locator(".cm-content").click();
     await page.keyboard.press("Meta+ArrowUp");
     await page.keyboard.insertText("# mój komentarz\n");
-    await bridge.getByRole("button", { name: "Policz prądy i napięcia (Shift+Enter w kodzie)" }).click();
+    await bridge
+      .getByRole("button", {
+        name: "Uruchom: prądy i napięcia, a gdy się da — symulacja w czasie (Shift+Enter w kodzie)",
+      })
+      .click();
     await bridge.locator('table[aria-label="Wyniki"]:not([data-stale])').waitFor({ timeout: 30_000 });
     const afterRun = await bridge.locator(".cm-content").innerText();
     await bridge.getByRole("tab", { name: "Schemat" }).click();

@@ -37,6 +37,8 @@ export const pl = {
     controls: "Regulacja",
     console: "Konsola",
     resize: "Przeciągnij, żeby zmienić wysokość panelu",
+    fold: "Zwiń panel",
+    unfold: "Rozwiń panel",
   },
   code: {
     tabs: "Co edytować",
@@ -121,6 +123,8 @@ export const en: typeof pl = {
     controls: "Controls",
     console: "Console",
     resize: "Drag to change the panel's height",
+    fold: "Fold the panel",
+    unfold: "Unfold the panel",
   },
   code: {
     tabs: "What to edit",

@@ -1,7 +1,8 @@
-// While the circuit runs: one panel under the board, like an IDE's — its controls (pause, stop,
-// time, speed) and its tabs: the chart (the scope), the controls (what can be turned, flipped or held,
-// and what the meters read) and the console (what the Arduinos write to their serial ports, and how
-// their sketches compiled). Dressed like the board's islands.
+// One panel under the board, like an IDE's: while the circuit runs, its controls (pause, stop, time,
+// speed) and its tabs — the chart (the scope), the controls (what can be turned, flipped or held, and
+// what the meters read) and the console (what the Arduinos write to their serial ports, and how their
+// sketches compiled); beside them what the cell made of it otherwise (the solver's table, the plots:
+// ``more``). Folded to its bar by the chevron, a tab opens it again. Dressed like the board's islands.
 import { type ReactNode, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { cn } from "@/shared/lib/cn";
@@ -32,7 +33,12 @@ const ChartIcon = () => <Icon d="M4 19h16M4 15l4.5-5 4 3L20 6" />;
 const ConsoleIcon = () => <Icon d="M4 5h16v14H4zM7.5 9.5l2.5 2.5-2.5 2.5M12.5 15h4" />;
 const SlidersIcon = () => <Icon d="M5 6h9M18 6h1M5 12h3M12 12h7M5 18h11M20 18h-1M16 4v4M10 10v4M18 16v4" />;
 
-type Tab = "chart" | "controls" | "console";
+type Tab = string; // "chart" | "controls" | "console", or one of ``more``
+
+/** A tab of the cell's own: its name, its icon, what it shows. */
+export type PanelTab = { id: string; label: string; icon?: ReactNode; body: ReactNode };
+
+const Fold = ({ open }: { open: boolean }) => <Icon d={open ? "M6 9l6 6 6-6" : "M6 15l6-6 6 6"} />;
 
 export function SimPanel({
   live,
@@ -43,8 +49,20 @@ export function SimPanel({
   onPress,
   full,
   height,
+  running = true,
+  more = [],
+  tab: chosen,
+  onTab,
+  open = true,
+  onOpen,
 }: {
   live: Live;
+  running?: boolean; // the simulation's tabs (else only ``more``)
+  more?: PanelTab[];
+  tab?: Tab | null; // the tab shown, when the cell picks it (a run: its results)
+  onTab?: (tab: Tab) => void;
+  open?: boolean; // its body shown (else only its bar)
+  onOpen?: (open: boolean) => void;
   arduinos: ElementData[]; // the console is theirs
   elements: ElementData[]; // the board's: the controls tab's
   pressed: string[]; // buttons held down
@@ -57,24 +75,36 @@ export function SimPanel({
   const hasControls = elements.some(controlled);
   const [spectral, setSpectral] = useState(false); // the scope by frequency (FFT)
   // on a touch screen (no keys to press): the controls first, where there are buttons or switches to hold
-  const [tab, setTab] = useState<Tab>(() =>
+  const [own, setOwn] = useState<Tab>(() =>
     matchMedia("(pointer: coarse)").matches && elements.some((e) => e.kind === "button" || e.kind === "switch")
       ? "controls"
       : "chart",
   );
-  const tabs: { id: Tab; label: string; icon: ReactNode }[] = [
-    { id: "chart", label: t("panel.chart"), icon: <ChartIcon /> },
-    ...(hasControls ? [{ id: "controls" as const, label: t("panel.controls"), icon: <SlidersIcon /> }] : []),
-    ...(arduinos.length ? [{ id: "console" as const, label: t("panel.console"), icon: <ConsoleIcon /> }] : []),
+  const tab = chosen ?? own;
+  const setTab = (next: Tab) => {
+    setOwn(next);
+    onTab?.(next);
+    onOpen?.(true);
+  };
+  const tabs: { id: Tab; label: string; icon?: ReactNode }[] = [
+    ...(running
+      ? [
+          { id: "chart", label: t("panel.chart"), icon: <ChartIcon /> },
+          ...(hasControls ? [{ id: "controls", label: t("panel.controls"), icon: <SlidersIcon /> }] : []),
+          ...(arduinos.length ? [{ id: "console", label: t("panel.console"), icon: <ConsoleIcon /> }] : []),
+        ]
+      : []),
+    ...more,
   ];
-  const shown: Tab = tabs.some((x) => x.id === tab) ? tab : "chart";
+  const shown: Tab = tabs.some((x) => x.id === tab) ? tab : (tabs[0]?.id ?? "chart");
+  const extra = more.find((m) => m.id === shown);
   return (
     <section
       aria-label={t("panel.label")}
-      style={full && height ? { height } : undefined}
+      style={full && height && open ? { height } : undefined}
       className={cn(
         "flex flex-col bg-code-bg overflow-hidden",
-        full ? "h-[38%] min-h-40 flex-none" : "rounded-b-xl border border-t-0 border-line",
+        full ? (open ? "h-[38%] min-h-40 flex-none" : "flex-none") : "rounded-b-xl border border-t-0 border-line",
       )}
     >
       {/* like the code editor's: one thin bar, the tabs on the left, the controls on the right */}
@@ -99,9 +129,22 @@ export function SimPanel({
           ))}
         </div>
         <span className="flex-1" />
-        <LiveControls live={live} />
+        {running && <LiveControls live={live} />}
+        {onOpen && (
+          <button
+            className="inline-grid place-items-center size-7 rounded-md text-muted hover:bg-hover hover:text-fg"
+            onClick={() => onOpen(!open)}
+            aria-expanded={open}
+            title={open ? t("panel.fold") : t("panel.unfold")}
+            aria-label={open ? t("panel.fold") : t("panel.unfold")}
+          >
+            <Fold open={open} />
+          </button>
+        )}
       </header>
-      {shown === "chart" ? (
+      {!open ? null : extra ? (
+        <div className={cn("overflow-auto", full && height ? "flex-1 min-h-0" : "max-h-80")}>{extra.body}</div>
+      ) : shown === "chart" ? (
         <div className={cn("flex flex-col gap-1 px-2.5 pt-1.5 pb-1", full && "flex-1 min-h-0")}>
           <div className="flex items-center gap-2">
             <ScopeChoice live={live} />

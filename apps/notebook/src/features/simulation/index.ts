@@ -3,7 +3,7 @@ export { si } from "./format";
 export { LiveControls } from "./LiveControls";
 export * as messages from "./messages";
 export { type Probed, ProbePanel } from "./ProbePanel";
-export { SimPanel } from "./SimPanel";
+export { type PanelTab, SimPanel } from "./SimPanel";
 export { SketchEditor, UploadButton } from "./SketchEditor";
 export {
   type Live,

@@ -22,6 +22,7 @@ import {
 } from "@/features/schematic";
 import {
   carriesFiles,
+  type PanelTab,
   ProbePanel,
   SimPanel,
   SketchEditor,
@@ -34,17 +35,7 @@ import { usePhone } from "@/shared/hooks/usePhone";
 import { cn } from "@/shared/lib/cn";
 import type { Failure } from "@/shared/model/issues";
 import type { Cell, SchematicData, SymbolLibrary } from "@/shared/model/types";
-import {
-  Close,
-  CodeIcon,
-  ComponentIcon,
-  Expand,
-  Flash,
-  SchematicIcon,
-  Shrink,
-  SpreadIcon,
-  Wave,
-} from "@/shared/ui/icons";
+import { Close, CodeIcon, ComponentIcon, Expand, SchematicIcon, Shrink, SpreadIcon, Wave } from "@/shared/ui/icons";
 import { Sash, useKeptSize } from "@/shared/ui/Splitter";
 import { barButton, RunButton } from "./CellBar";
 import { runOnShiftEnter } from "./CodeCell";
@@ -205,8 +196,10 @@ function Tab({
  * there. The simulation's panel under the groups. The same in the notebook and full screen (then
  * the whole window). The element library is the board's own, docked beside it.
  *
- * A drawing with a non-linear element (a diode, an Arduino…) cannot be solved on paper, only run
- * in time: then the bolt runs it.
+ * One run button: it solves the drawing (the currents and voltages, the table, its unknowns found) and,
+ * when it can run in time (every value known), runs it too — a drawing with a non-linear element (a
+ * diode, an Arduino…) only that. What came of it is in the panel under the board, each its tab: the
+ * simulation's, the solver's table, the plots; folded to its bar when not wanted.
  */
 export function SchematicCell({
   cell,
@@ -237,6 +230,13 @@ export function SchematicCell({
   const [busy, setBusy] = useState(false);
   // the plots are kept in the cell (Bode, a sweep, a spread); why the last one could not be made, here
   const [plotError, setPlotError] = useState<{ kind: PlotKind; failure: Failure } | null>(null);
+  // the panel under the board: its tab (null: the first there is), its body shown or folded
+  const [tab, setTab] = useState<string | null>(null);
+  const [panelOpen, setPanelOpen] = useState(true);
+  const show = (next: string) => {
+    setTab(next);
+    setPanelOpen(true);
+  };
   /** A new drawing: what runs made of the old one is out of date. */
   const changed = (schematic: SchematicData): Partial<Cell> => ({
     schematic,
@@ -245,7 +245,8 @@ export function SchematicCell({
   });
   const live = useLive(cell.schematic);
   const running = live.status === "running" || live.status === "paused";
-  const timed = inTimeOnly(cell.schematic); // only in time: the bolt runs it
+  const timed = inTimeOnly(cell.schematic); // only in time: not solved, only run
+  const inTime = !empty && (timed || canRunInTime(cell.schematic)); // (every value known)
   const arduinos = cell.schematic.elements.filter((e) => isBoard(e.kind)); // (an Arduino, a Pico: each its sketch)
   const pressed = useRef<string[]>([]);
   const [pressedIds, setPressedIds] = useState<string[]>([]);
@@ -456,7 +457,6 @@ export function SchematicCell({
       setBusy(false);
     }
   };
-  const solve = () => withDrawing(simulate);
   /** A plot of the drawing (kept in the cell under ``kind``), or why there is none. */
   const plot = (kind: PlotKind, make: (schematic: SchematicData) => Promise<{ svg: string } | { error: Failure }>) =>
     withDrawing(async (schematic) => {
@@ -464,13 +464,20 @@ export function SchematicCell({
       const out = await make(schematic);
       setPlotError("error" in out ? { kind, failure: out.error } : null);
       if ("svg" in out) update({ [kind]: { svg: out.svg } });
+      show(kind);
     });
   const plotDone = (kind: PlotKind) => !!cell[kind] && !cell[kind]?.stale && plotError?.kind !== kind;
   const reactive = cell.schematic.elements.some((e) => e.kind === "capacitor" || e.kind === "inductor");
   const passive = cell.schematic.elements.some((e) => ["resistor", "capacitor", "inductor"].includes(e.kind));
-  const runInTime = () => (running ? live.stop() : withDrawing((schematic) => live.start(schematic)));
-  // Shift+Enter in the code: what the circuit can do — solved, or (only in time) run
-  const run = () => (timed ? runInTime() : solve());
+  // ▶ (and Shift+Enter in the code): solved — and run in time, when it can be; ■ stops that
+  const run = () =>
+    running
+      ? live.stop()
+      : withDrawing((schematic) => {
+          if (!timed) simulate(schematic);
+          if (inTime) live.start(schematic);
+          show(inTime ? "chart" : "results");
+        });
 
   // ------------------------------------------------------------------ dragging a tab
 
@@ -572,11 +579,15 @@ export function SchematicCell({
     !timed && !cell.stale && cell.problems?.length && cell.problems !== dismissed ? (
       <Problems problems={cell.problems} below={!inBoard} compact onDismiss={() => setDismissed(cell.problems)} />
     ) : null;
-  // two ways to run it: ▶ solves it once (the currents and voltages, in the table) — not a circuit that
-  // only works in time; ⚡ runs it in time (and stops it), whenever it can be
-  const inTime = !empty && (timed || canRunInTime(cell.schematic));
-  const solveButton = !timed && (
-    <RunButton run={solve} quiet running={solving || busy} done={done || empty} label={t("schematic.run")} />
+  const runButton = (
+    <RunButton
+      run={run}
+      quiet
+      icon={running ? <Stop /> : undefined}
+      running={solving || busy || live.status === "starting"}
+      done={!running && (empty || (done && !inTime))}
+      label={running ? ts("controls.stop") : t("schematic.run")}
+    />
   );
   // ∿ the frequency response (with a capacitor or an inductor); the spread over the parts' tolerances
   // (with an R, C or L): a circuit solved on paper
@@ -598,15 +609,6 @@ export function SchematicCell({
       quiet
       icon={<SpreadIcon />}
       label={t("schematic.spread")}
-    />
-  );
-  const liveButton = inTime && (
-    <RunButton
-      run={runInTime}
-      eager={timed || running}
-      icon={running ? <Stop /> : <Flash />}
-      running={live.status === "starting"}
-      label={running ? ts("controls.stop") : ts("controls.startTitle")}
     />
   );
   const fullButton = (
@@ -638,10 +640,9 @@ export function SchematicCell({
         </>
       )}
       {problems}
-      {solveButton}
       {bodeButton}
       {spreadButton}
-      {liveButton}
+      {runButton}
     </>
   );
 
@@ -744,8 +745,61 @@ export function SchematicCell({
       <SketchEditor key={id} element={sketchOf(id)!} live={live} fill onChange={(text) => setSketchText(id, text)} />
     );
 
-  const panel = running && (
+  // the panel's tabs of the cell's own: the solver's table, the plots (or why one could not be made)
+  const more: PanelTab[] = [
+    ...(cell.results && Object.keys(cell.results).length > 0
+      ? [
+          {
+            id: "results",
+            label: t("results.label"),
+            body: (
+              <div className="px-3 pb-3">
+                <ResultsTable
+                  // (the arrows' own: on the drawing only — the elements they are of have a row)
+                  results={Object.fromEntries(
+                    Object.entries(cell.results).filter(
+                      ([id]) => !cell.schematic.elements.some((e) => e.id === id && e.kind.endsWith("_arrow")),
+                    ),
+                  )}
+                  stale={!!cell.stale}
+                />
+              </div>
+            ),
+          },
+        ]
+      : []),
+    ...PLOTS.flatMap((kind) =>
+      plotError?.kind === kind || cell[kind]
+        ? [
+            {
+              id: kind,
+              label: t(`schematic.plot.${kind}`),
+              body:
+                plotError?.kind === kind ? (
+                  <FailureBox failure={plotError.failure} kind="error" className="m-2.5" />
+                ) : (
+                  // SVG produced by our own renderer (electro.plot), from this drawing
+                  <div
+                    data-output="svg"
+                    data-plot={kind}
+                    className={cn("p-2 bg-paper [&_svg]:max-w-full [&_svg]:h-auto", cell[kind]?.stale && "opacity-50")}
+                    dangerouslySetInnerHTML={{ __html: cell[kind]?.svg ?? "" }}
+                  />
+                ),
+            },
+          ]
+        : [],
+    ),
+  ];
+  const extraShown = !running || more.some((m) => m.id === tab);
+  const panel = (running || more.length > 0) && (
     <SimPanel
+      running={running}
+      more={more}
+      tab={tab}
+      onTab={setTab}
+      open={panelOpen}
+      onOpen={setPanelOpen}
       live={live}
       arduinos={arduinos}
       elements={cell.schematic.elements}
@@ -753,7 +807,7 @@ export function SchematicCell({
       onPress={press}
       onElement={(id, patch) => update({ schematic: updateElement(cell.schematic, library, id, patch) })}
       full
-      height={full ? (panelHeight ?? 260) : 260}
+      height={full ? (panelHeight ?? 260) : extraShown ? undefined : 260}
     />
   );
   const last = view.groups.length - 1;
@@ -866,7 +920,7 @@ export function SchematicCell({
         </div>
         {panel && (
           <>
-            {full && (
+            {full && panelOpen && (
               <Sash
                 label={ts("panel.resize")}
                 onDrag={(y) =>
@@ -925,33 +979,6 @@ export function SchematicCell({
           name={cell.name}
           library={library}
           onClose={() => setSaving(false)}
-        />
-      )}
-      {PLOTS.map((kind) =>
-        plotError?.kind === kind ? (
-          <FailureBox key={kind} failure={plotError.failure} kind="error" />
-        ) : (
-          cell[kind] && (
-            // SVG produced by our own renderer (electro.plot), from this drawing
-            <div
-              key={kind}
-              data-output="svg"
-              data-plot={kind}
-              className={cn("overflow-x-auto [&_svg]:max-w-full [&_svg]:h-auto", cell[kind]?.stale && "opacity-50")}
-              dangerouslySetInnerHTML={{ __html: cell[kind]?.svg ?? "" }}
-            />
-          )
-        ),
-      )}
-      {cell.results && Object.keys(cell.results).length > 0 && (
-        <ResultsTable
-          // (the arrows' own: on the drawing only — the elements they are of have a row)
-          results={Object.fromEntries(
-            Object.entries(cell.results).filter(
-              ([id]) => !cell.schematic.elements.some((e) => e.id === id && e.kind.endsWith("_arrow")),
-            ),
-          )}
-          stale={!!cell.stale}
         />
       )}
     </div>

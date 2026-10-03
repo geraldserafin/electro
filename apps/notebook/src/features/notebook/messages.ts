@@ -65,7 +65,8 @@ export const pl = {
   },
   schematic: {
     defaultName: "Układ {{n}}",
-    run: "Policz prądy i napięcia (Shift+Enter w kodzie)",
+    run: "Uruchom: prądy i napięcia, a gdy się da — symulacja w czasie (Shift+Enter w kodzie)",
+    plot: { frequency: "Bode", sweep: "Przemiatanie", spread: "Rozrzut" },
     upToDate: "Wyniki są aktualne — zmień coś na schemacie, żeby przeliczyć",
     frequency: "Charakterystyka częstotliwościowa (Bode): nazwane węzły, a bez nazw napięcia na C i L",
     spread: "Rozrzut przy tolerancjach 5 % (R, C, L): 500 losowych egzemplarzy układu, histogram nazwanych węzłów",
@@ -238,7 +239,8 @@ export const en: typeof pl = {
   },
   schematic: {
     defaultName: "Circuit {{n}}",
-    run: "Solve for currents and voltages (Shift+Enter in the code)",
+    run: "Run: currents and voltages, and the circuit in time when it can (Shift+Enter in the code)",
+    plot: { frequency: "Bode", sweep: "Sweep", spread: "Spread" },
     upToDate: "The results are up to date — change something on the schematic to solve again",
     frequency: "Frequency response (Bode): the named nodes, or else the voltages across C and L",
     spread: "Spread with 5 % tolerances (R, C, L): 500 random builds of the circuit, a histogram of the named nodes",
