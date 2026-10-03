@@ -1,19 +1,13 @@
-// The tools, top centre: the hand (the view moves; the drawing at hand — the default) and the arrow (a
-// drag selects many); the elements drawn most (a resistor, a voltage source, ground), each a key away;
-// the element library for the rest. Wires are drawn from a pin or a wire to another.
+// The tools, top centre: the lock (an element placed again and again), the hand (the view moves; the
+// drawing at hand — the default) and the arrow (a drag selects many); the element library (lit while one
+// of its elements is being placed). Wires are drawn from a pin or a wire to another.
 
 import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { cn } from "@/shared/lib/cn";
-import type { PartDef, SymbolLibrary } from "@/shared/model/types";
+import type { PartDef } from "@/shared/model/types";
 import { Hand, Pointer } from "@/shared/ui/icons";
 import { BoardButton, BoardIsland, islandButton, Separator } from "./Board";
-import { useKinds } from "./kinds";
-import { shortcut } from "./LibraryPanel";
-import { SymbolIcon } from "./SymbolIcon";
-
-/** On the toolbar itself (the rest is in the library). */
-const QUICK = ["resistor", "voltage_source", "ground"];
 
 /** The library: a grid of shapes, one of them a plus — more elements. */
 const Library = () => (
@@ -68,7 +62,6 @@ export function Toolbar({
   onTool,
   libraryOpen,
   onLibrary,
-  library,
   locked,
   onLock,
   className,
@@ -79,27 +72,12 @@ export function Toolbar({
   onTool: (tool: Tool) => void;
   libraryOpen: boolean;
   onLibrary: () => void;
-  library: SymbolLibrary;
   className?: string;
 }) {
   const { t } = useTranslation("schematic");
-  const { kinds } = useKinds();
   const tools: { tool: Tool; label: string; key: string; icon: ReactNode }[] = [
     { tool: { type: "hand" }, label: t("tools.hand"), key: "H", icon: <Hand /> },
     { tool: { type: "select" }, label: t("tools.select"), key: "V", icon: <Pointer /> },
-  ];
-  const drawing: { tool: Tool; label: string; key: string; icon: ReactNode; on: boolean }[] = [
-    ...QUICK.map((kind) => ({
-      tool: { type: "place", kind } as Tool,
-      label: kinds.find((k) => k.kind === kind)?.name ?? kind,
-      key: shortcut(kind),
-      icon: (
-        <span className="inline-flex [&_svg]:w-7 [&_svg]:h-5">
-          <SymbolIcon kind={kind} library={library} />
-        </span>
-      ),
-      on: current.type === "place" && current.kind === kind,
-    })),
   ];
   return (
     <BoardIsland
@@ -134,22 +112,8 @@ export function Toolbar({
         </BoardButton>
       ))}
       <Separator />
-      {drawing.map(({ tool: it, label, key, icon, on }) => (
-        <BoardButton
-          key={it.type === "place" ? it.kind : it.type}
-          className={tool(on)}
-          title={`${label} (${key})`}
-          aria-label={label}
-          aria-pressed={on}
-          onClick={() => onTool(it)}
-        >
-          {icon}
-          <Key>{key}</Key>
-        </BoardButton>
-      ))}
-      <Separator />
       <BoardButton
-        className={tool(libraryOpen)}
+        className={tool(libraryOpen || current.type === "place")}
         title={t("tools.libraryTitle")}
         aria-label={t("tools.library")}
         aria-pressed={libraryOpen}

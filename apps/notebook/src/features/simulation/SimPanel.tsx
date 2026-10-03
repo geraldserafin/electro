@@ -108,10 +108,7 @@ export function SimPanel({
       )}
     >
       {/* like the code editor's: one thin bar, the tabs on the left, the controls on the right */}
-      <header
-        // (a phone: off its rounded corners)
-        className="flex items-center h-9 flex-none border-b border-line bg-board pr-1 max-sm:px-3"
-      >
+      <header className="flex items-center h-9 flex-none border-b border-line bg-board pr-1">
         <div role="tablist" aria-label={t("panel.label")} className="flex self-stretch">
           {tabs.map(({ id, label, icon }) => (
             <button

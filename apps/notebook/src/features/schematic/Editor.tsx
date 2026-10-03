@@ -214,6 +214,7 @@ export function SchematicEditor({
     viewRef,
     kept: camera,
     inUse: active || full,
+    full,
     // (an element selected: two fingers turning it turn it, a quarter at a time)
     onTwist: (dir) => !live && !viewOnly && rotateSelected(dir),
     // (two fingers: the drawing as it was before the first one touched it — no drag, no wire, no box)
@@ -1070,7 +1071,6 @@ export function SchematicEditor({
           locked={locked}
           onLock={() => setLocked(!locked)}
           libraryOpen={libraryOpen}
-          library={library}
           onTool={(next) => {
             setTool(next);
             focusBoard();

@@ -24,6 +24,7 @@ export function useCamera({
   inset = 0,
   onTwist,
   onPinch,
+  full = false,
 }: {
   value: SchematicData;
   library: SymbolLibrary;
@@ -33,6 +34,7 @@ export function useCamera({
   inset?: number; // px of the board's top under a bar laid over it: "fit" centres in what is left
   onTwist?: (dir: 1 | -1) => void; // two fingers turned a quarter turn (past an eighth; 1: clockwise)
   onPinch?: () => void; // a second finger down: what the first one began is not to be (a drag, a wire)
+  full?: boolean; // full screen: going in or out, the drawing fitted to the new size anew
 }) {
   const G = library.grid;
   const [cam, setCam] = useState<Camera>(() => kept?.current ?? startCamera(value, library));
@@ -49,6 +51,15 @@ export function useCamera({
   // the size of the board on screen: the camera shows view.w × view.h screen px
   const [view, setView] = useState({ w: 800, h: 480 });
   const shown = useRef(view);
+  // full screen toggled: its next size fits the drawing anew (a notebook's small board's zoom, kept in
+  // a whole window, showed it far away)
+  const refit = useRef(false);
+  const wasFull = useRef(full);
+  if (wasFull.current !== full) {
+    wasFull.current = full;
+    refit.current = true;
+  }
+  const fit = useRef<(size: { w: number; h: number }) => Camera>(() => startCamera(value, library));
   // measured before the first paint: a note opens with each drawing centred, as "fit" shows it
   // (unless the view was kept from before); later the board keeps its middle where it was
   // when it changes size (full screen, the window, a panel beside it)
@@ -61,13 +72,17 @@ export function useCamera({
       if (!size.w || (size.w === before.w && size.h === before.h)) return;
       shown.current = size;
       setView(size);
-      setCam((c) => ({ ...c, x: c.x + (before.w - size.w) / 2 / c.zoom, y: c.y + (before.h - size.h) / 2 / c.zoom }));
+      if (refit.current) {
+        refit.current = false;
+        setCam(fit.current(size));
+      } else
+        setCam((c) => ({ ...c, x: c.x + (before.w - size.w) / 2 / c.zoom, y: c.y + (before.h - size.h) / 2 / c.zoom }));
     };
     const first = { w: el.clientWidth, h: el.clientHeight };
     if (first.w) {
       shown.current = first;
       setView(first);
-      if (!kept?.current) setCam(fitted(first));
+      if (!kept?.current || full) setCam(fitted(first)); // (opened full screen: fitted to it, too)
     }
     const observer = new ResizeObserver(measure);
     observer.observe(el);
@@ -75,6 +90,7 @@ export function useCamera({
     // eslint-disable-next-line react-hooks/exhaustive-deps -- once, with the drawing as it opened
   }, [viewRef]);
 
+  fit.current = (size) => fitted(size);
   /** A camera that shows the whole drawing (on a board of ``size``). */
   function fitted(size = view): Camera {
     if (!value.elements.length && !value.wires.length) return startCamera(value, library);

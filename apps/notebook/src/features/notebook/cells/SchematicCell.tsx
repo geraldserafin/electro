@@ -58,6 +58,9 @@ import { variableName } from "./NameBox";
 import { Problems } from "./Problems";
 import { ResultsTable } from "./ResultsTable";
 
+/** This browser's choice: the panel under a board folded ("0") or not. */
+const PANEL_OPEN = "electro.panelOpen";
+
 /** The plots a schematic cell keeps, in the order they show under it. */
 const PLOTS = ["frequency", "sweep", "spread"] as const;
 type PlotKind = (typeof PLOTS)[number];
@@ -232,11 +235,22 @@ export function SchematicCell({
   const [plotError, setPlotError] = useState<{ kind: PlotKind; failure: Failure } | null>(null);
   // the panel under the board: its tab (null: the first there is), its body shown or folded
   const [tab, setTab] = useState<string | null>(null);
-  const [panelOpen, setPanelOpen] = useState(true);
-  const show = (next: string) => {
-    setTab(next);
-    setPanelOpen(true);
+  // (folded or not: this browser's choice, kept)
+  const [panelOpen, setPanelOpenNow] = useState(() => {
+    try {
+      return localStorage.getItem(PANEL_OPEN) !== "0";
+    } catch {
+      return true;
+    }
+  });
+  const setPanelOpen = (open: boolean) => {
+    setPanelOpenNow(open);
+    try {
+      localStorage.setItem(PANEL_OPEN, open ? "1" : "0");
+    } catch {}
   };
+  // what a run made: its tab (folded, the panel stays so — that is kept)
+  const show = (next: string) => setTab(next);
   /** A new drawing: what runs made of the old one is out of date. */
   const changed = (schematic: SchematicData): Partial<Cell> => ({
     schematic,
@@ -932,7 +946,8 @@ export function SchematicCell({
                 }
               />
             )}
-            {!full && <div className="h-px flex-none bg-line" />}
+            {/* (full screen and open: the sash is the line) */}
+            {!(full && panelOpen) && <div className="h-px flex-none bg-line" />}
             {panel}
           </>
         )}
