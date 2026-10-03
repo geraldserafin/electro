@@ -92,11 +92,6 @@
     stroke-dasharray: 5 4;
     pointer-events: none;
   }
-  /* a terminal: an open circle the wire stops at (not through it) */
-  .canvas [data-kind="terminal"] .open {
-    r: 4.5px;
-    fill: var(--board);
-  }
   .canvas .open-pin {
     fill: var(--board);
     stroke: #e03131;

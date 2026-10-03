@@ -1,6 +1,6 @@
 {
  "grid": 20,
- "style": "\n.w{stroke:currentColor;stroke-width:1.6;fill:none;stroke-linecap:round;stroke-linejoin:round}\n.w .thick{stroke-width:3}.w .fill{fill:currentColor;stroke:none}.w .dashed{stroke-dasharray:4 3}\n.w .open{fill:none}.dot{fill:currentColor}\ntext{font:13px ui-sans-serif,system-ui,sans-serif;fill:currentColor}.halo{fill:var(--paper,#fff)}\ntext .sub{font-size:10px}.solved{fill:#2563eb;font-weight:600}.result{fill:#059669}\n.node{font-style:italic}.letter{font-weight:600;text-anchor:middle;dominant-baseline:central}\n.w .when-closed,.closed .when-open{display:none}.closed .when-closed{display:inline}\n.w .seg{stroke-width:4;opacity:.12}.w .on{stroke-width:4;stroke:#ff3b30;fill:#ff3b30}.w .waves{stroke-width:1.4}\n.w .pins text{font-size:9px;stroke:none;fill:currentColor;opacity:.75}.w text.chip{font-size:13px;font-weight:600;stroke:none;fill:currentColor}\n",
+ "style": "\n.w{stroke:currentColor;stroke-width:1.6;fill:none;stroke-linecap:round;stroke-linejoin:round}\n.w .thick{stroke-width:3}.w .fill{fill:currentColor;stroke:none}.w .dashed{stroke-dasharray:4 3}\n.w .open{fill:none}.w .hole{fill:var(--board,#fff)}.dot{fill:currentColor}\ntext{font:13px ui-sans-serif,system-ui,sans-serif;fill:currentColor}.halo{fill:var(--paper,#fff)}\ntext .sub{font-size:10px}.solved{fill:#2563eb;font-weight:600}.result{fill:#059669}\n.node{font-style:italic}.letter{font-weight:600;text-anchor:middle;dominant-baseline:central}\n.w .when-closed,.closed .when-open{display:none}.closed .when-closed{display:inline}\n.w .seg{stroke-width:4;opacity:.12}.w .on{stroke-width:4;stroke:#ff3b30;fill:#ff3b30}.w .waves{stroke-width:1.4}\n.w .pins text{font-size:9px;stroke:none;fill:currentColor;opacity:.75}.w text.chip{font-size:13px;font-weight:600;stroke:none;fill:currentColor}\n",
  "kinds": {
   "resistor": {
    "pins": [
@@ -1359,7 +1359,7 @@
      0
     ]
    ],
-   "svg": "<circle class=\"open\" r=\"3.5\"/>",
+   "svg": "<circle class=\"hole\" r=\"4.5\"/>",
    "letter": null,
    "upright": true
   },

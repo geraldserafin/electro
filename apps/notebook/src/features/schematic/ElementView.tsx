@@ -238,7 +238,7 @@ function ArrowView({ element: e, library, selected, result, onPointerDown }: Pro
   const [dx, dy, anchor] = ends
     ? ([lx * 10, ly * 10 + 4, lx < -0.3 ? "end" : lx > 0.3 ? "start" : "middle"] as const)
     : (ARROW_NAME[e.flip ? (e.rotation + 180) % 360 : e.rotation] ?? ARROW_NAME[0]!);
-  // a current's: a chevron on its wire (the wire is its line), pointing the current's way
+  // a current's: an open chevron on its wire (the wire is its line), pointing the current's way
   const chevron = e.kind === "current_arrow" && !ends;
   const box = { x: Math.min(x, x + hx), y: Math.min(y, y + hy), width: Math.abs(hx), height: Math.abs(hy) };
   return (
@@ -257,7 +257,7 @@ function ArrowView({ element: e, library, selected, result, onPointerDown }: Pro
         transform={`translate(${x} ${y}) rotate(${angle})`}
         dangerouslySetInnerHTML={{
           __html: chevron
-            ? `<path class="fill" d="M${length / 2 - 5} -5.5L${length / 2 + 6} 0L${length / 2 - 5} 5.5z"/>`
+            ? `<path d="M${length / 2 - 4} -5L${length / 2 + 4} 0L${length / 2 - 4} 5"/>` // (open, as a wire's current is marked)
             : `<path d="M${gap} 0H${length - gap - 7}"/><path class="fill" d="M${length - gap} 0l-9 -4.5v9z"/>`,
         }}
       />

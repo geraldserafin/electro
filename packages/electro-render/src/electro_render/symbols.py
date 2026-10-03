@@ -180,7 +180,7 @@ SYMBOLS: dict[str, str] = {
     "xor_gate": '<path d="M0 0H16M0 40H16"/><rect x="16" y="-12" width="36" height="64"/><path d="M52 20H80"/><text class="chip" x="34" y="25" text-anchor="middle">=1</text>',
     "ground": '<path d="M0 0v10M-11 10h22M-7 14h14M-3 18h6"/>',
     "label": "",
-    "terminal": '<circle class="open" r="3.5"/>',
+    "terminal": '<circle class="hole" r="4.5"/>',  # (filled with the board: a wire ends at it, not through it)
     # a component's pin, in its own drawing: a tag pointing at the point (its name above, as a label's)
     "port": '<path d="M0 0L-6 -6V-16H6V-6Z"/>',
     "part": "",  # drawn from its definition: part_symbol()
@@ -267,7 +267,7 @@ UPRIGHT = {"ground", "label", "terminal", "port"}
 STYLE = """
 .w{stroke:currentColor;stroke-width:1.6;fill:none;stroke-linecap:round;stroke-linejoin:round}
 .w .thick{stroke-width:3}.w .fill{fill:currentColor;stroke:none}.w .dashed{stroke-dasharray:4 3}
-.w .open{fill:none}.dot{fill:currentColor}
+.w .open{fill:none}.w .hole{fill:var(--board,#fff)}.dot{fill:currentColor}
 text{font:13px ui-sans-serif,system-ui,sans-serif;fill:currentColor}.halo{fill:var(--paper,#fff)}
 text .sub{font-size:10px}.solved{fill:#2563eb;font-weight:600}.result{fill:#059669}
 .node{font-style:italic}.letter{font-weight:600;text-anchor:middle;dominant-baseline:central}
