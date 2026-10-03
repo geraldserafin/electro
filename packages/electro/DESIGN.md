@@ -9,20 +9,113 @@ typy, zero ręcznego grzebania we wspólnym stanie.
 
 ---
 
-## 1. Teoria w trzech zdaniach
+## 1. Teoria
 
-1. **Obwody to kategoria.** Obiekt = liczba wolnych końcówek. Morfizm = kawałek obwodu `n → m`.
-   Jedyna prawdziwa operacja to **sklejanie węzłów** (idealny kabel = dwa punkty to jeden węzeł);
-   szeregowo, równolegle, zamykanie — to przepisy na to, co z czym skleić.
-2. **Semantyka to funktor:** tłumaczenie obwodu na równania, które szanuje sklejanie (złożyć i
-   przetłumaczyć = przetłumaczyć i skleić równania). Równania to **relacje**, nie funkcje — nie mają
-   kierunku, dlatego działają zadania odwrotne (dany prąd → szukane R).
-3. **Jeden obwód, wiele tłumaczeń** — różnią się tylko „wymiarem” wielkości:
-   - kartka (DC): liczby,
-   - częstotliwość (AC, Bode): funkcje ω (d/dt → jω),
-   - czas (symulacja): funkcje t.
+### 1.1 Kategoria obwodów
 
-   Kartka = stan, do którego symulacja się ustala (równowaga dynamiki), liczony wprost.
+- **Kategoria** to „rzeczy + strzałki, które da się łączyć”: strzałkę `A → B` ze strzałką `B → C`
+  łączy się w `A → C`. Monoid (`a → a`) to kategoria z jednym obiektem — czyli „monoid z typami”.
+- **U nas:** obiekt = liczba wolnych końcówek; strzałka (morfizm) = kawałek obwodu `n → m`
+  (rezystor `1 → 1`, masa `1 → 0`, zamknięty układ `0 → 0`). Szeregowe łączenie składa strzałki
+  tylko, gdy końcówki pasują — dlatego kategoria, a nie monoid (byłby nim, gdyby wszystko było `1 → 1`).
+- **Jedyna prawdziwa operacja to sklejanie węzłów.** Idealny kabel = dwa punkty o tym samym
+  potencjale = jeden węzeł. Szeregowo, równolegle, zamykanie, etykiety — to tylko przepisy, co z czym
+  skleić:
+
+  | operacja | skleja |
+  |---|---|
+  | `a >> b` | prawe końce `a` z lewymi `b` |
+  | `a \| b` | lewe z lewymi, prawe z prawymi |
+  | `close(a)` | prawe końce `a` z jego własnymi lewymi (ślad, *trace*; to samo co pętla sprzężenia zwrotnego) |
+  | węzeł / sieć | wszystkie miejsca z tym samym węzłem |
+
+- **Iloczyn tensorowy** `@` (obwody obok siebie) i **pająki** (węzły jako sklejenie `n → m` w jeden
+  punkt; z nich `cup`, `cap`, `close`, `transpose`) czynią z tego kategorię hipergrafową
+  (Frobeniusa) — wszystko da się zgiąć, odwrócić, zamknąć.
+
+### 1.2 Jak to jest zbudowane dziś (i zostaje)
+
+Trzy warstwy połączone funktorami (`circuit.py`):
+
+```
+Circuit (drzewo składni, kategoria wolna) --netlist--> Netlist (kospan węzłów) --semantics--> równania (relacje)
+```
+
+- **Drzewo składni** zachowane, jak je zbudowano — renderer może je narysować.
+- **`Netlist`** to postać normalna: kospan `lewe końce → węzły ← prawe końce`, udekorowany elementami
+  (konstrukcja Fonga, *decorated cospans*). Złożenie = sklejenie węzłów brzegu (pushout).
+- **Semantyka**: równania. Konstrukcja z Baez–Fong, *A compositional framework for passive linear
+  networks*: czarna skrzynka (*black-boxing*) to funktor z obwodów do relacji.
+
+### 1.3 Funktor = tłumaczenie, które szanuje łączenie
+
+Każdy kawałek obwodu tłumaczy się na równania (rezystor → `U = R·I`). Własność: złożyć i
+przetłumaczyć = przetłumaczyć osobno i skleić równania. Takie tłumaczenie to **funktor**.
+
+Równania to **relacje, nie funkcje** — nie mają kierunku. Stąd:
+- zadania odwrotne działają za darmo (dany prąd → szukane R),
+- dane i szukane są symetryczne: jedne i drugie to zmienne, jedne ograniczone, drugie odczytywane.
+
+### 1.4 Jeden obwód, trzy tłumaczenia („+1 wymiar”)
+
+Składnia ta sama, zmienia się tylko to, **nad czym** są relacje (pierścień skalarów):
+
+| tłumaczenie | wielkość to | kondensator | analiza |
+|---|---|---|---|
+| kartka (DC) | liczba | przerwa (d/dt = 0) | `solve` |
+| częstotliwość (AC) | funkcja ω, fazor | impedancja 1/(jωC) (d/dt → jω) | `solve` z sinusem, `respond` (Bode) |
+| czas | funkcja t | `i = C·du/dt` | `simulate` |
+
+- DC = ewaluacja s → 0, AC = ewaluacja s → jω tłumaczenia „po s” (impedancje jako funkcje
+  wymierne, pole ℝ(s)); czas = relacje na sygnałach (podejście behawioralne, Willems).
+- Ciekawostka: dla samych rezystorów i stałych źródeł wymiar czasu jest pusty — każda klatka
+  symulacji = kartka. Elementy żyjące tylko w czasie (Arduino, 555, fala prostokątna) nie mają
+  sensownego „punktu” — dla nich jest tylko czas.
+
+### 1.5 Symulacja jako rekurencja; kartka jako jej równowaga
+
+- Symulacja to maszyna ze stanem (automat Mealy'ego): `step :: State -> State`, wywoływany na
+  własnym wyniku. Wynik symulacji to **cały przebieg**, nie ostatnia klatka.
+- Kartka to **równowaga** tej dynamiki: stan, w którym nic się nie zmienia. Branie stanów
+  ustalonych też jest funktorem (Baez–Pollard): równowaga złożenia = złożenie równowag — więc da się
+  ją liczyć wprost, kompozycyjnie, bez kręcenia filmu. Szybciej, dokładnie, w obie strony.
+- Przykład (RC, E = 10 V, R = 1 kΩ, C = 100 µF): kartka U_C = 10 V; symulacja 0 → 3,9 → 6,3 →
+  8,6 → 9,93 V (t = 0; 0,05; 0,1; 0,2; 0,5 s) — dąży do kartki.
+
+### 1.6 Gdzie teoria się sypie (żeby jej nie przecenić)
+
+- Funktor stanów ustalonych daje **równowagi, nie granice**: oscylator ma równowagę, do której
+  symulacja nigdy nie dojdzie. Stabilność to osobna własność, nie wynika z kategorii.
+- Symulacja numeryczna (krok dyskretny) jest funktorem tylko w przybliżeniu — dyskretyzacja
+  złożenia ≠ złożenie dyskretyzacji.
+- Elementy nieliniowe (dioda): relacje dalej się składają, ale przestają być liniowe — tracimy
+  rachunek macierzowy, nie kategorię. DC dla nich to i tak iteracja (Newton) do punktu stałego.
+- Arduino, 555, przerzutniki: stan dyskretny + ciągły (systemy hybrydowe) — poza relacjami
+  liniowymi; teoria dla nich to np. snopy czasowe (Schultz–Spivak–Vasilakopoulou).
+
+### 1.7 Co z tego wynika w praktyce
+
+1. **Nowy element dopisuje się raz** — jego równanie w każdym tłumaczeniu; łączenie, własne
+   komponenty, wszystkie analizy działają od razu. I odwrotnie: nowa analiza działa dla każdego obwodu.
+2. **Własny komponent to zwykły kawałek** — zagnieżdża się bez końca; można go zastąpić czarną
+   skrzynką (same równania na zaciskach, np. Thévenin) — szybciej, a na zewnątrz to samo.
+3. **Równoważność obwodów da się sprawdzić** (te same równania na zaciskach) → sprawdzanie układu
+   zastępczego ucznia; kroki rozwiązania („R₁, R₂ szeregowo → R₁+R₂”) jako zamiany na równoważne,
+   z gwarancją, że wynik się nie zmieni.
+4. **Zadania odwrotne i warianty zadań** za darmo (dane = równania).
+5. **Darmowy test poprawności:** kartka i symulacja to dwa tłumaczenia tego samego obwodu — ich
+   niezgodność (kartka ≠ symulacja po ustaleniu) to błąd w którymś. Test losujący obwody wyłapie
+   błędy modeli elementów.
+
+### 1.8 Odrzucone alternatywy
+
+- **Parametry jako wejście funkcji (`Para(C)`: morfizm `P ⊗ A → B`, `obwod(R_1=5)` jako częściowe
+  podstawienie).** Kierunkowe — parametry wchodzą, wynik wychodzi; nie wyrazi „dany prąd → szukane R”.
+  Wybrane: parametry to zmienne relacji, a dane to dodatkowe warunki (`Given`). Funkcja to
+  szczególny przypadek relacji. Istniejące `circuit(**data)` (commit 7e35e06) zastąpi `Problem`.
+- **Liczenie kartki przez symulację do końca.** Odpada: tracimy zadania odwrotne i symbole,
+  przybliżenie zamiast dokładności, brak wyniku dla układów, które się nie ustalają.
+- **Węzły nazywane napisem.** Odpada: przypadkowe sklejenia przy składaniu (F8).
 
 ## 2. Fakty o dziedzinie
 
@@ -44,7 +137,7 @@ Każdy fakt to coś, co w rzeczywistości jest osobnym pojęciem — więc w kod
 | F12 | **Wynik ma wspólny interfejs** — rozwiązanie, przebieg i charakterystyka odpowiadają na to samo pytanie, różni się wymiar odpowiedzi. | `result(sought)` → liczba / funkcja t / funkcja ω. |
 | F13 | **Własny komponent to nazwana wartość** (jak `let`). | Zwykły `Circuit` przypisany do nazwy; szablon wielokrotnego użytku = funkcja zwracająca `Circuit` (świeże węzły na każde wywołanie). |
 | F14 | **Wartości mają jednostki.** `R_1 = 5 V` to błąd. | Sprawdzane przy budowie `Problem`. |
-| F15 | **Składanie nie jest przemienne.** `a >> b ≠ b >> a` (inny brzeg, inny kierunek). Równoległe naprawdę jest przemienne. | `>>` zamiast `+` (patrz §4). |
+| F15 | **Składanie nie jest przemienne.** `a >> b ≠ b >> a` (inny brzeg, inny kierunek). Równoległe naprawdę jest przemienne. Uwaga: `R1 >> R2` i `R2 >> R1` to różne obwody (węzeł środkowy gdzie indziej), ale z zacisków zachowują się tak samo (R₁+R₂) — przemienność na poziomie zachowania, nie struktury. Biblioteka opisuje strukturę. | `>>` zamiast `+` (patrz §4). |
 
 ## 3. Typy
 
@@ -111,6 +204,19 @@ bridge = (a >> E1 >> R1 >> b) @ (b >> R2 >> a) @ (b >> R3 >> E2 >> a)   # dwa oc
 - **Zasada domknięcia:** koniec leżący na węźle (`Node`/`Net`) nie jest wolny. Składanie (`>>`)
   działa na wszystkich końcach, ale **typ zadania** liczy tylko końce wolne: wyrażenie, którego każdy
   koniec leży na węźle, jest zamknięte (`0 → 0`). `a >> E >> R >> a` jest zamknięty.
+- Jeden wspólny węzeł nie łączy pętli elektrycznie — dwie pętle sklejone w jednym punkcie
+  („ósemka”) płyną niezależnie (prąd nie ma którędy wrócić); wspólny węzeł daje tylko wspólny
+  potencjał. Oczka wpływają na siebie dopiero przez wspólną gałąź (dwa wspólne węzły):
+
+  ```python
+  a, b = Node(), Node()
+  figure_eight = (a >> E1 >> R1 >> a) >> (b >> E2 >> R2 >> b)   # sklejone w a ≡ b: niezależne
+  two_meshes   = (a >> E1 >> R1 >> b) @ (b >> R2 >> a) @ (b >> R3 >> E2 >> a)   # R2 wspólny
+  ```
+- Dwa sposoby zrobienia `0 → 0` z kawałka `1 → 1` (F4), np. E = 10 V, R₁ = R₂ = 1 kΩ:
+  `close(E >> R1 >> R2)` — końce połączone, I = 5 mA; `cap`-owanie końców (zostawione wolne) —
+  I = 0, napięcie jałowe na końcach 10 V (to pytanie o kawałek: `equivalent`, E_th = 10 V,
+  R_th = 2 kΩ). Dlatego domknięcie musi być jawne.
 - Kawałek wielokrotnego użytku to funkcja zwracająca obwód — każde wywołanie ma świeże węzły i
   świeże elementy (jak zmienne lokalne), więc dwie kopie się nie skleją i nie podzielą elementu:
 
@@ -171,7 +277,15 @@ bridge = (a >> E1 >> R1 >> b) @ (b >> R2 >> a) @ (b >> R3 >> E2 >> a)   # dwa oc
 6. **Generator kodu i UI:** kod ze schematu w formie `circuit = …` / `Problem(circuit, given, find)`;
    mierniki jako obserwacje (F5).
 
-## 8. Otwarte
+## 8. Związek z aplikacją
+
+Notatnik już działa jak `Problem` (commit 9299796): schemat = `Circuit` (na rysunku tylko nazwy),
+zakładka **Dane** = `given`, lista **Szukane** = `find` (wybrane + wszystko bez wartości), zakładka
+**Wyniki** = odpowiedzi na `find`, przycisk ▶ = analiza (kartka, a gdy się da — czas). Strzałki prądu i
+napięcia, punkty i prądy oczkowe na schemacie to `Sought`/`Given` przypięte do miejsca w obwodzie.
+Przebudowa biblioteki ma to odzwierciedlić w kodzie, nie zmieniać zachowania.
+
+## 9. Otwarte
 
 - Jak pokazać `Given` z wymiarem czasu w zakładce Dane (przełącznik od 1 s, przebieg z pliku).
 - `Net` a etykiety na schemacie: czy każda etykieta to `Net`, czy tylko jawnie globalne.
