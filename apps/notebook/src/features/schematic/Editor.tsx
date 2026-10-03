@@ -55,6 +55,7 @@ import {
 } from "./model";
 import { OledScreen, type OledScreenData } from "./OledScreen";
 import { partKind, usedParts, withParts } from "./parts";
+import { route } from "./route";
 import { TftScreen, type TftScreenData } from "./TftScreen";
 import { type LiveTool, LiveToolbar, type Tool, Toolbar } from "./Toolbar";
 import { type Camera, useCamera } from "./useCamera";
@@ -346,15 +347,21 @@ export function SchematicEditor({
     return [Math.round(point.x / G), Math.round(point.y / G)];
   };
 
-  /** A wire's way from a pin (or a wire) to ``b``: out of a pin along its element first (up from a
-   *  source's top, not sideways into its body's way). */
+  /** A wire's way from a pin (or a wire) to ``b``: to something to wire to, laid around what is in the
+   *  way (route.ts) — out of a pin along its element first (up from a source's top, not sideways); else
+   *  (the pointer on nothing yet) a plain elbow. */
   const wireTo = (g: Extract<Gesture, { type: "wire" }>, b: Point): Point[] => {
     const a = g.from;
     const tap = g.tap;
     const e = "id" in tap ? value.elements.find((x) => x.id === tap.id) : undefined;
     const ps = e ? pins(e, library) : [];
     const upright = ps.length === 2 && ps[0]![0] === ps[1]![0];
-    return upright && a[0] !== b[0] && a[1] !== b[1] ? [a, [a[0], b[1]], b] : elbow(a, b);
+    const plain: Point[] = upright && a[0] !== b[0] && a[1] !== b[1] ? [a, [a[0], b[1]], b] : elbow(a, b);
+    if (!isConnectionPoint(value, library, b)) return plain;
+    // out of its pin: away from the element's other pin (a two-pin one's)
+    const other = ps.length === 2 ? ps.find((q) => !same(q, a)) : undefined;
+    const out: Point | undefined = other && [Math.sign(a[0] - other[0]), Math.sign(a[1] - other[1])];
+    return route(value, library, a, b, plain, out);
   };
 
   const addWire = (points: Point[]) => {
