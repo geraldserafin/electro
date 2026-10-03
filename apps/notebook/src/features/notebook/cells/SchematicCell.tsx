@@ -613,7 +613,7 @@ export function SchematicCell({
   );
   const fullButton = (
     <button
-      className={cn(barButton, "[&_svg]:size-4", inBoard && "size-9 text-fg")}
+      className={cn(barButton, "[&_svg]:size-4", compact && "size-9 text-fg")}
       onClick={() => setFull(!full)}
       title={full ? t("schematic.exitFull") : t("schematic.full")}
       aria-label={t("schematic.full")}
@@ -665,8 +665,23 @@ export function SchematicCell({
       }}
       bare
       viewOnly={compact}
-      corner={inBoard ? actions : undefined}
-      topRight={inBoard ? fullButton : undefined}
+      // a phone: in the notebook, full screen in the top right corner (the run and what is wrong in the
+      // bottom one); full screen, its way back on the bar as elsewhere, the run in that corner — nothing
+      // else of the bar's (no plots, no component made: the board's own for its element instead)
+      phone={phone}
+      corner={
+        inBoard ? (
+          compact ? (
+            <>
+              {problems}
+              {runButton}
+            </>
+          ) : (
+            problems || undefined
+          )
+        ) : undefined
+      }
+      topRight={inBoard ? compact ? fullButton : <div className="flex [&_button]:size-9">{runButton}</div> : undefined}
       value={cell.schematic}
       onChange={(schematic) => update(changed(schematic))}
       library={library}
@@ -839,7 +854,7 @@ export function SchematicCell({
                 {/* (a phone, in the notebook: none — only the drawing shows) */}
                 <div data-tab-bar className={cn(BAR, compact && "hidden")}>
                   {/* full screen (and back): first, before the files (on the board: its top right corner) */}
-                  {i === 0 && !inBoard && (
+                  {i === 0 && !compact && (
                     <div className="flex flex-none items-center pl-1 pr-1.5 border-r border-line">{fullButton}</div>
                   )}
                   <div

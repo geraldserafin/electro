@@ -18,7 +18,7 @@ import {
 import { useTranslation } from "react-i18next";
 import { cn } from "@/shared/lib/cn";
 import type { ElementData, ElementResult, Point, SchematicData, SymbolLibrary } from "@/shared/model/types";
-import { Target, Trash } from "@/shared/ui/icons";
+import { More, Rotate, Target, Trash } from "@/shared/ui/icons";
 import { isAdjustable } from "./Adjusters";
 import { BoardButton, BoardIsland, board, boardIsland, islandButton } from "./Board";
 import { CurrentDots } from "./CurrentDots";
@@ -40,6 +40,7 @@ import {
   isConnectionPoint,
   junctions,
   KINDS,
+  key,
   keyName,
   ledColor,
   moveGroup,
@@ -96,7 +97,8 @@ interface Props {
   topLeft?: ReactNode;
   topRight?: ReactNode;
   status?: ReactNode; // next to the full screen button, as it is (e.g. the warning sign)
-  corner?: ReactNode; // an island of the cell's own in the bottom right corner (a phone: run it, full screen)
+  corner?: ReactNode; // an island of the cell's own in the bottom right corner (a phone: what is wrong, …)
+  phone?: boolean; // the selection's own buttons in that corner (turn it, away with it, its panel), not over the board
   viewOnly?: boolean; // looked at, not edited: no tools, nothing moves (while it runs, its buttons still work)
   camera?: { current: Camera | null }; // where the view was: kept here while the editor is away
   autoFocus?: boolean; // take the keyboard when shown
@@ -156,6 +158,7 @@ export function SchematicEditor({
   topRight,
   status,
   corner,
+  phone = false,
   viewOnly = false,
   camera,
   autoFocus,
@@ -381,7 +384,18 @@ export function SchematicEditor({
             value: defaultValue(tool.kind),
             text: defaultText(tool.kind),
           };
-      commit(attach({ ...next, elements: [...next.elements, element] }, withParts(symbols, next.parts), element.id));
+      // right on one that is there (the same pins): that one, picked — not another over it
+      const lib = withParts(symbols, next.parts);
+      const there = value.elements.find((e) => {
+        const [a, b] = [pins(e, lib).map(key).sort(), pins(element, lib).map(key).sort()];
+        return a.length === b.length && a.every((k, i) => k === b[i]);
+      });
+      if (there) {
+        setSelection({ type: "element", id: there.id });
+        setInspect(event.pointerType !== "touch");
+        return;
+      }
+      commit(attach({ ...next, elements: [...next.elements, element] }, lib, element.id));
       // (the tool stays: another one where the next click is)
       setSelection({ type: "element", id: element.id });
       setInspect(event.pointerType !== "touch");
@@ -1064,6 +1078,7 @@ export function SchematicEditor({
           finger has no Del key) */}
       {!live &&
         !viewOnly &&
+        !phone &&
         (selection?.type === "wire" || selection?.type === "group" || (selection?.type === "element" && !inspect)) && (
           <BoardIsland stays className="top-15 right-3">
             <BoardButton
@@ -1125,6 +1140,39 @@ export function SchematicEditor({
       {/* bottom right: what is wrong with the circuit (always shown, a sign of its own), then full screen */}
       <div className="absolute bottom-3 right-3 z-3 flex items-end gap-1.5">
         {status}
+        {/* a phone: what is selected, its own buttons — turned, away, its whole panel */}
+        {phone && !live && !viewOnly && selection && !(selectedElement && inspect) && (
+          <BoardIsland stays className="static gap-1 [&_button]:size-9">
+            {selectedElement && (
+              <BoardButton
+                className={islandButton()}
+                onClick={() => rotateSelected()}
+                title={t("inspector.rotateTitle")}
+                aria-label={t("inspector.rotate")}
+              >
+                <Rotate />
+              </BoardButton>
+            )}
+            <BoardButton
+              className={cn(islandButton(), "hover:bg-err-bg hover:text-danger")}
+              onClick={removeSelected}
+              title={t("inspector.removeTitle")}
+              aria-label={t("inspector.remove")}
+            >
+              <Trash />
+            </BoardButton>
+            {selectedElement && (
+              <BoardButton
+                className={islandButton()}
+                onClick={() => setInspect(true)}
+                title={t("inspector.label")}
+                aria-label={t("inspector.label")}
+              >
+                <More />
+              </BoardButton>
+            )}
+          </BoardIsland>
+        )}
         {corner && (
           <BoardIsland stays className="static gap-1 [&_button]:size-9">
             {corner}
