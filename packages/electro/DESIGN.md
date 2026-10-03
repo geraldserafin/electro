@@ -137,6 +137,7 @@ Każdy fakt to coś, co w rzeczywistości jest osobnym pojęciem — więc w kod
 | F12 | **Wynik ma wspólny interfejs** — rozwiązanie, przebieg i charakterystyka odpowiadają na to samo pytanie, różni się wymiar odpowiedzi. | `result(sought)` → liczba / funkcja t / funkcja ω. |
 | F13 | **Własny komponent to nazwana wartość** (jak `let`). | Zwykły `Circuit` przypisany do nazwy; szablon wielokrotnego użytku = funkcja zwracająca `Circuit` (świeże węzły na każde wywołanie). |
 | F14 | **Wartości mają jednostki.** `R_1 = 5 V` to błąd. | Sprawdzane przy budowie `Problem`. |
+| F16 | **Minimalny i ogólny rdzeń.** Prawa rządzące obwodem (sklejanie → Kirchhoff) nie zależą od elementów; element to tylko jego relacja U–I, zapisana raz w czasie (`D` = d/dt). Nawet w systemie z samym rezystorem dodanie kondensatora to dopisanie jednej definicji. Analizy różnią się tylko interpretacją `D` (DC: 0, AC: jω, krok: różnica wsteczna). | §9.2: `two_terminal(…, law=…)`; analiza = `interpret(law, analysis)`. |
 | F15 | **Składanie nie jest przemienne.** `a >> b ≠ b >> a` (inny brzeg, inny kierunek). Równoległe naprawdę jest przemienne. Uwaga: `R1 >> R2` i `R2 >> R1` to różne obwody (węzeł środkowy gdzie indziej), ale z zacisków zachowują się tak samo (R₁+R₂) — przemienność na poziomie zachowania, nie struktury. Biblioteka opisuje strukturę. | `>>` zamiast `+` (patrz §4). |
 
 ## 3. Typy
@@ -245,13 +246,15 @@ bridge = (a >> E1 >> R1 >> b) @ (b >> R2 >> a) @ (b >> R3 >> E2 >> a)   # dwa oc
    Arność `n → m` sprawdzana przy budowie (Python nie ma typów zależnych), reszta statycznie.
 9. **Efekt jest jeden i jawny: świeża tożsamość.** `Node()` i nowy element przydzielają nową tożsamość
    (w Haskellu: monada świeżych nazw). Trzymamy to tylko tam — reszta czysta.
+10. **Minimalny rdzeń (F16).** Nowy element = jego prawo i nic więcej; nowa analiza = interpretacja
+    `D` i nic więcej. Jeśli dodanie czegoś wymaga zmian w kilku miejscach, to błąd projektu.
 
 ## 6. Przegląd obecnego kodu (`src/electro`, ~5800 linii)
 
 | problem | gdzie | kierunek |
 |---|---|---|
 | Elementy zmienne: wartość w konstruktorze, `Parts._use` robi `setattr`, `circuit(**data)` musi kopiować obiekt i czyścić `netlist` z cache'u | `components.py:102`, `:166`, `circuit.py` (`__call__`) | element bez wartości, frozen; dane w `Problem` |
-| Prawa elementów przez dziedziczenie i metodę `build(self, label, V, param, ctx) -> Model`; `Model` to zmienny dataclass z mutowalnymi domyślnymi słownikami | `components.py`, `devices.py` | prawo elementu = czysta funkcja `laws(kind, terminals, analysis) -> Laws`; rejestr rodzajów jako dane |
+| Prawa elementów przez dziedziczenie i metodę `build(self, label, V, param, ctx) -> Model` — każdy element sam rozpatruje DC/AC/krok; `Model` to zmienny dataclass z mutowalnymi domyślnymi słownikami | `components.py`, `devices.py` | element = jedna relacja U–I z `D`, analizy interpretują `D` (F16, §9.2) |
 | Wielkie imperatywne `compile_netlist`: akumuluje listy i słowniki, w środku własny union-find | `semantics.py:122` | rozbić na małe funkcje: węzły → potencjały → prawa elementów → KCL → odniesienia |
 | Union-find trzy razy | `circuit.py` (`glue`), `semantics.py` (odniesienia), `electro_schematic/model.py` (`nodes`) | jedna funkcja `components(pairs) -> partition` |
 | Etykiety: automatyczne nadawanie (`_labels`) i „luźne” dopasowanie (`"R1"` znajduje `R_1`) — ukryta magia na napisach | `semantics.py:87`, `System.symbol` | tożsamość elementu (F7); nazwy parametrów jawne |
@@ -285,7 +288,324 @@ zakładka **Dane** = `given`, lista **Szukane** = `find` (wybrane + wszystko bez
 napięcia, punkty i prądy oczkowe na schemacie to `Sought`/`Given` przypięte do miejsca w obwodzie.
 Przebudowa biblioteki ma to odzwierciedlić w kodzie, nie zmieniać zachowania.
 
-## 9. Otwarte
+## 9. Docelowy kod (szkic do review)
+
+Szkic, nie implementacja — pokazuje, w co idziemy. Najpierw jak się tego używa, potem jak to jest
+zbudowane w środku.
+
+### 9.1 Użycie
+
+```python
+from electro import *
+
+# --- obwód: sama struktura, bez liczb ---------------------------------------------------------
+e  = VoltageSource("E")          # element: rodzaj + nazwa parametru; tożsamość = ten obiekt
+r1 = Resistor("R_1")
+r2 = Resistor("R_2")
+r3 = Resistor("R_3")
+b  = Node("B")                   # węzeł: tożsamość = obiekt, "B" to tylko podpis
+
+circuit = (GND >> e >> r1 >> b) @ (b >> r2 >> GND) @ (b >> r3 >> GND)
+# każdy koniec leży na węźle (GND, b) → zamknięty, typ 0 → 0
+
+# --- zadanie: obwód + dane + szukane ------------------------------------------------------------
+problem = Problem(
+    circuit,
+    given={e: 12, r1: 10, r2: 20, r3: 20},          # klucz = element (albo nazwa parametru: "R_1")
+    find=[I(r1), U(r3), R(b, GND)],                 # szukane to typy, nie napisy
+)
+
+solution = solve(problem)
+solution(I(r1))        # 600 mA
+solution(U(r3))        # 6 V
+solution(R(b, GND))    # 5 Ω   (widziana z B: R1 ∥ R2 ∥ R3, źródło zwarte)
+solution.answers       # {I(r1): 600 mA, U(r3): 6 V, R(b, GND): 5 Ω}
+solution.steps         # kroki z uzasadnieniem (jak dziś)
+
+# --- zadanie odwrotne: dany prąd, szukany opór ---------------------------------------------------
+inverse = Problem(circuit, given={e: 12, r1: 10, r2: 20, I(r1): "500 mA"}, find=[Parameter(r3)])
+solve(inverse)(Parameter(r3))      # 46,67 Ω
+
+# --- ten sam problem, inny wymiar: czas ------------------------------------------------------------
+c = Capacitor("C")
+rc = Problem(
+    (GND >> e >> r1 >> b) @ (b >> c >> GND),
+    given={e: 10, r1: "1 kΩ", c: "100 µF"},
+    find=[U(c)],
+)
+solve(rc)(U(c))                         # 10 V      — gdzie się kończy
+trace = simulate(rc, until="0.5 s")
+trace(U(c))                             # Signal: funkcja czasu
+trace(U(c))(0.1)                        # 6,32 V    — jak tam dochodzi
+
+# dane z wymiarem czasu (F11): przełącznik zamknięty od 1 s, źródło sinusoidalne
+s = Switch("S")
+given = {s: closed_from("1 s"), e: sine(amplitude="10 V", frequency="50 Hz")}
+
+# --- kawałek, nie zadanie (F4) ---------------------------------------------------------------------
+equivalent(e >> r1)     # Thevenin(E=12 V, R=10 Ω) — widziany z końcówek
+
+# --- wspólny parametr (F7): dwa różne rezystory, jedna wartość R ----------------------------------
+ra, rb = Resistor("R"), Resistor("R")
+Problem(GND >> e >> ra >> rb >> GND, given={"R": 100, e: 10}, find=[I(ra), I(rb)])
+
+# --- kawałek wielokrotnego użytku (F13): funkcja, świeże węzły i elementy ---------------------------
+def divider(top: str, bottom: str) -> Circuit:
+    mid = Node()
+    return Resistor(top) >> mid >> Resistor(bottom)
+
+# --- prymitywy i funkcje pochodne -----------------------------------------------------------------
+loop(e, r1, r2)          # = close(e >> r1 >> r2)
+r1 | r2                  # równolegle
+r1 @ r2                  # obok siebie (2 → 2)
+```
+
+### 9.2 Element: jedno prawo w czasie, analizy go tylko interpretują
+
+Rdzeń wie tylko o sklejaniu węzłów (KCL/KVL wynikają z niego) i o tym, że element to **relacja
+między napięciem a prądem na jego końcówkach**, zapisana raz, w czasie, z operatorem pochodnej `D`.
+Nic więcej. Kondensator dopisuje się jedną definicją — żadna analiza ani reszta biblioteki o nim
+nie wie (F16).
+
+```python
+# cały rdzeń elementów dwukońcówkowych: nazwa, jednostka, symetria, prawo
+def two_terminal(name: str, prefix: str, unit: Unit, law: Law2, symmetric: bool = True) -> Kind: ...
+
+# Law2 = (U, I, parametr) -> wyrażenie równe zero; D(x) to pochodna po czasie
+Resistor  = two_terminal("resistor",  "R", OHM,   lambda U, I, R: U - R * I)
+Capacitor = two_terminal("capacitor", "C", FARAD, lambda U, I, C: I - C * D(U))
+Inductor  = two_terminal("inductor",  "L", HENRY, lambda U, I, L: U - L * D(I))
+VoltageSource = two_terminal("voltage_source", "E", VOLT,   lambda U, I, E: U - E, symmetric=False)
+CurrentSource = two_terminal("current_source", "J", AMPERE, lambda U, I, J: I - J, symmetric=False)
+```
+
+Rodzaj wywołany z nazwą daje element: `Resistor("R_1")` → `Element(kind=Resistor, name="R_1")`
+(niezmienny, tożsamość = obiekt — §9.3).
+
+Analiza to interpretacja `D` — jedna funkcja na analizę, nie gałąź w każdym elemencie:
+
+```python
+@dataclass(frozen=True)
+class DC: ...                     # D(x) → 0           (kondensator: przerwa, cewka: zwarcie — wychodzi samo)
+
+@dataclass(frozen=True)
+class AC:
+    omega: sp.Expr                # D(x) → jω·x        (impedancje 1/(jωC), jωL — wychodzą same)
+
+@dataclass(frozen=True)
+class Step:
+    dt: sp.Symbol                 # D(x) → (x − x⁻)/dt (krok wstecz; co trzeba pamiętać między
+                                  #  krokami, wynika z tego, czego pochodna występuje)
+
+Analysis = DC | AC | Step
+
+
+def interpret(law: sp.Expr, analysis: Analysis) -> tuple[sp.Expr, States]:
+    """Prawo elementu w danej analizie: każde D(x) zastąpione, plus stan do zapamiętania (Step)."""
+    match analysis:
+        case DC():          return law.replace(D, lambda x: 0), {}
+        case AC(omega):     return law.replace(D, lambda x: sp.I * omega * x), {}
+        case Step(dt):      ...   # D(x) → (x − x_prev)/dt, x_prev do stanu
+```
+
+Co z tego wynika:
+
+- **Nowy element = jedna linijka** (prawo). Kartka, fazory, Bode, symulacja działają od razu.
+- **Nowa analiza = jedna funkcja** (interpretacja `D`). Działa od razu dla każdego elementu.
+- **Kroki rozwiązania** (`steps`) biorą uzasadnienie z prawa elementu: „prawo R_1”, a nazwę prawa
+  (Ohm) z jego definicji — bez osobnej klasy powodu na każdy element.
+
+Granice (uczciwie):
+
+- **Elementy wielokońcówkowe** (transformator, wzmacniacz, tranzystor): to samo, tylko relacja na
+  kilku parach (U, I): `multi_terminal(..., law=lambda U, I, p: [...])`.
+- **Nieliniowe** (dioda: `I − I_S·(exp(U/(n·V_T)) − 1)`): prawo zapisuje się tak samo. DC liczy je
+  Newtonem; AC wymaga linearyzacji w punkcie pracy — da się ją wyprowadzić automatycznie z prawa
+  (pochodna po U), więc też bez dopisywania czegokolwiek w elemencie.
+- **Elementy ze stanem dyskretnym** (Arduino, przerzutnik, 555): nie są relacją U–I z `D`. Dla nich
+  osobna, jawna furtka — rodzaj z własną funkcją kroku. To jedyny wyjątek od „jedno prawo”.
+
+### 9.3 Obwód: niezmienne drzewo, operatory jako cukier
+
+```python
+@dataclass(frozen=True)
+class Circuit:
+    """n → m. Podklasy to konstruktory typu sum: Element, Wire, Swap, Spider, Node, Net, Seq, Tensor."""
+
+    def __rshift__(self, other: Circuit) -> Circuit: return series(self, other)
+    def __or__(self, other: Circuit) -> Circuit:     return parallel(self, other)
+    def __matmul__(self, other: Circuit) -> Circuit: return beside(self, other)
+
+
+@dataclass(frozen=True)
+class Seq(Circuit):
+    first: Circuit
+    then: Circuit
+
+@dataclass(frozen=True)
+class Tensor(Circuit):
+    left: Circuit
+    right: Circuit
+
+@dataclass(frozen=True)
+class Spider(Circuit):          # n końców sklejonych w jeden punkt
+    dom: int
+    cod: int
+
+@dataclass(frozen=True, eq=False)
+class Node(Circuit):            # punkt z tożsamością; 1 → 1, jego końce nie są wolne
+    label: str | None = None
+
+@dataclass(frozen=True)
+class Net(Circuit):             # globalna sieć: wszystkie Net("VCC") to jeden węzeł (F8)
+    name: str
+
+GND = Net("GND")
+
+
+# --- funkcje pochodne: z prymitywów, bez magii ---
+wire = Spider(1, 1)
+cup, cap = Spider(2, 0), Spider(0, 2)
+
+def series(*parts: Circuit) -> Circuit:       return reduce(Seq, parts)
+def beside(*parts: Circuit) -> Circuit:       return reduce(Tensor, parts)
+def parallel(f: Circuit, g: Circuit) -> Circuit:
+    return split(arity(f).dom) >> (f @ g) >> merge(arity(f).cod)
+def close(f: Circuit) -> Circuit:             return cap >> (f @ wire) >> cup
+def loop(*parts: Circuit) -> Circuit:         return close(series(*parts))
+
+
+# --- typ: liczony, nie przechowywany ---
+@dataclass(frozen=True)
+class Arity:
+    dom: int
+    cod: int
+
+def arity(c: Circuit) -> Arity: ...        # wszystkie końce (do składania)
+def free(c: Circuit) -> Arity: ...         # końce, które nie leżą na węźle (do zasady domknięcia)
+def is_closed(c: Circuit) -> bool:  return free(c) == Arity(0, 0)
+
+
+# --- postać normalna: czysta funkcja przez dopasowanie wzorca ---
+@cache                                      # wolno: wszystko niezmienne i hashowalne
+def netlist(c: Circuit) -> Netlist:
+    match c:
+        case Element():        return Netlist.of_element(c)
+        case Seq(f, g):        return glue_series(netlist(f), netlist(g))
+        case Tensor(f, g):     return disjoint(netlist(f), netlist(g))
+        case Spider(n, m):     return Netlist.point(n, m)
+        case Node() | Net():   return Netlist.point(1, 1, at=c)
+```
+
+### 9.4 Zadanie
+
+```python
+# wielkości: o co można pytać i co można zadać (F2, F7) — typy, nie napisy
+@dataclass(frozen=True)
+class Current:   of: Element
+@dataclass(frozen=True)
+class Voltage:   of: Element
+@dataclass(frozen=True)
+class Power:     of: Element
+@dataclass(frozen=True)
+class Parameter: of: Element          # wartość elementu
+@dataclass(frozen=True)
+class Potential: at: Node | Net
+@dataclass(frozen=True)
+class Across:    a: Node | Net; b: Node | Net      # napięcie między punktami
+@dataclass(frozen=True)
+class Resistance: a: Node | Net; b: Node | Net     # rezystancja zastępcza między punktami
+
+Quantity = Current | Voltage | Power | Parameter | Potential | Across | Resistance
+Sought = Quantity
+
+# krótkie konstruktory, jak w podręczniku
+def I(e: Element) -> Current: return Current(e)
+def U(x: Element | Node, y: Node | None = None) -> Voltage | Across: ...
+def P(e: Element) -> Power: return Power(e)
+def V(n: Node | Net) -> Potential: return Potential(n)
+def R(a: Node | Net, b: Node | Net) -> Resistance: return Resistance(a, b)
+
+# dane: wartość może być liczbą, napisem z jednostką albo funkcją czasu (F11)
+Value = sp.Expr | str | int | float | Signal
+
+@dataclass(frozen=True)
+class Problem:
+    circuit: Circuit
+    given: Mapping[Element | str | Quantity, Value]   # element / nazwa parametru → wartość; wielkość → warunek
+    find: tuple[Sought, ...] = ()
+
+    def __post_init__(self) -> None:
+        # walidacja przy budowie, nie przy rozwiązywaniu
+        if not is_closed(self.circuit):
+            raise NotClosed(free(self.circuit))
+        check_units(self.circuit, self.given)       # F14: R_1 = 5 V → BadUnit
+        check_names(self.circuit, self.given)       # nazwa, której nie ma → NoSuchParameter
+```
+
+### 9.5 Analizy i wyniki
+
+```python
+def solve(problem: Problem) -> Solution:
+    analysis = steady_analysis(problem)              # DC albo AC(ω) — ω z danych źródeł (F10)
+    system = equations(problem, analysis)            # czysta: obwód + dane → układ równań
+    return solve_system(system, problem.find)        # w środku sympy (imperatywnie, za czystym interfejsem)
+
+
+@dataclass(frozen=True)
+class Solution:
+    problem: Problem
+    values: Mapping[sp.Symbol, sp.Expr]
+    steps: tuple[Step, ...]
+    undetermined: tuple[Sought, ...]                 # zamiast warnings.warn: wynik mówi sam
+
+    def __call__(self, q: Quantity) -> Measure: ...  # liczba z jednostką
+    @property
+    def answers(self) -> Mapping[Sought, Measure]: ...
+
+
+def simulate(problem: Problem, until: Duration) -> Trace:
+    program = compile_program(problem)               # czysta: równania jednego kroku → kod
+    states = unfold(partial(step, program), initial(program), until)
+    return Trace(problem, tuple(states))
+
+
+def step(program: Program, state: State) -> State:   # czysta: nowy stan ze starego
+    ...                                              # Newton w środku: pętla lokalna, nic wspólnego
+
+
+@dataclass(frozen=True)
+class Trace:
+    problem: Problem
+    states: tuple[State, ...]
+
+    def __call__(self, q: Quantity) -> Signal: ...   # funkcja czasu
+
+
+def respond(problem: Problem) -> Response: ...       # Response(q) → funkcja ω
+def equivalent(part: Circuit) -> Thevenin: ...       # kawałek 1 → 1 widziany z końcówek
+```
+
+To samo pytanie (`result(U(c))`) do każdego wyniku, różny wymiar odpowiedzi: `Measure`
+(liczba), `Signal` (t ↦ wartość), funkcja ω (F12).
+
+### 9.6 Kod generowany ze schematu
+
+```python
+# Zadanie 8 (wygenerowane z rysunku)
+e_1, r_1, r_2, r_3 = VoltageSource("E_1"), Resistor("R_1"), Resistor("R_2"), Resistor("R_3")
+n_1 = Node()
+
+circuit = (GND >> e_1 >> r_1 >> n_1) @ (n_1 >> r_2 >> GND) @ (n_1 >> r_3 >> GND)
+problem = Problem(
+    circuit,
+    given={e_1: 12, r_1: 10, r_2: 20},          # zakładka Dane
+    find=[Parameter(r_3), U(r_2)],              # Szukane (r_3 bez wartości — dopisane samo)
+)
+solution = solve(problem)
+```
+
+## 10. Otwarte
 
 - Jak pokazać `Given` z wymiarem czasu w zakładce Dane (przełącznik od 1 s, przebieg z pliku).
 - `Net` a etykiety na schemacie: czy każda etykieta to `Net`, czy tylko jawnie globalne.
