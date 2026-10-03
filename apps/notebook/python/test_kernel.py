@@ -409,3 +409,22 @@ def test_a_current_arrow_on_a_wire_is_the_current_of_the_element_it_leads_to():
     sch["elements"][0]["value"] = None
     got = json.loads(kernel.simulate(json.dumps(sch)))["results"]
     assert got["E1"]["value"] == "30 V" and got["E1"]["solved"]
+
+
+def test_a_terminals_value_is_its_points_potential_given_and_one_without_shows_it():
+    drawing = {
+        "elements": [
+            {"id": "E1", "kind": "voltage_source", "value": None, "nodes": ["0", "T"], "at": [[0, 8], [0, 0]]},
+            {"id": "R1", "kind": "resistor", "value": "10", "nodes": ["T", "A"], "at": [[0, 0], [6, 0]]},
+            {"id": "R2", "kind": "resistor", "value": "20", "nodes": ["A", "0"], "at": [[10, 0], [10, 8]]},
+        ],
+        "wires": [[[6, 0], [8, 0]], [[8, 0], [10, 0]], [[10, 8], [0, 8]]],
+    }
+    sch = json.loads(kernel.from_drawing(json.dumps(drawing)))["schematic"]
+    sch["elements"].append({"id": "P1", "kind": "terminal", "at": [8, 0], "rotation": 0, "value": "4", "text": None})
+    got = json.loads(kernel.simulate(json.dumps(sch)))["results"]
+    assert got["E1"]["value"] == "6 V" and got["P1"]["value"] == "4 V" and not got["P1"]["solved"]
+    sch["elements"][-1]["value"] = None
+    sch["elements"][0]["value"] = "12"
+    got = json.loads(kernel.simulate(json.dumps(sch)))["results"]
+    assert got["P1"]["value"] == "8 V" and got["P1"]["solved"]

@@ -365,6 +365,38 @@ export function SchematicEditor({
     return route(value, library, a, b, plain, out);
   };
 
+  const kindOf = (id: string) => value.elements.find((x) => x.id === id)?.kind;
+
+  /** The voltage from ``a`` to ``b`` (points of the circuit): a terminal at ``b`` (one there already: that
+   *  one), an arrow between them, selected — its value, its name on it. */
+  const measure = (a: Point, b: Point, pointerType: string | undefined) => {
+    let next = value;
+    if (!next.elements.some((x) => x.kind === "terminal" && same(x.at, b))) {
+      const id = nextId(next, "terminal");
+      next = attach(
+        {
+          ...next,
+          elements: [...next.elements, { id, kind: "terminal", at: b, rotation: 0, value: null, text: null }],
+        },
+        library,
+        id,
+      );
+    }
+    const id = nextId(next, "voltage_arrow");
+    const arrow: ElementData = {
+      id,
+      kind: "voltage_arrow",
+      at: a,
+      rotation: 0,
+      value: null,
+      text: defaultText("voltage_arrow"),
+      between: [a, b],
+    };
+    commit({ ...next, elements: [...next.elements, arrow] });
+    setSelection({ type: "element", id });
+    setInspect(pointerType !== "touch");
+  };
+
   const addWire = (points: Point[]) => {
     const clean = simplify(points);
     if (clean.length >= 2) commit({ ...value, wires: [...value.wires, { points: clean }] });
@@ -419,7 +451,7 @@ export function SchematicEditor({
       const lib = withParts(symbols, next.parts);
       const there = value.elements.find((e) => {
         const [a, b] = [pins(e, lib).map(key).sort(), pins(element, lib).map(key).sort()];
-        return a.length === b.length && a.every((k, i) => k === b[i]);
+        return b.length > 0 && a.length === b.length && a.every((k, i) => k === b[i]); // (no pins, an arrow: never)
       });
       if (there) {
         setSelection({ type: "element", id: there.id });
@@ -630,7 +662,13 @@ export function SchematicEditor({
     }
     // a wire: from something to something (a pin, a wire) — let go on nothing, there is none
     const end = toGrid(event);
-    if (g.type === "wire" && !same(end, g.from) && isConnectionPoint(value, library, end)) addWire(wireTo(g, end));
+    // from a terminal (a voltage's point) to another point of the circuit: a terminal there too, the
+    // voltage between them an arrow — not a wire
+    const fromTerminal = g.type === "wire" && "id" in g.tap && kindOf(g.tap.id) === "terminal";
+    if (g.type === "wire" && !same(end, g.from) && isConnectionPoint(value, library, end)) {
+      if (fromTerminal) measure(g.from, end, event.pointerType);
+      else addWire(wireTo(g, end));
+    }
     // a voltage arrow: stretched from a point of the circuit to another, the voltage between them (let go
     // where it was pressed: placed there, as any element)
     if (g.type === "arrow" && !same(end, g.from) && isConnectionPoint(value, library, end)) {
@@ -746,13 +784,17 @@ export function SchematicEditor({
   elementDown.current = onElementDown;
   // (the same drawing: the same dots; while it runs, the board is drawn 30 times a second)
   const junctionPoints = useMemo(() => junctions(value, library), [value, library]);
+  // the points voltage arrows are between: their terminals say nothing themselves (the arrow does)
+  const arrowEnds = useMemo(() => new Set(value.elements.flatMap((x) => (x.between ?? []).map(key))), [value.elements]);
   const obstacles = useMemo(() => inTheWay(value), [value]); // (what labels keep off)
   const openPinPoints = useMemo(() => openPins(value, library), [value, library]);
   const wiring = gesture?.type === "wire" || gesture?.type === "arrow";
   // (a terminal to another: the arrow it will be, straight)
+  // (a voltage arrow: straight, from where it was pressed — or from a terminal)
+  const fromTerminal = gesture?.type === "wire" && "id" in gesture.tap && kindOf(gesture.tap.id) === "terminal";
   const preview: Point[] | null =
-    cursor && gesture?.type === "arrow"
-      ? [gesture.from, cursor] // (a voltage arrow: straight, from where it was pressed)
+    cursor && (gesture?.type === "arrow" || (gesture?.type === "wire" && fromTerminal))
+      ? [gesture.from, cursor]
       : cursor && gesture?.type === "wire"
         ? wireTo(gesture, cursor)
         : null;
@@ -1016,6 +1058,7 @@ export function SchematicEditor({
               look={live?.looks[e.id]}
               live={live && { pins: live.pins[e.id] ?? [], scale: live.scale }}
               selected={picked(selection).ids.includes(e.id) || (probed?.type === "element" && probed.id === e.id)}
+              quiet={e.kind === "terminal" && arrowEnds.has(key(e.at))}
               onPointerDown={onElementDownStable}
             />
           ))}

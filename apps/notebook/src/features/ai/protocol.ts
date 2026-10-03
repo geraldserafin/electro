@@ -18,9 +18,11 @@ export const CIRCUIT_FORMAT = `ELEMENT: {"id": "R1", "kind": KIND, "value": "4.7
     npn, pnp: [base, collector, emitter]; nmos, pmos: [gate, drain, source]
     opamp: [plus, minus, out]                       (ideal, no value)
     hole: [a, b]                                    (an unknown element: the solver finds the simplest that fits)
-    terminal: [a]                                   (an open end — a small circle or a bare wire end where the
-                                                     picture leaves the circuit open; "at" one point)
-    current_arrow: []                               (a current's arrow as the picture marks it, I_2 by R2: "at" its tail
+    terminal: [a]                                   (an open circle — an open end, or a point a voltage is
+                                                     at or between; "at" one point; value: its potential
+                                                     against ground, V, when given)
+    current_arrow: []                               (a current's arrow as the picture marks it — on its wire, "of"
+                                                     not needed: the wire's element — I_2 by R2: "at" its tail
                                                      and head on the wire, 1 apart, the way it points)
     voltage_arrow: []                               (a voltage's arrow beside what it is across, U_1 by R1: "at" its
                                                      tail and head, as long as drawn, the way it points — to "+")

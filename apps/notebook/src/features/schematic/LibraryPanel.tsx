@@ -58,7 +58,7 @@ export function LibraryPanel({
   useEffect(() => {
     if (!matchMedia("(pointer: coarse)").matches) field.current?.focus({ preventScroll: true });
   }, []);
-  const found = search(query);
+  const found = search(query).filter((k) => k.kind !== "voltage_arrow"); // (drawn from a voltage's point to another, not placed)
   const groups = [...new Set(found.map((k) => k.groupName))];
   const mine = parts.filter((p) => plain(p.def.name).includes(plain(query.trim())));
   const partsLibrary = useMemo(

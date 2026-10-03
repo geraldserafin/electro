@@ -206,11 +206,17 @@ def simulate(schematic_json: str, data: str = "") -> str:
         try:
             # a voltage between two points, given: V_head − V_tail = its value
             between = sch.voltages()
-            potential = _potentials(sch) if between else None
+            terminals = [e for e in sch.elements if e.kind == "terminal"]
+            potential = _potentials(sch) if between or terminals else None
             equations = [
                 sp.Eq(potential(head) - potential(tail), parse(a.value.strip()))
                 for a, tail, head in between
                 if a.value and a.value.strip()
+            ] + [
+                # a terminal's value: its point's potential, against ground
+                sp.Eq(potential(t.at), parse(t.value.strip()))
+                for t in terminals
+                if t.value and t.value.strip()
             ]
             solution = sch.to_circuit().solve(*equations, **{**sch.given(), **_parse_data(data)})
         except (Issue, ValueError, KeyError) as err:
@@ -257,6 +263,19 @@ def simulate(schematic_json: str, data: str = "") -> str:
         if v is not None and v.is_number:
             given = bool(a.value and a.value.strip())
             results[a.id] = {
+                "value": fmt(v, "V"),
+                "solved": not given,
+                "U": None,
+                "I": None,
+                "P": None,
+                "reversed": False,
+            }
+    # a terminal: its point's potential (given, or what it came to)
+    for t in terminals:
+        v = solution(potential(t.at))
+        if v is not None and v.is_number:
+            given = bool(t.value and t.value.strip())
+            results[t.id] = {
                 "value": fmt(v, "V"),
                 "solved": not given,
                 "U": None,

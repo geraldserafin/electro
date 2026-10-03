@@ -773,7 +773,8 @@ export function SchematicCell({
                     Object.entries(cell.results).filter(
                       ([id]) =>
                         !cell.schematic.elements.some(
-                          (e) => e.id === id && (e.kind.endsWith("_arrow") || e.kind === "label"),
+                          (e) =>
+                            e.id === id && (e.kind.endsWith("_arrow") || e.kind === "label" || e.kind === "terminal"),
                         ),
                     ),
                   )}

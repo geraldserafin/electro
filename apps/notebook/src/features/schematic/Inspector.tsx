@@ -23,6 +23,38 @@ const place =
   "top-15 right-3 w-66 max-h-[calc(100%-8rem)] overflow-y-auto text-[14px] animate-panel-in motion-reduce:animate-none " +
   "max-sm:top-auto max-sm:inset-x-0 max-sm:bottom-0 max-sm:z-6 max-sm:w-auto max-sm:max-h-[45%] max-sm:rounded-b-none max-sm:pt-2 max-sm:shadow-[0_-4px_16px_rgb(0_0_0/0.12)] max-sm:animate-sheet-in";
 
+/** Its label (an arrow's name) to the other side of it: a small button in its field, on the right. */
+function Flip({ element, onChange }: { element: ElementData; onChange: (patch: Partial<ElementData>) => void }) {
+  const { t } = useTranslation("schematic");
+  return (
+    <button
+      type="button"
+      className={cn(
+        "absolute right-1 top-1/2 -translate-y-1/2 grid place-items-center size-7 rounded-md text-muted hover:bg-selected hover:text-fg",
+        element.flip && "text-accent",
+      )}
+      aria-pressed={!!element.flip}
+      title={t("inspector.flipLabel")}
+      aria-label={t("inspector.flipLabel")}
+      onClick={() => onChange({ flip: element.flip ? null : true })}
+    >
+      <svg
+        viewBox="0 0 24 24"
+        width={16}
+        height={16}
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        aria-hidden="true"
+      >
+        <path d="M7 4v16M7 4L4 7M7 4l3 3M17 20V4M17 20l-3-3M17 20l3-3" />
+      </svg>
+    </button>
+  );
+}
+
 export function Inspector({
   element,
   taken,
@@ -83,32 +115,7 @@ export function Inspector({
               onBlur={commitId}
               onKeyDown={(e) => e.key === "Enter" && commitId()}
             />
-            {/* its label on the other side of it */}
-            <button
-              type="button"
-              className={cn(
-                "absolute right-1 top-1/2 -translate-y-1/2 grid place-items-center size-7 rounded-md text-muted hover:bg-selected hover:text-fg",
-                element.flip && "text-accent",
-              )}
-              aria-pressed={!!element.flip}
-              title={t("inspector.flipLabel")}
-              aria-label={t("inspector.flipLabel")}
-              onClick={() => onChange({ flip: element.flip ? null : true })}
-            >
-              <svg
-                viewBox="0 0 24 24"
-                width={16}
-                height={16}
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="1.8"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                aria-hidden="true"
-              >
-                <path d="M7 4v16M7 4L4 7M7 4l3 3M17 20V4M17 20l-3-3M17 20l3-3" />
-              </svg>
-            </button>
+            <Flip element={element} onChange={onChange} />
           </span>
         </Section>
       )}
@@ -146,13 +153,16 @@ export function Inspector({
       {/* an arrow: its name (U, I_2), the amount it is — given (the solver's), or empty: what it comes to */}
       {!live && isArrow(element.kind) && (
         <Section label={t("inspector.arrowName")}>
-          <input
-            className={field}
-            value={element.text ?? ""}
-            spellCheck={false}
-            aria-label={t("inspector.arrowName")}
-            onChange={(e) => onChange({ text: e.target.value })}
-          />
+          <span className="relative block">
+            <input
+              className={cn(field, "pr-10")}
+              value={element.text ?? ""}
+              spellCheck={false}
+              aria-label={t("inspector.arrowName")}
+              onChange={(e) => onChange({ text: e.target.value })}
+            />
+            <Flip element={element} onChange={onChange} />
+          </span>
         </Section>
       )}
       {!live && isArrow(element.kind) && (
@@ -170,6 +180,24 @@ export function Inspector({
             <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted pointer-events-none">
               {element.kind === "current_arrow" ? "A" : "V"}
             </span>
+          </span>
+        </Section>
+      )}
+      {/* a terminal: its point's potential, against ground — given, or empty (beside it: where it goes) */}
+      {!live && element.kind === "terminal" && (
+        <Section label={t("inspector.potential")}>
+          <span className="relative block">
+            <input
+              className={cn(field, "pr-16")}
+              value={element.value ?? ""}
+              inputMode="decimal"
+              spellCheck={false}
+              placeholder="?"
+              aria-label={t("inspector.potential")}
+              onChange={(e) => onChange({ value: e.target.value.trim() === "" ? null : e.target.value })}
+            />
+            <span className="absolute right-10 top-1/2 -translate-y-1/2 text-muted pointer-events-none">V</span>
+            <Flip element={element} onChange={onChange} />
           </span>
         </Section>
       )}

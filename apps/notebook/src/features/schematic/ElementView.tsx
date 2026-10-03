@@ -161,6 +161,7 @@ type Props = {
   lit?: number; // an LED while simulating: how bright (0–1)
   look?: Record<string, number>; // while simulating, what else it shows: its symbol's CSS variables (--a, --angle, …)
   live?: { pins: (number | null)[]; scale: number }; // running: its pins' voltages, the element coloured by them
+  quiet?: boolean; // a terminal at a voltage arrow's end: no potential beside it
   onPointerDown: (event: ReactPointerEvent, element: ElementData) => void;
 };
 
@@ -200,6 +201,7 @@ export const ElementView = memo(
     a.wires === b.wires &&
     a.selected === b.selected &&
     a.closed === b.closed &&
+    a.quiet === b.quiet &&
     (a.lit ?? 0) > 0.01 === (b.lit ?? 0) > 0.01 &&
     a.onPointerDown === b.onPointerDown &&
     sameResult(a.result, b.result) &&
@@ -230,11 +232,14 @@ function ArrowView({ element: e, library, selected, result, onPointerDown }: Pro
   const length = Math.hypot(hx, hy) || 1;
   const angle = ends ? (Math.atan2(hy, hx) * 180) / Math.PI : e.rotation;
   const gap = ends ? 9 : 0;
-  // its name on its left as it points (above one pointing right)
-  const [lx, ly] = [hy / length, -hx / length];
+  // its name on its left as it points (above one pointing right) — or its right (e.flip)
+  const side = e.flip ? -1 : 1;
+  const [lx, ly] = [(side * hy) / length, (side * -hx) / length];
   const [dx, dy, anchor] = ends
     ? ([lx * 10, ly * 10 + 4, lx < -0.3 ? "end" : lx > 0.3 ? "start" : "middle"] as const)
-    : (ARROW_NAME[e.rotation] ?? ARROW_NAME[0]!);
+    : (ARROW_NAME[e.flip ? (e.rotation + 180) % 360 : e.rotation] ?? ARROW_NAME[0]!);
+  // a current's: a chevron on its wire (the wire is its line), pointing the current's way
+  const chevron = e.kind === "current_arrow" && !ends;
   const box = { x: Math.min(x, x + hx), y: Math.min(y, y + hy), width: Math.abs(hx), height: Math.abs(hy) };
   return (
     <g
@@ -251,7 +256,9 @@ function ArrowView({ element: e, library, selected, result, onPointerDown }: Pro
         className="w"
         transform={`translate(${x} ${y}) rotate(${angle})`}
         dangerouslySetInnerHTML={{
-          __html: `<path d="M${gap} 0H${length - gap - 7}"/><path class="fill" d="M${length - gap} 0l-9 -4.5v9z"/>`,
+          __html: chevron
+            ? `<path class="fill" d="M${length / 2 - 5} -5.5L${length / 2 + 6} 0L${length / 2 - 5} 5.5z"/>`
+            : `<path d="M${gap} 0H${length - gap - 7}"/><path class="fill" d="M${length - gap} 0l-9 -4.5v9z"/>`,
         }}
       />
       {(e.text || result) && (
@@ -275,7 +282,19 @@ function ArrowView({ element: e, library, selected, result, onPointerDown }: Pro
   );
 }
 
-function ElementView_({ element: e, library, wires, result, selected, closed, lit, look, live, onPointerDown }: Props) {
+function ElementView_({
+  element: e,
+  library,
+  wires,
+  result,
+  selected,
+  closed,
+  lit,
+  look,
+  live,
+  quiet,
+  onPointerDown,
+}: Props) {
   const G = library.grid;
   const symbol = symbolOf(e, library);
   const ps = pins(e, library).map(([x, y]) => [x * G, y * G] as Point);
@@ -343,13 +362,16 @@ function ElementView_({ element: e, library, wires, result, selected, closed, li
   const vars =
     look &&
     (Object.fromEntries(Object.entries(look).map(([k, v]) => [`--${k}`, Math.round(v * 100) / 100])) as CSSProperties);
-  // a net label: its node's name, and its potential — given, or what it came to
+  // a net label (its node's name) or a terminal: its potential — given, or what it came to (a terminal at
+  // a voltage arrow's end: none, the arrow says it)
   const potential =
-    e.kind === "label" &&
+    (e.kind === "label" || (e.kind === "terminal" && !quiet)) &&
     (e.value?.trim() ? `${e.value.trim()}${/\d$/.test(e.value.trim()) ? " V" : ""}` : result?.value);
   const label = potential
-    ? `${e.text ?? ""} = ${potential}`
-    : result?.solved && result.value && e.kind !== "label"
+    ? e.text
+      ? `${e.text} = ${potential}`
+      : potential
+    : result?.solved && result.value && e.kind !== "label" && e.kind !== "terminal"
       ? e.kind === "hole"
         ? `${e.id}: ${result.value}`
         : isBoard(e.kind)
