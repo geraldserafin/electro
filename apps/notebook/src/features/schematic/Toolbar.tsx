@@ -1,17 +1,18 @@
-// The tools, top centre: select, hand; the wire and the elements drawn most (a resistor, a voltage
-// source, ground), each a key away; the element library for the rest.
+// The tools, top centre: the hand (the view moves; the drawing at hand — the default) and the arrow (a
+// drag selects many); the elements drawn most (a resistor, a voltage source, ground), each a key away;
+// the element library for the rest. Wires are drawn from a pin or a wire to another.
 
 import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { cn } from "@/shared/lib/cn";
 import type { PartDef, SymbolLibrary } from "@/shared/model/types";
-import { Hand, Pointer, WireIcon } from "@/shared/ui/icons";
+import { Hand, Pointer } from "@/shared/ui/icons";
 import { BoardButton, BoardIsland, islandButton, Separator } from "./Board";
 import { useKinds } from "./kinds";
 import { shortcut } from "./LibraryPanel";
 import { SymbolIcon } from "./SymbolIcon";
 
-/** On the toolbar itself, beside the wire (the rest is in the library). */
+/** On the toolbar itself (the rest is in the library). */
 const QUICK = ["resistor", "voltage_source", "ground"];
 
 /** The library: a grid of shapes, one of them a plus — more elements. */
@@ -37,7 +38,6 @@ const Library = () => (
 export type Tool =
   | { type: "select" }
   | { type: "hand" }
-  | { type: "wire" }
   | { type: "place"; kind: string; part?: { key: string; def: PartDef } }; // part: one's own component (its kind "part:<key>")
 
 const tool = (on: boolean) => cn(islandButton(on), "w-10");
@@ -63,11 +63,10 @@ export function Toolbar({
   const { t } = useTranslation("schematic");
   const { kinds } = useKinds();
   const tools: { tool: Tool; label: string; key: string; icon: ReactNode }[] = [
-    { tool: { type: "select" }, label: t("tools.select"), key: "V", icon: <Pointer /> },
     { tool: { type: "hand" }, label: t("tools.hand"), key: "H", icon: <Hand /> },
+    { tool: { type: "select" }, label: t("tools.select"), key: "V", icon: <Pointer /> },
   ];
   const drawing: { tool: Tool; label: string; key: string; icon: ReactNode; on: boolean }[] = [
-    { tool: { type: "wire" }, label: t("tools.wire"), key: "W", icon: <WireIcon />, on: current.type === "wire" },
     ...QUICK.map((kind) => ({
       tool: { type: "place", kind } as Tool,
       label: kinds.find((k) => k.kind === kind)?.name ?? kind,

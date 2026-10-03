@@ -1,7 +1,7 @@
 // On the right (drawings start top-left, so this side is usually free): the element selected — its
 // label, value (or a meter's reading), a node label's name. A panel like Excalidraw's: sections
-// under plain labels, tiles for choices and actions. (A wire or many things selected: no panel —
-// the keys do what there is to do.)
+// under plain labels, tiles for choices and actions. (A wire or many things selected: no panel — the
+// keys, or the bin beside, do what there is to do.)
 import { type ReactNode, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { cn } from "@/shared/lib/cn";
@@ -39,6 +39,76 @@ const hint = "m-0 text-[12px] leading-[1.4] text-faint";
 
 // the board's buttons (a sketch to edit, a program file to load): the icon and the words together, centred
 const wide = "flex w-full h-9 gap-2 px-3 items-center justify-center text-[14px] font-medium";
+
+const PREFIXES = ["p", "n", "µ", "m", "k", "M"];
+
+/** An amount (4.7k, 100n): a touch screen's number keys for it, its SI prefixes as buttons under it —
+ *  and "abc" for the letters' keys (a value may be a symbol). */
+function Amount({
+  value,
+  onChange,
+  unit,
+  label,
+  placeholder,
+}: {
+  value: string;
+  onChange: (value: string) => void;
+  unit?: string;
+  label: string;
+  placeholder?: string;
+}) {
+  const input = useRef<HTMLInputElement>(null);
+  const [letters, setLetters] = useState(false);
+  const touch = matchMedia("(pointer: coarse)").matches;
+  /** The prefix after the number set (that one again: taken off). */
+  const prefix = (p: string) => {
+    const m = /^(.*\d)\s*([pnuµmkM]?)$/.exec(value.trim());
+    if (m) onChange(m[1] + (m[2] === p ? "" : p));
+  };
+  const chip = "h-7 min-w-8 px-2 rounded-md bg-hover text-[13px] text-muted hover:text-fg";
+  return (
+    <>
+      <span className="relative block">
+        <input
+          ref={input}
+          className={cn(field, unit && "pr-8.5")}
+          value={value}
+          inputMode={letters ? "text" : "decimal"}
+          spellCheck={false}
+          aria-label={label}
+          placeholder={placeholder}
+          onChange={(e) => onChange(e.target.value)}
+        />
+        {unit && (
+          <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted pointer-events-none">{unit}</span>
+        )}
+      </span>
+      {touch && (
+        // (pressed, the field keeps the keyboard)
+        <span className="flex flex-wrap gap-1" onPointerDown={(e) => e.preventDefault()}>
+          {PREFIXES.map((p) => (
+            <button key={p} type="button" className={chip} onClick={() => prefix(p)}>
+              {p}
+            </button>
+          ))}
+          <button
+            type="button"
+            className={cn(chip, letters && "bg-selected text-fg")}
+            aria-pressed={letters}
+            onClick={() => {
+              setLetters(!letters);
+              // (the keyboard changes once the field is taken up again)
+              input.current?.blur();
+              requestAnimationFrame(() => input.current?.focus());
+            }}
+          >
+            abc
+          </button>
+        </span>
+      )}
+    </>
+  );
+}
 
 export function Inspector({
   element,
@@ -128,38 +198,24 @@ export function Inspector({
       )}
       {!live && hasValue(element.kind) && (
         <Section label={valueName}>
-          <span className="relative block">
-            <input
-              className={cn(field, "pr-8.5")}
-              value={element.value ?? ""}
-              spellCheck={false}
-              aria-label={valueName}
-              placeholder={info?.meter ? t("inspector.noReading") : "?"}
-              onChange={(e) => onChange({ value: e.target.value.trim() === "" ? null : e.target.value })}
-            />
-            {info?.unit && (
-              <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted pointer-events-none">
-                {info.unit}
-              </span>
-            )}
-          </span>
+          <Amount
+            value={element.value ?? ""}
+            unit={info?.unit}
+            label={valueName}
+            placeholder={info?.meter ? t("inspector.noReading") : "?"}
+            onChange={(v) => onChange({ value: v.trim() === "" ? null : v })}
+          />
           <p className={hint}>{info?.meter ? t("inspector.readingHint") : t("inspector.valueHint")}</p>
         </Section>
       )}
       {!live && isWaveSource(element.kind) && (
         <Section label={t("inspector.frequency")}>
-          <span className="relative block">
-            <input
-              className={cn(field, "pr-8.5")}
-              value={frequency}
-              spellCheck={false}
-              aria-label={t("inspector.frequency")}
-              onChange={(e) => onChange({ text: waveText(e.target.value, duty, phase) })}
-            />
-            {/\d$/.test(frequency) && (
-              <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted pointer-events-none">Hz</span>
-            )}
-          </span>
+          <Amount
+            value={frequency}
+            unit={/\d$/.test(frequency) ? "Hz" : undefined}
+            label={t("inspector.frequency")}
+            onChange={(v) => onChange({ text: waveText(v, duty, phase) })}
+          />
           <p className={hint}>{t("inspector.frequencyHint")}</p>
         </Section>
       )}
@@ -169,6 +225,7 @@ export function Inspector({
             <input
               className={field}
               value={range.lo}
+              inputMode="decimal"
               placeholder={t("inspector.sweepFrom")}
               aria-label={t("inspector.sweepFrom")}
               onChange={(e) => setRange({ ...range, lo: e.target.value })}
@@ -177,6 +234,7 @@ export function Inspector({
             <input
               className={field}
               value={range.hi}
+              inputMode="decimal"
               placeholder={t("inspector.sweepTo")}
               aria-label={t("inspector.sweepTo")}
               onChange={(e) => setRange({ ...range, hi: e.target.value })}
@@ -408,20 +466,13 @@ export function Inspector({
             ))}
           </select>
           {element.of && (
-            <span className="relative block">
-              <input
-                className={cn(field, "pr-8.5")}
-                value={element.value ?? ""}
-                spellCheck={false}
-                placeholder="?"
-                aria-label={t("inspector.arrowValue")}
-                title={t("inspector.arrowValue")}
-                onChange={(e) => onChange({ value: e.target.value.trim() === "" ? null : e.target.value })}
-              />
-              <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[13px] text-muted pointer-events-none">
-                {element.kind === "current_arrow" ? "A" : "V"}
-              </span>
-            </span>
+            <Amount
+              value={element.value ?? ""}
+              unit={element.kind === "current_arrow" ? "A" : "V"}
+              label={t("inspector.arrowValue")}
+              placeholder="?"
+              onChange={(v) => onChange({ value: v.trim() === "" ? null : v })}
+            />
           )}
           <p className={hint}>{t(element.of ? "inspector.arrowGivenHint" : "inspector.arrowHint")}</p>
         </Section>

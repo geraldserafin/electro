@@ -53,8 +53,11 @@ export function LibraryPanel({
   const { search } = useKinds();
   const [query, setQuery] = useState("");
   const field = useRef<HTMLInputElement>(null);
-  // the search takes the keyboard when the panel opens — without scrolling the page to it
-  useEffect(() => field.current?.focus({ preventScroll: true }), []);
+  // the search takes the keyboard when the panel opens — without scrolling the page to it (not on a touch
+  // screen: its keyboard would come up over the board)
+  useEffect(() => {
+    if (!matchMedia("(pointer: coarse)").matches) field.current?.focus({ preventScroll: true });
+  }, []);
   const found = search(query);
   const groups = [...new Set(found.map((k) => k.groupName))];
   const mine = parts.filter((p) => plain(p.def.name).includes(plain(query.trim())));

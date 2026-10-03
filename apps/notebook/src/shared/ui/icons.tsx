@@ -27,13 +27,6 @@ export const Pointer = () => (
     <path d="M6 3.5l12 7.2-5.3 1.2-2.4 5.1z" />
   </Icon>
 );
-export const WireIcon = () => (
-  <Icon>
-    <path d="M4 18h6V6h10" />
-    <circle cx="4" cy="18" r="1.6" fill="currentColor" />
-    <circle cx="20" cy="6" r="1.6" fill="currentColor" />
-  </Icon>
-);
 export const Undo = () => (
   <Icon>
     <path d="M9 14L4 9l5-5" />

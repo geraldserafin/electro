@@ -18,9 +18,9 @@ import {
 import { useTranslation } from "react-i18next";
 import { cn } from "@/shared/lib/cn";
 import type { ElementData, ElementResult, Point, SchematicData, SymbolLibrary } from "@/shared/model/types";
-import { Target } from "@/shared/ui/icons";
+import { Target, Trash } from "@/shared/ui/icons";
 import { isAdjustable } from "./Adjusters";
-import { BoardIsland, board, boardIsland } from "./Board";
+import { BoardButton, BoardIsland, board, boardIsland, islandButton } from "./Board";
 import { CurrentDots } from "./CurrentDots";
 import { ElementView, liveColor } from "./ElementView";
 import { flowGraph, type Segment, segmentCurrents } from "./flow";
@@ -64,7 +64,7 @@ import "./Canvas.css";
 
 type Gesture =
   | { type: "move"; id: string; start: Point; origin: Point; snapshot: SchematicData; moved: boolean } // start: not rounded
-  | { type: "wire"; from: Point }
+  | { type: "wire"; from: Point; tap: { wire: number } | { id: string } } // tap: let go where it started, that is selected
   | { type: "segment"; wire: number; index: number; start: Point; snapshot: SchematicData; moved: boolean }
   | { type: "group"; ids: string[]; wires: number[]; start: Point; snapshot: SchematicData; moved: boolean }
   | { type: "box"; from: Point; to: Point }; // shift + drag on empty space, in drawing units (not rounded)
@@ -180,7 +180,7 @@ export function SchematicEditor({
   const gridId = useId();
   const svgRef = useRef<SVGSVGElement>(null);
   const viewRef = useRef<HTMLDivElement>(null);
-  const [tool, setTool] = useState<Tool>({ type: "select" });
+  const [tool, setTool] = useState<Tool>({ type: "hand" }); // (the hand: the view moves, the drawing is at hand)
   // what the element being placed is drawn from (one's own component, not on the drawing yet: with it)
   const placing =
     tool.type === "place" && tool.part
@@ -188,9 +188,8 @@ export function SchematicEditor({
       : library;
   const [selection, setSelection] = useState<Selection>(null);
   const [cursor, setCursor] = useState<Point | null>(null);
-  // the wire being drawn: what is laid down is in the drawing already (``wire``: its index, from the
-  // second click on), only the stretch to the pointer is dashed
-  const [draft, setDraft] = useState<{ points: Point[]; wire: number | null } | null>(null);
+  // a tap selects (a finger: the element's panel on the next tap, not over the board at once)
+  const [inspect, setInspect] = useState(true);
   const [gesture, setGesture] = useState<Gesture | null>(null);
   const [help, setHelp] = useState(false);
   const [libraryOpen, setLibraryOpen] = useState(false);
@@ -233,16 +232,14 @@ export function SchematicEditor({
   useEffect(() => {
     if (!viewOnly) return;
     setSelection(null);
-    setTool({ type: "select" });
+    setTool({ type: "hand" });
     setLibraryOpen(false);
-    setDraft(null);
   }, [viewOnly]);
   // running in time: the board is an instrument, not a drawing — switches, buttons, the
   // potentiometer's slider; what would change the circuit steps aside
   useEffect(() => {
     if (!live) return;
-    setTool({ type: "select" });
-    setDraft(null);
+    setTool({ type: "hand" });
     held.current = null;
     setGesture(null);
     setLibraryOpen(false);
@@ -323,8 +320,7 @@ export function SchematicEditor({
     }
     const wires = clipboard.wires.map((_, i) => next.wires.length + i);
     commit({ ...next, wires: [...next.wires, ...clipboard.wires.map((w) => ({ points: w.points.map(shift) }))] });
-    setTool({ type: "select" });
-    setDraft(null);
+    setTool({ type: "hand" });
     setSelection(selectionOf(ids, wires));
   };
 
@@ -339,31 +335,15 @@ export function SchematicEditor({
     return [Math.round(point.x / G), Math.round(point.y / G)];
   };
 
-  /**
-   * Wire tool: every click lays the wire down as far as it (a step of its own to undo) and goes on
-   * from there; clicking the same point again, or something to connect to, ends it. It need not end
-   * on anything — Esc takes away only the dashed stretch still following the pointer.
-   */
-  const addDraftPoint = (p: Point) => {
-    if (!draft) {
-      setDraft({ points: [p], wire: null });
-      return;
-    }
-    const last = draft.points[draft.points.length - 1];
-    if (same(last, p)) {
-      setDraft(null);
-      return;
-    }
-    // still the wire it was? (the drawing may have changed under it) — if not, a new one from here
-    const own =
-      draft.wire !== null && value.wires[draft.wire]?.points.at(-1)?.join() === last.join() ? draft.wire : null;
-    const points = simplify(own === null ? elbow(last, p) : [...draft.points, ...elbow(last, p).slice(1)]);
-    const wire = own ?? value.wires.length;
-    commit({
-      ...value,
-      wires: own === null ? [...value.wires, { points }] : value.wires.map((w, i) => (i === own ? { points } : w)),
-    });
-    setDraft(isConnectionPoint(value, library, p) ? null : { points, wire });
+  /** A wire's way from a pin (or a wire) to ``b``: out of a pin along its element first (up from a
+   *  source's top, not sideways into its body's way). */
+  const wireTo = (g: Extract<Gesture, { type: "wire" }>, b: Point): Point[] => {
+    const a = g.from;
+    const tap = g.tap;
+    const e = "id" in tap ? value.elements.find((x) => x.id === tap.id) : undefined;
+    const ps = e ? pins(e, library) : [];
+    const upright = ps.length === 2 && ps[0]![0] === ps[1]![0];
+    return upright && a[0] !== b[0] && a[1] !== b[1] ? [a, [a[0], b[1]], b] : elbow(a, b);
   };
 
   const addWire = (points: Point[]) => {
@@ -396,9 +376,10 @@ export function SchematicEditor({
             text: defaultText(tool.kind),
           };
       commit(attach({ ...next, elements: [...next.elements, element] }, withParts(symbols, next.parts), element.id));
+      // (the tool stays: another one where the next click is)
       setSelection({ type: "element", id: element.id });
-      setTool({ type: "select" });
-    } else if (tool.type === "wire") addDraftPoint(p);
+      setInspect(event.pointerType !== "touch");
+    }
   };
 
   /** Drag the view. From empty space in select mode a click without dragging deselects. */
@@ -417,8 +398,10 @@ export function SchematicEditor({
   );
   // a finger on a board not yet tapped: it may be scrolling the page — nothing moves, nothing is wired
   const untapped = (event: ReactPointerEvent) => event.pointerType === "touch" && !active && !full;
+  /** The hand or the arrow: the drawing at hand (elements moved, wires drawn from pins). */
+  const drawingTool = tool.type === "hand" || tool.type === "select";
   const onElementDown = (event: ReactPointerEvent, e: ElementData) => {
-    if (tool.type !== "select") return;
+    if (!drawingTool) return;
     if (live) {
       if (liveTool === "hand") return; // the view pans
       if (liveTool === "probe") {
@@ -461,6 +444,8 @@ export function SchematicEditor({
         moved: false,
       });
     else {
+      // a finger: its panel once it is tapped again (the first tap only picks it)
+      setInspect(event.pointerType !== "touch" || (selection?.type === "element" && selection.id === e.id));
       setSelection({ type: "element", id: e.id });
       begin({ type: "move", id: e.id, start: toDrawing(event), origin: e.at, snapshot: value, moved: false });
     }
@@ -479,11 +464,11 @@ export function SchematicEditor({
     svgRef.current?.setPointerCapture(event.pointerId);
   };
 
-  const onPinDown = (event: ReactPointerEvent, pin: Point) => {
-    if (tool.type !== "select" || live || viewOnly || untapped(event)) return; // the wire tool handles pins like any other point
+  const onPinDown = (event: ReactPointerEvent, pin: Point, e: ElementData) => {
+    if (!drawingTool || live || viewOnly || untapped(event)) return;
     event.stopPropagation();
     svgRef.current?.focus({ preventScroll: true });
-    begin({ type: "wire", from: pin });
+    begin({ type: "wire", from: pin, tap: { id: e.id } });
     svgRef.current?.setPointerCapture(event.pointerId);
   };
 
@@ -543,11 +528,18 @@ export function SchematicEditor({
       setProbed({ type: "wire", index: wire });
       return;
     }
-    if (tool.type !== "select" || live || viewOnly || untapped(event)) return;
+    if (!drawingTool || live || viewOnly || untapped(event)) return;
     event.stopPropagation();
     svgRef.current?.focus({ preventScroll: true });
     if (event.shiftKey) {
       setSelection(toggled(selection, { wire }));
+      return;
+    }
+    // not selected: a new wire from this point of it (let go where it was: the wire is selected)
+    const chosen = picked(selection).wires.includes(wire);
+    if (!chosen) {
+      begin({ type: "wire", from: toGrid(event), tap: { wire } });
+      svgRef.current?.setPointerCapture(event.pointerId);
       return;
     }
     // a wire of the selection: all of it moves; otherwise the segment, sideways
@@ -567,7 +559,7 @@ export function SchematicEditor({
     svgRef.current?.setPointerCapture(event.pointerId);
   };
 
-  const onUp = (event: { clientX: number; clientY: number }) => {
+  const onUp = (event: { clientX: number; clientY: number; pointerType?: string }) => {
     onMove(event); // where the pointer was let go is where it ends
     const g = held.current;
     const now = drawn.current;
@@ -583,12 +575,17 @@ export function SchematicEditor({
       const had = picked(selection);
       setSelection(selectionOf([...new Set([...had.ids, ...box.ids])], [...new Set([...had.wires, ...box.wires])]));
     }
+    // a wire: from something to something (a pin, a wire) — let go on nothing, there is none
     const end = toGrid(event);
-    if (g.type === "wire" && !same(end, g.from)) addWire(elbow(g.from, end));
-    // a pin clicked, not dragged from: the wire goes on click by click, as with the wire tool
+    if (g.type === "wire" && !same(end, g.from) && isConnectionPoint(value, library, end)) addWire(wireTo(g, end));
+    // a tap: what it was on, selected (an element as a tap on it: a finger's panel on the second)
     if (g.type === "wire" && same(end, g.from)) {
-      setTool({ type: "wire" });
-      setDraft({ points: [g.from], wire: null });
+      const tap = g.tap;
+      if ("wire" in tap) setSelection({ type: "wire", index: tap.wire });
+      else {
+        setInspect(event.pointerType !== "touch" || (selection?.type === "element" && selection.id === tap.id));
+        setSelection({ type: "element", id: tap.id });
+      }
     }
   };
 
@@ -626,33 +623,22 @@ export function SchematicEditor({
       event.preventDefault();
       return;
     }
-    if (mod && event.key.toLowerCase() === "z") {
-      setDraft(null);
-      (event.shiftKey ? redo : undoStep)();
-    } else if (mod && event.key.toLowerCase() === "y") {
-      setDraft(null);
-      redo();
-    } else if (mod && event.key.toLowerCase() === "c") copySelected();
+    if (mod && event.key.toLowerCase() === "z") (event.shiftKey ? redo : undoStep)();
+    else if (mod && event.key.toLowerCase() === "y") redo();
+    else if (mod && event.key.toLowerCase() === "c") copySelected();
     else if (mod && event.key.toLowerCase() === "x") {
       if (copySelected()) removeSelected();
     } else if (mod && event.key.toLowerCase() === "v") paste();
     else if (event.key === "Escape") {
-      // one step back at a time: the wire being drawn, the tool / selection, the panel, full screen
-      if (draft) setDraft(null);
-      else if (tool.type !== "select" || selection) {
-        setTool({ type: "select" });
+      // one step back at a time: the tool / selection, the panel, full screen
+      if (tool.type !== "hand" || selection) {
+        setTool({ type: "hand" });
         setSelection(null);
       } else if (libraryOpen) setLibraryOpen(false);
       else if (full) onFull(false);
-    } else if (event.key === "Enter" && draft) setDraft(null);
-    else if (plain("r")) rotateSelected();
-    else if (plain("v")) {
-      setTool({ type: "select" });
-      setDraft(null);
-    } else if (plain("h")) {
-      setTool({ type: "hand" });
-      setDraft(null);
-    } else if (plain("w")) setTool({ type: "wire" });
+    } else if (plain("r")) rotateSelected();
+    else if (plain("v")) setTool({ type: "select" });
+    else if (plain("h")) setTool({ type: "hand" });
     else if (/^[0-9]$/.test(event.key) && !mod) {
       const k = KINDS[(Number(event.key) + 9) % 10];
       if (k) choose(k.kind);
@@ -664,10 +650,11 @@ export function SchematicEditor({
     event.preventDefault();
   };
 
-  /** Pick an element to place (the side panel stays open, like Excalidraw's). */
+  /** Pick an element to place, as many times as clicked (the side panel stays open, like Excalidraw's —
+   *  a phone's: out of the board's way). */
   function choose(kind: string) {
     setTool({ type: "place", kind });
-    setDraft(null);
+    if (matchMedia("(pointer: coarse)").matches) setLibraryOpen(false);
     focusBoard();
   }
 
@@ -686,13 +673,8 @@ export function SchematicEditor({
   const junctionPoints = useMemo(() => junctions(value, library), [value, library]);
   const obstacles = useMemo(() => inTheWay(value), [value]); // (what labels keep off)
   const openPinPoints = useMemo(() => openPins(value, library), [value, library]);
-  const wiring = draft !== null || gesture?.type === "wire";
-  const preview: Point[] | null =
-    cursor && draft
-      ? elbow(draft.points[draft.points.length - 1], cursor)
-      : cursor && gesture?.type === "wire"
-        ? elbow(gesture.from, cursor)
-        : null;
+  const wiring = gesture?.type === "wire";
+  const preview: Point[] | null = cursor && gesture?.type === "wire" ? wireTo(gesture, cursor) : null;
   const snap = wiring && cursor && isConnectionPoint(value, library, cursor) ? cursor : null;
   const pointsOf = (ps: Point[]) => ps.map(([x, y]) => `${x * G},${y * G}`).join(" ");
   // running: a junction's dot takes the colour of the wires meeting there
@@ -778,7 +760,7 @@ export function SchematicEditor({
             "canvas",
             `tool-${tool.type}`,
             wiring && "wiring",
-            (spaceHeld || tool.type === "hand" || (live && liveTool === "hand")) && "panning",
+            (spaceHeld || (live && liveTool === "hand")) && "panning",
             live && "running",
             live && liveTool === "probe" && "probing",
           )}
@@ -787,12 +769,11 @@ export function SchematicEditor({
           height="100%"
           tabIndex={0}
           onPointerDown={(event) => {
-            if (spaceHeld || tool.type === "hand" || (live && liveTool === "hand") || event.button === 1)
-              startPan(event, false);
-            else if (tool.type === "select" && event.shiftKey && !viewOnly)
-              startBox(event); // shift + drag: select many
-            else if (tool.type === "select")
-              startPan(event, true); // empty space: drag pans, click deselects
+            if (spaceHeld || (live && liveTool === "hand") || event.button === 1) startPan(event, false);
+            else if (drawingTool && (tool.type === "select" || event.shiftKey) && !viewOnly && !live)
+              startBox(event); // the arrow (or shift held): a drag selects many
+            else if (drawingTool)
+              startPan(event, true); // the hand: a drag pans, a click deselects
             else onCanvasDown(event);
           }}
           onPointerMove={(event) => {
@@ -823,7 +804,6 @@ export function SchematicEditor({
             pointer.current = null;
             setCursor(null);
           }}
-          onDoubleClick={() => setDraft(null)}
           onKeyDown={(event) => {
             if (live && pressKey(event, true)) return;
             if (event.key === " ") {
@@ -1006,7 +986,7 @@ export function SchematicEditor({
                   cx={x * G}
                   cy={y * G}
                   r="8"
-                  onPointerDown={(event) => onPinDown(event, [x, y])}
+                  onPointerDown={(event) => onPinDown(event, [x, y], e)}
                 >
                   <title>{t("drawing.drawWire")}</title>
                 </circle>
@@ -1054,7 +1034,6 @@ export function SchematicEditor({
           library={library}
           onTool={(next) => {
             setTool(next);
-            setDraft(null);
             focusBoard();
           }}
           onLibrary={() => (libraryOpen ? setLibraryOpen(false) : openLibrary())}
@@ -1063,7 +1042,20 @@ export function SchematicEditor({
       {live && probed && probe?.(probed, () => setProbed(null))}
       {panel}
       {topRight && <BoardIsland className="top-[calc(var(--board-top,0px)+0.75rem)] right-3">{topRight}</BoardIsland>}
-      {(live ? isAdjustable(selectedKind ?? "") && !probed : !viewOnly && selectedElement) && (
+      {/* a wire or a few things selected: away with them (a finger has no Del key) */}
+      {!live && !viewOnly && (selection?.type === "wire" || selection?.type === "group") && (
+        <BoardIsland stays className="top-15 right-3">
+          <BoardButton
+            className={cn(islandButton(), "hover:bg-err-bg hover:text-danger")}
+            onClick={removeSelected}
+            title={t("inspector.removeTitle")}
+            aria-label={t("inspector.remove")}
+          >
+            <Trash />
+          </BoardButton>
+        </BoardIsland>
+      )}
+      {(live ? isAdjustable(selectedKind ?? "") && !probed : !viewOnly && selectedElement && inspect) && (
         <Inspector
           key={selectedElement?.id}
           element={selectedElement}
