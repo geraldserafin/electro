@@ -470,3 +470,19 @@ def test_real_parts():
     assert max(trace["V_OUT"][len(trace.t) // 2 :]) == pytest.approx(1, rel=0.02)
     with pytest.raises(BadValue):
         NPN(part="BC999")
+
+
+def test_a_circuit_built_without_values_takes_its_data_after_once_for_solving_and_simulating():
+    from electro import Capacitor, Resistor, VoltageSource, simulate, solve
+    from electro.issues import NoSuchElement, ValueNeeded
+
+    rc = (VoltageSource(label="E_1") + Resistor(label="R_1") + Capacitor(label="C_1")).close()
+    given = rc(E_1=10, R_1=1000, C_1="100u")
+    assert solve(given)("U_C_1") == 10  # where it ends
+    assert abs(simulate(given, t=0.5).at(0.1)["U_C_1"] - 10 * (1 - math.exp(-1))) < 0.05  # on its way
+    assert str(rc).count("?") == 3  # (the circuit itself as it was)
+    assert solve(rc(E_1=10), R_1=5)("U_C_1") == 10  # part of the data now, the rest later
+    with pytest.raises(NoSuchElement):
+        rc(R_9=1)
+    with pytest.raises(ValueNeeded):
+        simulate(rc(R_1=5), t=1)

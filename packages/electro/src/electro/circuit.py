@@ -154,6 +154,37 @@ class Circuit:
     def _replace(self, fn) -> Circuit:
         return self  # leaves without components: wires, spiders, swaps
 
+    def __call__(self, **data) -> Circuit:
+        """The circuit with data applied — each element named given that value (``obwod(R_1=10,
+        E_1="12")``), the rest as they were (an unknown stays one): the same circuit, to solve or to
+        simulate. Built once, given data apart, as a problem is set."""
+        import copy
+
+        from .issues import NoSuchElement
+        from .values import parse
+
+        valued: list[str] = []
+
+        def collect(c):
+            if c.has_value and c.label:
+                valued.append(c.label)
+            return c
+
+        self.replace(collect)
+        for label in data:
+            if label not in valued:
+                raise NoSuchElement(label, valued)
+
+        def given(c):
+            if c.label not in data:
+                return c
+            out = copy.copy(c)
+            out.__dict__.pop("netlist", None)  # (its netlist, cached, has the old one in it)
+            out.value = parse(data[c.label], positive=c.positive)
+            return out
+
+        return self.replace(given)
+
     def fill(self, solution) -> Circuit:
         """This circuit with every ``Hole`` replaced by the element the solution found."""
         return self.replace(solution.realize_component)
