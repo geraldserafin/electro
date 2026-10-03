@@ -8,6 +8,7 @@ import { cn } from "@/shared/lib/cn";
 import type { ElementData } from "@/shared/model/types";
 import { Rotate, Trash } from "@/shared/ui/icons";
 import { Adjusters, isAdjustable } from "./Adjusters";
+import { useKinds } from "./kinds";
 import { hasValue, isComponent, isControlled, kindInfo } from "./model";
 import { field, Panel, Section, Tile } from "./Panel";
 
@@ -40,6 +41,7 @@ export function Inspector({
   live?: boolean; // running: only what works as an input
 }) {
   const { t } = useTranslation("schematic");
+  const { name } = useKinds();
   const [id, setId] = useState(element?.id ?? "");
   useEffect(() => setId(element?.id ?? ""), [element?.id]); // (another one picked: the panel stays, its label anew)
   if (!element) return null;
@@ -65,6 +67,10 @@ export function Inspector({
   return (
     <Panel className={place} role="group" aria-label={t("inspector.label")}>
       <span aria-hidden className="hidden max-sm:block flex-none self-center w-9 h-1 rounded-full bg-line" />
+      {/* what it is */}
+      <h3 className="m-0 text-[15px] font-semibold">
+        {element.kind === "part" ? t("inspector.part") : name(element.kind)}
+      </h3>
       {!live && isComponent(element.kind) && (
         <Section label={t("inspector.id")}>
           <input
