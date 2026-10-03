@@ -190,6 +190,8 @@ export function SchematicEditor({
   const [cursor, setCursor] = useState<Point | null>(null);
   // a tap selects (a finger: the element's panel on the next tap, not over the board at once)
   const [inspect, setInspect] = useState(true);
+  // the segment of a wire (not selected) under the pointer: a wire starts from it — its point shown
+  const [over, setOver] = useState<{ wire: number; index: number } | null>(null);
   const [gesture, setGesture] = useState<Gesture | null>(null);
   const [help, setHelp] = useState(false);
   const [libraryOpen, setLibraryOpen] = useState(false);
@@ -851,11 +853,14 @@ export function SchematicEditor({
                 {w.points.slice(1).map((q, j) => (
                   <polyline
                     key={j}
-                    className={`hit ${w.points[j][1] === q[1] ? "segment-h" : "segment-v"}`}
+                    // (selected: its segment moves sideways; else a wire starts from it)
+                    className={`hit ${chosen ? (w.points[j][1] === q[1] ? "segment-h" : "segment-v") : "segment-from"}`}
                     points={pointsOf([w.points[j], q])}
                     onPointerDown={(event) => onSegmentDown(event, i, j)}
+                    onPointerEnter={() => !chosen && setOver({ wire: i, index: j })}
+                    onPointerLeave={() => setOver(null)}
                   >
-                    <title>{t("drawing.moveSegment")}</title>
+                    <title>{t(chosen ? "drawing.moveSegment" : "drawing.drawWire")}</title>
                   </polyline>
                 ))}
               </g>
@@ -1003,6 +1008,15 @@ export function SchematicEditor({
             />
           )}
           {snap && <circle className="snap" cx={snap[0] * G} cy={snap[1] * G} r="7" />}
+          {(() => {
+            // where on the wire under the pointer a new one would start
+            const w = over && !gesture && !live && drawingTool && cursor ? value.wires[over.wire] : undefined;
+            const [a, b] = w ? [w.points[over!.index], w.points[over!.index + 1]] : [];
+            if (!a || !b || !cursor || picked(selection).wires.includes(over!.wire)) return null;
+            const clamp = (v: number, p: number, q: number) => Math.min(Math.max(v, Math.min(p, q)), Math.max(p, q));
+            const at = a[1] === b[1] ? [clamp(cursor[0], a[0], b[0]), a[1]] : [a[0], clamp(cursor[1], a[1], b[1])];
+            return <circle className="wire-start" cx={at[0] * G} cy={at[1] * G} r="5" />;
+          })()}
           {tool.type === "place" && cursor && (
             <g
               className="w ghost"

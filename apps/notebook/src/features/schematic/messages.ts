@@ -93,7 +93,7 @@ export const pl = {
     nothing: "Nic nie pasuje do „{{query}}”.",
   },
   drawing: {
-    moveSegment: "Przeciągnij do zacisku albo przewodu: nowy przewód stąd (zaznaczony — przesuwasz odcinek)",
+    moveSegment: "Przeciągnij, żeby przesunąć ten odcinek",
     openPin: "Niepodłączony zacisk",
     drawWire: "Przeciągnij do innego zacisku albo przewodu, żeby je połączyć",
   },
@@ -335,7 +335,7 @@ export const en: typeof pl = {
     nothing: "Nothing matches “{{query}}”.",
   },
   drawing: {
-    moveSegment: "Drag to a pin or a wire: a new wire from here (selected — the segment moves)",
+    moveSegment: "Drag to move this segment",
     openPin: "Unconnected pin",
     drawWire: "Drag to another pin or wire to connect them",
   },

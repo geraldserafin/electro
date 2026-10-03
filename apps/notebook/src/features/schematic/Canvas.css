@@ -110,6 +110,15 @@
   .canvas:not(.tool-select, .tool-hand) .pin-handle {
     pointer-events: none;
   }
+  .canvas:is(.tool-select, .tool-hand) .segment-from {
+    cursor: crosshair;
+  }
+  .canvas .wire-start {
+    fill: var(--tool-active);
+    stroke: var(--accent);
+    stroke-width: 1.2;
+    pointer-events: none;
+  }
   .canvas .snap {
     fill: none;
     stroke: #2f9e44;
