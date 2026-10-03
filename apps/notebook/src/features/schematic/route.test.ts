@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
 import type { Point, SchematicData } from "@/shared/model/types";
 import { library } from "./library";
-import { route } from "./route";
+import { updateElement } from "./model";
+import { relaid, route } from "./route";
 
 const r = (id: string, at: Point, rotation = 0) => ({ id, kind: "resistor", at, rotation, value: "1", text: null });
 const way = (a: Point, b: Point): Point[] => [a, [b[0], a[1]], b];
@@ -62,5 +63,51 @@ describe("route", () => {
     const sch: SchematicData = { elements: [r("R_1", [4, -2], 90)], wires: [] }; // pins (4,-2), (4,2)
     const path = route(sch, library, [0, 2], [8, 2], way([0, 2], [8, 2]));
     expect(inside(path).some(([x, y]) => x === 4 && y === 2)).toBe(false);
+  });
+});
+
+describe("relaid", () => {
+  it("a moved element's wire laid anew around what is in the way", () => {
+    // R_1 (0,0)–(4,0), a wire from its right pin to R_2's top (8,2); R_1 moved under R_2's level
+    const before: SchematicData = {
+      elements: [r("R_1", [0, 0]), r("R_2", [8, 2], 90)],
+      wires: [
+        {
+          points: [
+            [4, 0],
+            [8, 0],
+            [8, 2],
+          ],
+        },
+      ],
+    };
+    const after = relaid(before, updateElement(before, library, "R_1", { at: [0, 4] }), library, "R_1");
+    const w = after.wires[0]!.points;
+    expect(w[0]).toEqual([4, 4]);
+    expect(w.at(-1)).toEqual([8, 2]);
+    // not through R_2's body (8,2)–(8,6)
+    expect(inside(w).some(([x, y]) => x === 8 && y > 2 && y <= 6)).toBe(false);
+  });
+
+  it("a wire with another joined along it: kept as dragged", () => {
+    const before: SchematicData = {
+      elements: [r("R_1", [0, 0])],
+      wires: [
+        {
+          points: [
+            [4, 0],
+            [10, 0],
+          ],
+        },
+        {
+          points: [
+            [7, 0],
+            [7, 4],
+          ],
+        },
+      ],
+    };
+    const dragged = updateElement(before, library, "R_1", { at: [0, 2] });
+    expect(relaid(before, dragged, library, "R_1").wires[0]).toEqual(dragged.wires[0]);
   });
 });

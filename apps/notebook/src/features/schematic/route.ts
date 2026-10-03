@@ -2,7 +2,7 @@
 // another wire or through a pin or a wire's end or corner (that would join what is not to be joined),
 // with as few corners as it can. Crossing another wire is fine (lines that only cross are not joined).
 import type { Point, SchematicData, SymbolLibrary } from "@/shared/model/types";
-import { isComponent, key, pins, same } from "./model";
+import { isComponent, key, onSegment, pins, same } from "./model";
 
 const BEND = 4; // a corner costs as much as this many squares of wire
 const MARGIN = 6; // how far around the two ends it may go, in squares
@@ -101,4 +101,45 @@ export function route(
     const [q, r] = [path[k - 1]!, path[k + 1]!];
     return !((q[0] === p[0] && p[0] === r[0]) || (q[1] === p[1] && p[1] === r[1]));
   });
+}
+
+/**
+ * Element ``id`` moved (``before`` → ``after``, its wires dragged along with it by updateElement): each
+ * wire with an end on its pins laid anew from where its other end is, around what is in the way — but
+ * one with something joined to it along the way (a T, a pin on it), kept as dragged: laid anew, that
+ * would come apart.
+ */
+export function relaid(before: SchematicData, after: SchematicData, lib: SymbolLibrary, id: string): SchematicData {
+  const old = before.elements.find((e) => e.id === id);
+  const now = after.elements.find((e) => e.id === id);
+  if (!old || !now) return after;
+  const [was, is] = [pins(old, lib), pins(now, lib)];
+  // what is joined along a wire: other wires' ends, pins (not its own ends)
+  const joints = [
+    ...before.wires.flatMap((w) => [w.points[0]!, w.points.at(-1)!]),
+    ...before.elements.flatMap((e) => pins(e, lib)),
+  ];
+  let sch = after;
+  before.wires.forEach((w, i) => {
+    const [s, t] = [w.points[0]!, w.points.at(-1)!];
+    const [ks, kt] = [was.findIndex((p) => same(p, s)), was.findIndex((p) => same(p, t))];
+    if (ks < 0 && kt < 0) return;
+    const along = (p: Point) =>
+      !same(p, s) &&
+      !same(p, t) &&
+      (w.points.some((q) => same(q, p)) || w.points.slice(1).some((q, j) => onSegment(p, w.points[j]!, q)));
+    if (joints.some(along)) return;
+    // from its moved end (out of that pin, along its element), to the other
+    const k = ks >= 0 ? ks : kt;
+    const from = is[k]!;
+    const to = ks >= 0 ? (kt >= 0 ? is[kt]! : t) : s;
+    const other = is.length === 2 ? is[1 - k]! : undefined;
+    const out: Point | undefined = other && [Math.sign(from[0] - other[0]), Math.sign(from[1] - other[1])];
+    const rest = { ...sch, wires: sch.wires.filter((_, j) => j !== i) };
+    const dragged = sch.wires[i]!.points;
+    const path = route(rest, lib, from, to, ks >= 0 ? dragged : [...dragged].reverse(), out);
+    const points = ks >= 0 ? path : [...path].reverse();
+    sch = { ...sch, wires: sch.wires.map((x, j) => (j === i ? { points } : x)) };
+  });
+  return sch;
 }

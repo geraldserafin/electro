@@ -55,7 +55,7 @@ import {
 } from "./model";
 import { OledScreen, type OledScreenData } from "./OledScreen";
 import { partKind, usedParts, withParts } from "./parts";
-import { route } from "./route";
+import { relaid, route } from "./route";
 import { TftScreen, type TftScreenData } from "./TftScreen";
 import { type LiveTool, LiveToolbar, type Tool, Toolbar } from "./Toolbar";
 import { type Camera, useCamera } from "./useCamera";
@@ -347,9 +347,8 @@ export function SchematicEditor({
     return [Math.round(point.x / G), Math.round(point.y / G)];
   };
 
-  /** A wire's way from a pin (or a wire) to ``b``: to something to wire to, laid around what is in the
-   *  way (route.ts) — out of a pin along its element first (up from a source's top, not sideways); else
-   *  (the pointer on nothing yet) a plain elbow. */
+  /** A wire's way from a pin (or a wire) to ``b`` (the pointer: as it goes, too), laid around what is in
+   *  the way (route.ts) — out of a pin along its element first (up from a source's top, not sideways). */
   const wireTo = (g: Extract<Gesture, { type: "wire" }>, b: Point): Point[] => {
     const a = g.from;
     const tap = g.tap;
@@ -357,7 +356,6 @@ export function SchematicEditor({
     const ps = e ? pins(e, library) : [];
     const upright = ps.length === 2 && ps[0]![0] === ps[1]![0];
     const plain: Point[] = upright && a[0] !== b[0] && a[1] !== b[1] ? [a, [a[0], b[1]], b] : elbow(a, b);
-    if (!isConnectionPoint(value, library, b)) return plain;
     // out of its pin: away from the element's other pin (a two-pin one's)
     const other = ps.length === 2 ? ps.find((q) => !same(q, a)) : undefined;
     const out: Point | undefined = other && [Math.sign(a[0] - other[0]), Math.sign(a[1] - other[1])];
@@ -529,7 +527,8 @@ export function SchematicEditor({
       const [x, y] = toDrawing(event);
       const at: Point = [g.origin[0] + Math.round(x - g.start[0]), g.origin[1] + Math.round(y - g.start[1])];
       const now = (drawn.current ?? g.snapshot).elements.find((e) => e.id === g.id)!.at;
-      if (!same(at, now)) emit(g, updateElement(g.snapshot, library, g.id, { at }));
+      // (its wires laid anew around what is in the way, as it goes)
+      if (!same(at, now)) emit(g, relaid(g.snapshot, updateElement(g.snapshot, library, g.id, { at }), library, g.id));
     }
     if (g?.type === "box") {
       g.to = toDrawing(event);
