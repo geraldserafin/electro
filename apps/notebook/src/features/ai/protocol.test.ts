@@ -9,7 +9,7 @@ describe("a model's JSON read", () => {
   it("keeps its LaTeX", () => {
     const raw = String.raw`{"s": "$U\frac{R_1}{R_2}\,\Omega$ \text{V} \underline{\qquad}\nNowa linia \\beta \"q\" é"}`;
     expect(jsonOf<{ s: string }>(raw).s).toBe(
-      String.raw`$U\frac{R_1}{R_2}\,\Omega$ \text{V} \underline{\qquad}` + '\nNowa linia \\beta "q" é',
+      `${String.raw`$U\frac{R_1}{R_2}\,\Omega$ \text{V} \underline{\qquad}`}\nNowa linia \\beta "q" é`,
     );
   });
 });

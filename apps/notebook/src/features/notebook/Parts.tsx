@@ -82,12 +82,10 @@ export function PartList({
             // (only the chapter read now: its sections)
             body={i === page && <div className="ml-3 pl-1 border-l border-line empty:hidden">{children(i)}</div>}
             menu={
-              <>
-                <button role="menuitem" className="text-danger" onClick={() => onRemove(i)}>
-                  <Trash />
-                  {t("remove")}
-                </button>
-              </>
+              <button role="menuitem" className="text-danger" onClick={() => onRemove(i)}>
+                <Trash />
+                {t("remove")}
+              </button>
             }
           >
             <button

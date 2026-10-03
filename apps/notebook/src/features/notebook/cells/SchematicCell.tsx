@@ -707,22 +707,6 @@ export function SchematicCell({
       }}
       full={full}
       onFull={setFull}
-      // an Arduino's sketch from its inspector: beside the board
-      onFirmware={(id, file) => void loadFile(id, file)}
-      onSweep={timed ? undefined : (id, lo, hi) => void plot("sweep", (s) => kernel.sweep(s, id, lo, hi))}
-      onSketch={(id) =>
-        void go(
-          shown(id) || !full
-            ? open(layout, id, files)
-            : split(
-                layout,
-                id,
-                layout.groups.findIndex((g) => g.active === "board"),
-                "right",
-                files,
-              ),
-        )
-      }
     />
   );
 

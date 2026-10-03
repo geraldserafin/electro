@@ -53,8 +53,7 @@ import {
   updateElement,
 } from "./model";
 import { OledScreen, type OledScreenData } from "./OledScreen";
-import { partBox, partKind, symbolKey, usedParts, withParts } from "./parts";
-import { SymbolIcon } from "./SymbolIcon";
+import { partKind, usedParts, withParts } from "./parts";
 import { TftScreen, type TftScreenData } from "./TftScreen";
 import { type LiveTool, LiveToolbar, type Tool, Toolbar } from "./Toolbar";
 import { type Camera, useCamera } from "./useCamera";
@@ -105,9 +104,6 @@ interface Props {
   below?: ReactNode; // an island at the bottom, in the middle (the live simulation's controls)
   full: boolean; // full screen: the board fills the space its parent gives it
   onFull: (full: boolean) => void;
-  onSketch?: (id: string) => void; // an Arduino's sketch, opened from its inspector
-  onFirmware?: (id: string, file: File) => void; // a Pico's program file, picked in its inspector
-  onSweep?: (id: string, lo: string, hi: string) => void; // an element's value swept, from its inspector
   bare?: boolean; // no frame of its own: it fills an editor group (the cell's)
   probe?: (target: ProbeTarget, onClose: () => void) => ReactNode; // running: the meter's panel for what it was put on
   // the user's own components, offered first in the element library (features/components)
@@ -167,9 +163,6 @@ export function SchematicEditor({
   below,
   full,
   onFull,
-  onSketch,
-  onFirmware,
-  onSweep,
   bare,
   probe,
   myParts,
@@ -1056,28 +1049,28 @@ export function SchematicEditor({
       {live && probed && probe?.(probed, () => setProbed(null))}
       {panel}
       {topRight && <BoardIsland className="top-[calc(var(--board-top,0px)+0.75rem)] right-3">{topRight}</BoardIsland>}
-      {/* a wire or a few things selected: away with them (a finger has no Del key) */}
-      {!live && !viewOnly && (selection?.type === "wire" || selection?.type === "group") && (
-        <BoardIsland stays className="top-15 right-3">
-          <BoardButton
-            className={cn(islandButton(), "hover:bg-err-bg hover:text-danger")}
-            onClick={removeSelected}
-            title={t("inspector.removeTitle")}
-            aria-label={t("inspector.remove")}
-          >
-            <Trash />
-          </BoardButton>
-        </BoardIsland>
-      )}
+      {/* a wire, a few things, or an element tapped once (its panel not open) selected: away with them (a
+          finger has no Del key) */}
+      {!live &&
+        !viewOnly &&
+        (selection?.type === "wire" || selection?.type === "group" || (selection?.type === "element" && !inspect)) && (
+          <BoardIsland stays className="top-15 right-3">
+            <BoardButton
+              className={cn(islandButton(), "hover:bg-err-bg hover:text-danger")}
+              onClick={removeSelected}
+              title={t("inspector.removeTitle")}
+              aria-label={t("inspector.remove")}
+            >
+              <Trash />
+            </BoardButton>
+          </BoardIsland>
+        )}
       {(live ? isAdjustable(selectedKind ?? "") && !probed : !viewOnly && selectedElement && inspect) && (
         <Inspector
           key={selectedElement?.id}
           element={selectedElement}
           live={!!live}
-          onSketch={onSketch && selectedElement ? () => onSketch(selectedElement.id) : undefined}
-          onFirmware={onFirmware && selectedElement ? (file) => onFirmware(selectedElement.id, file) : undefined}
           taken={value.elements.map((e) => e.id)}
-          components={value.elements.filter((e) => isComponent(e.kind)).map((e) => e.id)}
           onChange={(patch) => selectedElement && commit(updateElement(value, library, selectedElement.id, patch))}
           onRename={(id) => {
             if (!selectedElement) return;
@@ -1086,20 +1079,6 @@ export function SchematicEditor({
           }}
           onRotate={rotateSelected}
           onRemove={removeSelected}
-          part={selectedElement?.kind === "part" ? value.parts?.[selectedElement.text ?? ""] : undefined}
-          models={selectedElement ? library.kinds[selectedElement.kind]?.parts : undefined}
-          onSweep={onSweep && selectedElement ? (lo, hi) => onSweep(selectedElement.id, lo, hi) : undefined}
-          icon={
-            selectedElement ? (
-              <SymbolIcon
-                kind={symbolKey(selectedElement)}
-                library={library}
-                box={
-                  selectedElement.kind === "part" ? partBox(value.parts?.[selectedElement.text ?? ""], G) : undefined
-                }
-              />
-            ) : null
-          }
         />
       )}
       {lost && (
