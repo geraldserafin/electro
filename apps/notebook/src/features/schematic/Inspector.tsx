@@ -34,7 +34,10 @@ export type Selection =
   | { type: "group"; ids: string[]; wires: number[] } // shift + click, shift + drag
   | null;
 
-const place = "top-15 right-3 w-66 max-h-[calc(100%-8rem)] overflow-y-auto text-[14px]";
+// (a phone: a sheet from the bottom, the drawing above it in view)
+const place =
+  "top-15 right-3 w-66 max-h-[calc(100%-8rem)] overflow-y-auto text-[14px] " +
+  "max-sm:top-auto max-sm:inset-x-0 max-sm:bottom-0 max-sm:z-6 max-sm:w-auto max-sm:max-h-[45%] max-sm:rounded-b-none max-sm:pt-2 max-sm:shadow-[0_-4px_16px_rgb(0_0_0/0.12)]";
 const hint = "m-0 text-[12px] leading-[1.4] text-faint";
 
 // the board's buttons (a sketch to edit, a program file to load): the icon and the words together, centred
@@ -178,6 +181,7 @@ export function Inspector({
   };
   return (
     <Panel className={place} role="group" aria-label={t("inspector.label")}>
+      <span aria-hidden className="hidden max-sm:block flex-none self-center w-9 h-1 rounded-full bg-line" />
       <PanelHead
         icon={icon}
         caption={element.kind === "part" ? (part?.name ?? t("inspector.part")) : name(element.kind)}

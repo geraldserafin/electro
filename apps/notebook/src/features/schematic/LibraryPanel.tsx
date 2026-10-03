@@ -19,8 +19,8 @@ export const shortcut = (kind: string) => {
 };
 
 // a tile: the symbol filling its top, the name under it (two lines at most)
-const tile = "w-full h-auto grid-rows-[56px_auto] content-start gap-1 px-1.5 pt-2 pb-1.5 [&_svg]:w-full [&_svg]:h-14";
-const name = "w-full text-[11.5px] leading-tight text-center text-muted line-clamp-2 break-words";
+const tile = "w-full h-auto grid-rows-[44px_auto] content-start gap-1 px-1 pt-1.5 pb-1.5 [&_svg]:w-full [&_svg]:h-11";
+const name = "w-full text-[11px] leading-tight text-center text-muted line-clamp-2 break-words hyphens-auto";
 
 /** One of the user's own components, as the library offers it. */
 export interface MyPart {
@@ -94,7 +94,7 @@ export function LibraryPanel({
       <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden -mx-1 px-1 pb-1 grid content-start gap-4">
         {mine.length > 0 && onChoosePart && (
           <Section label={partsLabel}>
-            <div className="grid grid-cols-3 gap-1.5">
+            <div className="grid grid-cols-4 gap-1">
               {mine.map((p) => {
                 const G = library.grid;
                 return (
@@ -127,7 +127,7 @@ export function LibraryPanel({
         )}
         {groups.map((group) => (
           <Section key={group} label={group}>
-            <div className="grid grid-cols-3 gap-1.5">
+            <div className="grid grid-cols-4 gap-1">
               {found
                 .filter((k) => k.groupName === group)
                 .map((k) => (
