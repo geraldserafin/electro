@@ -35,6 +35,24 @@ const Library = () => (
   </svg>
 );
 
+/** The lock, as Excalidraw's: an element placed again and again (shut), or once and back to the hand. */
+const Lock = ({ shut }: { shut: boolean }) => (
+  <svg
+    viewBox="0 0 24 24"
+    width={17}
+    height={17}
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="1.8"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    aria-hidden="true"
+  >
+    <rect x="5" y="10.5" width="14" height="10" rx="2" />
+    <path d={shut ? "M8.5 10.5V7.5a3.5 3.5 0 017 0v3" : "M8.5 10.5V7.5a3.5 3.5 0 016.7-1.4"} />
+  </svg>
+);
+
 export type Tool =
   | { type: "select" }
   | { type: "hand" }
@@ -51,8 +69,12 @@ export function Toolbar({
   libraryOpen,
   onLibrary,
   library,
+  locked,
+  onLock,
   className,
 }: {
+  locked: boolean; // an element placed again and again
+  onLock: () => void;
   current: Tool;
   onTool: (tool: Tool) => void;
   libraryOpen: boolean;
@@ -88,6 +110,17 @@ export function Toolbar({
         className,
       )}
     >
+      <BoardButton
+        className={tool(locked)}
+        title={`${t("tools.lock")} (Q)`}
+        aria-label={t("tools.lock")}
+        aria-pressed={locked}
+        onClick={onLock}
+      >
+        <Lock shut={locked} />
+        <Key>Q</Key>
+      </BoardButton>
+      <Separator />
       {tools.map(({ tool: it, label, key, icon }) => (
         <BoardButton
           key={it.type}

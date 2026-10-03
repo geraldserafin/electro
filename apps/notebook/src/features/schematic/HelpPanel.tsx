@@ -15,6 +15,7 @@ const KEYS = [
   "escape",
   "undo",
   "hand",
+  "lock",
   "pan",
   "wheel",
   "zoom",

@@ -186,6 +186,7 @@ export function SchematicEditor({
   const [cursor, setCursor] = useState<Point | null>(null);
   // a tap selects (a finger: the element's panel only from its ⋯, not over the board at once)
   const [inspect, setInspect] = useState(true);
+  const [locked, setLocked] = useState(false); // the tool stays (the lock): an element placed again and again
   // the segment of a wire (not selected) under the pointer: a wire starts from it — its point shown
   const [over, setOver] = useState<{ wire: number; index: number } | null>(null);
   const [gesture, setGesture] = useState<Gesture | null>(null);
@@ -396,7 +397,8 @@ export function SchematicEditor({
         return;
       }
       commit(attach({ ...next, elements: [...next.elements, element] }, lib, element.id));
-      // (the tool stays: another one where the next click is)
+      // once, then the hand (the lock shut: another one where the next click is)
+      if (!locked) setTool({ type: "hand" });
       setSelection({ type: "element", id: element.id });
       setInspect(event.pointerType !== "touch");
     }
@@ -659,6 +661,7 @@ export function SchematicEditor({
     } else if (plain("r")) rotateSelected();
     else if (plain("v")) setTool({ type: "select" });
     else if (plain("h")) setTool({ type: "hand" });
+    else if (plain("q")) setLocked((l) => !l);
     else if (/^[0-9]$/.test(event.key) && !mod) {
       const k = KINDS[(Number(event.key) + 9) % 10];
       if (k) choose(k.kind);
@@ -680,8 +683,10 @@ export function SchematicEditor({
 
   function openLibrary() {
     setLibraryOpen(true);
-    // the panel floats over the left of the board: move the drawing out from under it
+    // the panel floats over the left of the board: move the drawing out from under it (a phone's is a
+    // sheet from the bottom: nothing to move)
     if (!value.elements.length && !value.wires.length) return;
+    if (matchMedia("(max-width: 639px)").matches) return;
     const left = (bounds(value, library)[0] * G - 60 - cam.x) * cam.zoom; // - room for labels
     if (left < PANEL) setCam((c) => ({ ...c, x: c.x - (PANEL - left) / c.zoom }));
   }
@@ -1062,6 +1067,8 @@ export function SchematicEditor({
           // (a phone: the top right corner is the full screen button's — the tools from the left, short of it)
           className={topRight ? "max-sm:left-3 max-sm:translate-x-0 max-sm:max-w-[calc(100%-80px)]" : undefined}
           current={tool}
+          locked={locked}
+          onLock={() => setLocked(!locked)}
           libraryOpen={libraryOpen}
           library={library}
           onTool={(next) => {
