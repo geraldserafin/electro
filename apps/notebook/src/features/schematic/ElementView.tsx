@@ -10,7 +10,19 @@ import {
   useState,
 } from "react";
 import type { ElementData, ElementResult, Point, SymbolLibrary, WireData } from "@/shared/model/types";
-import { hasValue, isBoard, isComponent, isWaveSource, keyLabel, kindInfo, pins, rotate, waveLabel } from "./model";
+import {
+  arrowLength,
+  hasValue,
+  isArrow,
+  isBoard,
+  isComponent,
+  isWaveSource,
+  keyLabel,
+  kindInfo,
+  pins,
+  rotate,
+  waveLabel,
+} from "./model";
 import { symbolOf } from "./parts";
 
 /**
@@ -181,7 +193,7 @@ const sameColours = (a: Props["live"], b: Props["live"]) =>
  * 30 times a second, and most elements look just as they did (the same colours, the same readings).
  */
 export const ElementView = memo(
-  ElementView_,
+  (props: Props) => (isArrow(props.element.kind) ? <ArrowView {...props} /> : <ElementView_ {...props} />),
   (a, b) =>
     a.element === b.element &&
     a.library === b.library &&
@@ -194,6 +206,63 @@ export const ElementView = memo(
     sameColours(a.live, b.live) &&
     sameLook(a.look, b.look),
 );
+
+/** Where an arrow's name goes, from its middle: on its left as it points (above one pointing right),
+ *  as electro_render draws it. */
+const ARROW_NAME: Record<number, [number, number, "middle" | "start" | "end"]> = {
+  0: [0, -8, "middle"],
+  90: [8, 4, "start"],
+  180: [0, 18, "middle"],
+  270: [-8, 4, "end"],
+};
+
+/** A current's or a voltage's arrow: a mark on the drawing (not of the circuit), from its tail the
+ *  way it points, its name beside it. */
+function ArrowView({ element: e, library, selected, result, onPointerDown }: Props) {
+  const G = library.grid;
+  const length = arrowLength(e) * G;
+  const [hx, hy] = rotate([length, 0], e.rotation);
+  const [x, y] = [e.at[0] * G, e.at[1] * G];
+  const [dx, dy, anchor] = ARROW_NAME[e.rotation] ?? ARROW_NAME[0]!;
+  const box = { x: Math.min(x, x + hx), y: Math.min(y, y + hy), width: Math.abs(hx), height: Math.abs(hy) };
+  return (
+    <g
+      className={`element ${selected ? "selected" : ""}`}
+      data-id={e.id}
+      data-kind={e.kind}
+      onPointerDown={(event) => onPointerDown(event, e)}
+    >
+      <rect className="hit" x={box.x - 8} y={box.y - 8} width={box.width + 16} height={box.height + 16} />
+      {selected && (
+        <rect className="frame" x={box.x - 8} y={box.y - 8} width={box.width + 16} height={box.height + 16} rx="4" />
+      )}
+      <g
+        className="w"
+        transform={`translate(${x} ${y}) rotate(${e.rotation})`}
+        dangerouslySetInnerHTML={{
+          __html: `<path d="M0 0H${length - 7}"/><path class="fill" d="M${length} 0l-9 -4.5v9z"/>`,
+        }}
+      />
+      {(e.text || result) && (
+        // its name, and what it is: given (its value), or after a run what it came to
+        <Label
+          text={[
+            e.text,
+            e.value?.trim()
+              ? `${e.value.trim()}${/\d$/.test(e.value.trim()) ? (e.kind === "current_arrow" ? " A" : " V") : ""}`
+              : result?.value,
+          ]
+            .filter(Boolean)
+            .join(" = ")}
+          x={x + hx / 2 + dx}
+          y={y + hy / 2 + dy}
+          anchor={anchor}
+          solved={!e.value?.trim() && !!result}
+        />
+      )}
+    </g>
+  );
+}
 
 function ElementView_({ element: e, library, wires, result, selected, closed, lit, look, live, onPointerDown }: Props) {
   const G = library.grid;

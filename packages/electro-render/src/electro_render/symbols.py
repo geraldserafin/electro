@@ -184,6 +184,9 @@ SYMBOLS: dict[str, str] = {
     # a component's pin, in its own drawing: a tag pointing at the point (its name above, as a label's)
     "port": '<path d="M0 0L-6 -6V-16H6V-6Z"/>',
     "part": "",  # drawn from its definition: part_symbol()
+    # as arrow_symbol() draws them (a voltage's as long as set: this its default)
+    "current_arrow": '<path d="M0 0H13"/><path class="fill" d="M20 0l-9 -4.5v9z"/>',
+    "voltage_arrow": '<path d="M0 0H73"/><path class="fill" d="M80 0l-9 -4.5v9z"/>',
 }
 
 # IEEE Std 315's own (the rest as in IEC)
@@ -219,6 +222,11 @@ def use(standard: str) -> None:
 def symbol(kind: str) -> str:
     """A kind's symbol in the standard in use."""
     return STANDARDS[_standard].get(kind, SYMBOLS[kind])
+
+
+def arrow_symbol(length: float) -> str:
+    """A current's or a voltage's arrow, ``length`` px from its tail (at the origin) to its head."""
+    return f'<path d="M0 0H{length - 7:g}"/><path class="fill" d="M{length:g} 0l-9 -4.5v9z"/>'
 
 
 def part_symbol(part) -> str:

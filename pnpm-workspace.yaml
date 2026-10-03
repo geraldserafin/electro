@@ -11,3 +11,7 @@ allowBuilds:
 
 patchedDependencies:
   '@yowasp/runtime@11.0.67': patches/@yowasp__runtime@11.0.67.patch
+
+# one KaTeX: rehype-katex's typesets with the same one whose stylesheet the app loads (0.18 renamed its classes)
+overrides:
+  katex: ^0.18.9

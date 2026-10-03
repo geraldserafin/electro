@@ -38,6 +38,7 @@
     "isomorphic-git": "^1.42.3",
     "katex": "^0.18.9",
     "nanotar": "^0.3.0",
+    "pdfjs-dist": "^6.3.289",
     "react": "^19.3.0",
     "react-dom": "^19.3.0",
     "react-i18next": "^17.0.15",

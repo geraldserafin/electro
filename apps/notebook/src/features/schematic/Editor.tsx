@@ -35,6 +35,7 @@ import {
   defaultValue,
   elbow,
   inBox,
+  inTheWay,
   isComponent,
   isConnectionPoint,
   junctions,
@@ -683,6 +684,7 @@ export function SchematicEditor({
   elementDown.current = onElementDown;
   // (the same drawing: the same dots; while it runs, the board is drawn 30 times a second)
   const junctionPoints = useMemo(() => junctions(value, library), [value, library]);
+  const obstacles = useMemo(() => inTheWay(value), [value]); // (what labels keep off)
   const openPinPoints = useMemo(() => openPins(value, library), [value, library]);
   const wiring = draft !== null || gesture?.type === "wire";
   const preview: Point[] | null =
@@ -941,7 +943,7 @@ export function SchematicEditor({
               key={e.id}
               element={e}
               library={library}
-              wires={value.wires}
+              wires={obstacles}
               result={results?.[e.id]}
               closed={
                 e.kind === "switch" ? e.text === "closed" : e.kind === "button" ? !!live?.pressed.includes(e.id) : false
@@ -1069,6 +1071,7 @@ export function SchematicEditor({
           onSketch={onSketch && selectedElement ? () => onSketch(selectedElement.id) : undefined}
           onFirmware={onFirmware && selectedElement ? (file) => onFirmware(selectedElement.id, file) : undefined}
           taken={value.elements.map((e) => e.id)}
+          components={value.elements.filter((e) => isComponent(e.kind)).map((e) => e.id)}
           onChange={(patch) => selectedElement && commit(updateElement(value, library, selectedElement.id, patch))}
           onRename={(id) => {
             if (!selectedElement) return;

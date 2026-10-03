@@ -198,3 +198,148 @@ def test_a_schematic_is_a_variable_named_after_it():
     assert out[0]["type"] == "svg" and "6" in out[1]["data"]
     assert json.loads(kernel.run("układ1", json.dumps({"Układ 1": drawing})))[0]["type"] == "svg"
     assert kernel.code(drawing, "Układ 1").startswith("układ1 = ")
+
+
+def _divider():
+    from electro import Resistor, ground, supply
+    from electro_schematic import layout
+
+    return layout(supply(12) + Resistor(10) + Resistor(20) + ground).to_json()
+
+
+def test_a_tasks_steps_are_solved_on_the_drawing():
+    steps = [{"id": "rz", "value": "U_E_1 / I_E_1"}, {"id": "i", "value": "I_R_1"}, {"id": "x", "value": "I_R_9"}]
+    got = json.loads(kernel.task_values(_divider(), json.dumps(steps)))["values"]
+    assert got["rz"] == {"value": 30.0} and got["i"] == {"value": 0.4}
+    assert got["x"]["error"]["issue"]["type"] == "NoSuchQuantity"  # said by that step, the others still solved
+
+
+def test_a_circuit_from_data_is_drawn_and_never_run():
+    def loop(id: str, kind: str = "resistor") -> str:
+        return json.dumps(
+            {
+                "elements": [
+                    {"id": "E1", "kind": "voltage_source", "value": "12", "nodes": ["0", "A"], "at": [[0, 4], [0, 0]]},
+                    {"id": id, "kind": kind, "value": "10", "nodes": ["A", "0"], "at": [[0, 0], [4, 0]]},
+                ],
+                "wires": [[[4, 0], [4, 4], [0, 4]]],
+            }
+        )
+
+    drawn = json.loads(kernel.from_drawing(loop("R1")))["schematic"]
+    got = json.loads(kernel.task_values(json.dumps(drawn), json.dumps([{"id": "i", "value": "I_R1"}])))
+    assert got["values"]["i"] == {"value": 1.2}
+    evil = json.loads(kernel.from_drawing(loop("x)+__import__('os').system('x')")))
+    assert evil["error"]["issue"]["type"] == "BadName"
+    assert "UnknownKind" in json.loads(kernel.from_drawing(loop("Q1", "flux_capacitor")))["error"]["data"]
+
+
+def test_a_circuit_drawn_as_its_picture_is_drawn_so():
+    # the worksheet's task 3: E on the left, R on top, R1 over R2 in the middle, R3 on the right
+    drawing = {
+        "elements": [
+            {"id": "E1", "kind": "voltage_source", "value": "45", "nodes": ["0", "A"], "at": [[0, 12], [0, 0]]},
+            {"id": "R", "kind": "resistor", "value": "10", "nodes": ["A", "B"], "at": [[0, 0], [8, 0]]},
+            {"id": "R1", "kind": "resistor", "value": "6", "nodes": ["B", "C"], "at": [[8, 0], [8, 6]]},
+            {"id": "R2", "kind": "resistor", "value": "4", "nodes": ["C", "0"], "at": [[8, 6], [8, 12]]},
+            {"id": "R3", "kind": "resistor", "value": "10", "nodes": ["B", "0"], "at": [[14, 0], [14, 12]]},
+        ],
+        # the bottom wire runs under R2's pin: touching, so joined
+        "wires": [[[8, 0], [14, 0]], [[0, 12], [14, 12]]],
+    }
+    drawn = json.loads(kernel.from_drawing(json.dumps(drawing)))["schematic"]
+    at = {e["id"]: (e["at"], e["rotation"]) for e in drawn["elements"]}
+    assert at["R"] == ([2, 0], 0)  # in the middle of its 8 units, as on the picture
+    assert at["R1"][1] == 90 and at["R3"][1] == 90  # standing, as drawn
+    got = json.loads(kernel.task_values(json.dumps(drawn), json.dumps([{"id": "i", "value": "I_R"}])))
+    assert abs(got["values"]["i"]["value"] - 45 / (10 + 10 * 10 / 20)) < 1e-9
+    assert json.loads(kernel.from_drawing(json.dumps(drawing)))["rerouted"] is False
+    # the right branch's top wire left out: the elements where they were, the wires laid by the nodes
+    broken = json.loads(kernel.from_drawing(json.dumps({**drawing, "wires": [[[0, 12], [14, 12]]]})))
+    assert broken["rerouted"] is True
+    strict = json.loads(kernel.from_drawing(json.dumps({**drawing, "wires": [[[0, 12], [14, 12]]]}), True))
+    assert strict["error"]["mismatch"] == ["node B is drawn as 2 separate pieces"]
+    assert kernel.render_svg(json.dumps(drawn)).startswith("<svg")
+    assert {e["id"]: e["at"] for e in broken["schematic"]["elements"]} == {e["id"]: e["at"] for e in drawn["elements"]}
+    again = json.loads(kernel.task_values(json.dumps(broken["schematic"]), json.dumps([{"id": "i", "value": "I_R"}])))
+    assert again["values"] == got["values"]
+    # a terminal joined to nothing (its node's name alone): the circuit wrong, said so
+    lone = {**drawing, "elements": [*drawing["elements"][:4], {**drawing["elements"][4], "nodes": ["B", "D"]}]}
+    assert json.loads(kernel.from_drawing(json.dumps(lone)))["error"]["dangling"] == [
+        "R3's terminal 2 (node D) is joined to nothing"
+    ]
+    # an open network (a divider: no source, its ends terminals): as drawn
+    divider = {
+        "elements": [
+            {"id": "T1", "kind": "terminal", "nodes": ["A"], "at": [[0, 0]]},
+            {"id": "R1", "kind": "resistor", "value": "100", "nodes": ["A", "B"], "at": [[4, 0], [4, 6]]},
+            {"id": "R2", "kind": "resistor", "value": "100", "nodes": ["B", "C"], "at": [[4, 6], [4, 12]]},
+            {"id": "T2", "kind": "terminal", "nodes": ["C"], "at": [[0, 12]]},
+        ],
+        "wires": [[[0, 0], [4, 0]], [[0, 12], [4, 12]]],
+    }
+    opened = json.loads(kernel.from_drawing(json.dumps(divider), True))
+    assert opened["rerouted"] is False
+    assert [e["kind"] for e in opened["schematic"]["elements"]].count("terminal") == 2
+    # two nodes' pins on one point: no drawing of it
+    clash = {**drawing, "elements": [*drawing["elements"][:4], {**drawing["elements"][4], "at": [[8, 6], [8, 12]]}]}
+    assert json.loads(kernel.from_drawing(json.dumps(clash)))["error"]["mismatch"]
+    # as a model may slip: drawn too small (scaled up, its shape kept), askew, wires as text or slanted
+    small = {
+        "elements": [{**e, "at": [[x / 2, y / 2] for x, y in e["at"]]} for e in drawing["elements"][:4]]
+        + [{**drawing["elements"][4], "at": [[7, 0], [6, 6]]}],
+        "wires": ["[4, 0], [7, 0]", [0, 6, 7, 6]],
+    }
+    again = json.loads(kernel.from_drawing(json.dumps(small)))["schematic"]
+    assert {e["id"]: e["at"] for e in again["elements"]}["R"] == [2, 0]  # as before: scaled ×2
+    tiny = {"elements": [{**drawing["elements"][1], "at": [[0, 0], [0, 0]]}], "wires": []}
+    assert "error" in json.loads(kernel.from_drawing(json.dumps(tiny)))
+
+
+def test_a_drawings_arrows_are_drawn_named_and_not_of_the_circuit():
+    drawing = {
+        "elements": [
+            {"id": "E", "kind": "voltage_source", "value": "12", "nodes": ["0", "A"], "at": [[0, 8], [0, 0]]},
+            {"id": "R1", "kind": "resistor", "value": "6", "nodes": ["A", "0"], "at": [[8, 0], [8, 8]]},
+            {"id": "i", "kind": "current_arrow", "text": "I_1", "at": [[8, 5], [8, 6]]},
+            {"id": "u", "kind": "voltage_arrow", "text": "U", "at": [[11, 8], [11, 0]]},
+        ],
+        "wires": [[[0, 0], [8, 0]], [[0, 8], [8, 8]]],
+    }
+    sch = json.loads(kernel.from_drawing(json.dumps(drawing), True))["schematic"]
+    arrows = {e["id"]: e for e in sch["elements"] if e["kind"].endswith("_arrow")}
+    assert (arrows["i"]["rotation"], arrows["i"]["text"]) == (90, "I_1")
+    assert (arrows["u"]["rotation"], arrows["u"]["span"]) == (270, 8)  # up, 8 units long
+    assert json.loads(kernel.simulate(json.dumps(sch)))["results"]["R1"]["I"] == "2 A"
+    svg = kernel.render_svg(json.dumps(sch))
+    assert '<tspan class="sub" dy="4">1</tspan>' in svg and ">U</text>" in svg
+
+
+def test_an_arrows_value_is_given_and_one_without_shows_what_it_comes_to():
+    # E unknown; I_2 = 2 A through R2 (its arrow down, the way R2 runs): E = 54 V, I_4 = 4 A
+    drawing = {
+        "elements": [
+            {"id": "E", "kind": "voltage_source", "value": None, "nodes": ["0", "T"], "at": [[0, 9], [0, 3]]},
+            {"id": "R1", "kind": "resistor", "value": "3", "nodes": ["T", "A"], "at": [[0, 0], [8, 0]]},
+            {"id": "R2", "kind": "resistor", "value": "18", "nodes": ["A", "0"], "at": [[8, 2], [8, 8]]},
+            {"id": "R3", "kind": "resistor", "value": "3", "nodes": ["A", "X"], "at": [[16, 0], [16, 5]]},
+            {"id": "R4", "kind": "resistor", "value": "6", "nodes": ["X", "0"], "at": [[16, 5], [16, 12]]},
+            {"id": "i2", "kind": "current_arrow", "text": "I_2", "value": "2", "of": "R2", "at": [[8, 9], [8, 10]]},
+            {"id": "i4", "kind": "current_arrow", "text": "I_4", "of": "R4", "at": [[16, 14], [16, 13]]},
+            {"id": "u", "kind": "voltage_arrow", "text": "U_1", "of": "R1", "at": [[8, -2], [0, -2]]},
+        ],
+        "wires": [
+            [[0, 3], [0, 0]],
+            [[8, 0], [16, 0]],
+            [[8, 0], [8, 2]],
+            [[0, 9], [0, 12], [16, 12]],
+            [[8, 8], [8, 12]],
+        ],
+    }
+    sch = json.loads(kernel.from_drawing(json.dumps(drawing), True))["schematic"]
+    results = json.loads(kernel.simulate(json.dumps(sch)))["results"]
+    assert results["E"]["value"] == "54 V" and results["E"]["solved"]
+    assert results["i4"]["value"] == "-4 A"  # (its arrow up, the current down)
+    assert results["u"]["value"] == "18 V"  # (to R1's left end, the higher one)
+    steps = [{"id": "s", "label": "E", "unit": "V", "value": "U_E"}]
+    assert json.loads(kernel.task_values(json.dumps(sch), json.dumps(steps)))["values"]["s"]["value"] == 54

@@ -37,7 +37,7 @@ export function Downloads() {
   return (
     <div
       data-keep-focus
-      className="fixed bottom-4 right-4 max-sm:bottom-18 max-sm:right-3 z-30 animate-fade-in" // (a phone: above the notice, which is as wide as the screen)
+      className="fixed bottom-4 right-18 max-sm:bottom-18 max-sm:right-3 z-30 animate-fade-in" // (beside the assistant's sparkle; a phone: above the notice, which is as wide as the screen)
       onPointerEnter={() => setOpen(true)}
       onPointerLeave={() => setOpen(false)}
     >

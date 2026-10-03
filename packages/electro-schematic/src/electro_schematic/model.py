@@ -131,7 +131,50 @@ KINDS: dict[str, Kind] = {
     # its own, a net label
     "port": Kind(((0, 0),)),
     "part": Kind(()),  # one of one's own components: ``text`` names its definition (Schematic.parts)
+    # what a drawing marks, not of the circuit: a current's arrow on a wire, a voltage's beside what it
+    # is across — from ``at`` the way it points (``rotation``), named by ``text`` ("I_2", "U_1")
+    # an arrow's ``of``: the element whose current (voltage) it is — then its ``value``, if any, a given
+    # of the problem (the solver's data: I_R2 = 2), and with none the solved one shown by it
+    "current_arrow": Kind(()),
+    "voltage_arrow": Kind(()),  # ``span``: its length in grid units (4, an element's, by default)
 }
+
+ARROWS = ("current_arrow", "voltage_arrow")
+
+
+def arrow_length(e: Element) -> int:
+    """How long an arrow is drawn, in grid units: a current's 1, a voltage's as set (4 by default)."""
+    return 1 if e.kind == "current_arrow" else max(1, min(40, e.span or 4))
+
+
+def arrow_sign(arrow: Element, of: Element) -> int | None:
+    """How an arrow's quantity is the element's own (its current a → b, its voltage V_a − V_b): 1, −1,
+    or None when its direction says nothing of it. Along the element: a current's the way it points;
+    a voltage's head at the higher potential (pointing to ``a``: U_ab > 0). Across it (a current's on a
+    wire into it): into the element at its nearer pin, or out of it."""
+    pins = of.pins()
+    if len(pins) != 2:
+        return None
+    (ax, ay), (bx, by) = pins
+    dx, dy = rotate((1, 0), arrow.rotation)
+    along = dx * (bx - ax) + dy * (by - ay)
+    if along:
+        same = 1 if along > 0 else -1
+        return same if arrow.kind == "current_arrow" else -same
+    if arrow.kind != "current_arrow":
+        return None
+    n = arrow_length(arrow)
+    tail = arrow.at
+    head = (tail[0] + dx * n, tail[1] + dy * n)
+    middle = ((tail[0] + head[0]) / 2, (tail[1] + head[1]) / 2)
+
+    def far(p, q):
+        return abs(p[0] - q[0]) + abs(p[1] - q[1])
+
+    near = min(pins, key=lambda p: far(middle, p))
+    into = far(head, near) < far(tail, near)
+    return (1 if near == pins[0] else -1) * (1 if into else -1)
+
 
 SIDES = ("left", "right", "top", "bottom")
 
@@ -205,6 +248,8 @@ class Element:
     text: str | None = (
         None  # net label name; or an LED's colour, a switch's position, a source's frequency, a sensor's reading, an Arduino's sketch
     )
+    of: str | None = None  # an arrow's: the element whose current or voltage it is
+    span: int | None = None  # a voltage arrow's: its length in grid units
 
     def __post_init__(self):
         self.at = tuple(self.at)
@@ -465,7 +510,9 @@ class Schematic:
     def to_dict(self) -> dict:
         out = {
             "version": 1,
-            "elements": [asdict(e) for e in self.elements],
+            "elements": [
+                {k: v for k, v in asdict(e).items() if v is not None or k not in ("of", "span")} for e in self.elements
+            ],
             "wires": [{"points": [list(p) for p in w.points]} for w in self.wires],
         }
         if self.parts:
@@ -474,6 +521,28 @@ class Schematic:
 
     def to_json(self) -> str:
         return json.dumps(self.to_dict(), ensure_ascii=False)
+
+    def arrows(self) -> list[tuple[Element, Element, int]]:
+        """Its arrows that are an element's current or voltage: each, that element, how (``arrow_sign``)."""
+        by_id = {e.id: e for e in self.elements}
+        out = []
+        for a in self.elements:
+            of = by_id.get(a.of or "") if a.kind in ARROWS else None
+            sign = arrow_sign(a, of) if of is not None and KINDS[of.kind].component is not None else None
+            if sign is not None:
+                out.append((a, of, sign))
+        return out
+
+    def given(self) -> dict[str, str]:
+        """What its arrows give (those with a value): the solver's data, ``{"U_R5": "125"}``."""
+        out = {}
+        for a, of, sign in self.arrows():
+            if a.value and a.value.strip():
+                value = a.value.strip()
+                if sign < 0:
+                    value = value[1:] if value.startswith("-") else f"-{value}"
+                out[f"{'I' if a.kind == 'current_arrow' else 'U'}_{of.id}"] = value
+        return out
 
     @classmethod
     def from_dict(cls, data: dict) -> Schematic:

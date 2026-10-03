@@ -2,6 +2,7 @@
 // The page (pages/NotePage.tsx) reads the note by its address and hands it over.
 import { memo, useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { AiButton, AiChat } from "@/features/ai";
 import { ReadOnlyNotice, SyncNotice, useCreateNote, useNoteSync } from "@/features/notes";
 import { ExportDialog, PdfContext, type PdfSettings, pdfOf, warmUpWhenIdle } from "@/features/pdf-export";
 import { kernel, usePython } from "@/features/python";
@@ -85,6 +86,8 @@ export function Notebook({
   useEffect(() => onTitle?.(notebook.title), [notebook.title]); // eslint-disable-line react-hooks/exhaustive-deps
   const [outline, setOutline] = useOutlineOpen();
   const [exporting, setExporting] = useState(false);
+  const [chat, setChat] = useState(false); // the assistant, open beside the note (one's own)
+  const assistant = !readOnly && !embed;
   const pdf = pdfOf(notebook.settings);
   // the symbols' standard the note draws with (IEC unless it says IEEE)
   const symbols: SymbolStandard = notebook.settings.symbols === "ieee" ? "ieee" : "iec";
@@ -226,6 +229,22 @@ export function Notebook({
           </button>
         </div>
       )}
+      {assistant && (
+        <>
+          <AiButton open={chat} onToggle={() => setChat(!chat)} />
+          <AiChat
+            open={chat}
+            onClose={() => setChat(false)}
+            cells={() => latest.current.cells}
+            setCells={(cells) => setCells(() => cells)}
+            at={() => {
+              const now = latest.current.cells;
+              const i = focused ? now.findIndex((c) => c.id === focused) : -1;
+              return i < 0 ? now.length : i + 1;
+            }}
+          />
+        </>
+      )}
       {exporting && (
         <ExportDialog
           notebook={notebook}
@@ -237,7 +256,7 @@ export function Notebook({
       )}
 
       <PdfContext.Provider value={pdf}>
-        <main className={cn("appear", column(outline))}>
+        <main className={cn("appear", column(outline, chat && assistant))}>
           {/* the title is the note's first heading too (and the PDF's); in line with the cells' text */}
           <input
             className="block w-full mt-0 mb-4 py-1 pr-2 pl-3 rounded-lg border-none bg-transparent text-[34px] max-sm:text-[26px] font-semibold leading-tight

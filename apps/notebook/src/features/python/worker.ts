@@ -19,6 +19,10 @@ type Request =
   | { id: number; type: "frequency"; schematic: string }
   | { id: number; type: "sweep"; schematic: string; element: string; lo: string; hi: string }
   | { id: number; type: "spread"; schematic: string; tol: number }
+  | { id: number; type: "taskValues"; schematic: string; steps: string }
+  | { id: number; type: "fromDrawing"; drawing: string; strict: boolean }
+  | { id: number; type: "renderSvg"; schematic: string }
+  | { id: number; type: "netlistOf"; schematic: string }
   | { id: number; type: "reset" };
 
 interface Kernel {
@@ -30,6 +34,10 @@ interface Kernel {
   frequency(schematic: string): string;
   sweep_plot(schematic: string, element: string, lo: string, hi: string): string;
   spread(schematic: string, tol: number): string;
+  task_values(schematic: string, steps: string): string;
+  from_drawing(drawing: string, strict: boolean): string;
+  render_svg(schematic: string): string;
+  netlist_of(schematic: string): string;
   reset(): void;
 }
 
@@ -97,7 +105,15 @@ self.onmessage = async (event: MessageEvent<Request>) => {
                     ? k.sweep_plot(request.schematic, request.element, request.lo, request.hi)
                     : request.type === "spread"
                       ? k.spread(request.schematic, request.tol)
-                      : (k.reset(), null);
+                      : request.type === "taskValues"
+                        ? k.task_values(request.schematic, request.steps)
+                        : request.type === "fromDrawing"
+                          ? k.from_drawing(request.drawing, request.strict)
+                          : request.type === "renderSvg"
+                            ? k.render_svg(request.schematic)
+                            : request.type === "netlistOf"
+                              ? k.netlist_of(request.schematic)
+                              : (k.reset(), null);
     self.postMessage({ id: request.id, ok: true, result });
   } catch (error) {
     self.postMessage({ id: request.id, ok: false, error: String(error) });

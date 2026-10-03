@@ -7,6 +7,19 @@ It converts both ways: ``layout(circuit)`` places a circuit built in code, and
 
 from .issues import Unsupported
 from .layout import layout
-from .model import GRID, KINDS, Element, Kind, Schematic, Wire, kind_of
+from .model import ARROWS, GRID, KINDS, Element, Kind, Schematic, Wire, arrow_length, arrow_sign, kind_of
 
-__all__ = ["GRID", "KINDS", "Element", "Kind", "Schematic", "Unsupported", "Wire", "kind_of", "layout"]
+__all__ = [
+    "ARROWS",
+    "GRID",
+    "KINDS",
+    "Element",
+    "Kind",
+    "Schematic",
+    "Unsupported",
+    "Wire",
+    "arrow_length",
+    "arrow_sign",
+    "kind_of",
+    "layout",
+]

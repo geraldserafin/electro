@@ -10,6 +10,8 @@ export interface ElementData {
   rotation: number;
   value: string | null;
   text: string | null;
+  of?: string | null; // an arrow's: the element whose current or voltage it is (its value then a given)
+  span?: number | null; // a voltage arrow's length, grid units
 }
 
 export interface WireData {

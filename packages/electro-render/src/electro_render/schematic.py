@@ -13,11 +13,12 @@ from xml.sax.saxutils import escape
 
 from electro.components import Ammeter, Hole, Voltmeter, notation
 from electro.values import UNKNOWN, fmt
-from electro_schematic import GRID, KINDS, Schematic, layout
+from electro_schematic import ARROWS as MARKS
+from electro_schematic import GRID, KINDS, Schematic, arrow_length, layout
 from electro_schematic.layout import label_sides
 from electro_schematic.model import on_segment, rotate
 
-from .symbols import LETTERS, STYLE, UPRIGHT, part_symbol, symbol
+from .symbols import LETTERS, STYLE, UPRIGHT, arrow_symbol, part_symbol, symbol
 
 Vec = tuple[float, float]
 RIGHT, LEFT, UP, DOWN = (1, 0), (-1, 0), (0, -1), (0, 1)
@@ -199,10 +200,27 @@ def _draw(sch: Schematic, solution) -> Svg:
     for e in sch.elements:
         ps = [(px * GRID, py * GRID) for px, py in e.pins()]
         obstacles += list(zip(ps, ps[1:]))
+        if e.kind in MARKS:  # (an arrow: from its tail to its head)
+            hx, hy = rotate((arrow_length(e) * GRID, 0), e.rotation)
+            obstacles.append(((e.at[0] * GRID, e.at[1] * GRID), (e.at[0] * GRID + hx, e.at[1] * GRID + hy)))
 
     placed: list[tuple] = []  # boxes of texts already on the page
     for e in sch.elements:
         x, y = e.at[0] * GRID, e.at[1] * GRID
+        if e.kind in MARKS:  # an arrow: its name on its left as it points (above one pointing right)
+            length = arrow_length(e) * GRID
+            canvas.items.append(
+                f'<g class="w" transform="translate({x:g} {y:g}) rotate({e.rotation})">{arrow_symbol(length)}</g>'
+            )
+            hx, hy = rotate((length, 0), e.rotation)
+            canvas.grow(x, y)
+            canvas.grow(x + hx, y + hy)
+            side = {0: UP, 90: RIGHT, 180: DOWN, 270: LEFT}[e.rotation]
+            unit = "A" if e.kind == "current_arrow" else "V"
+            given = e.value and e.value.strip()
+            name = f"{e.text or ''} = {given}{' ' + unit if given[-1:].isdigit() else ''}" if given else e.text or ""
+            canvas.text(x + hx / 2, y + hy / 2, side, [(name, "label")])
+            continue
         rotation = 0 if e.kind in UPRIGHT else e.rotation
         state = " closed" if e.kind in ("switch", "button") and e.text == "closed" else ""
         canvas.items.append(

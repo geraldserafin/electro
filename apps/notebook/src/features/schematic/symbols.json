@@ -1379,6 +1379,18 @@
    "svg": "",
    "letter": null,
    "upright": false
+  },
+  "current_arrow": {
+   "pins": [],
+   "svg": "<path d=\"M0 0H13\"/><path class=\"fill\" d=\"M20 0l-9 -4.5v9z\"/>",
+   "letter": null,
+   "upright": false
+  },
+  "voltage_arrow": {
+   "pins": [],
+   "svg": "<path d=\"M0 0H73\"/><path class=\"fill\" d=\"M80 0l-9 -4.5v9z\"/>",
+   "letter": null,
+   "upright": false
   }
  },
  "standards": {

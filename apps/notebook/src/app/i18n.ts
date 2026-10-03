@@ -3,6 +3,7 @@
 // only keys the Polish messages have.
 import i18n from "i18next";
 import { initReactI18next } from "react-i18next";
+import { messages as ai } from "@/features/ai";
 import { messages as auth } from "@/features/auth";
 import { messages as components } from "@/features/components";
 import { messages as downloads } from "@/features/downloads";
@@ -32,6 +33,7 @@ const resources = {
     theme: theme.pl,
     settings: settings.pl,
     language: language.pl,
+    ai: ai.pl,
     auth: auth.pl,
     components: components.pl,
     downloads: downloads.pl,
@@ -49,6 +51,7 @@ const resources = {
     theme: theme.en,
     settings: settings.en,
     language: language.en,
+    ai: ai.en,
     auth: auth.en,
     components: components.en,
     downloads: downloads.en,

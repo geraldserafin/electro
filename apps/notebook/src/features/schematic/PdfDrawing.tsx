@@ -1,7 +1,7 @@
 import { useLayoutEffect, useRef, useState } from "react";
 import type { ElementResult, Point, SchematicData, SymbolLibrary } from "@/shared/model/types";
 import { ElementView } from "./ElementView";
-import { junctions } from "./model";
+import { inTheWay, junctions } from "./model";
 import { withParts } from "./parts";
 import "./Canvas.css";
 
@@ -40,6 +40,7 @@ export function PdfDrawing({
     if (!box || next.some((v, i) => Math.abs(v - box[i]) > 0.5)) setBox(next);
   });
   if (!value.elements.length && !value.wires.length) return null;
+  const obstacles = inTheWay(value);
   const pointsOf = (ps: Point[]) => ps.map(([x, y]) => `${x * G},${y * G}`).join(" ");
   const [x, y, w, h] = box ?? [0, 0, 1, 1];
   return (
@@ -58,7 +59,7 @@ export function PdfDrawing({
               key={e.id}
               element={e}
               library={library}
-              wires={value.wires}
+              wires={obstacles}
               result={results?.[e.id]}
               selected={false}
               onPointerDown={nothing}

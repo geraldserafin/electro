@@ -45,6 +45,9 @@ export const KINDS = [
   { kind: "ground", prefix: "gnd", group: "connections" },
   { kind: "label", prefix: "lbl", group: "connections" },
   { kind: "port", prefix: "pin", group: "connections" },
+  // what a drawing marks, not of the circuit (electro_schematic: ARROWS): a current, a voltage
+  { kind: "current_arrow", prefix: "I", group: "connections" },
+  { kind: "voltage_arrow", prefix: "U", group: "connections" },
   { kind: "hole", prefix: "X", group: "other" },
   { kind: "opamp", prefix: "OA", group: "other" },
   { kind: "switch", prefix: "S", group: "controls" },
@@ -103,33 +106,37 @@ export const ledColor = (text: string | null) =>
 export const defaultText = (kind: string): string | null =>
   kind === "label"
     ? "A"
-    : kind === "port"
-      ? "IN"
-      : kind === "led"
-        ? "red"
-        : kind === "arduino"
-          ? BLINK
-          : kind === "pico"
-            ? PICO_BLINK
-            : kind === "sine_source"
-              ? "50"
-              : kind === "square_source"
-                ? "1k"
-                : kind === "photoresistor"
-                  ? "100"
-                  : kind === "thermistor"
-                    ? "25"
-                    : kind === "ultrasonic"
+    : kind === "current_arrow"
+      ? "I"
+      : kind === "voltage_arrow"
+        ? "U"
+        : kind === "port"
+          ? "IN"
+          : kind === "led"
+            ? "red"
+            : kind === "arduino"
+              ? BLINK
+              : kind === "pico"
+                ? PICO_BLINK
+                : kind === "sine_source"
+                  ? "50"
+                  : kind === "square_source"
+                    ? "1k"
+                    : kind === "photoresistor"
                       ? "100"
-                      : kind === "lcd1602_i2c"
-                        ? "0x27"
-                        : kind === "ssd1306"
-                          ? "0x3C"
-                          : kind === "ds1307"
-                            ? "0x68"
-                            : kind === "lamp"
-                              ? "3"
-                              : null;
+                      : kind === "thermistor"
+                        ? "25"
+                        : kind === "ultrasonic"
+                          ? "100"
+                          : kind === "lcd1602_i2c"
+                            ? "0x27"
+                            : kind === "ssd1306"
+                              ? "0x3C"
+                              : kind === "ds1307"
+                                ? "0x68"
+                                : kind === "lamp"
+                                  ? "3"
+                                  : null;
 /** The addresses an I²C module can be set to (the first: as it comes). */
 export const I2C_ADDRESSES: Record<string, string[]> = { lcd1602_i2c: ["0x27", "0x3F"], ssd1306: ["0x3C", "0x3D"] };
 /** What a new element of a kind starts with in ``value``: a part that comes in one usual value. */
@@ -216,7 +223,22 @@ export const canRunInTime = (sch: SchematicData) =>
   sch.elements.every(
     (e) => e.kind !== "hole" && (!hasValue(e.kind) || kindInfo(e.kind)?.meter || (e.value ?? "").trim() !== ""),
   );
-export const isComponent = (kind: string) => !["ground", "label", "terminal", "port"].includes(kind);
+export const isComponent = (kind: string) =>
+  !["ground", "label", "terminal", "port", "current_arrow", "voltage_arrow"].includes(kind);
+/** What an element's label keeps off: the wires, and the arrows (each as a wire from its tail to its head). */
+export const inTheWay = (sch: SchematicData): WireData[] => [
+  ...sch.wires,
+  ...sch.elements
+    .filter((e) => isArrow(e.kind))
+    .map((e) => {
+      const [dx, dy] = rotate([arrowLength(e), 0], e.rotation);
+      return { points: [e.at, [e.at[0] + dx, e.at[1] + dy] as Point] };
+    }),
+];
+export const isArrow = (kind: string) => kind === "current_arrow" || kind === "voltage_arrow";
+/** An arrow's length in grid units (electro_schematic.arrow_length): a current's 1, a voltage's as set. */
+export const arrowLength = (e: ElementData) =>
+  e.kind === "current_arrow" ? 1 : Math.max(1, Math.min(40, Math.trunc(e.span ?? 4) || 4));
 
 export const key = ([x, y]: Point) => `${x},${y}`;
 export const same = (a: Point, b: Point) => a[0] === b[0] && a[1] === b[1];

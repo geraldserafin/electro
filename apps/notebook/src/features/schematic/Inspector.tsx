@@ -11,8 +11,10 @@ import { CodeIcon, PageIcon, Rotate, Trash } from "@/shared/ui/icons";
 import { Adjusters, isAdjustable } from "./Adjusters";
 import { useKinds } from "./kinds";
 import {
+  arrowLength,
   hasValue,
   I2C_ADDRESSES,
+  isArrow,
   isBoard,
   isComponent,
   isControlled,
@@ -41,6 +43,7 @@ const wide = "flex w-full h-9 gap-2 px-3 items-center justify-center text-[14px]
 export function Inspector({
   element,
   taken,
+  components,
   onChange,
   onRename,
   onRotate,
@@ -58,6 +61,7 @@ export function Inspector({
   onSweep?: (lo: string, hi: string) => void; // plot the outputs as its value goes from lo to hi (empty: around it)
   element: ElementData | null;
   taken: string[];
+  components: string[]; // the drawing's elements an arrow may be of (their ids)
   onChange: (patch: Partial<ElementData>) => void;
   onRename: (id: string) => void;
   onRotate: () => void;
@@ -375,6 +379,64 @@ export function Inspector({
             onChange={(e) => onChange({ text: e.target.value })}
           />
           {element.kind === "port" && <p className={hint}>{t("inspector.portHint")}</p>}
+        </Section>
+      )}
+      {!live && isArrow(element.kind) && (
+        <Section label={t("inspector.arrowName")}>
+          <input
+            className={field}
+            value={element.text ?? ""}
+            spellCheck={false}
+            aria-label={t("inspector.arrowName")}
+            onChange={(e) => onChange({ text: e.target.value })}
+          />
+        </Section>
+      )}
+      {!live && isArrow(element.kind) && (
+        <Section label={t("inspector.arrowOf")}>
+          <select
+            className={field}
+            value={element.of ?? ""}
+            aria-label={t("inspector.arrowOf")}
+            onChange={(e) => onChange({ of: e.target.value || null })}
+          >
+            <option value="">{t("inspector.arrowOfNone")}</option>
+            {components.map((id) => (
+              <option key={id} value={id}>
+                {id}
+              </option>
+            ))}
+          </select>
+          {element.of && (
+            <span className="relative block">
+              <input
+                className={cn(field, "pr-8.5")}
+                value={element.value ?? ""}
+                spellCheck={false}
+                placeholder="?"
+                aria-label={t("inspector.arrowValue")}
+                title={t("inspector.arrowValue")}
+                onChange={(e) => onChange({ value: e.target.value.trim() === "" ? null : e.target.value })}
+              />
+              <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[13px] text-muted pointer-events-none">
+                {element.kind === "current_arrow" ? "A" : "V"}
+              </span>
+            </span>
+          )}
+          <p className={hint}>{t(element.of ? "inspector.arrowGivenHint" : "inspector.arrowHint")}</p>
+        </Section>
+      )}
+      {!live && element.kind === "voltage_arrow" && (
+        <Section label={t("inspector.arrowLength")}>
+          <input
+            className={field}
+            type="number"
+            min={1}
+            max={40}
+            value={arrowLength(element)}
+            aria-label={t("inspector.arrowLength")}
+            onChange={(e) => onChange({ span: Math.trunc(Number(e.target.value)) || null })}
+          />
         </Section>
       )}
       {!live && (
