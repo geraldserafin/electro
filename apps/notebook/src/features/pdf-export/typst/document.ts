@@ -90,6 +90,8 @@ export function toTypst(
 
   const parts: string[] = [];
   for (const cell of notebook.cells) {
+    // each chapter its own page
+    if (cell.type === "markdown" && cell.part && parts.length) parts.push("#pagebreak(weak: true)");
     if (cell.type === "markdown") parts.push(md(cell.source));
     else if (cell.type === "code") {
       if (notebook.settings.codeInPdf && cell.source.trim()) parts.push(`#code(${str(cell.source.trimEnd())})`);

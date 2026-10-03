@@ -1,28 +1,32 @@
-// One note, edited: its cells, running them, and saving it to the notes server as it changes.
-// The page (pages/NotePage.tsx) reads the note by its address and hands it over.
-import { memo, useCallback, useEffect, useRef, useState } from "react";
+// One note, edited: its cells, running them, and saving it as it changes. The page
+// (pages/NotePage.tsx) reads the note by its address and hands it over. A note in chapters
+// (shared/model/parts.ts) shows one chapter — a page — at a time, the way to the others under it
+// and in the sidebar (its ⋯ menu: the whole note, one page, instead).
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { AiButton, AiChat } from "@/features/ai";
 import { ReadOnlyNotice, SyncNotice, useCreateNote, useNoteSync } from "@/features/notes";
 import { ExportDialog, PdfContext, type PdfSettings, pdfOf, warmUpWhenIdle } from "@/features/pdf-export";
 import { kernel, usePython } from "@/features/python";
-import { libraryFor } from "@/features/schematic";
+import { libraryFor, PdfDrawing } from "@/features/schematic";
 import { SettingsMenu, SymbolsChoice } from "@/features/settings";
 import { useTitle } from "@/shared/hooks/useTitle";
 import { cn } from "@/shared/lib/cn";
 import { newCell } from "@/shared/model/cells";
 import { copyOf } from "@/shared/model/format";
+import { partMark, partsOf } from "@/shared/model/parts";
 import type { Cell, CellType, Notebook as NotebookData, SymbolStandard } from "@/shared/model/types";
 import { IslandButton, IslandLink, Islands } from "@/shared/ui/Island";
-import { Back, Export, OutlineIcon, RunAll, ShareIcon } from "@/shared/ui/icons";
+import { Back, Export, Notes, OutlineIcon, RunAll, ShareIcon } from "@/shared/ui/icons";
 import { MenuItem } from "@/shared/ui/Menu";
 import { AddRow } from "./AddRow";
 import { CellFrame } from "./CellFrame";
-import { freeName, moveRange } from "./cellList";
+import { freeName, moveRange, moveSection } from "./cellList";
 import { CodeCell } from "./cells/CodeCell";
 import { MarkdownCell } from "./cells/MarkdownCell";
 import { SchematicCell } from "./cells/SchematicCell";
 import { column } from "./layout";
+import { Pager } from "./Parts";
 import { Sidebar } from "./Sidebar";
 import { useOutlineOpen } from "./useOutlineOpen";
 import { usePrintKey } from "./usePrintKey";
@@ -39,6 +43,8 @@ const sameButCallbacks = <P extends object>(a: P, b: P) =>
 const Markdown = memo(MarkdownCell, sameButCallbacks);
 const Code = memo(CodeCell, sameButCallbacks);
 const Schematic = memo(SchematicCell, sameButCallbacks);
+/** This browser's choice: a note in chapters as one long page, not a page a chapter. */
+const WHOLE = "electro.wholeNote";
 
 /**
  * ``initial``/``revision``: the note as read from the server; ``reload``: read it again (after a
@@ -99,6 +105,55 @@ export function Notebook({
   const setCells = (fn: (cells: Cell[]) => Cell[]) => setNotebook((nb) => ({ ...nb, cells: fn(nb.cells) }));
   const update = (id: string, patch: Partial<Cell>) =>
     setCells((cells) => cells.map((c) => (c.id === id ? ({ ...c, ...patch } as Cell) : c)));
+  // its chapters: pages, the one shown (a cell worked on elsewhere brings its chapter up); one long page
+  // instead, if this browser's reader would rather (the one read now lit in the outline)
+  const [whole, setWhole] = useState(() => {
+    try {
+      return localStorage.getItem(WHOLE) === "1";
+    } catch {
+      return false;
+    }
+  });
+  const setWholeKept = (on: boolean) => {
+    setWhole(on);
+    try {
+      localStorage.setItem(WHOLE, on ? "1" : "0");
+    } catch {}
+  };
+  const parts = useMemo(() => partsOf(notebook.cells), [notebook.cells]);
+  const paged = !whole && parts.length > 1;
+  const [page, setPage] = useState(0);
+  const at = Math.min(page, parts.length - 1);
+  const part = parts[at]!;
+  const go = (n: number) => {
+    setPage(n);
+    setFocused(null); // (a cell worked on elsewhere would bring its own page back)
+    const first = latest.current.cells[parts[n]!.start];
+    if (paged || n === 0 || !first) window.scrollTo({ top: 0 });
+    else document.getElementById(`cell-${first.id}`)?.scrollIntoView({ block: "start" });
+  };
+  useEffect(() => {
+    const i = focused ? notebook.cells.findIndex((c) => c.id === focused) : -1;
+    if (paged && i >= 0 && (i < part.start || i >= part.end))
+      setPage(parts.findIndex((p) => i >= p.start && i < p.end));
+  }, [paged, focused, notebook.cells, part, parts]);
+  useEffect(() => {
+    if (paged || parts.length < 2) return;
+    // the chapter read now: the last whose first cell is above a line under the app bar
+    const onScroll = () => {
+      const cells = latest.current.cells;
+      const above = parts.filter((p, i) => {
+        const el = i && document.getElementById(`cell-${cells[p.start]?.id}`);
+        return !el || el.getBoundingClientRect().top < 140;
+      });
+      setPage(above.length - 1);
+    };
+    onScroll();
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
+  }, [paged, parts]);
+  const shown = paged ? part : { start: 0, end: notebook.cells.length };
+
   const insert = (index: number, type: CellType) => {
     const cell = newCell(type);
     if (cell.type === "schematic") cell.name = freeName(latest.current.cells, (n) => t("schematic.defaultName", { n }));
@@ -118,6 +173,13 @@ export function Notebook({
 
   usePrintKey(useCallback(() => setExporting(true), []));
   const removed = useRemoved(() => latest.current.cells, setCells); // a removed cell comes back with Ctrl/⌘ Z
+  /** A new chapter at the note's end: its heading, the start of its page. */
+  const addPart = () => {
+    const cell = { ...newCell("markdown"), source: `# ${t("part.name", { n: parts.length + 1 })}`, part: {} } as Cell;
+    setCells((cells) => [...cells, cell]);
+    setPage(parts.length);
+    setFocused(cell.id);
+  };
 
   return (
     <div
@@ -163,7 +225,17 @@ export function Notebook({
           title={notebook.title}
           onTitle={setTitle}
           cells={notebook.cells}
-          onMove={(from, count, before) => setCells((cells) => moveRange(cells, from, count, before))}
+          parts={parts}
+          page={at}
+          editing={!readOnly}
+          onPage={go}
+          onMove={(from, until, before) => setCells((cells) => moveSection(cells, from, until, before))}
+          onAddPart={addPart}
+          onRemove={(n) => removed.remove(notebook.cells[parts[n]!.start]!.id, parts[n]!.end - parts[n]!.start)}
+          onMovePart={(n, before) => {
+            const p = parts[n]!;
+            setCells((cells) => moveRange(cells, p.start, p.end - p.start, parts[before]?.start ?? cells.length));
+          }}
           onClose={() => setOutline(false)}
         />
       )}
@@ -199,6 +271,11 @@ export function Notebook({
               >
                 {t("exportPdf")}
               </MenuItem>
+              {parts.length > 1 && (
+                <MenuItem icon={<Notes />} onSelect={() => setWholeKept(!whole)}>
+                  {whole ? t("part.paged") : t("part.whole")}
+                </MenuItem>
+              )}
             </>
           }
           preferences={
@@ -220,7 +297,7 @@ export function Notebook({
           role="status"
           className="fixed bottom-5 left-1/2 -translate-x-1/2 z-40 flex items-center gap-3 pl-4 pr-1.5 py-1.5 rounded-xl border border-line bg-paper shadow-menu text-[15px]"
         >
-          {t("cell.removed")}
+          {removed.last.length > 1 || partMark(removed.last[0]!) ? t("part.removed") : t("cell.removed")}
           <button className="h-8 px-3 rounded-lg font-medium text-accent hover:bg-accent-soft" onClick={removed.undo}>
             {t("cell.undo")}{" "}
             <kbd className="ml-1 font-sans text-[13px] text-faint pointer-coarse:hidden">
@@ -257,54 +334,76 @@ export function Notebook({
 
       <PdfContext.Provider value={pdf}>
         <main className={cn("appear", column(outline, chat && assistant))}>
-          {/* the title is the note's first heading too (and the PDF's); in line with the cells' text */}
-          <input
-            className="block w-full mt-0 mb-4 py-1 pr-2 pl-3 rounded-lg border-none bg-transparent text-[34px] max-sm:text-[26px] font-semibold leading-tight
+          {/* the title is the note's first heading too (and the PDF's); in line with the cells' text — the
+              start's, on pages */}
+          {(!paged || at === 0) && (
+            <input
+              className="block w-full mt-0 mb-4 py-1 pr-2 pl-3 rounded-lg border-none bg-transparent text-[34px] max-sm:text-[26px] font-semibold leading-tight
                           placeholder:text-faint focus:outline-none focus:bg-hover"
-            value={notebook.title}
-            placeholder={t("untitled")}
-            aria-label={t("title")}
-            spellCheck={false}
-            onChange={(e) => setTitle(e.target.value)}
-          />
-          <AddRow onAdd={(type) => insert(0, type)} shown={notebook.cells.length === 0} />
-          {notebook.cells.map((cell, index) => (
-            <CellFrame
-              key={cell.id}
-              id={cell.id}
-              type={cell.type}
-              focused={focused === cell.id}
-              onFocus={() => setFocused(cell.id)}
-              onMoveTo={(before) => setCells((cells) => moveRange(cells, index, 1, before))}
-              onRemove={() => removed.remove(cell.id)}
-              onAdd={(type) => insert(index + 1, type)}
-            >
-              {cell.type === "markdown" && <Markdown cell={cell} update={(p) => update(cell.id, p)} />}
-              {cell.type === "code" && (
-                <Code
-                  cell={cell}
-                  update={(p) => update(cell.id, p)}
-                  run={() => run(cell.id)}
-                  running={running.has(cell.id)}
-                />
-              )}
-              {cell.type === "schematic" && (
-                <Schematic
-                  cell={cell}
-                  update={(p) => update(cell.id, p)}
-                  library={library}
-                  simulate={(s) => simulate(cell.id, s)}
-                  running={running.has(cell.id)}
-                />
-              )}
-            </CellFrame>
-          ))}
+              value={notebook.title}
+              placeholder={t("untitled")}
+              aria-label={t("title")}
+              spellCheck={false}
+              onChange={(e) => setTitle(e.target.value)}
+            />
+          )}
+          <AddRow onAdd={(type) => insert(shown.start, type)} shown={notebook.cells.length === 0} />
+          {notebook.cells.slice(shown.start, shown.end).map((cell, k) => {
+            const index = shown.start + k;
+            return (
+              <CellFrame
+                key={cell.id}
+                id={cell.id}
+                type={cell.type}
+                focused={focused === cell.id}
+                onFocus={() => setFocused(cell.id)}
+                onMoveTo={(before) => setCells((cells) => moveRange(cells, index, 1, before))}
+                onRemove={() => removed.remove(cell.id)}
+                onAdd={(type) => insert(index + 1, type)}
+              >
+                {cell.type === "markdown" && <Markdown cell={cell} update={(p) => update(cell.id, p)} />}
+                {cell.type === "code" && (
+                  <Code
+                    cell={cell}
+                    update={(p) => update(cell.id, p)}
+                    run={() => run(cell.id)}
+                    running={running.has(cell.id)}
+                  />
+                )}
+                {cell.type === "schematic" && (
+                  <Schematic
+                    cell={cell}
+                    update={(p) => update(cell.id, p)}
+                    library={library}
+                    simulate={(s) => simulate(cell.id, s)}
+                    running={running.has(cell.id)}
+                  />
+                )}
+              </CellFrame>
+            );
+          })}
           {/* a touch screen: a cell added at the end, always there (none between the cells: see CellFrame) */}
           {notebook.cells.length > 0 && (
             <div className="hidden pointer-coarse:block mt-8">
-              <AddRow shown onAdd={(type) => insert(notebook.cells.length, type)} />
+              <AddRow shown onAdd={(type) => insert(shown.end, type)} />
             </div>
           )}
+          {paged && <Pager parts={parts} page={at} title={notebook.title || t("untitled")} onPage={go} />}
+          {/* the other pages' drawings, hidden: the PDF takes every drawing from the page */}
+          {paged &&
+            notebook.cells.map(
+              (c, i) =>
+                c.type === "schematic" &&
+                (i < shown.start || i >= shown.end) && (
+                  <div key={c.id} id={`cell-${c.id}`} aria-hidden>
+                    <PdfDrawing
+                      value={c.schematic}
+                      library={library}
+                      results={pdf.results && !c.stale ? c.results : undefined}
+                    />
+                  </div>
+                ),
+            )}
           {!notebook.cells.length && <p className="my-4.5 text-muted text-center">{t("empty")}</p>}
         </main>
       </PdfContext.Provider>

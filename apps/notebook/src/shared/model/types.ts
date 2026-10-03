@@ -1,4 +1,5 @@
 import type { Failure, Issue, Steps } from "./issues";
+import type { PartMark } from "./parts";
 
 export type Point = [number, number];
 
@@ -99,7 +100,7 @@ export interface Problem {
 }
 
 export type Cell =
-  | { id: string; type: "markdown"; source: string }
+  | { id: string; type: "markdown"; source: string; part?: PartMark } // part: it starts a chapter (parts.ts)
   | { id: string; type: "code"; source: string; outputs: Output[]; execution?: number }
   | {
       id: string;
