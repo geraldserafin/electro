@@ -111,13 +111,13 @@ bridge = (a >> E1 >> R1 >> b) @ (b >> R2 >> a) @ (b >> R3 >> E2 >> a)   # dwa oc
 - **Zasada domknięcia:** koniec leżący na węźle (`Node`/`Net`) nie jest wolny. Składanie (`>>`)
   działa na wszystkich końcach, ale **typ zadania** liczy tylko końce wolne: wyrażenie, którego każdy
   koniec leży na węźle, jest zamknięte (`0 → 0`). `a >> E >> R >> a` jest zamknięty.
-- Kawałek wielokrotnego użytku to funkcja zwracająca obwód — każde wywołanie ma świeże węzły (jak
-  zmienne lokalne), więc dwie kopie się nie skleją:
+- Kawałek wielokrotnego użytku to funkcja zwracająca obwód — każde wywołanie ma świeże węzły i
+  świeże elementy (jak zmienne lokalne), więc dwie kopie się nie skleją i nie podzielą elementu:
 
   ```python
-  def divider():
+  def divider(top: str, bottom: str) -> Circuit:
       mid = Node()
-      return R1 >> mid >> R2
+      return Resistor(top) >> mid >> Resistor(bottom)
   ```
 
 ## 5. Zasady kodu
@@ -137,8 +137,8 @@ bridge = (a >> E1 >> R1 >> b) @ (b >> R2 >> a) @ (b >> R3 >> E2 >> a)   # dwa oc
    jako sposób zwracania informacji): to, co wynik ma do powiedzenia, jest w wyniku.
 8. **Pełne typowanie + sprawdzanie.** Każda funkcja z typami argumentów i wyniku; pyright/mypy w CI.
    Arność `n → m` sprawdzana przy budowie (Python nie ma typów zależnych), reszta statycznie.
-9. **Efekt jest jeden i jawny: świeży węzeł.** `Node()` przydziela nową tożsamość (w Haskellu: monada
-   świeżych nazw). Trzymamy go tylko tam — reszta czysta.
+9. **Efekt jest jeden i jawny: świeża tożsamość.** `Node()` i nowy element przydzielają nową tożsamość
+   (w Haskellu: monada świeżych nazw). Trzymamy to tylko tam — reszta czysta.
 
 ## 6. Przegląd obecnego kodu (`src/electro`, ~5800 linii)
 
