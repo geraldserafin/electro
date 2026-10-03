@@ -239,7 +239,44 @@ def simulate(schematic_json: str, data: str = "") -> str:
                 "reversed": False,
             }
     problems = [_problem("warning", w.message) for w in caught]
-    return json.dumps({"results": results, "problems": problems}, ensure_ascii=False)
+    # what was asked for (the drawing's ``find``): each what it came to, None when it could not be found
+    found: dict[str, str | None] = {}
+    for key in json.loads(schematic_json).get("find") or []:
+        what, _, rest = key.partition(":")
+        try:
+            if what == "R":
+                a, b = rest.split(":")
+                found[key] = fmt(_resistance(sch, a, b), "Ω")
+            else:
+                value = results.get(rest, {}).get({"U": "U", "I": "I", "P": "P"}.get(what, "value"))
+                found[key] = None if value in (None, "", "?") else value
+        except Exception as err:  # noqa: BLE001 — that one not found: said by its row
+            found[key] = None
+            problems.append(_problem("warning", err))
+    return json.dumps({"results": results, "problems": problems, "found": found}, ensure_ascii=False)
+
+
+def _resistance(sch: Schematic, a: str, b: str):
+    """The resistance (an impedance) between two points of the drawing (elements on them: terminals,
+    labels) as seen from there: its sources quiet — a voltage source a short, a current source open —
+    1 A in at one, out at the other, the voltage between them."""
+    import dataclasses
+
+    from electro import circuit as ct
+    from electro import components as comp
+    from electro.circuit import GROUND
+
+    sources = ("voltage_source", "current_source", "sine_source", "square_source")
+    quiet = Schematic(
+        [dataclasses.replace(e, value="0") if e.kind in sources else e for e in sch.elements], sch.wires, sch.parts
+    )
+    items, names = quiet._netlist_items()
+    na, nb = (quiet.node_at(quiet.element(x).at, names) for x in (a, b))
+    if na is None or nb is None or na == nb:
+        raise ValueError(f"{a}, {b}: not two points of the circuit")
+    items.append((comp.CurrentSource(1, label="PROBE"), nb, na))  # (pushed into a)
+    solution = ct.net(*items).solve()
+    return sp.simplify(sum(0 if n == GROUND else solution(f"V_{n}") * k for n, k in ((na, 1), (nb, -1))))
 
 
 def frequency(schematic_json: str) -> str:

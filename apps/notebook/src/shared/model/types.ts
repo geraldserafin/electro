@@ -25,6 +25,7 @@ export interface SchematicData {
   elements: ElementData[];
   wires: WireData[];
   parts?: Record<string, PartDef>; // one's own components on it (kind "part", its text the key)
+  find?: string[]; // what is asked for, beside what has no value (schematic/sought.ts: "U:R_5", "R:A:B")
 }
 
 /** A pin of one's own component: its port's name, which side of the box, how far along it. */
@@ -110,6 +111,7 @@ export type Cell =
       name: string;
       schematic: SchematicData;
       results?: Record<string, ElementResult>; // from the last run
+      found?: Record<string, string | null>; // what was sought, what it came to (null: not found)
       problems?: Problem[]; // why the last run could not find everything
       stale?: boolean; // the drawing changed since the last run
       frequency?: Plot; // the last Bode plot (∿)

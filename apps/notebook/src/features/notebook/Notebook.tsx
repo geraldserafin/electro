@@ -396,11 +396,7 @@ export function Notebook({
                 c.type === "schematic" &&
                 (i < shown.start || i >= shown.end) && (
                   <div key={c.id} id={`cell-${c.id}`} aria-hidden>
-                    <PdfDrawing
-                      value={c.schematic}
-                      library={library}
-                      results={pdf.results && !c.stale ? c.results : undefined}
-                    />
+                    <PdfDrawing value={c.schematic} library={library} />
                   </div>
                 ),
             )}

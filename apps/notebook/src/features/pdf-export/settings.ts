@@ -58,6 +58,6 @@ export const pdfOf = (settings: Record<string, unknown>): PdfSettings => ({
   ...(settings.pdf as Partial<PdfSettings>),
 });
 
-/** For the drawings: show the values a run found (settings.pdf.results). */
+/** The note's PDF settings, for what draws for it (the hidden drawings). */
 export const PdfContext = createContext<PdfSettings>(DEFAULTS);
 export const usePdf = () => useContext(PdfContext);

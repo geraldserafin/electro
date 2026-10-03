@@ -184,6 +184,18 @@ export function Inspector({
           </span>
         </Section>
       )}
+      {/* a terminal: its name (A, B: a resistance between two points is named by them), its potential */}
+      {!live && element.kind === "terminal" && (
+        <Section label={t("inspector.arrowName")}>
+          <input
+            className={field}
+            value={element.text ?? ""}
+            spellCheck={false}
+            aria-label={t("inspector.arrowName")}
+            onChange={(e) => onChange({ text: e.target.value.trim() === "" ? null : e.target.value })}
+          />
+        </Section>
+      )}
       {/* a terminal: its point's potential, against ground — given, or empty (beside it: where it goes) */}
       {!live && element.kind === "terminal" && (
         <Section label={t("inspector.potential")}>

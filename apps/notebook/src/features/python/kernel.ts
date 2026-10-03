@@ -77,7 +77,11 @@ class Kernel {
   }
 
   /** A schematic cell's run button: every element's values, and what went wrong. */
-  async simulate(schematic: SchematicData): Promise<{ results: Record<string, ElementResult>; problems: Problem[] }> {
+  async simulate(schematic: SchematicData): Promise<{
+    results: Record<string, ElementResult>;
+    problems: Problem[];
+    found?: Record<string, string | null>; // what ``find`` asks for, what it came to
+  }> {
     return JSON.parse((await this.call("simulate", { schematic: JSON.stringify(schematic) })) as string);
   }
 

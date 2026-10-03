@@ -10,20 +10,7 @@ import {
   useState,
 } from "react";
 import type { ElementData, ElementResult, Point, SymbolLibrary, WireData } from "@/shared/model/types";
-import {
-  arrowLength,
-  beside,
-  hasValue,
-  isArrow,
-  isBoard,
-  isComponent,
-  isWaveSource,
-  keyLabel,
-  kindInfo,
-  pins,
-  rotate,
-  waveLabel,
-} from "./model";
+import { arrowLength, beside, isArrow, isBoard, isComponent, keyLabel, kindInfo, pins, rotate } from "./model";
 import { symbolOf } from "./parts";
 
 /**
@@ -40,17 +27,13 @@ function hitArea(box: DOMRect | null, xs: number[], ys: number[]) {
   return { x: x0 - padX, y: y0 - padY, width: x1 - x0 + 2 * padX, height: y1 - y0 + 2 * padY };
 }
 
-/** The text next to an element: "R_1 = 100 Ω", "A_1", or a net label's name. */
+/** The text next to an element: its label ("R_1", "D_1 1N4148"), or a net label's name. */
 function label_(e: ElementData): string {
-  const unit = kindInfo(e.kind)?.unit ?? "";
   if (e.kind === "label" || e.kind === "port") return e.text ?? "";
   if (!isComponent(e.kind)) return "";
   if (e.kind === "button" && e.text) return `${e.id} [${keyLabel(e.text)}]`; // held with that key while it runs
   if (["diode", "npn", "pnp", "opamp"].includes(e.kind) && e.text) return `${e.id} ${e.text}`; // a real part: its name
-  if (!hasValue(e.kind)) return e.id;
-  if (kindInfo(e.kind)?.meter && !e.value) return e.id; // no reading: the simulation fills it in
-  const wave = isWaveSource(e.kind) ? `, ${waveLabel(e.text)}` : "";
-  return `${e.id} = ${e.value ?? "?"}${e.value && /\d$/.test(e.value) ? ` ${unit}` : ""}${wave}`;
+  return e.id; // (its value is the data's, given apart: the Data tab)
 }
 
 function Label({
@@ -162,7 +145,6 @@ type Props = {
   lit?: number; // an LED while simulating: how bright (0–1)
   look?: Record<string, number>; // while simulating, what else it shows: its symbol's CSS variables (--a, --angle, …)
   live?: { pins: (number | null)[]; scale: number }; // running: its pins' voltages, the element coloured by them
-  quiet?: boolean; // a terminal at a voltage arrow's end: no potential beside it
   aside?: boolean; // a voltage arrow across an element (a wire): drawn beside it
   onPointerDown: (event: ReactPointerEvent, element: ElementData) => void;
 };
@@ -210,7 +192,6 @@ export const ElementView = memo(
     a.wires === b.wires &&
     a.selected === b.selected &&
     a.closed === b.closed &&
-    a.quiet === b.quiet &&
     a.aside === b.aside &&
     (a.lit ?? 0) > 0.01 === (b.lit ?? 0) > 0.01 &&
     a.onPointerDown === b.onPointerDown &&
@@ -275,7 +256,7 @@ function ArrowView({ element: e, library, selected, result, aside, onPointerDown
       {(e.text || result) && (
         // its name, and what it is: given (its value), or after a run what it came to
         <Label
-          text={markText(e, result)}
+          text={markText(e)}
           x={x + hx / 2 + dx}
           y={y + hy / 2 + dy}
           anchor={anchor}
@@ -286,23 +267,15 @@ function ArrowView({ element: e, library, selected, result, aside, onPointerDown
   );
 }
 
-/** What a mark says: its name, and its value — given, or after a run what it came to. */
-const markText = (e: ElementData, result?: ElementResult) =>
-  [
-    e.text,
-    e.value?.trim()
-      ? `${e.value.trim()}${/\d$/.test(e.value.trim()) ? (e.kind === "voltage_arrow" ? " V" : " A") : ""}`
-      : result?.value,
-  ]
-    .filter(Boolean)
-    .join(" = ");
+/** What a mark says on the drawing: its name (its value given, or found, is the Data's and the Results'). */
+const markText = (e: ElementData) => e.text ?? "";
 
 /** A loop's current (a mesh current): a round arrow inside the loop, clockwise (``flip``: the other way),
  *  its name and value beside it. */
 function MeshView({ element: e, library, selected, result, onPointerDown }: Props) {
   const G = library.grid;
   const [x, y] = [e.at[0] * G, e.at[1] * G];
-  const text = markText(e, result);
+  const text = markText(e);
   return (
     <g
       className={`element ${selected ? "selected" : ""}`}
@@ -322,19 +295,7 @@ function MeshView({ element: e, library, selected, result, onPointerDown }: Prop
   );
 }
 
-function ElementView_({
-  element: e,
-  library,
-  wires,
-  result,
-  selected,
-  closed,
-  lit,
-  look,
-  live,
-  quiet,
-  onPointerDown,
-}: Props) {
+function ElementView_({ element: e, library, wires, result, selected, closed, lit, look, live, onPointerDown }: Props) {
   const G = library.grid;
   const symbol = symbolOf(e, library);
   const ps = pins(e, library).map(([x, y]) => [x * G, y * G] as Point);
@@ -402,22 +363,9 @@ function ElementView_({
   const vars =
     look &&
     (Object.fromEntries(Object.entries(look).map(([k, v]) => [`--${k}`, Math.round(v * 100) / 100])) as CSSProperties);
-  // a net label (its node's name) or a terminal: its potential — given, or what it came to (a terminal at
-  // a voltage arrow's end: none, the arrow says it)
-  const potential =
-    (e.kind === "label" || (e.kind === "terminal" && !quiet)) &&
-    (e.value?.trim() ? `${e.value.trim()}${/\d$/.test(e.value.trim()) ? " V" : ""}` : result?.value);
-  const label = potential
-    ? e.text
-      ? `${e.text} = ${potential}`
-      : potential
-    : result?.solved && result.value && e.kind !== "label" && e.kind !== "terminal"
-      ? e.kind === "hole"
-        ? `${e.id}: ${result.value}`
-        : isBoard(e.kind)
-          ? `${e.id} · ${result.value}`
-          : `${e.id} = ${result.value}` // (a board: its clock, slowed)
-      : label_(e);
+  // its name (a terminal's: when it has one); a board running: its clock, slowed
+  const label =
+    e.kind === "terminal" ? (e.text ?? "") : isBoard(e.kind) && result?.value ? `${e.id} · ${result.value}` : label_(e);
   const readings =
     result && !chip
       ? ([

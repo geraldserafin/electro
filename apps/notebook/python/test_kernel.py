@@ -431,6 +431,27 @@ def test_a_current_arrow_between_two_junctions_is_the_current_on_beyond_it():
     assert got["I1"]["value"] == "480 mA"
 
 
+def test_what_is_sought_comes_back_on_its_own_the_resistance_between_two_points_too():
+    # E 12 — R1 10 — R2 20: R2's voltage, R1's current, and the resistance between A (R1–R2) and ground
+    # as seen from there (E a short): 10 ∥ 20
+    drawing = {
+        "elements": [
+            {"id": "E1", "kind": "voltage_source", "value": "12", "nodes": ["0", "T"], "at": [[0, 8], [0, 0]]},
+            {"id": "R1", "kind": "resistor", "value": "10", "nodes": ["T", "A"], "at": [[0, 0], [6, 0]]},
+            {"id": "R2", "kind": "resistor", "value": "20", "nodes": ["A", "0"], "at": [[10, 0], [10, 8]]},
+        ],
+        "wires": [[[6, 0], [8, 0]], [[8, 0], [10, 0]], [[10, 8], [0, 8]]],
+    }
+    sch = json.loads(kernel.from_drawing(json.dumps(drawing)))["schematic"]
+    sch["elements"] += [
+        {"id": "A", "kind": "terminal", "at": [8, 0], "rotation": 0},
+        {"id": "B", "kind": "terminal", "at": [4, 8], "rotation": 0},
+    ]
+    sch["find"] = ["U:R2", "I:R1", "R:A:B"]
+    found = json.loads(kernel.simulate(json.dumps(sch)))["found"]
+    assert found == {"U:R2": "8 V", "I:R1": "400 mA", "R:A:B": "6.667 Ω"}
+
+
 def test_a_terminal_on_a_wires_corner_is_on_that_wire():
     sch = {
         "elements": [

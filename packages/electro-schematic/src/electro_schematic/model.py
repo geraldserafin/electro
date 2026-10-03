@@ -438,10 +438,10 @@ class Schematic:
         for e in self.elements:
             if e.kind in ("label", "port") and e.text:
                 names.setdefault(nodes[e.pins()[0]], prefix + e.text)
-        # a terminal (a point a voltage is at): its node named by it — its name, else its id
+        # a terminal (a point a voltage is at): its node named by its id (its name may be any, twice too)
         for e in self.elements:
             if e.kind == "terminal":
-                names.setdefault(nodes[e.pins()[0]], prefix + (e.text or e.id))
+                names.setdefault(nodes[e.pins()[0]], prefix + e.id)
         taken, k = set(names.values()), 0
 
         def name(p):

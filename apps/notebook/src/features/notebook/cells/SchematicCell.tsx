@@ -9,14 +9,12 @@ import {
 import { useTranslation } from "react-i18next";
 import { useLocation, useNavigate, useSearchParams } from "react-router";
 import { removeComponent, SaveComponentDialog, useComponents } from "@/features/components";
-import { usePdf } from "@/features/pdf-export";
 import { kernel } from "@/features/python";
 import {
   type Camera,
   canRunInTime,
   inTimeOnly,
   isBoard,
-  isMark,
   PdfDrawing,
   SchematicEditor,
   updateElement,
@@ -56,8 +54,8 @@ import {
   split,
 } from "./layout";
 import { variableName } from "./NameBox";
+import { DataTab, FoundTab } from "./Problem";
 import { Problems } from "./Problems";
-import { ResultsTable } from "./ResultsTable";
 
 /** This browser's choice: the panel under a board folded ("0") or not. */
 const PANEL_OPEN = "electro.panelOpen";
@@ -225,8 +223,6 @@ export function SchematicCell({
   const mine = useComponents();
   const [saving, setSaving] = useState(false); // "save as a component" open
   const empty = !cell.schematic.elements.length;
-  const pdf = usePdf();
-  const printed = pdf.results && !cell.stale ? cell.results : undefined; // values on the drawing, if the PDF has them
   // the circuit's code: `generated` is the drawing as code, `source` what is in the editor now
   const [source, setSource] = useState<string | null>(null);
   const [generated, setGenerated] = useState<string | null>(null);
@@ -700,7 +696,8 @@ export function SchematicCell({
       value={cell.schematic}
       onChange={(schematic) => update(changed(schematic))}
       library={library}
-      results={running ? live.frame?.results : cell.stale ? undefined : cell.results}
+      // (solved: on the drawing nothing, the Results tab says it; running: its readings as it goes)
+      results={running ? live.frame?.results : undefined}
       live={
         running && live.frame
           ? {
@@ -761,27 +758,28 @@ export function SchematicCell({
 
   // the panel's tabs of the cell's own: the solver's table, the plots (or why one could not be made)
   const more: PanelTab[] = [
-    ...(cell.results && Object.keys(cell.results).length > 0
+    // the problem as set: its data and what is sought; then what that came to
+    ...(empty
+      ? []
+      : [
+          {
+            id: "data",
+            label: t("data.label"),
+            body: (
+              <DataTab
+                schematic={cell.schematic}
+                library={library}
+                onChange={(schematic) => update(changed(schematic))}
+              />
+            ),
+          },
+        ]),
+    ...(cell.found
       ? [
           {
             id: "results",
             label: t("results.label"),
-            body: (
-              <div className="px-3 pb-3">
-                <ResultsTable
-                  // (the arrows' own: on the drawing only — the elements they are of have a row)
-                  results={Object.fromEntries(
-                    Object.entries(cell.results).filter(
-                      ([id]) =>
-                        !cell.schematic.elements.some(
-                          (e) => e.id === id && (isMark(e.kind) || e.kind === "label" || e.kind === "terminal"),
-                        ),
-                    ),
-                  )}
-                  stale={!!cell.stale}
-                />
-              </div>
-            ),
+            body: <FoundTab schematic={cell.schematic} found={cell.found} stale={!!cell.stale} />,
           },
         ]
       : []),
@@ -990,7 +988,7 @@ export function SchematicCell({
         </>
       )}
       {/* the PDF shows the circuit as drawn; results belong to code cells: schematic(układ1, sol) */}
-      <PdfDrawing value={cell.schematic} library={library} results={printed} />
+      <PdfDrawing value={cell.schematic} library={library} />
       {saving && (
         <SaveComponentDialog
           schematic={cell.schematic}

@@ -1,6 +1,7 @@
 // A note as a Typst document: main.typ (the cells, in order), config.typ (the settings and the
 // formulas) and the drawings as SVG files. electro.typ (the theme) gives the pieces their look.
 
+import { givenBy, named, nameOf, sought, unitOf } from "@/features/schematic";
 import { sayIn } from "@/features/solution";
 import type { Failure } from "@/shared/model/issues";
 import type { Notebook, Output } from "@/shared/model/types";
@@ -99,6 +100,23 @@ export function toTypst(
     } else {
       const svg = drawingOf(cell.id);
       if (svg) parts.push(image(svg, true));
+      // the problem as set: its data, what is sought (the drawing names things only)
+      const sch = cell.schematic;
+      const given = sch.elements
+        .filter((e) => givenBy(e) && e.value?.trim())
+        .map((e) => `${tex(nameOf(e))} = ${quantity(e.value!.trim(), unitOf(e))}`);
+      const asked = sought(sch).map((k) => `${tex(named(sch, k) ?? k)} = ?`);
+      const [givenWord, soughtWord] = lang.startsWith("pl") ? ["Dane", "Szukane"] : ["Given", "Sought"];
+      if (given.length) parts.push(md(`**${givenWord}:** ${given.map((g) => `$${g}$`).join(", ")}`));
+      if (asked.length) parts.push(md(`**${soughtWord}:** ${asked.map((a) => `$${a}$`).join(", ")}`));
+      // …and, asked for, what a run found it to be
+      const found = cell.found;
+      if (pdf.results && found && !cell.stale) {
+        const lines = sought(sch).flatMap((k) =>
+          found[k] ? [`$${tex(named(sch, k) ?? k)} = ${quantity(...split(found[k]!))}$`] : [],
+        );
+        if (lines.length) parts.push(md(`**${lang.startsWith("pl") ? "Wyniki" : "Results"}:** ${lines.join(", ")}`));
+      }
       for (const plot of [cell.frequency, cell.sweep, cell.spread])
         if (pdf.outputs && plot && !plot.stale) parts.push(output({ type: "svg", data: plot.svg }));
     }
@@ -137,6 +155,22 @@ ${parts.filter((p) => p.trim()).join("\n\n")}
 `;
   return { main, config, files };
 }
+
+/** "U_R5" as TeX: U with a subscript R5. */
+const tex = (name: string) => {
+  const [base, ...sub] = name.split("_");
+  return sub.length ? `${base}_{\\mathrm{${sub.join("")}}}` : base!;
+};
+
+/** A value as written, its unit after it when it is a number ("4.7k" Ω; "R" stays a symbol). */
+const quantity = (value: string, unit: string) =>
+  /\d$/.test(value) && unit ? `\\mathrm{${value}}\\,${unit === "Ω" ? "\\Omega" : `\\mathrm{${unit}}`}` : value;
+
+/** "6.667 Ω" → its number and its unit. */
+const split = (found: string): [string, string] => {
+  const [value, ...unit] = found.split(" ");
+  return [value!, unit.join(" ")];
+};
 
 function parseSvg(source: string): SVGSVGElement | null {
   const doc = new DOMParser().parseFromString(source, "image/svg+xml");

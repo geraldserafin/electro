@@ -48,8 +48,8 @@ export const pl = {
     codeLines: "Numery wierszy kodu",
     outputs: "Wyniki kodu",
     outputsHint: "to, co komórki wypisały i narysowały",
-    results: "Wartości na schematach",
-    resultsHint: "prądy i napięcia z ostatniego uruchomienia",
+    results: "Wyniki pod schematami",
+    resultsHint: "szukane z ostatniego uruchomienia",
   },
   page: {
     label: "Strona",
@@ -134,8 +134,8 @@ export const en: typeof pl = {
     codeLines: "Code line numbers",
     outputs: "Code output",
     outputsHint: "what the cells printed and drew",
-    results: "Values on schematics",
-    resultsHint: "currents and voltages from the last run",
+    results: "Results under schematics",
+    resultsHint: "the sought from the last run",
   },
   page: {
     label: "Page",

@@ -853,8 +853,6 @@ export function SchematicEditor({
   elementDown.current = onElementDown;
   // (the same drawing: the same dots; while it runs, the board is drawn 30 times a second)
   const junctionPoints = useMemo(() => junctions(value, library), [value, library]);
-  // the points voltage arrows are between: their terminals say nothing themselves (the arrow does)
-  const arrowEnds = useMemo(() => new Set(value.elements.flatMap((x) => (x.between ?? []).map(key))), [value.elements]);
   const obstacles = useMemo(() => inTheWay(value, library), [value, library]); // (what labels keep off)
   const aside = useMemo(() => besides(value, library), [value, library]); // (voltages drawn beside)
   const openPinPoints = useMemo(() => openPins(value, library), [value, library]);
@@ -1128,7 +1126,6 @@ export function SchematicEditor({
               look={live?.looks[e.id]}
               live={live && { pins: live.pins[e.id] ?? [], scale: live.scale }}
               selected={picked(selection).ids.includes(e.id) || (probed?.type === "element" && probed.id === e.id)}
-              quiet={e.kind === "terminal" && arrowEnds.has(key(e.at))}
               aside={aside.has(e.id)}
               onPointerDown={onElementDownStable}
             />
