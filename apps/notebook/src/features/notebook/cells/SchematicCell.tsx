@@ -576,7 +576,7 @@ export function SchematicCell({
   // only works in time; ⚡ runs it in time (and stops it), whenever it can be
   const inTime = !empty && (timed || canRunInTime(cell.schematic));
   const solveButton = !timed && (
-    <RunButton run={solve} eager running={solving || busy} done={done || empty} label={t("schematic.run")} />
+    <RunButton run={solve} quiet running={solving || busy} done={done || empty} label={t("schematic.run")} />
   );
   // ∿ the frequency response (with a capacitor or an inductor); the spread over the parts' tolerances
   // (with an R, C or L): a circuit solved on paper
@@ -585,6 +585,7 @@ export function SchematicCell({
       run={() => plot("frequency", (s) => kernel.frequency(s))}
       running={busy}
       done={plotDone("frequency")}
+      quiet
       icon={<Wave />}
       label={t("schematic.frequency")}
     />
@@ -594,6 +595,7 @@ export function SchematicCell({
       run={() => plot("spread", (s) => kernel.spread(s, 0.05))}
       running={busy}
       done={plotDone("spread")}
+      quiet
       icon={<SpreadIcon />}
       label={t("schematic.spread")}
     />
@@ -617,26 +619,29 @@ export function SchematicCell({
       {full ? <Shrink /> : <Expand />}
     </button>
   );
+  // made a component of: apart from the rest (a line between); then what is wrong, the runs, the bolt
+  // last, at the very end
   const actions = (
     <>
+      {/* (a phone, in the notebook: nothing edited there, no component made) */}
+      {!running && !compact && (
+        <>
+          <button
+            className={cn(barButton, "[&_svg]:size-4")}
+            onClick={() => setSaving(true)}
+            title={tc("button")}
+            aria-label={tc("button")}
+          >
+            <ComponentIcon />
+          </button>
+          <span aria-hidden className="mx-1 h-4 w-px flex-none bg-line" />
+        </>
+      )}
       {problems}
       {solveButton}
       {bodeButton}
       {spreadButton}
       {liveButton}
-      {/* (a phone, in the notebook: nothing edited there, no component made) */}
-      {!running && !compact && (
-        <button
-          className={cn(barButton, "[&_svg]:size-4")}
-          onClick={() => setSaving(true)}
-          title={tc("button")}
-          aria-label={tc("button")}
-        >
-          <ComponentIcon />
-        </button>
-      )}
-      {/* (on the board: in its top right corner, apart) */}
-      {!inBoard && fullButton}
     </>
   );
 
@@ -795,6 +800,10 @@ export function SchematicCell({
               >
                 {/* (a phone, in the notebook: none — only the drawing shows) */}
                 <div data-tab-bar className={cn(BAR, compact && "hidden")}>
+                  {/* full screen (and back): first, before the files (on the board: its top right corner) */}
+                  {i === 0 && !inBoard && (
+                    <div className="flex flex-none items-center pl-1 pr-1.5 border-r border-line">{fullButton}</div>
+                  )}
                   <div
                     role="tablist"
                     aria-label={ts("code.tabs")}
@@ -829,7 +838,7 @@ export function SchematicCell({
                   </div>
                   <span className="flex-1" />
                   {/* a sketch shown here: compile it; the editor's own (once, at the end of the last bar):
-                      what is wrong, the bolt, full screen */}
+                      a component of it, what is wrong, the runs, the bolt */}
                   <div className="flex flex-none items-center gap-0.5 pr-1">
                     {sketchOf(g.active) && <UploadButton element={sketchOf(g.active)!} live={live} />}
                     {i === last && !inBoard && actions}

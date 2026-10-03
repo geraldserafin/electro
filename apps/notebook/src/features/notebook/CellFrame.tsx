@@ -9,7 +9,7 @@ import { useDragSort } from "@/shared/hooks/useDragSort";
 import { cn } from "@/shared/lib/cn";
 import type { CellType } from "@/shared/model/types";
 import { Plus, Trash } from "@/shared/ui/icons";
-import { AddRow } from "./AddRow";
+import { AddRow, BlockMenu } from "./AddRow";
 import { barButton, CellFocusContext } from "./cells/CellBar";
 
 export const Grip = () => (
@@ -61,8 +61,9 @@ export function CellFrame({
       id={`cell-${id}`}
       data-cell={type}
       data-focused={focused || undefined}
-      onFocusCapture={onFocus}
-      onPointerDownCapture={onFocus}
+      // (not from its add row: taking the cell up would move the row from under the pointer)
+      onFocusCapture={(e) => !(e.target as Element).closest("[data-add-row]") && onFocus()}
+      onPointerDownCapture={(e) => !(e.target as Element).closest("[data-add-row]") && onFocus()}
       className={cn("group/cell relative mb-4 scroll-mt-18 transition-opacity", drag.dragging && "opacity-40")}
     >
       {/* a safe strip from the block's edge, its full height: the pointer on its way to the handle or
@@ -91,32 +92,13 @@ export function CellFrame({
             <Plus />
           </button>
           {adding && (
-            <span
-              role="menu"
-              aria-label={t("add.label")}
-              className="absolute top-full right-0 mt-1.5 z-30 grid w-40 p-1.5 rounded-xl border border-line bg-paper shadow-menu"
-            >
-              {(
-                [
-                  ["code", t("add.code")],
-                  ["markdown", t("add.markdown")],
-                  ["schematic", t("add.schematic")],
-                ] as const
-              ).map(([type, label]) => (
-                <button
-                  key={type}
-                  role="menuitem"
-                  className="flex items-center gap-2 px-3 py-2.5 rounded-lg text-left text-[15px] hover:bg-hover [&_svg]:text-muted"
-                  onClick={() => {
-                    setAdding(false);
-                    onAdd(type);
-                  }}
-                >
-                  <Plus />
-                  {label}
-                </button>
-              ))}
-            </span>
+            <BlockMenu
+              className="absolute top-full right-0 mt-1.5"
+              onAdd={(type) => {
+                setAdding(false);
+                onAdd(type);
+              }}
+            />
           )}
         </span>
         <button

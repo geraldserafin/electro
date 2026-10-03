@@ -88,6 +88,7 @@ export function RunButton({
   done,
   eager,
   icon = <Play />,
+  quiet,
 }: {
   run: () => void;
   running: boolean;
@@ -96,6 +97,7 @@ export function RunButton({
   done?: boolean; // nothing changed since the last run: nothing to run, it rests
   eager?: boolean; // lit whenever there is something to run (a schematic), not only on the cell
   icon?: ReactNode;
+  quiet?: boolean; // one of a few on the bar: never lit, plain like its other buttons
 }) {
   const { t } = useTranslation("notebook");
   return (
@@ -110,9 +112,11 @@ export function RunButton({
           "inline-flex flex-none items-center justify-center size-7 rounded-md [&_svg]:size-4",
           done
             ? "text-faint opacity-60"
-            : eager && !running
-              ? "bg-primary text-on-primary hover:bg-primary-hover"
-              : "text-muted hover:bg-primary hover:text-on-primary group-data-focused/cell:bg-primary group-data-focused/cell:text-on-primary",
+            : quiet
+              ? "text-fg hover:bg-selected"
+              : eager && !running
+                ? "bg-primary text-on-primary hover:bg-primary-hover"
+                : "text-muted hover:bg-primary hover:text-on-primary group-data-focused/cell:bg-primary group-data-focused/cell:text-on-primary",
           running && "animate-blink",
         )}
       >

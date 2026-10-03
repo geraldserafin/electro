@@ -30,13 +30,14 @@ export const pl = {
     resizeGroups: "Przeciągnij, żeby zmienić podział",
   },
   add: {
-    label: "Dodaj komórkę",
+    label: "Dodaj blok",
+    block: "Nowy blok",
     chapter: "Rozdział",
     code: "Kod",
     codeTitle: "Dodaj komórkę z kodem",
     markdown: "Tekst",
     markdownTitle: "Dodaj komórkę z tekstem",
-    schematic: "Schemat",
+    schematic: "Układ",
     schematicTitle: "Dodaj schemat",
   },
   part: {
@@ -202,7 +203,8 @@ export const en: typeof pl = {
     resizeGroups: "Drag to change the split",
   },
   add: {
-    label: "Add a cell",
+    label: "Add a block",
+    block: "New block",
     chapter: "Chapter",
     code: "Code",
     codeTitle: "Add a code cell",
