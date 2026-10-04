@@ -63,7 +63,7 @@ class _Scalable:
     """A quantity times a number: ``2 * U(r2)`` — for a condition between quantities (U_1 = 2·U_2)."""
 
     def __rmul__(self, k: object) -> Scaled:
-        return Scaled(sp.sympify(k), cast("Quantity", self))
+        return Scaled(cast(sp.Expr, sp.sympify(k)), cast("Quantity", self))
 
     __mul__ = __rmul__
 
@@ -214,7 +214,7 @@ class MissingData(Undetermined):
     """What is sought does not follow yet: ``needed`` data more; ``options``: quantities each of which,
     given, would do (when one is needed); ``found``: what is sought and could be found."""
 
-    def __init__(self, needed: int, options: Sequence[object], found: Mapping[object, sp.Expr]) -> None:
+    def __init__(self, needed: int, options: Sequence[Quantity], found: Mapping[Quantity, sp.Expr]) -> None:
         super().__init__(f"{needed} more datum needed")
         self.needed, self.options, self.found = needed, tuple(options), dict(found)
 
@@ -509,7 +509,11 @@ def equations(problem: Problem, analysis: Analysis, sources: sp.Expr | int = 1) 
             case str():
                 values[sp.Symbol(key)] = cast(sp.Expr, value)
             case _:
-                other = s.of(value) if isinstance(value, (_Scalable, Scaled)) else cast(sp.Expr, value)
+                other = (
+                    s.of(cast("Quantity | Scaled", value))
+                    if isinstance(value, (_Scalable, Scaled))
+                    else cast(sp.Expr, value)
+                )
                 conditions.append(Equation(s.of(key) - other, Origin("given", key)))
     if sources != 1:
         for e, _ in s.net.parts:
@@ -600,7 +604,7 @@ class Solution:
                     continue
                 roots = sp.solve(e - k, x)
                 if len(roots) == 1 and all(
-                    not (_symbols_in(sp.sympify(t).subs(x, roots[0])) & self.unknowns) for t in lacking
+                    not (_symbols_in(cast(sp.Expr, sp.sympify(t).subs(x, roots[0]))) & self.unknowns) for t in lacking
                 ):
                     options.append(candidate)
         raise MissingData(len(free), options, found)
