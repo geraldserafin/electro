@@ -233,6 +233,19 @@ def _checked(net: Netlist) -> Netlist:
     return net
 
 
+def rebuild(parts: Iterable[tuple[Element, int, int]], named: Iterable[tuple[int, Point]] = ()) -> Circuit:
+    """A closed circuit from its points: each element from one to the other; a point keeps its ``Node``
+    or ``Net``, the others get fresh nodes (the inverse of ``netlist`` for a closed one)."""
+    parts = tuple(parts)
+    shown = dict(named)
+    points: dict[int, Point] = {}
+
+    def at(n: int) -> Point:
+        return points.setdefault(n, shown.get(n) or Node())
+
+    return beside(*(at(a) >> e >> at(b) for e, a, b in parts))
+
+
 def free(c: Circuit) -> tuple[int, int]:
     """Its ends not on a ``Node`` / ``Net`` (left, right): the ones still to be connected."""
     net = netlist(c)
@@ -253,3 +266,5 @@ Inductor = Kind("inductor", "L", "H", lambda U, I, L: U - L * D(I))
 # a source's + on its second end: V_b − V_a = E, i.e. U = −E; a current source pushes J from a to b
 VoltageSource = Kind("voltage_source", "E", "V", lambda U, I, E: U + E, symmetric=False)
 CurrentSource = Kind("current_source", "J", "A", lambda U, I, J: I - J, symmetric=False)
+
+KINDS: tuple[Kind, ...] = (Resistor, Capacitor, Inductor, VoltageSource, CurrentSource)

@@ -696,7 +696,32 @@ Obok biblioteki, nic w niej nie zmienia. ~720 linii (bez eksportów): składnia 
 własne komponenty, Thévenin, szybka symulacja (dziś: sympy co krok, wolne), stan dyskretny (`Pre`).
 Dopiero z nimi da się uczciwie porównać rozmiar i prostotę z obecną biblioteką.
 
-**Następne kroki prototypu, w kolejności ryzyka:** czarna skrzynka kawałka (bez niej warstwa metod
+**Warstwa metod w prototypie** (`core/methods.py`, operacje w `core/problem.py`, 3 testy więcej):
+
+- `port`/`blackbox` (relacja na zaciskach kawałka) i `matches` (relacja → rodzaj + parametr) **odkrywają
+  reguły, których nikt nie wpisał**: szeregowo R₁+R₂, równolegle R₁R₂/(R₁+R₂), źródła szeregowo E₁+E₂, a
+  w AC R z C to impedancja R + 1/(jωC) — z samego prawa kondensatora.
+- `simplify` daje kroki jak w zeszycie, z nazwami i liczbami: R₃₄ = R₃+R₄ = 3 Ω → R₂₃₄ = R₂·R₃₄/(R₂+R₃₄)
+  = 2 Ω → R₁₂₃₄ = 4 Ω; uproszczony obwód daje ten sam prąd co oryginał.
+- `superposition`: liniowość i to, co jest źródłem, czytane z praw; dioda odrzucona (`NotLinear`).
+
+**Czego to nauczyło:**
+
+- **Upraszczanie z ochroną szukanej to pół metody.** Gdy szukane jest I₃, chroniony R₃ blokuje
+  upraszczanie. Podręcznik upraszcza wszystko, liczy prąd całkowity i **wraca** dzielnikami do I₃ —
+  potrzebna droga powrotna (dzielnik = symboliczne rozwiązanie kawałka, wg §12).
+- **Źródło z rezystorem to nie jeden element** — zamiana źródeł (Thévenin ↔ Norton) wymaga dopasowania
+  do szablonu z dwóch elementów (źródło ∥ R), nie do jednego rodzaju.
+- **Prawo `(U, I, parametr)` jest za wąskie.** Źródło sterowane (U = μ·U_innego), transformator,
+  tranzystor potrzebują praw nad kilkoma parami (U, I) albo nad wielkościami innego elementu. Typ prawa
+  trzeba uogólnić, zanim dojdą — to też sprawdzian F16 („bez wyjątków”).
+
+**Następne kroki prototypu, w kolejności ryzyka:** uogólnione prawo (kilka par U, I; źródło sterowane) →
+droga powrotna upraszczania (dzielniki) → zamiana źródeł (szablony dwuelementowe) → dioda (nieliniowość,
+Newton bez ręcznych sztuczek) → przerzutnik (`Pre`, zdarzenia) → jednostki → porównanie z obecną
+biblioteką na jej testach.
+
+**Poprzednia kolejka (już zrobione: czarna skrzynka, superpozycja, upraszczanie):** czarna skrzynka kawałka (bez niej warstwa metod
 z §12 nie ruszy) → superpozycja i upraszczanie szeregowo-równoległe z regułami odkrywanymi rachunkiem
 (porównać kroki z rozwiązaniem z zeszytu) → dioda (nieliniowość, Newton bez ręcznych sztuczek) →
 przerzutnik (`Pre`, zdarzenia) → jednostki → porównanie z obecną biblioteką na jej testach.

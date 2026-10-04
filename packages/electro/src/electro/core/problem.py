@@ -16,12 +16,12 @@ import sympy as sp
 
 from electro.values import UNKNOWN, parse
 
-from .syntax import GND, Circuit, D, Element, Net, Netlist, Node, is_closed, netlist
+from .syntax import GND, Circuit, D, Element, Kind, Net, Netlist, Node, free, is_closed, netlist
 
 # sympy's own types are loose (``subs`` of a dict, ``replace`` gives ``Basic``): said once, here
 
 
-def _subs(x: sp.Expr, values: Mapping[sp.Symbol, sp.Expr] | Mapping[sp.Symbol, float]) -> sp.Expr:
+def subs(x: sp.Expr, values: Mapping[sp.Symbol, sp.Expr] | Mapping[sp.Symbol, float]) -> sp.Expr:
     return cast(sp.Expr, x.subs(list(values.items())))
 
 
@@ -269,8 +269,87 @@ def equations(problem: Problem, analysis: Analysis) -> System:
         + [p for p in s.potentials if isinstance(p, sp.Symbol)]
         + sorted(params, key=str)
     )
-    eqs = tuple(_subs(sp.sympify(x), values) for x in laws + drops + kcl + conditions)
+    eqs = tuple(subs(sp.sympify(x), values) for x in laws + drops + kcl + conditions)
     return System(eqs, tuple(unknowns), s)
+
+
+# --------------------------------------------------------------------------------------- black box
+
+PORT_U, PORT_I = sp.symbols("U_port I_port")  # a two-ended piece's: the drop from its first end to its second, the
+# current in at its first end (out at its second) — as an element's U and I
+
+
+class NotOnePort(ValueError):
+    """A black box here is of a piece with one free end each side (1 → 1)."""
+
+
+@dataclass(frozen=True)
+class Relation:
+    """A piece as seen from its two ends: ``expr == 0`` in ``PORT_U``, ``PORT_I`` (and parameters)."""
+
+    expr: sp.Expr
+
+
+def port(
+    parts: Sequence[tuple[Element, int, int]],
+    a: int,
+    b: int,
+    param: Callable[[Element], sp.Symbol],
+    analysis: Analysis,
+) -> Relation | None:
+    """The relation between ``a`` and ``b`` of these elements alone: Kirchhoff and their laws, every
+    other point eliminated. None: no single relation (nothing joins the two ends, or more than one)."""
+    points = sorted({n for _, x, y in parts for n in (x, y)} | {a, b})
+    V = {n: sp.Integer(0) if n == b else sp.Symbol(f"v{n}") for n in points}
+    U = [sp.Symbol(f"u{k}") for k in range(len(parts))]
+    I = [sp.Symbol(f"i{k}") for k in range(len(parts))]  # noqa: E741
+    eqs = [interpret(e.kind.law(U[k], I[k], param(e)), analysis) for k, (e, _, _) in enumerate(parts)]
+    eqs += [U[k] - (V[x] - V[y]) for k, (_, x, y) in enumerate(parts)]
+    eqs += [
+        sp.Add(
+            *(I[k] for k, (_, x, _) in enumerate(parts) if x == n),
+            *(-I[k] for k, (_, _, y) in enumerate(parts) if y == n),
+        )
+        - (PORT_I if n == a else 0)
+        for n in points
+        if n != b
+    ]
+    eqs.append(PORT_U - V[a])
+    inner = U + I + [V[n] for n in points if n != b]
+    for port_var in (PORT_U, PORT_I):  # U from I (most pieces); I from U (a current source: U is free)
+        found = sp.solve(eqs, [*inner, port_var], dict=True)
+        if len(found) == 1 and port_var in found[0]:
+            return Relation(sp.simplify(port_var - found[0][port_var]))
+    return None
+
+
+def blackbox(piece: Circuit, analysis: Analysis | None = None) -> Relation | None:
+    """A 1 → 1 piece seen from its ends (the elements' own names as their parameters)."""
+    net = netlist(piece)
+    if free(piece) != (1, 1) or len(net.left) != 1:
+        raise NotOnePort(free(piece))
+    return port(net.parts, net.left[0], net.right[0], lambda e: sp.Symbol(e.name or e.kind.prefix), analysis or DC())
+
+
+def matches(relation: Relation, kind: Kind, analysis: Analysis | None = None) -> sp.Expr | None:
+    """The parameter that makes ``kind``'s law this very relation — a piece that is one such element —
+    or None. (Two resistors in series: a resistor of R₁ + R₂. Found, not told.)"""
+    p = sp.Dummy("p")
+    law = interpret(sp.sympify(kind.law(PORT_U, PORT_I, p)), analysis or DC())
+    for var, other in ((PORT_U, PORT_I), (PORT_I, PORT_U)):
+        mine, its = sp.solve(relation.expr, var), sp.solve(law, var)
+        if len(mine) != 1 or len(its) != 1:
+            continue
+        rest = sp.numer(sp.together(sp.expand(mine[0] - its[0])))
+        coeffs = sp.Poly(rest, other).all_coeffs() if rest.has(other) else [rest]
+        # every coefficient zero, whatever ``other`` is: those without p must already be
+        if any(not c.has(p) and sp.simplify(c) != 0 for c in coeffs):
+            return None
+        found = sp.solve([c for c in coeffs if c.has(p)], p, dict=True)
+        if len(found) == 1 and p in found[0]:
+            return sp.simplify(found[0][p])
+        return None
+    return None
 
 
 # --------------------------------------------------------------------------------------- solve
@@ -284,7 +363,7 @@ class Solution:
     symbols: Symbols
 
     def __call__(self, q: Quantity) -> sp.Expr:
-        value = sp.simplify(_subs(self.symbols.of(q), self.values))
+        value = sp.simplify(subs(self.symbols.of(q), self.values))
         if value.free_symbols & self.unknowns:  # (still in what was not found)
             raise Undetermined(q)
         return value
@@ -355,7 +434,7 @@ class Trace:
     def __call__(self, q: Quantity):
         """``q`` in time: a function of t (linear between the steps)."""
         x = self.symbols.of(q)
-        ys = [float(_subs(sp.sympify(x), row)) for row in self.rows]
+        ys = [float(subs(sp.sympify(x), row)) for row in self.rows]
 
         def at(t: float) -> float:
             k = min(range(len(self.times)), key=lambda i: abs(self.times[i] - t))

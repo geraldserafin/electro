@@ -5,21 +5,10 @@ point by its number — and read back, fresh objects take their places."""
 from __future__ import annotations
 
 from .problem import Across, Current, Parameter, Potential, Problem, Quantity, Voltage
-from .syntax import (
-    Capacitor,
-    CurrentSource,
-    Element,
-    Inductor,
-    Kind,
-    Net,
-    Node,
-    Resistor,
-    VoltageSource,
-    beside,
-    netlist,
-)
+from .syntax import KINDS as ALL_KINDS
+from .syntax import Element, Kind, Net, Node, netlist, rebuild
 
-KINDS: dict[str, Kind] = {k.name: k for k in (Resistor, Capacitor, Inductor, VoltageSource, CurrentSource)}
+KINDS: dict[str, Kind] = {k.name: k for k in ALL_KINDS}
 QUANTITIES = {Current: "I", Voltage: "U", Parameter: "value"}
 
 
@@ -65,9 +54,7 @@ def _point(net, at) -> int:
 def problem_from_data(d: dict) -> tuple[Problem, list[Element]]:
     points = [Net(p["net"]) if "net" in p else Node(p.get("label")) for p in d["points"]]
     elements = [KINDS[e["kind"]](e["name"]) for e in d["elements"]]
-    circuit = beside(
-        *(points[a] >> e >> points[b] for e, (a, b) in zip(elements, (x["between"] for x in d["elements"])))
-    )
+    circuit = rebuild(((e, *x["between"]) for e, x in zip(elements, d["elements"], strict=True)), enumerate(points))
 
     def quantity(q: list) -> Quantity:
         match q:

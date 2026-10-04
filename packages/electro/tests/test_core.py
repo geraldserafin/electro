@@ -25,6 +25,7 @@ from electro.core import (
     close,
     free,
     is_closed,
+    netlist,
     problem_from_data,
     problem_to_data,
     simulate,
@@ -129,3 +130,57 @@ def test_written_down_and_read_back_it_solves_the_same():
     data = json.loads(json.dumps(problem_to_data(p)))
     again, _ = problem_from_data(data)
     assert list(solve(again).answers.values()) == list(solve(p).answers.values()) == [sp.Rational(2, 5), 8]
+
+
+# --- the engine's operations and the methods over them (DESIGN.md §12) ----------------------------
+
+
+def test_a_pieces_black_box_matched_to_a_kind_finds_the_rules_nobody_wrote():
+    from electro.core.problem import blackbox, matches
+    from electro.core.syntax import CurrentSource
+
+    r1, r2 = Resistor("R_1"), Resistor("R_2")
+    R1, R2, E1, E2 = sp.symbols("R_1 R_2 E_1 E_2")
+    assert matches(blackbox(r1 >> r2), Resistor) == R1 + R2  # series
+    assert sp.simplify(matches(blackbox(r1 | r2), Resistor) - R1 * R2 / (R1 + R2)) == 0  # parallel
+    assert matches(blackbox(VoltageSource("E_1") >> VoltageSource("E_2")), VoltageSource) == E1 + E2
+    # a resistor is no source, and a source with a resistor is no single element (that takes two)
+    assert matches(blackbox(r1 >> r2), VoltageSource) is None
+    one = blackbox(VoltageSource("E") >> Resistor("R"))
+    assert all(matches(one, k) is None for k in (Resistor, VoltageSource, CurrentSource))
+    # in AC a resistor and a capacitor are an impedance: R + 1/(jωC), from the capacitor's law alone
+    w, R, C = sp.symbols("w R C")
+    z = matches(blackbox(Resistor("R") >> Capacitor("C"), AC(w)), Resistor, AC(w))
+    assert sp.simplify(z - (R + 1 / (sp.I * w * C))) == 0
+
+
+def test_simplifying_step_by_step_as_a_book_does_its_equivalent_circuits():
+    from electro.core.methods import simplify
+
+    e, r1, r2, r3, r4 = VoltageSource("E"), Resistor("R_1"), Resistor("R_2"), Resistor("R_3"), Resistor("R_4")
+    a, b = Node("A"), Node("B")
+    circuit = (GND >> e >> r1 >> a) @ (a >> r2 >> GND) @ (a >> r3 >> b) @ (b >> r4 >> GND)
+    p = Problem(circuit, {e: 12, r1: 2, r2: 6, r3: 1, r4: 2}, [I(e)])
+    simpler, steps = simplify(p)
+    assert [(s.how, s.by.name, s.amount) for s in steps] == [
+        ("series", "R_34", 3),
+        ("parallel", "R_234", 2),
+        ("series", "R_1234", 4),
+    ]
+    assert len(netlist(simpler.circuit).parts) == 2  # E and one resistor
+    assert solve(simpler)(I(e)) == solve(p)(I(e)) == 3  # the same where it is asked about
+
+
+def test_superposition_each_source_alone_then_summed_and_never_for_a_diode():
+    from electro.core.methods import NotLinear, superposition
+    from electro.core.syntax import CurrentSource
+
+    e, j, r1, r2 = VoltageSource("E"), CurrentSource("J"), Resistor("R_1"), Resistor("R_2")
+    a = Node("A")
+    circuit = (GND >> e >> r1 >> a) @ (a >> r2 >> GND) @ (GND >> j >> a)
+    p = Problem(circuit, {e: 12, j: 2, r1: 4, r2: 4})
+    s = superposition(p, I(r2))
+    assert dict(s.parts) == {e: sp.Rational(3, 2), j: 1} and s.total == solve(p)(I(r2))
+    diode = Kind("diode", "D", "", lambda u, i, i_s: i - i_s * (sp.exp(u) - 1), symmetric=False)
+    with pytest.raises(NotLinear):
+        superposition(Problem(GND >> e >> diode("D") >> GND, {e: 1, "D": "1e-12"}), I(e))
