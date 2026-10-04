@@ -7,10 +7,16 @@ the rules of simplifying (series, parallel, sources in series) are found by comp
 
 from __future__ import annotations
 
-from collections.abc import Collection
+import cmath
+import math
+import random
+from collections.abc import Collection, Mapping, Sequence
 from dataclasses import dataclass
+from typing import cast
 
 import sympy as sp
+
+from electro.values import parse
 
 from .problem import (
     AC,
@@ -20,11 +26,14 @@ from .problem import (
     Analysis,
     Current,
     Equation,
+    Key,
     NotLinear,
     Parameter,
     Problem,
     Quantity,
     Relation,
+    Solution,
+    Undetermined,
     Voltage,
     is_linear,
     is_source,
@@ -34,7 +43,20 @@ from .problem import (
     subs,
     symbols,
 )
-from .syntax import GND, KINDS, Element, Net, Node, Resistor, netlist, rebuild
+from .syntax import (
+    GND,
+    KINDS,
+    CurrentSource,
+    Element,
+    Net,
+    Node,
+    Open,
+    Resistor,
+    VoltageSource,
+    Wire,
+    netlist,
+    rebuild,
+)
 
 # --------------------------------------------------------------------------------------- what the laws say
 
@@ -189,3 +211,123 @@ def thevenin(relation: Relation | None) -> Thevenin | None:
         return None
     u = sp.expand(us[0])
     return Thevenin(sp.simplify(u.subs(PORT_I, 0)), sp.simplify(u.diff(PORT_I)))
+
+
+# --------------------------------------------------------------------------------------- a hole filled
+
+
+@dataclass(frozen=True)
+class Filled:
+    """A problem with its hole filled: by what, and the solution with it."""
+
+    problem: Problem
+    by: Element
+    solution: Solution
+
+
+def fill(problem: Problem, hole: Element, analysis: DC | AC | None = None) -> Filled:
+    """The simplest element that fits where ``hole`` is: a wire, a break, a resistor (never negative),
+    a voltage source, a current source — the first that the data do not contradict and pin down."""
+    s = symbols(problem.circuit)
+    net = s.net
+    for kind in (Wire, Open, Resistor, VoltageSource, CurrentSource):
+        by = kind(hole.name)
+        parts = [(by, ns) if e is hole else (e, ns) for e, ns in net.parts]
+        given = {k: v for k, v in problem.given.items() if k is not hole}
+        candidate = Problem(rebuild(parts, net.named), given, problem.find)
+        try:
+            solution = solve(candidate, analysis)
+            for w in kind.parameters:  # (pinned down by the data, not left free)
+                solution(Parameter(by, w))
+        except Undetermined:
+            continue
+        return Filled(candidate, by, solution)
+    raise Undetermined("no simple element fits where the hole is")
+
+
+# --------------------------------------------------------------------------------------- over a range
+
+
+@dataclass(frozen=True)
+class Sweep:
+    """What ``q`` comes to as one datum takes each value."""
+
+    values: tuple[sp.Expr, ...]
+    results: tuple[sp.Expr, ...]
+
+
+def sweep(problem: Problem, key: Key, values: Sequence[object], q: Quantity, analysis: DC | AC | None = None) -> Sweep:
+    results = tuple(
+        solve(Problem(problem.circuit, {**problem.given, key: v}, problem.find), analysis)(q) for v in values
+    )
+    return Sweep(tuple(cast(sp.Expr, parse(v)) for v in values), results)
+
+
+@dataclass(frozen=True)
+class Response:
+    """``q`` against the frequency, the source at 1 (its transfer function H): solved once, ω a letter."""
+
+    f: tuple[float, ...]
+    H: tuple[complex, ...]
+
+    @property
+    def gain_db(self) -> tuple[float, ...]:
+        return tuple(20 * math.log10(max(abs(h), 1e-300)) for h in self.H)
+
+    @property
+    def phase_deg(self) -> tuple[float, ...]:
+        return tuple(math.degrees(cmath.phase(h)) for h in self.H)
+
+    def cutoffs(self) -> list[float]:
+        """Where the gain crosses 3 dB under its largest (between two points: in log f, straight)."""
+        g = self.gain_db
+        level = max(g) - 3.0103
+        out = []
+        for k in range(len(g) - 1):
+            if (g[k] - level) * (g[k + 1] - level) < 0:
+                t = (level - g[k]) / (g[k + 1] - g[k])
+                out.append(10 ** (math.log10(self.f[k]) + t * (math.log10(self.f[k + 1]) - math.log10(self.f[k]))))
+        return out
+
+
+def respond(
+    problem: Problem, q: Quantity, source: Element, f: tuple[float, float] = (10, 1e6), points: int = 200
+) -> Response:
+    omega = sp.Symbol("omega", positive=True)
+    h = solve(Problem(problem.circuit, {**problem.given, source: 1}), AC(omega))(q)
+    at = sp.lambdify(omega, h, "cmath")
+    lo, hi = math.log10(f[0]), math.log10(f[1])
+    fs = tuple(10 ** (lo + (hi - lo) * k / (points - 1)) for k in range(points))
+    return Response(fs, tuple(complex(at(2 * math.pi * x)) for x in fs))
+
+
+@dataclass(frozen=True)
+class Spread:
+    """What ``q`` came to in each build of the circuit, its parts within their tolerances."""
+
+    values: tuple[float, ...]
+
+    def stats(self) -> dict[str, float]:
+        n = len(self.values)
+        mean = sum(self.values) / n
+        std = math.sqrt(sum((v - mean) ** 2 for v in self.values) / n)
+        return {"mean": mean, "min": min(self.values), "max": max(self.values), "std": std}
+
+
+def tolerance(
+    problem: Problem, q: Quantity, tol: float | Mapping[str, float] = 0.05, runs: int = 500, seed: int = 0
+) -> Spread:
+    """Each part with a value given, varied within its tolerance (``tol``: every resistor, capacitor and
+    inductor alike; by kind prefix, ``{"C": 0.1}``) — solved once with them as letters, then each build."""
+    of = {
+        k: (tol.get(k.kind.prefix, 0.0) if isinstance(tol, Mapping) else tol)
+        for k in problem.given
+        if isinstance(k, Element) and k.kind.positive
+    }
+    varied = {k: float(cast(sp.Expr, problem.given[k])) for k, t in of.items() if t}
+    letters = {k: sp.Symbol(f"tol_{i}") for i, k in enumerate(varied)}
+    h = solve(Problem(problem.circuit, {**problem.given, **letters}), None)(q)
+    at = sp.lambdify(list(letters.values()), h, "math")
+    rng = random.Random(seed)
+    values = tuple(float(at(*(v * (1 + rng.uniform(-of[k], of[k])) for k, v in varied.items()))) for _ in range(runs))
+    return Spread(values)

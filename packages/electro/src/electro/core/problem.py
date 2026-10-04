@@ -544,7 +544,8 @@ def equations(problem: Problem, analysis: Analysis, sources: sp.Expr | int = 1) 
         x for choice in choices for w in choice for eq in w.equations for x in _symbols_in(eq.expr)
     }
     in_data = {x for v in values.values() for x in _symbols_in(sp.sympify(v))}  # (a value "R": a symbol)
-    unknowns = (found - in_data - {TIME} - {x for x in found if x.name.endswith("⁻")}) | (params & found)
+    of_analysis = _symbols_in(analysis.omega) if isinstance(analysis, AC) else set()  # (ω as a letter: a response)
+    unknowns = (found - in_data - of_analysis - {TIME} - {x for x in found if x.name.endswith("⁻")}) | (params & found)
     positive = frozenset(s.param(e, w) for e, _ in s.net.parts for w in e.kind.positive) & unknowns
     return System(eqs, tuple(sorted(unknowns, key=str)), s, choices, positive, frozenset(params & found))
 

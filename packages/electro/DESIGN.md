@@ -917,6 +917,30 @@ Zadania z `test_school.py` przeniesione jedno do jednego, z tymi samymi liczbami
   To cena tożsamości obiektów (F7, F8). Do rozważenia: skróty dla prostych łańcuchów, które same tworzą
   elementy i zwracają je do danych.
 
+### 13.5 Luki domknięte (wszystkie zadania szkolne biblioteki działają na prototypie)
+
+Każda bez zmiany rdzenia — wszystko jako dane rodzaju elementu, funkcje na `solve` albo złożenie:
+
+| luka | jak |
+|---|---|
+| ujemny opór | rodzaj mówi, które parametry są dodatnie (`Kind.positive`); ujemny wynik = sprzeczność, odfiltrowany z wariantów |
+| które dane są sprzeczne | `Contradiction.data`: te, bez których zadanie pasuje (sprawdzane po kolei) |
+| oba rozwiązania | `Ambiguous.options`: każde z wartościami niewiadomych parametrów; warunek między wielkościami (`U(r1) = 2·U(r2)`) wybiera |
+| czego brakuje | `Solution.answers` → `MissingData`: ile danych brakuje (wolne niewiadome szukanych) i które pojedyncze wielkości by wystarczyły; to, co się dało, zostaje |
+| moc w AC | średnia ½·Re(U·I*) — `Solution` wie, jaką analizą powstało |
+| nieznany element | `Hole` = element bez prawa (norator); `fill` próbuje kabel, przerwę, rezystor, źródło napięcia, źródło prądu — zwykłym `solve`, pierwszy bez sprzeczności |
+| transformator | przez strumień i indukcyjność magnesowania, jak prawdziwy: w AC przekładnia, w DC uzwojenie = zwarcie — bez `if DC` w elemencie |
+| cewki sprzężone | rodzaj z L₁, L₂, M i `D` |
+| trójfazowe | **nic w bibliotece**: trzy źródła złożone funkcją (F13) |
+| Bode, przemiatanie, tolerancje | czyste funkcje na `solve`; Bode i tolerancje rozwiązane raz z ω / wartościami jako literami, potem tylko liczby |
+
+Stan: 200 testów zielonych (prototyp ~2100 linii). Przy pisaniu wyszły jeszcze: symbol ω analizy nie może
+trafiać do niewiadomych; dane opisane zapisem elektroniki („1u") czyta jeden wspólny czytnik.
+
+**Czego prototyp dalej nie ma (względem biblioteki):** kroków podanych jako wzory do wyświetlenia (są kroki
+z pochodzeniem, bez ładnego formatu), generowania kodu, importu SPICE, rysowania, urządzeń (Arduino, Pico,
+wyświetlacze, czujniki), szybkiej symulacji w JS. To już nie luki modelu, tylko warstwy nad nim.
+
 ## 14. Otwarte
 
 - Jak pokazać `Given` z wymiarem czasu w zakładce Dane (przełącznik od 1 s, przebieg z pliku).

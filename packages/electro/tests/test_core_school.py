@@ -19,6 +19,7 @@ from electro.core import (
     V,
     VoltageSource,
     at,
+    beside,
     blackbox,
     close,
     loop,
@@ -29,8 +30,6 @@ from electro.core.problem import Ambiguous, Contradiction, MissingData, P
 from electro.core.syntax import CCCS, CCVS, VCCS, Ammeter, OpAmp
 from electro.core.syntax import Capacitor as C
 from electro.values import parse
-
-GAP = pytest.mark.xfail(strict=True)
 
 
 def test_divider_with_unknown_resistor():
@@ -144,9 +143,57 @@ def test_ac_power_is_average():
     assert s(P(r)) == sp.Rational(1, 4000) and s(P(c)) == 0  # ½·|I|²·R, |I| = 1/√2 mA
 
 
-@GAP
+def _rc(c_value="1u"):
+    e, r, c = VoltageSource("E"), Resistor("R"), Capacitor("C")
+    a = Node("A")
+    return Problem((GND >> e >> r >> a) @ (a >> c >> GND), {e: 12, r: "1k", c: c_value}), e, r, c, a
+
+
 def test_bode_rc_low_pass():
-    raise NotImplementedError("bode, sweep, tolerance: the analyses over a range are not in the prototype")
+    from electro.core.methods import respond
+
+    p, e, _, _, a = _rc()
+    resp = respond(p, V(a), e)
+
+    def at(f):
+        return min(range(len(resp.f)), key=lambda k: abs(resp.f[k] - f))
+
+    fc = 1 / (2 * 3.14159265 * 1e-3)
+    assert resp.gain_db[0] == pytest.approx(0, abs=0.05)
+    assert resp.gain_db[at(fc)] == pytest.approx(-3, abs=0.1) and resp.phase_deg[at(fc)] == pytest.approx(-45, abs=1)
+    assert resp.gain_db[at(1e5)] - resp.gain_db[at(1e4)] == pytest.approx(-20, abs=0.5)  # −20 dB a decade
+    [corner] = resp.cutoffs()
+    assert corner == pytest.approx(fc, rel=0.01)
+
+
+def test_sweep_a_divider():
+    from electro.core.methods import sweep
+
+    e, r1, r2 = VoltageSource("E"), Resistor("R_1"), Resistor("R_2")
+    a = Node("A")
+    p = Problem((GND >> e >> r1 >> a) @ (a >> r2 >> GND), {e: 12, r1: "1k"})
+    out = sweep(p, r2, (100, 5050, 10000), V(a))
+    assert out.values == (100, 5050, 10000) and out.results[0] == sp.Rational(12 * 100, 1100)
+
+
+def test_sweep_at_a_frequency_gives_amplitudes():
+    from electro.core.methods import sweep
+
+    p, e, _, c, _ = _rc()
+    out = sweep(Problem(p.circuit, {**p.given, e: 1}), c, ("1u", "1n"), U(c), AC(sp.Integer(1000)))
+    assert [abs(complex(x)) for x in out.results] == pytest.approx([1 / abs(1 + 1j), 1 / abs(1 + 1e-3j)])
+
+
+def test_tolerance_of_a_divider():
+    from electro.core.methods import tolerance
+
+    e, r1, r2 = VoltageSource("E"), Resistor("R_1"), Resistor("R_2")
+    a = Node("A")
+    p = Problem((GND >> e >> r1 >> a) @ (a >> r2 >> GND), {e: 12, r1: "10k", r2: "10k"})
+    s = tolerance(p, V(a), tol=0.05, runs=400).stats()
+    assert s["mean"] == pytest.approx(6, abs=0.03) and 5.7 <= s["min"] and s["max"] <= 6.3
+    assert tolerance(p, V(a), tol=0.05, runs=400) == tolerance(p, V(a), tol=0.05, runs=400)  # (a seed: the same)
+    assert tolerance(p, V(a), tol={"C": 0.1}, runs=5).stats()["std"] == 0  # (no resistor varies)
 
 
 def test_dc_capacitor_blocks():
@@ -259,9 +306,42 @@ def test_missing_data_counts_redundant_givens_once():
     assert err.value.needed == 2
 
 
-@GAP
+def _with_hole(given_current):
+    from electro.core.syntax import Hole
+
+    e, r, x = VoltageSource("E"), Resistor("R_1"), Hole("X")
+    return Problem(GND >> e >> r >> Node() >> x >> GND, {e: 12, r: 10, I(r): given_current}), x
+
+
 def test_hole_becomes_the_simplest_element():
-    raise NotImplementedError("Hole: an unknown element, filled with the simplest that fits")
+    from electro.core.methods import fill
+
+    filled = fill(*_with_hole("0.5"))
+    assert filled.by.kind is Resistor and filled.solution(Parameter(filled.by)) == 14
+    assert solve(filled.problem)(I(filled.by)) == sp.Rational(1, 2)  # (the filled circuit gives the data back)
+
+
+def test_hole_needs_a_source_when_current_flows_backwards():
+    from electro.core.methods import fill
+
+    filled = fill(*_with_hole("-0.5"))  # (a resistor would be −34 Ω: never)
+    assert filled.by.kind is VoltageSource and filled.solution(Parameter(filled.by)) == -17  # (+ at its first end)
+
+
+def test_hole_can_be_a_plain_wire():
+    from electro.core.methods import fill
+    from electro.core.syntax import Wire
+
+    assert fill(*_with_hole("1,2")).by.kind is Wire  # (12 V on 10 Ω alone: nothing else in the way)
+
+
+def test_hole_with_no_current_is_a_break():
+    from electro.core.methods import fill
+    from electro.core.syntax import Hole, Open
+
+    e, r, x = VoltageSource("E"), Resistor("R_1"), Hole("X")
+    filled = fill(Problem(loop(e, r, x), {e: 12, r: 10, I(r): 0}), x)
+    assert filled.by.kind is Open and filled.solution(U(filled.by)) == 12  # (all the voltage across the break)
 
 
 def test_unknown_resistor_cannot_be_negative():
@@ -326,9 +406,79 @@ def test_the_gain_is_found_from_the_data():
     assert s(Parameter(beta)) == 100
 
 
-@GAP
-def test_ideal_transformer_coupled_inductors_three_phase():
-    raise NotImplementedError("a transformer, coupled inductors, three-phase sources: kinds not written yet")
+def test_ideal_transformer_steps_down():
+    from electro.core.syntax import Transformer
+
+    e, tr, r = VoltageSource("E"), Transformer("n"), Resistor("R")
+    a, b = Node("A"), Node("B")
+    s = solve(
+        Problem((GND >> e >> a) @ at(tr, a, GND, b, GND) @ (b >> r >> GND), {e: 10, "n": 2, r: 10}), AC(sp.Integer(100))
+    )
+    assert (s(U(r)), s(I(r))) == (5, sp.Rational(1, 2))  # half the voltage, twice the current…
+    assert complex(s(I(tr, "p+"))) == pytest.approx(0.25, abs=1e-6)  # …and the core's own next to nothing
+    # DC: the flux does not change — a winding is a short
+    e, r1, tr = VoltageSource("E"), Resistor("R"), Transformer("n")
+    s_, a = Node("S"), Node("A")
+    assert (
+        solve(Problem((GND >> e >> s_) @ (s_ >> r1 >> a) @ at(tr, a, GND, GND, Node()), {e: 10, r1: 5, "n": 2}))(I(r1))
+        == 2
+    )
+
+
+def test_coupled_inductors():
+    from electro.core.syntax import Coupled
+
+    e, r, m, rl = VoltageSource("E"), Resistor("R"), Coupled("M"), Resistor("R_L")
+    a, b, c = Node("A"), Node("B"), Node("C")
+    circuit = (GND >> e >> a) @ (a >> r >> b) @ at(m, b, GND, c, GND) @ (c >> rl >> GND)
+    s = solve(Problem(circuit, {e: 1, r: 1, m: {"": "1m", "L1": "2m", "L2": "3m"}, rl: "1G"}), AC(sp.Integer(1000)))
+    i1 = complex(s(I(m, "p+")))
+    assert i1 == pytest.approx(1 / (1 + 2j), rel=1e-6) and complex(s(V(c))) == pytest.approx(1j * i1, rel=1e-6)
+
+
+def _three_phase(loads):
+    """Three sources from a neutral, 120° apart — nothing of its own: three elements composed (F13)."""
+    sources = [VoltageSource(f"E_{k}") for k in (1, 2, 3)]
+    lines = [Node(f"L{k}") for k in (1, 2, 3)]
+    given = {e: f"230∠{a}" for e, a in zip(sources, (0, -120, 120), strict=True)}
+    return beside(*(GND >> e >> line for e, line in zip(sources, lines, strict=True))), lines, sources, given
+
+
+def test_three_phase_star_and_delta():
+    from electro.core import beside
+
+    # a balanced star with its neutral: nothing flows in the neutral
+    r = [Resistor(f"R_{k}") for k in (1, 2, 3)]
+    supply, lines, sources, given = _three_phase(r)
+    star = Node("S")
+    s = solve(
+        Problem(
+            supply
+            @ beside(*(line >> x >> star for line, x in zip(lines, r, strict=True)))
+            @ (star >> Resistor("R_n") >> GND),
+            {**given, **dict.fromkeys(r, 10), "R_n": 1},
+        ),
+        AC(sp.Integer(314)),
+    )
+    assert sp.simplify(s(V(star))) == 0
+    # unbalanced, three wires: the star point floats away from the neutral
+    r = [Resistor(f"R_{k}") for k in (1, 2, 3)]
+    supply, lines, sources, given = _three_phase(r)
+    star = Node("S")
+    s = solve(
+        Problem(
+            supply @ beside(*(line >> x >> star for line, x in zip(lines, r, strict=True))),
+            {**given, **dict(zip(r, (10, 20, 30), strict=True))},
+        ),
+        AC(sp.Integer(314)),
+    )
+    assert abs(complex(s(V(star)))) > 1
+    # delta: each load between two lines, at √3 the phase voltage and 30° ahead
+    r = [Resistor(f"R_{k}") for k in (1, 2, 3)]
+    supply, (l1, l2, l3), sources, given = _three_phase(r)
+    delta = (l1 >> r[0] >> l2) @ (l2 >> r[1] >> l3) @ (l3 >> r[2] >> l1)
+    s = solve(Problem(supply @ delta, {**given, **dict.fromkeys(r, 10)}), AC(sp.Integer(314)))
+    assert sp.simplify(sp.expand(s(U(r[0])) - 230 * sp.sqrt(3) * sp.exp(sp.I * sp.pi / 6), complex=True)) == 0
 
 
 def test_phasor_strings():

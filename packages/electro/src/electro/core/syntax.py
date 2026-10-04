@@ -356,6 +356,12 @@ CurrentSource = two_terminal("current_source", "J", "A", lambda U, I, J: I - J, 
 # the nullor's halves: a nullator neither drops nor passes anything (two laws), a norator anything (none)
 Nullator = Kind("nullator", "N", "", ("a", "b"), lambda t, _: [t.V["a"] - t.V["b"], t.I["a"]], parameters=())
 Norator = Kind("norator", "O", "", ("a", "b"), lambda t, _: [], parameters=())
+# a hole: an element not known — no law at all (anything); ``methods.fill`` finds the simplest that fits
+Hole = Kind("hole", "X", "", ("a", "b"), lambda t, _: [], symmetric=False, parameters=())
+# a wire and a break, as elements (what a hole may turn out to be)
+Wire = Kind("wire", "W", "", ("a", "b"), lambda t, _: [t.V["a"] - t.V["b"]], parameters=())
+Open = Kind("open", "O", "", ("a", "b"), lambda t, _: [t.I["a"]], parameters=())
+
 # an ideal ammeter: a wire, its current what is read (a meter is an observation: F5)
 Ammeter = Kind("ammeter", "A", "A", ("a", "b"), lambda t, _: [t.V["a"] - t.V["b"]], parameters=())
 # an ideal op-amp: its inputs at one potential, taking nothing; its output whatever it takes — returned
@@ -391,6 +397,49 @@ def _u_in(t: Terminals) -> sp.Expr:
 VCCS = _controlled("vccs", "VCCS", "S", lambda t, g: -t.I["out+"] - g * _u_in(t), senses_current=False)
 CCVS = _controlled("ccvs", "CCVS", "Ω", lambda t, r: t.V["out+"] - t.V["out-"] - r * t.I["in+"], senses_current=True)
 CCCS = _controlled("cccs", "CCCS", "", lambda t, k: -t.I["out+"] - k * t.I["in+"], senses_current=True)
+
+
+def _windings(t: Terminals) -> tuple[sp.Expr, sp.Expr, sp.Expr, sp.Expr]:
+    """Two windings' voltages and the currents into them (primary p+ p-, secondary s+ s-)."""
+    return t.V["p+"] - t.V["p-"], t.V["s+"] - t.V["s-"], t.I["p+"], t.I["s+"]
+
+
+def _transformer(t: Terminals, p: Params) -> list[sp.Expr]:
+    u1, u2, i1, i2 = _windings(t)
+    flux = t.inner("flux")
+    return [
+        u1 - D(flux),  # each winding sees the flux change (n turns to the secondary's one)
+        p[""] * u2 - D(flux),
+        flux - p["L_m"] * (i1 + i2 / p[""]),  # what is left over magnetizes the core
+        t.I["p+"] + t.I["p-"],  # (each winding its own loop)
+    ]
+
+
+# a transformer of ratio n (U₁ = n·U₂ — through its flux, so in DC a winding is a short: the flux does not
+# change), L_m its magnetizing inductance (large: what it takes to magnetize the core, next to nothing)
+Transformer = Kind(
+    "transformer",
+    "TR",
+    "",
+    ("p+", "p-", "s+", "s-"),
+    _transformer,
+    symmetric=False,
+    parameters=("", "L_m"),
+    defaults=(("L_m", 10**6),),
+)
+
+
+def _coupled(t: Terminals, p: Params) -> list[sp.Expr]:
+    u1, u2, i1, i2 = _windings(t)
+    return [
+        u1 - p["L1"] * D(i1) - p[""] * D(i2),
+        u2 - p[""] * D(i1) - p["L2"] * D(i2),
+        t.I["p+"] + t.I["p-"],
+    ]
+
+
+# two coupled inductors: L1, L2, and M (main) between them
+Coupled = Kind("coupled", "M", "H", ("p+", "p-", "s+", "s-"), _coupled, symmetric=False, parameters=("", "L1", "L2"))
 
 # a voltage-controlled voltage source: U_out = μ·U_in, its input takes no current
 VCVS = Kind(
