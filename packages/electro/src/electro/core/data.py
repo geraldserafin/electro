@@ -14,7 +14,7 @@ QUANTITIES = {Current: "I", Voltage: "U", Parameter: "value"}
 
 def problem_to_data(p: Problem) -> dict:
     net = netlist(p.circuit)
-    index = {id(e): k for k, (e, _, _) in enumerate(net.parts)}
+    index = {id(e): k for k, (e, _) in enumerate(net.parts)}
 
     def quantity(q: Quantity) -> list:
         match q:
@@ -31,7 +31,7 @@ def problem_to_data(p: Problem) -> dict:
             {"net": q.name} if isinstance(q, Net) else {"label": q.label} if isinstance(q, Node) else {}
             for q in (dict(net.named).get(n) for n in range(net.size))
         ],
-        "elements": [{"kind": e.kind.name, "name": e.name, "between": [a, b]} for e, a, b in net.parts],
+        "elements": [{"kind": e.kind.name, "name": e.name, "at": list(ns)} for e, ns in net.parts],
         "given": [
             [
                 ["element", index[id(k)]]
@@ -54,7 +54,7 @@ def _point(net, at) -> int:
 def problem_from_data(d: dict) -> tuple[Problem, list[Element]]:
     points = [Net(p["net"]) if "net" in p else Node(p.get("label")) for p in d["points"]]
     elements = [KINDS[e["kind"]](e["name"]) for e in d["elements"]]
-    circuit = rebuild(((e, *x["between"]) for e, x in zip(elements, d["elements"], strict=True)), enumerate(points))
+    circuit = rebuild(((e, tuple(x["at"])) for e, x in zip(elements, d["elements"], strict=True)), enumerate(points))
 
     def quantity(q: list) -> Quantity:
         match q:

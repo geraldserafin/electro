@@ -15,8 +15,6 @@ import sympy as sp
 from .problem import (
     AC,
     DC,
-    PORT_I,
-    PORT_U,
     Analysis,
     Current,
     Parameter,
@@ -30,7 +28,7 @@ from .problem import (
     subs,
     symbols,
 )
-from .syntax import GND, KINDS, Element, Net, Node, netlist, rebuild
+from .syntax import GND, KINDS, Element, Net, Node, Terminals, netlist, rebuild
 
 # --------------------------------------------------------------------------------------- what the laws say
 
@@ -39,20 +37,30 @@ class NotLinear(ValueError):
     """The method holds only for a linear circuit; this element's law is not."""
 
 
+def _laws(e: Element) -> tuple[list[sp.Expr], list[sp.Symbol]]:
+    """Its laws over symbols of its own (a potential and a current per terminal), and those symbols."""
+    ts = e.kind.terminals
+    V = {t: sp.Symbol(f"v_{t}") for t in ts}
+    I = {t: sp.Symbol(f"i_{t}") for t in ts}  # noqa: E741
+    laws = [sp.sympify(x) for x in e.kind.laws(Terminals(V, I, lambda n: sp.Symbol(f"x_{n}")), sp.Symbol("p"))]
+    return laws, [*V.values(), *I.values()]
+
+
 def is_linear(e: Element, analysis: Analysis | None = None) -> bool:
-    """Its law of degree one in U and I (a resistor, a source, a capacitor read by any analysis)."""
-    law = sp.expand(interpret(sp.sympify(e.kind.law(PORT_U, PORT_I, sp.Symbol("p"))), analysis or DC()))
+    """Its laws of degree one in its potentials and currents (a resistor, a source, a capacitor read by
+    any analysis, a controlled source)."""
+    laws, xs = _laws(e)
     try:
-        return sp.Poly(law, PORT_U, PORT_I).total_degree() <= 1
+        return all(sp.Poly(sp.expand(interpret(law, analysis or DC())), *xs).total_degree() <= 1 for law in laws)
     except sp.PolynomialError:  # (exp(U), a diode's: not a polynomial at all)
         return False
 
 
 def is_source(e: Element) -> bool:
-    """An independent source: its law keeps a term with neither U nor I in it (``U + E``, ``I − J``).
-    A resistor's parameter multiplies I; a controlled source's term is another element's quantity."""
-    law = sp.sympify(e.kind.law(PORT_U, PORT_I, sp.Symbol("p")))
-    return sp.simplify(law.subs({PORT_U: 0, PORT_I: 0})) != 0
+    """An independent source: a law keeps a term with no potential or current in it (``U + E``, ``I − J``).
+    A resistor's parameter multiplies I; a controlled source's every term is one of its quantities."""
+    laws, xs = _laws(e)
+    return any(sp.simplify(law.subs(dict.fromkeys(xs, 0))) != 0 for law in laws)
 
 
 # --------------------------------------------------------------------------------------- superposition
@@ -67,7 +75,7 @@ class Superposition:
 
 def superposition(problem: Problem, q: Quantity, analysis: DC | AC | None = None) -> Superposition:
     """``q`` as the sum of what each independent source makes of it alone."""
-    elements = [e for e, _, _ in netlist(problem.circuit).parts]
+    elements = [e for e, _ in netlist(problem.circuit).parts]
     for e in elements:
         if not is_linear(e, analysis):
             raise NotLinear(e)
@@ -112,7 +120,7 @@ def _step(problem: Problem, keep: Collection[Element], analysis: Analysis) -> tu
     s = symbols(problem.circuit)
     net = s.net
     held = _keeps(problem, keep)
-    ends = [n for _, a, b in net.parts for n in (a, b)]
+    ends = [n for _, ns in net.parts for n in ns]
     named = dict(net.named)
     asked = {
         p
@@ -122,8 +130,9 @@ def _step(problem: Problem, keep: Collection[Element], analysis: Analysis) -> tu
     }
     # candidates: two elements meeting at a point nothing else touches (series), or on the same two (parallel)
     pairs: list[tuple[str, int, int, int, int, int]] = []  # how, i, j, outer a, outer b, the point between
-    for i, (e, a, b) in enumerate(net.parts):
-        for j, (f, c, d) in enumerate(net.parts):
+    two = [(i, e, *ns) for i, (e, ns) in enumerate(net.parts) if len(ns) == 2]
+    for i, e, a, b in two:
+        for j, f, c, d in two:
             if j <= i or e in held or f in held:
                 continue
             if {a, b} == {c, d} and a != b:
@@ -133,20 +142,19 @@ def _step(problem: Problem, keep: Collection[Element], analysis: Analysis) -> tu
                     outer = [n for n in (a, b) if n != mid] + [n for n in (c, d) if n != mid]
                     pairs.append(("series", i, j, outer[0], outer[1], mid))
     for how, i, j, a, b, _ in pairs:
-        two = (net.parts[i], net.parts[j])
-        relation = port(two, a, b, s.param, analysis)
+        relation = port(s, (i, j), a, b, analysis)
         if relation is None:
             continue
         for kind in KINDS:  # (first that fits: a resistor before anything else — an impedance in AC)
             value = matches(relation, kind, analysis)
             if value is None:
                 continue
-            e, f = two[0][0], two[1][0]
+            e, f = net.parts[i][0], net.parts[j][0]
             by = kind(_combined(s.labels[i], s.labels[j]))
-            parts = [p for k, p in enumerate(net.parts) if k not in (i, j)] + [(by, a, b)]
+            parts = [p for k, p in enumerate(net.parts) if k not in (i, j)] + [(by, (a, b))]
             known = {s.param(x): v for x, v in problem.values.items() if isinstance(x, Element)}
             known |= {sp.Symbol(x): v for x, v in problem.values.items() if isinstance(x, str)}
-            names = {x.name for x, _, _ in parts}
+            names = {x.name for x, _ in parts}
             given = {
                 k: v
                 for k, v in problem.given.items()

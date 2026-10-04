@@ -716,7 +716,7 @@ Dopiero z nimi da się uczciwie porównać rozmiar i prostotę z obecną bibliot
   tranzystor potrzebują praw nad kilkoma parami (U, I) albo nad wielkościami innego elementu. Typ prawa
   trzeba uogólnić, zanim dojdą — to też sprawdzian F16 („bez wyjątków”).
 
-**Następne kroki prototypu, w kolejności ryzyka:** uogólnione prawo (kilka par U, I; źródło sterowane) →
+**Następne kroki prototypu, w kolejności ryzyka:** ~~uogólnione prawo~~ (zrobione: §13) →
 droga powrotna upraszczania (dzielniki) → zamiana źródeł (szablony dwuelementowe) → dioda (nieliniowość,
 Newton bez ręcznych sztuczek) → przerzutnik (`Pre`, zdarzenia) → jednostki → porównanie z obecną
 biblioteką na jej testach.
@@ -795,7 +795,37 @@ po kroku” dla użytkowników da się zrobić także przed przebudową.
 Zysk: nowy rodzaj elementu wchodzi do metod sam (kondensator w AC upraszcza się z rezystorem do impedancji
 bez linijki o kondensatorze w warstwie metod — dopasowanie dzieje się na relacjach).
 
-## 13. Otwarte
+## 13. Rdzeń: wszystko jest relacją
+
+Najmniejsza podstawa: **relacja** (zmienne + lista równań, każde z metką pochodzenia), `join` (wspólna
+zmienna = to samo), `hide` (co widać z zewnątrz). To dokładnie kategoria **Rel**: złożenie relacji =
+`join` + wyrugowanie wspólnych zmiennych; węzeł = pająk (wszystkie potencjały jednym, suma prądów zero),
+co czyni ją kategorią hipergrafową jak nasze obwody. Składnia (`>>`, `@`, `Node`, `Resistor`) to cukier
+kompilowany do relacji; struktura (co jest czym, nazwy) to adnotacje — potrzebne rysunkowi i metodom,
+nie matematyce.
+
+**Ogólna postać elementu** (koniec „brakuje nam X”): rodzaj = końcówki + **lista** równań nad ich
+potencjałami, prądami do nich i własnymi zmiennymi (`Terminals.inner`), w czasie (`D`, `Pre`, …).
+Dwukońcówkowe prawo `(U, I, p)` to skrót (`two_terminal`). Zachowanie ładunku **z konstrukcji**: prąd
+ostatniej końcówki to minus suma pozostałych — żadne prawo go nie złamie.
+
+Dlaczego to wystarcza: element skupiony to z definicji relacja na przebiegach swoich końcówek (Willems);
+zmienne własne + `D` to realizacja w postaci stanu (każdy przyczynowy układ o skończonej pamięci);
+`Pre` — skoki dyskretne. Poza tym tylko granice samej teorii obwodów skupionych: równania cząstkowe
+(linia ze stratami — przybliża drabinka), szum (procesy losowe), pola.
+
+**Kroki rozwiązania przy relacjach:** każde równanie niesie `Origin` (prawo elementu i które z jego praw /
+Kirchhoff w punkcie / dana). Rozwiązanie jak ręką: równanie z jedną niewiadomą na raz, z metką jako
+uzasadnieniem; gdy żadnego nie ma — reszta razem (pętla: w podręczniku równanie oczkowe). Test: V_A z
+prawa źródła, prądy rezystorów z ich praw (Ohm), prąd źródła z Kirchhoffa w A.
+
+**Prototyp na tym rdzeniu** (19 testów; wszystkie wcześniejsze przeszły bez zmian treści):
+źródło napięcia sterowane napięciem (4 końcówki, 3 równania) — i `is_source` sam je odróżnia od źródła
+niezależnego; nullator (2 równania) i norator (0) — wzmacniacz odwracający z nullora i dwóch rezystorów
+daje −R₂/R₁; cewka zapisana ogólnie przez swój strumień (zmienna własna) liczy się w czasie identycznie
+jak wbudowana. Żadna z tych rzeczy nie wymagała zmiany silnika.
+
+## 14. Otwarte
 
 - Jak pokazać `Given` z wymiarem czasu w zakładce Dane (przełącznik od 1 s, przebieg z pliku).
 - `Net` a etykiety na schemacie: czy każda etykieta to `Net`, czy tylko jawnie globalne.

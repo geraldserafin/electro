@@ -3,19 +3,22 @@
 The prototype of DESIGN.md §9: elements (a kind and the name of their parameter, no value), spiders
 (ends meeting in a point), nodes (a point with an identity) and nets (a point everyone named alike
 shares); ``>>`` series, ``@`` side by side. Everything else is built from these.
+
+An element's kind says what it is as a relation (DESIGN.md §12–13): its terminals, and a list of
+equations over their potentials and the currents into it (and its own inner quantities) — any number of
+them, in time (``D``, ``Pre``, …). A two-terminal law of ``U`` and ``I`` is only a shorthand of that.
 """
 
 from __future__ import annotations
 
-from collections.abc import Callable, Iterable
+from collections.abc import Callable, Iterable, Mapping, Sequence
 from dataclasses import dataclass, field
 from functools import cache, reduce
 
 import sympy as sp
 
-D = sp.Function("D")  # the derivative in time: an element's law speaks of time only through it
-
-Law = Callable[[sp.Expr, sp.Expr, sp.Expr], sp.Expr]  # (U, I, its parameter) -> what is zero
+D = sp.Function("D")  # the derivative in time
+Pre = sp.Function("Pre")  # the value just before (memory)
 
 
 class JoinsNodes(ValueError):
@@ -42,16 +45,30 @@ class Circuit:
 
 
 @dataclass(frozen=True)
-class Kind:
-    """What an element is apart from any one of them: its law, said once, in time (``D`` = d/dt).
+class Terminals:
+    """What an element's law speaks of: each terminal's potential, the current into it there, and its
+    own inner quantities by name (a flux, a charge, a state)."""
 
-    ``U`` is the drop from its first end to its second, ``I`` flows from the first to the second.
-    """
+    V: Mapping[str, sp.Expr]
+    I: Mapping[str, sp.Expr]  # noqa: E741
+    inner: Callable[[str], sp.Symbol]
+
+
+Laws = Callable[[Terminals, sp.Symbol], Sequence[sp.Expr]]  # -> what is zero (any number of them)
+
+
+@dataclass(frozen=True)
+class Kind:
+    """What an element is apart from any one of them: its terminals and its laws, said once, in time.
+
+    Currents into it always add up to zero (charge kept): the engine gives the last terminal's as minus
+    the others', so no law can break it."""
 
     name: str
     prefix: str
     unit: str
-    law: Law = field(repr=False)
+    terminals: tuple[str, ...]
+    laws: Laws = field(repr=False)
     symmetric: bool = True  # turned around: the same circuit (only its arrows' signs change)
 
     def __call__(self, name: str | None = None) -> Element:
@@ -59,6 +76,13 @@ class Kind:
 
     def __repr__(self) -> str:
         return self.name
+
+
+def two_terminal(
+    name: str, prefix: str, unit: str, law: Callable[[sp.Expr, sp.Expr, sp.Symbol], sp.Expr], symmetric: bool = True
+) -> Kind:
+    """The shorthand: one law of ``U`` (the drop from ``a`` to ``b``) and ``I`` (from ``a`` to ``b``)."""
+    return Kind(name, prefix, unit, ("a", "b"), lambda t, p: [law(t.V["a"] - t.V["b"], t.I["a"], p)], symmetric)
 
 
 @dataclass(frozen=True, eq=False)  # (eq=False: an element is itself — two are two, whatever their names)
@@ -139,18 +163,26 @@ def loop(*parts: Circuit) -> Circuit:
     return close(series(*parts))
 
 
+def at(e: Element, *points: Circuit) -> Circuit:
+    """An element with each terminal on a point, in its terminals' order: ``at(t, b, c, e)``."""
+    if len(e.kind.terminals) == 2:
+        return points[0] >> e >> points[1]
+    return e >> beside(*points)
+
+
 # --------------------------------------------------------------------------------------- netlist
 
 Point = Node | Net
+Part = tuple[Element, tuple[int, ...]]  # an element and the point of each of its terminals
 
 
 @dataclass(frozen=True)
 class Netlist:
-    """The normal form: points ``0..size-1``, each element between two of them, the ends on each side,
-    and which points are a ``Node`` or a ``Net`` (bound: not free ends)."""
+    """The normal form: points ``0..size-1``, each element with the point of each terminal, the ends on
+    each side, and which points are a ``Node`` or a ``Net`` (bound: not free ends)."""
 
     size: int
-    parts: tuple[tuple[Element, int, int], ...]
+    parts: tuple[Part, ...]
     left: tuple[int, ...]
     right: tuple[int, ...]
     named: tuple[tuple[int, Point], ...] = ()
@@ -163,7 +195,7 @@ def _point(dom: int, cod: int, at: Point | None = None) -> Netlist:
 def _shift(net: Netlist, k: int) -> Netlist:
     return Netlist(
         net.size,
-        tuple((e, a + k, b + k) for e, a, b in net.parts),
+        tuple((e, tuple(n + k for n in ns)) for e, ns in net.parts),
         tuple(n + k for n in net.left),
         tuple(n + k for n in net.right),
         tuple((n + k, p) for n, p in net.named),
@@ -187,23 +219,26 @@ def _glued(net: Netlist, pairs: Iterable[tuple[int, int]], left: tuple[int, ...]
     roots = sorted({find(n) for n in range(net.size)})
     new = {r: i for i, r in enumerate(roots)}
 
-    def at(n: int) -> int:
+    def to(n: int) -> int:
         return new[find(n)]
 
     return Netlist(
         len(roots),
-        tuple((e, at(a), at(b)) for e, a, b in net.parts),
-        tuple(at(n) for n in left),
-        tuple(at(n) for n in right),
-        tuple(dict((at(n), p) for n, p in net.named).items()),
+        tuple((e, tuple(to(n) for n in ns)) for e, ns in net.parts),
+        tuple(to(n) for n in left),
+        tuple(to(n) for n in right),
+        tuple(dict((to(n), p) for n, p in net.named).items()),
     )
 
 
 @cache
 def netlist(c: Circuit) -> Netlist:
     match c:
-        case Element():
-            return Netlist(2, ((c, 0, 1),), (0,), (1,))
+        case Element(kind):
+            n = len(kind.terminals)
+            ends = tuple(range(n))
+            # (two terminals: 1 → 1, one each side; any other number: 0 → n, all on the right — see ``at``)
+            return Netlist(n, ((c, ends),), (0,), (1,)) if n == 2 else Netlist(n, ((c, ends),), (), ends)
         case Spider(dom, cod):
             return _point(dom, cod)
         case Node() | Net():
@@ -214,11 +249,11 @@ def netlist(c: Circuit) -> Netlist:
                 raise ValueError(f"series: {len(a.right)} ends into {len(b.left)}")
             b = _shift(b, a.size)
             names = dict(a.named) | dict(b.named)
-            for x, y in zip(a.right, b.left):
+            for x, y in zip(a.right, b.left, strict=True):
                 if x in names and y in names and names[x] != names[y]:
                     raise JoinsNodes(f"{names[x]} and {names[y]}")
             both = Netlist(a.size + b.size, a.parts + b.parts, (), (), a.named + b.named)
-            return _checked(_glued(both, zip(a.right, b.left), a.left, b.right))
+            return _checked(_glued(both, zip(a.right, b.left, strict=True), a.left, b.right))
         case Tensor(f, g):
             a, b = netlist(f), _shift(netlist(g), netlist(f).size)
             both = Netlist(a.size + b.size, a.parts + b.parts, a.left + b.left, a.right + b.right, a.named + b.named)
@@ -227,23 +262,22 @@ def netlist(c: Circuit) -> Netlist:
 
 
 def _checked(net: Netlist) -> Netlist:
-    elements = [e for e, _, _ in net.parts]
+    elements = [e for e, _ in net.parts]
     if len(set(elements)) != len(elements):
         raise ElementTwice(next(e for e in elements if elements.count(e) > 1).name or "an element")
     return net
 
 
-def rebuild(parts: Iterable[tuple[Element, int, int]], named: Iterable[tuple[int, Point]] = ()) -> Circuit:
-    """A closed circuit from its points: each element from one to the other; a point keeps its ``Node``
-    or ``Net``, the others get fresh nodes (the inverse of ``netlist`` for a closed one)."""
-    parts = tuple(parts)
+def rebuild(parts: Iterable[Part], named: Iterable[tuple[int, Point]] = ()) -> Circuit:
+    """A closed circuit from its points: each element on its points; a point keeps its ``Node`` or ``Net``,
+    the others get fresh nodes (the inverse of ``netlist`` for a closed one)."""
     shown = dict(named)
     points: dict[int, Point] = {}
 
-    def at(n: int) -> Point:
+    def point(n: int) -> Point:
         return points.setdefault(n, shown.get(n) or Node())
 
-    return beside(*(at(a) >> e >> at(b) for e, a, b in parts))
+    return beside(*(at(e, *(point(n) for n in ns)) for e, ns in parts))
 
 
 def free(c: Circuit) -> tuple[int, int]:
@@ -260,11 +294,27 @@ def is_closed(c: Circuit) -> bool:
 
 # --------------------------------------------------------------------------------------- elements
 
-Resistor = Kind("resistor", "R", "Ω", lambda U, I, R: U - R * I)
-Capacitor = Kind("capacitor", "C", "F", lambda U, I, C: I - C * D(U))
-Inductor = Kind("inductor", "L", "H", lambda U, I, L: U - L * D(I))
+Resistor = two_terminal("resistor", "R", "Ω", lambda U, I, R: U - R * I)
+Capacitor = two_terminal("capacitor", "C", "F", lambda U, I, C: I - C * D(U))
+Inductor = two_terminal("inductor", "L", "H", lambda U, I, L: U - L * D(I))
 # a source's + on its second end: V_b − V_a = E, i.e. U = −E; a current source pushes J from a to b
-VoltageSource = Kind("voltage_source", "E", "V", lambda U, I, E: U + E, symmetric=False)
-CurrentSource = Kind("current_source", "J", "A", lambda U, I, J: I - J, symmetric=False)
+VoltageSource = two_terminal("voltage_source", "E", "V", lambda U, I, E: U + E, symmetric=False)
+CurrentSource = two_terminal("current_source", "J", "A", lambda U, I, J: I - J, symmetric=False)
+# the nullor's halves: a nullator neither drops nor passes anything (two laws), a norator anything (none)
+Nullator = Kind("nullator", "N", "", ("a", "b"), lambda t, _: [t.V["a"] - t.V["b"], t.I["a"]])
+Norator = Kind("norator", "O", "", ("a", "b"), lambda t, _: [])
+# a voltage-controlled voltage source: U_out = μ·U_in, its input takes no current
+VCVS = Kind(
+    "vcvs",
+    "VCVS",
+    "",
+    ("in+", "in-", "out+", "out-"),
+    lambda t, mu: [
+        (t.V["out+"] - t.V["out-"]) - mu * (t.V["in+"] - t.V["in-"]),
+        t.I["in+"],
+        t.I["in-"],
+    ],
+    symmetric=False,
+)
 
 KINDS: tuple[Kind, ...] = (Resistor, Capacitor, Inductor, VoltageSource, CurrentSource)

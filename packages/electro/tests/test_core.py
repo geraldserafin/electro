@@ -9,8 +9,10 @@ from electro.core import (
     AC,
     GND,
     Capacitor,
+    D,
     ElementTwice,
     I,
+    Inductor,
     JoinsNodes,
     Kind,
     Node,
@@ -30,6 +32,7 @@ from electro.core import (
     problem_to_data,
     simulate,
     solve,
+    two_terminal,
 )
 
 
@@ -117,7 +120,7 @@ def test_rc_on_paper_where_it_ends_in_time_how_it_gets_there_at_omega_its_phasor
 
 def test_a_new_element_is_one_law_and_nothing_else():
     # a conductance, unknown to everything else: given by its law alone, it works in every analysis
-    Conductance = Kind("conductance", "G", "S", lambda u, i, g: i - g * u)
+    Conductance = two_terminal("conductance", "G", "S", lambda u, i, g: i - g * u)
     e, g = VoltageSource("E"), Conductance("G")
     p = Problem(GND >> e >> g >> GND, {e: 10, g: "0.5"})
     assert solve(p)(I(g)) == 5 and solve(p, AC(sp.Integer(1)))(I(g)) == 5
@@ -136,7 +139,7 @@ def test_written_down_and_read_back_it_solves_the_same():
 
 
 def test_a_pieces_black_box_matched_to_a_kind_finds_the_rules_nobody_wrote():
-    from electro.core.problem import blackbox, matches
+    from electro.core import blackbox, matches
     from electro.core.syntax import CurrentSource
 
     r1, r2 = Resistor("R_1"), Resistor("R_2")
@@ -181,6 +184,67 @@ def test_superposition_each_source_alone_then_summed_and_never_for_a_diode():
     p = Problem(circuit, {e: 12, j: 2, r1: 4, r2: 4})
     s = superposition(p, I(r2))
     assert dict(s.parts) == {e: sp.Rational(3, 2), j: 1} and s.total == solve(p)(I(r2))
-    diode = Kind("diode", "D", "", lambda u, i, i_s: i - i_s * (sp.exp(u) - 1), symmetric=False)
+    diode = two_terminal("diode", "D", "", lambda u, i, i_s: i - i_s * (sp.exp(u) - 1), symmetric=False)
     with pytest.raises(NotLinear):
         superposition(Problem(GND >> e >> diode("D") >> GND, {e: 1, "D": "1e-12"}), I(e))
+
+
+# --- one form of law for everything (DESIGN.md §13): no element needs anything new -------------------
+
+
+def test_steps_say_where_each_value_comes_from():
+    from electro.core import Origin
+
+    e, r1, r2 = VoltageSource("E"), Resistor("R_1"), Resistor("R_2")
+    a = Node("A")
+    s = solve(Problem((GND >> e >> a) @ (a >> r1 >> GND) @ (a >> r2 >> GND), {e: 12, r1: 4, r2: 6}))
+    first = s.steps[0]
+    assert first.found == (sp.Symbol("V_A"),) and first.values == (12,)
+    assert first.because == (Origin("law", e, 0),)  # V_A from the source's law, then Ohm for each:
+    by = {x: step.because for step in s.steps for x in step.found}
+    assert by[sp.Symbol("I_R_1")] == (Origin("law", r1, 0),) and by[sp.Symbol("I_R_2")] == (Origin("law", r2, 0),)
+    assert by[sp.Symbol("I_E")][0].what == "kcl"  # and the source's current from Kirchhoff at A
+    assert s(I(e)) == 5  # (through the source from its − end to its +: 5 A)
+
+
+def test_a_four_terminal_element_a_voltage_controlled_source():
+    from electro.core import VCVS, at
+    from electro.core.methods import is_source
+
+    e, r, amp = VoltageSource("E"), Resistor("R"), VCVS("mu")
+    a, out = Node("A"), Node("OUT")
+    circuit = (GND >> e >> a) @ at(amp, a, GND, out, GND) @ (out >> r >> GND)
+    s = solve(Problem(circuit, {e: 2, r: 100, "mu": 10}))
+    assert s(V(out)) == 20 and s(I(amp, "in+")) == 0  # U_out = μ·U_in, its input takes nothing
+    assert not is_source(amp) and is_source(e)  # (controlled: not a source superposition would turn off)
+
+
+def test_a_nullor_two_laws_and_none_an_inverting_amplifier_from_it_and_two_resistors():
+    from electro.core import Norator, Nullator
+
+    e, r1, r2 = VoltageSource("E"), Resistor("R_1"), Resistor("R_2")
+    n, out = Node("N"), Node("OUT")
+    circuit = (
+        (GND >> e >> Node("IN") >> r1 >> n)
+        @ (n >> r2 >> out)
+        @ (n >> Nullator() >> GND)  # the inverting input held at 0 V, taking no current
+        @ (out >> Norator() >> GND)  # the output: whatever it takes
+    )
+    s = solve(Problem(circuit, {e: 1, r1: 1000, r2: 4700}))
+    assert s(V(out)) == sp.Rational(-47, 10)  # −R₂/R₁
+
+
+def test_an_inner_quantity_an_inductor_written_by_its_flux_is_the_inductor():
+    from electro.core import Terminals
+
+    def flux(t: Terminals, L: sp.Symbol) -> list[sp.Expr]:
+        phi = t.inner("phi")
+        return [t.V["a"] - t.V["b"] - D(phi), phi - L * t.I["a"]]
+
+    FluxInductor = Kind("flux_inductor", "L", "H", ("a", "b"), flux)
+    currents = []
+    for kind in (Inductor, FluxInductor):
+        e, r, coil = VoltageSource("E"), Resistor("R"), kind("L")
+        p = Problem(GND >> e >> r >> Node() >> coil >> GND, {e: 10, r: 10, coil: 1})
+        currents.append(simulate(p, until=0.3, dt=1e-3)(I(coil))(0.1))  # τ = L/R = 0.1 s
+    assert currents[0] == pytest.approx(currents[1]) and currents[0] == pytest.approx(1 - math.exp(-1), abs=0.01)

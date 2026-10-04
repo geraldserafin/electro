@@ -1,7 +1,11 @@
-"""A problem as one is set — a closed circuit, what is given, what is sought — and what answers it:
-``solve`` (DC, or phasors at ω) and ``simulate`` (in time). Each analysis is only a reading of ``D``:
-DC: 0, AC: jω, a step in time: the difference back to the step before. Pure functions throughout
-(sympy and a stepping loop inside, nothing shared).
+"""A circuit as one relation, a problem as one is set, and what answers it (DESIGN.md §13).
+
+The core is relations (the category Rel, with nodes as its spiders): variables and equations, each
+equation knowing where it comes from (an element's law, Kirchhoff at a point, a datum) — so a solution
+can say its steps. A circuit's relation is the join of its elements' and its points' relations (a point:
+one potential shared by all that meet there, and Kirchhoff's current law). Each analysis only reads the
+time words in it: ``D`` (DC: 0, AC: jω, a step: the difference back) and ``Pre`` (DC, AC: itself; a step:
+the value a step ago).
 """
 
 from __future__ import annotations
@@ -16,7 +20,7 @@ import sympy as sp
 
 from electro.values import UNKNOWN, parse
 
-from .syntax import GND, Circuit, D, Element, Kind, Net, Netlist, Node, free, is_closed, netlist
+from .syntax import GND, Circuit, D, Element, Kind, Net, Netlist, Node, Pre, Terminals, free, is_closed, netlist
 
 # sympy's own types are loose (``subs`` of a dict, ``replace`` gives ``Basic``): said once, here
 
@@ -25,8 +29,8 @@ def subs(x: sp.Expr, values: Mapping[sp.Symbol, sp.Expr] | Mapping[sp.Symbol, fl
     return cast(sp.Expr, x.subs(list(values.items())))
 
 
-def _replace(x: sp.Expr, f: Callable[[sp.Expr], sp.Expr]) -> sp.Expr:
-    return cast(sp.Expr, x.replace(D, f))
+def _replace(x: sp.Expr, f: sp.FunctionClass, by: Callable[[sp.Expr], sp.Expr]) -> sp.Expr:
+    return cast(sp.Expr, x.replace(f, by))
 
 
 def _symbols_in(x: sp.Expr) -> set[sp.Symbol]:
@@ -39,11 +43,12 @@ def _symbols_in(x: sp.Expr) -> set[sp.Symbol]:
 @dataclass(frozen=True)
 class Current:
     of: Element
+    at: str | None = None  # a terminal (an element of more than two); two: the current from a to b
 
 
 @dataclass(frozen=True)
 class Voltage:
-    of: Element
+    of: Element  # a two-terminal one's: the drop from a to b
 
 
 @dataclass(frozen=True)
@@ -65,8 +70,8 @@ class Across:
 Quantity = Current | Voltage | Parameter | Potential | Across
 
 
-def I(e: Element) -> Current:  # noqa: E743 — as a book writes it
-    return Current(e)
+def I(e: Element, at: str | None = None) -> Current:  # noqa: E743 — as a book writes it
+    return Current(e, at)
 
 
 def U(a: Element | Node | Net, b: Node | Net | None = None) -> Voltage | Across:
@@ -77,11 +82,48 @@ def V(p: Node | Net) -> Potential:
     return Potential(p)
 
 
+# --------------------------------------------------------------------------------------- relations
+
+
+@dataclass(frozen=True)
+class Origin:
+    """Where an equation comes from — what a step of a solution says as its reason."""
+
+    what: str  # "law" (an element's), "kcl" (Kirchhoff at a point), "given" (a datum), "port"
+    subject: object  # the element, the point (its number), the datum's key
+    index: int = 0  # which of the element's laws
+
+
+@dataclass(frozen=True)
+class Equation:
+    expr: sp.Expr  # = 0
+    origin: Origin
+
+
+@dataclass(frozen=True)
+class Relation:
+    """Variables and equations: ``ends`` what is seen from outside, the rest inside."""
+
+    ends: tuple[sp.Symbol, ...]
+    equations: tuple[Equation, ...]
+
+
+def join(*relations: Relation) -> Relation:
+    """Together: every equation of each; a variable they share is one (that is how they are joined)."""
+    ends = tuple(dict.fromkeys(x for r in relations for x in r.ends))
+    return Relation(ends, tuple(eq for r in relations for eq in r.equations))
+
+
+def hide(r: Relation, ends: Sequence[sp.Symbol]) -> Relation:
+    """Seen from outside only through ``ends`` (the rest is inside: eliminated when it is solved)."""
+    return Relation(tuple(ends), r.equations)
+
+
 # --------------------------------------------------------------------------------------- problem
 
 
 class NotClosed(ValueError):
-    """Only a circuit with nothing left to connect is a problem (a piece: ``equivalent``)."""
+    """Only a circuit with nothing left to connect is a problem (a piece: ``blackbox``)."""
 
 
 class NoSuchParameter(ValueError):
@@ -107,7 +149,7 @@ class Problem:
         object.__setattr__(self, "find", tuple(self.find))
         if not is_closed(self.circuit):
             raise NotClosed()
-        names = {e.name for e, _, _ in netlist(self.circuit).parts}
+        names = {e.name for e, _ in netlist(self.circuit).parts}
         for k in self.given:
             if isinstance(k, str) and k not in names:
                 raise NoSuchParameter(k)
@@ -138,55 +180,67 @@ class Step:
 Analysis = DC | AC | Step
 
 
-def before(x: sp.Symbol) -> sp.Symbol:
+def before(x: sp.Expr) -> sp.Symbol:
     """``x`` a step ago (what a step in time remembers)."""
-    return sp.Symbol(f"{x.name}⁻")
+    return sp.Symbol(f"{x}⁻")
 
 
 def interpret(law: sp.Expr, analysis: Analysis) -> sp.Expr:
-    """An element's law in an analysis: ``D`` read as it reads it."""
+    """A law in an analysis: its time words read as the analysis reads them."""
     match analysis:
         case DC():
-            return _replace(law, lambda x: sp.Integer(0))
+            return _replace(_replace(law, D, lambda x: sp.Integer(0)), Pre, lambda x: x)
         case AC(omega):
-            return _replace(law, lambda x: sp.I * omega * x)
+            return _replace(_replace(law, D, lambda x: sp.I * omega * x), Pre, lambda x: x)
         case Step(dt):
-            return _replace(law, lambda x: (x - before(cast(sp.Symbol, x))) / dt)
+            return _replace(_replace(law, D, lambda x: (x - before(x)) / dt), Pre, before)
     raise TypeError(analysis)
 
 
-# --------------------------------------------------------------------------------------- equations
+# --------------------------------------------------------------------------------------- a circuit's relation
 
 
 @dataclass(frozen=True)
 class Symbols:
-    """The circuit's quantities as the solver's symbols."""
+    """The circuit's quantities as the relation's variables."""
 
     net: Netlist
     labels: tuple[str, ...]  # each element's, in the netlist's order
     potentials: tuple[sp.Expr, ...]  # each point's (0: a reference)
 
-    def element(self, e: Element) -> int:
-        return next(k for k, (x, _, _) in enumerate(self.net.parts) if x is e)
+    def index(self, e: Element) -> int:
+        return next(k for k, (x, _) in enumerate(self.net.parts) if x is e)
 
-    def U(self, e: Element) -> sp.Symbol:
-        return sp.Symbol(f"U_{self.labels[self.element(e)]}")
+    def currents(self, k: int) -> dict[str, sp.Expr]:
+        """Into element ``k`` at each terminal: a variable for all but its last, which is minus their sum
+        (charge kept, by construction)."""
+        e, _ = self.net.parts[k]
+        ts = e.kind.terminals
+        own = {t: sp.Symbol(f"I_{self.labels[k]}" if len(ts) == 2 else f"I_{self.labels[k]}_{t}") for t in ts[:-1]}
+        return {**own, ts[-1]: -sp.Add(*own.values())}
 
-    def I(self, e: Element) -> sp.Symbol:  # noqa: E743
-        return sp.Symbol(f"I_{self.labels[self.element(e)]}")
+    def terminals(self, k: int) -> Terminals:
+        e, ns = self.net.parts[k]
+        label = self.labels[k]
+        return Terminals(
+            dict(zip(e.kind.terminals, (self.potentials[n] for n in ns), strict=True)),
+            self.currents(k),
+            lambda name: sp.Symbol(f"{name}_{label}"),
+        )
 
     def param(self, e: Element) -> sp.Symbol:
-        return sp.Symbol(e.name or self.labels[self.element(e)])
+        return sp.Symbol(e.name or self.labels[self.index(e)])
 
     def V(self, p: Node | Net) -> sp.Expr:
         return self.potentials[next(n for n, q in self.net.named if q == p)]
 
     def of(self, q: Quantity) -> sp.Expr:
         match q:
-            case Current(e):
-                return self.I(e)
+            case Current(e, at):
+                return self.currents(self.index(e))[at or e.kind.terminals[0]]
             case Voltage(e):
-                return self.U(e)
+                t = self.terminals(self.index(e))
+                return t.V[e.kind.terminals[0]] - t.V[e.kind.terminals[1]]
             case Parameter(e):
                 return self.param(e)
             case Potential(p):
@@ -200,10 +254,10 @@ class Symbols:
 def symbols(c: Circuit) -> Symbols:
     net = netlist(c)
     # labels: an element's name when it is the only one so named, else its prefix and number
-    names = [e.name for e, _, _ in net.parts]
+    names = [e.name for e, _ in net.parts]
     labels = tuple(
         e.name if e.name and names.count(e.name) == 1 else f"{e.kind.prefix}{k + 1}"
-        for k, (e, _, _) in enumerate(net.parts)
+        for k, (e, _) in enumerate(net.parts)
     )
     # references: ground, else one point of each piece not on ground
     piece = list(range(net.size))
@@ -213,15 +267,13 @@ def symbols(c: Circuit) -> Symbols:
             x = piece[x]
         return x
 
-    for _, a, b in net.parts:
-        piece[find(a)] = find(b)
+    for _, ns in net.parts:
+        for n in ns[1:]:
+            piece[find(n)] = find(ns[0])
     grounded = {n for n, p in net.named if p == GND}
-    roots_grounded = {find(n) for n in grounded}
-    references = grounded | {
-        min(n for n in range(net.size) if find(n) == r) for r in {find(n) for n in range(net.size)} - roots_grounded
-    }
-    # a point's symbol: its label (a net's name) when no other point shows the same, else its number —
-    # a label only shows, two points labelled alike are still two
+    roots = {find(n) for n in range(net.size)} - {find(n) for n in grounded}
+    references = grounded | {min(n for n in range(net.size) if find(n) == r) for r in roots}
+    # a point's symbol: its label (a net's name) when no other point shows the same, else its number
     shown = {n: p.name if isinstance(p, Net) else p.label for n, p in net.named}
     taken = list(shown.values())
     potentials = tuple(
@@ -233,27 +285,47 @@ def symbols(c: Circuit) -> Symbols:
     return Symbols(net, labels, potentials)
 
 
+def network(
+    s: Symbols, parts: Sequence[int], points: Sequence[int], inflow: Mapping[int, sp.Expr] | None = None
+) -> Relation:
+    """The relation of elements ``parts`` (their indices) meeting at ``points``: each element's laws, and
+    at each point Kirchhoff's current law — what flows into it from outside (``inflow``; none: nothing)
+    is what flows on into the elements there."""
+    inflow = inflow or {}
+    laws = [
+        Equation(sp.sympify(law), Origin("law", s.net.parts[k][0], i))
+        for k in parts
+        for i, law in enumerate(s.net.parts[k][0].kind.laws(s.terminals(k), s.param(s.net.parts[k][0])))
+    ]
+    kcl = []
+    for n in points:
+        into = [
+            s.currents(k)[t]
+            for k in parts
+            for t, m in zip(s.net.parts[k][0].kind.terminals, s.net.parts[k][1], strict=True)
+            if m == n
+        ]
+        kcl.append(Equation(sp.Add(*into) - inflow.get(n, sp.Integer(0)), Origin("kcl", n)))
+    return Relation((), tuple(laws + kcl))
+
+
+def relation(c: Circuit) -> Relation:
+    """The circuit as one relation (closed: nothing seen from outside)."""
+    s = symbols(c)
+    return network(s, range(len(s.net.parts)), [n for n in range(s.net.size) if s.potentials[n] != 0])
+
+
 @dataclass(frozen=True)
 class System:
-    equations: tuple[sp.Expr, ...]  # each = 0
+    equations: tuple[Equation, ...]  # each = 0, read by an analysis, the data in
     unknowns: tuple[sp.Symbol, ...]
     symbols: Symbols
 
 
 def equations(problem: Problem, analysis: Analysis) -> System:
-    """Kirchhoff (from how the points are glued) and each element's law read by the analysis; what is
-    given: a parameter's value, or a condition on a quantity."""
     s = symbols(problem.circuit)
-    net = s.net
-    laws = [interpret(e.kind.law(s.U(e), s.I(e), s.param(e)), analysis) for e, _, _ in net.parts]
-    drops = [s.U(e) - (s.potentials[a] - s.potentials[b]) for e, a, b in net.parts]
-    kcl = [
-        sp.Add(*(s.I(e) for e, a, _ in net.parts if a == n), *(-s.I(e) for e, _, b in net.parts if b == n))
-        for n in range(net.size)
-        if s.potentials[n] != 0
-    ]
     values: dict[sp.Symbol, sp.Expr] = {}
-    conditions: list[sp.Expr] = []
+    conditions: list[Equation] = []
     for key, value in problem.values.items():
         match key:
             case Element():
@@ -261,98 +333,26 @@ def equations(problem: Problem, analysis: Analysis) -> System:
             case str():
                 values[sp.Symbol(key)] = value
             case _:
-                conditions.append(s.of(key) - value)
-    params = {s.param(e) for e, _, _ in net.parts} - set(values)
-    unknowns = (
-        [s.U(e) for e, _, _ in net.parts]
-        + [s.I(e) for e, _, _ in net.parts]
-        + [p for p in s.potentials if isinstance(p, sp.Symbol)]
-        + sorted(params, key=str)
-    )
-    eqs = tuple(subs(sp.sympify(x), values) for x in laws + drops + kcl + conditions)
-    return System(eqs, tuple(unknowns), s)
-
-
-# --------------------------------------------------------------------------------------- black box
-
-PORT_U, PORT_I = sp.symbols("U_port I_port")  # a two-ended piece's: the drop from its first end to its second, the
-# current in at its first end (out at its second) — as an element's U and I
-
-
-class NotOnePort(ValueError):
-    """A black box here is of a piece with one free end each side (1 → 1)."""
-
-
-@dataclass(frozen=True)
-class Relation:
-    """A piece as seen from its two ends: ``expr == 0`` in ``PORT_U``, ``PORT_I`` (and parameters)."""
-
-    expr: sp.Expr
-
-
-def port(
-    parts: Sequence[tuple[Element, int, int]],
-    a: int,
-    b: int,
-    param: Callable[[Element], sp.Symbol],
-    analysis: Analysis,
-) -> Relation | None:
-    """The relation between ``a`` and ``b`` of these elements alone: Kirchhoff and their laws, every
-    other point eliminated. None: no single relation (nothing joins the two ends, or more than one)."""
-    points = sorted({n for _, x, y in parts for n in (x, y)} | {a, b})
-    V = {n: sp.Integer(0) if n == b else sp.Symbol(f"v{n}") for n in points}
-    U = [sp.Symbol(f"u{k}") for k in range(len(parts))]
-    I = [sp.Symbol(f"i{k}") for k in range(len(parts))]  # noqa: E741
-    eqs = [interpret(e.kind.law(U[k], I[k], param(e)), analysis) for k, (e, _, _) in enumerate(parts)]
-    eqs += [U[k] - (V[x] - V[y]) for k, (_, x, y) in enumerate(parts)]
-    eqs += [
-        sp.Add(
-            *(I[k] for k, (_, x, _) in enumerate(parts) if x == n),
-            *(-I[k] for k, (_, _, y) in enumerate(parts) if y == n),
-        )
-        - (PORT_I if n == a else 0)
-        for n in points
-        if n != b
-    ]
-    eqs.append(PORT_U - V[a])
-    inner = U + I + [V[n] for n in points if n != b]
-    for port_var in (PORT_U, PORT_I):  # U from I (most pieces); I from U (a current source: U is free)
-        found = sp.solve(eqs, [*inner, port_var], dict=True)
-        if len(found) == 1 and port_var in found[0]:
-            return Relation(sp.simplify(port_var - found[0][port_var]))
-    return None
-
-
-def blackbox(piece: Circuit, analysis: Analysis | None = None) -> Relation | None:
-    """A 1 → 1 piece seen from its ends (the elements' own names as their parameters)."""
-    net = netlist(piece)
-    if free(piece) != (1, 1) or len(net.left) != 1:
-        raise NotOnePort(free(piece))
-    return port(net.parts, net.left[0], net.right[0], lambda e: sp.Symbol(e.name or e.kind.prefix), analysis or DC())
-
-
-def matches(relation: Relation, kind: Kind, analysis: Analysis | None = None) -> sp.Expr | None:
-    """The parameter that makes ``kind``'s law this very relation — a piece that is one such element —
-    or None. (Two resistors in series: a resistor of R₁ + R₂. Found, not told.)"""
-    p = sp.Dummy("p")
-    law = interpret(sp.sympify(kind.law(PORT_U, PORT_I, p)), analysis or DC())
-    for var, other in ((PORT_U, PORT_I), (PORT_I, PORT_U)):
-        mine, its = sp.solve(relation.expr, var), sp.solve(law, var)
-        if len(mine) != 1 or len(its) != 1:
-            continue
-        rest = sp.numer(sp.together(sp.expand(mine[0] - its[0])))
-        coeffs = sp.Poly(rest, other).all_coeffs() if rest.has(other) else [rest]
-        # every coefficient zero, whatever ``other`` is: those without p must already be
-        if any(not c.has(p) and sp.simplify(c) != 0 for c in coeffs):
-            return None
-        found = sp.solve([c for c in coeffs if c.has(p)], p, dict=True)
-        if len(found) == 1 and p in found[0]:
-            return sp.simplify(found[0][p])
-        return None
-    return None
+                conditions.append(Equation(s.of(key) - value, Origin("given", key)))
+    rel = relation(problem.circuit)
+    eqs = tuple(Equation(subs(interpret(eq.expr, analysis), values), eq.origin) for eq in (*rel.equations, *conditions))
+    params = {s.param(e) for e, _ in s.net.parts} - set(values)
+    found = {x for eq in eqs for x in _symbols_in(eq.expr)}
+    in_data = {x for v in values.values() for x in _symbols_in(sp.sympify(v))}  # (a value "R": a symbol)
+    unknowns = (found - in_data - {x for x in found if x.name.endswith("⁻")}) | (params & found)
+    return System(eqs, tuple(sorted(unknowns, key=str)), s)
 
 
 # --------------------------------------------------------------------------------------- solve
+
+
+@dataclass(frozen=True)
+class SolutionStep:
+    """One step: what was found, its value, and from which equations (their origins: the reason)."""
+
+    found: tuple[sp.Symbol, ...]
+    values: tuple[sp.Expr, ...]
+    because: tuple[Origin, ...]
 
 
 @dataclass(frozen=True)
@@ -361,6 +361,7 @@ class Solution:
     values: Mapping[sp.Symbol, sp.Expr]
     unknowns: frozenset[sp.Symbol]
     symbols: Symbols
+    steps: tuple[SolutionStep, ...] = ()
 
     def __call__(self, q: Quantity) -> sp.Expr:
         value = sp.simplify(subs(self.symbols.of(q), self.values))
@@ -373,13 +374,110 @@ class Solution:
         return {q: self(q) for q in self.problem.find}
 
 
+def _steps(system: System) -> tuple[dict[sp.Symbol, sp.Expr], tuple[SolutionStep, ...]]:
+    """Solved as one does by hand: an equation with one unknown left at a time (its origin the reason);
+    when none is left, what remains together."""
+    known: dict[sp.Symbol, sp.Expr] = {}
+    pending = list(system.equations)
+    unknown = set(system.unknowns)
+    out: list[SolutionStep] = []
+    while pending:
+        for eq in pending:
+            expr = subs(eq.expr, known)
+            left = _symbols_in(expr) & unknown
+            if len(left) <= 1:
+                pending.remove(eq)
+                if left:
+                    (x,) = left
+                    roots = sp.solve(expr, x)
+                    if len(roots) == 1:
+                        known[x] = sp.simplify(roots[0])
+                        unknown.discard(x)
+                        out.append(SolutionStep((x,), (known[x],), (eq.origin,)))
+                break
+        else:  # nothing with one unknown: the rest together (a loop's equations, say)
+            rest = sorted({x for eq in pending for x in _symbols_in(subs(eq.expr, known))} & unknown, key=str)
+            found = sp.solve([subs(eq.expr, known) for eq in pending], rest, dict=True)
+            if not found:
+                raise Undetermined("no solution: the data contradict each other")
+            together = {x: sp.simplify(v) for x, v in found[0].items()}
+            known |= together
+            unknown -= set(together)
+            out.append(SolutionStep(tuple(together), tuple(together.values()), tuple(eq.origin for eq in pending)))
+            known = {x: sp.simplify(subs(v, known)) for x, v in known.items()}
+            break
+    return known, tuple(out)
+
+
 def solve(problem: Problem, analysis: DC | AC | None = None) -> Solution:
-    """Where it settles (DC), or its phasors at ``AC(ω)``."""
+    """Where it settles (DC), or its phasors at ``AC(ω)`` — and the steps there."""
     system = equations(problem, analysis or DC())
-    found = sp.solve(system.equations, system.unknowns, dict=True)
-    if not found:
-        raise Undetermined("no solution: the data contradict each other")
-    return Solution(problem, found[0], frozenset(system.unknowns), system.symbols)
+    values, steps = _steps(system)
+    return Solution(problem, values, frozenset(system.unknowns) - set(values), system.symbols, steps)
+
+
+# --------------------------------------------------------------------------------------- a piece seen from its ends
+
+PORT_U, PORT_I = sp.symbols("U_port I_port")  # a two-ended piece's: the drop from its first end to its
+# second, the current in at its first end (out at its second) — as a two-terminal element's U and I
+
+
+class NotOnePort(ValueError):
+    """A black box here is of a piece with one free end each side (1 → 1)."""
+
+
+def port(s: Symbols, parts: Sequence[int], a: int, b: int, analysis: Analysis) -> Relation | None:
+    """Elements ``parts`` between points ``a`` and ``b`` as one relation of ``PORT_U``, ``PORT_I``:
+    everything else inside eliminated (the black box). None: no single relation."""
+    points = sorted({n for k in parts for n in s.net.parts[k][1]} | {a, b})
+    ref = s.potentials[b]
+    zero: dict[sp.Symbol, sp.Expr] = {ref: sp.Integer(0)} if isinstance(ref, sp.Symbol) else {}
+    inside = network(s, parts, [n for n in points if n != b], {a: PORT_I})
+    eqs = [subs(interpret(eq.expr, analysis), zero) for eq in inside.equations]
+    eqs.append(PORT_U - subs(s.potentials[a], zero))
+    params = {s.param(s.net.parts[k][0]) for k in parts}
+    inner = sorted({x for eq in eqs for x in _symbols_in(eq)} - params - {PORT_U, PORT_I}, key=str)
+    for var in (PORT_U, PORT_I):  # U from I (most pieces); I from U (a current source: U is free)
+        found = sp.solve(eqs, [*inner, var], dict=True)
+        if len(found) == 1 and var in found[0]:
+            return Relation((PORT_U, PORT_I), (Equation(sp.simplify(var - found[0][var]), Origin("port", (a, b))),))
+    return None
+
+
+def blackbox(piece: Circuit, analysis: Analysis | None = None) -> Relation | None:
+    """A 1 → 1 piece seen from its ends (the elements' own names as their parameters)."""
+    net = netlist(piece)
+    if free(piece) != (1, 1) or len(net.left) != 1:
+        raise NotOnePort(free(piece))
+    s = Symbols(
+        net,
+        tuple(e.name or e.kind.prefix for e, _ in net.parts),
+        tuple(sp.Symbol(f"v{n}") for n in range(net.size)),
+    )
+    return port(s, range(len(net.parts)), net.left[0], net.right[0], analysis or DC())
+
+
+def matches(relation: Relation, kind: Kind, analysis: Analysis | None = None) -> sp.Expr | None:
+    """The parameter that makes one element of ``kind`` this very relation (two resistors in series: a
+    resistor of R₁ + R₂ — found, not told), or None."""
+    p = sp.Symbol("p_match")
+    its = blackbox(Element(kind, p.name), analysis) if len(kind.terminals) == 2 else None
+    if its is None or len(relation.equations) != 1:
+        return None
+    for var, other in ((PORT_U, PORT_I), (PORT_I, PORT_U)):
+        mine, theirs = sp.solve(relation.equations[0].expr, var), sp.solve(its.equations[0].expr, var)
+        if len(mine) != 1 or len(theirs) != 1:
+            continue
+        rest = sp.numer(sp.together(sp.expand(mine[0] - theirs[0])))
+        coeffs = sp.Poly(rest, other).all_coeffs() if rest.has(other) else [rest]
+        # every coefficient zero, whatever ``other`` is: those without p must already be
+        if any(not c.has(p) and sp.simplify(c) != 0 for c in coeffs):
+            return None
+        found = sp.solve([c for c in coeffs if c.has(p)], p, dict=True)
+        if len(found) == 1 and p in found[0]:
+            return sp.simplify(found[0][p])
+        return None
+    return None
 
 
 # --------------------------------------------------------------------------------------- simulate
@@ -388,7 +486,7 @@ def solve(problem: Problem, analysis: DC | AC | None = None) -> Solution:
 @dataclass(frozen=True)
 class State:
     t: float
-    remembered: Mapping[sp.Symbol, float]  # what the last step left (x⁻ for each x under D)
+    remembered: Mapping[sp.Symbol, float]  # what the last step left (x⁻ for each x under D or Pre)
 
 
 @dataclass(frozen=True)
@@ -403,8 +501,9 @@ class Stepper:
 
 def compile_steps(problem: Problem, dt: float) -> Stepper:
     system = equations(problem, Step(sp.Float(dt)))
-    remembered = sorted({x for eq in system.equations for x in _symbols_in(eq) if x.name.endswith("⁻")}, key=str)
-    found = sp.solve(system.equations, system.unknowns, dict=True)
+    eqs = [eq.expr for eq in system.equations]
+    remembered = sorted({x for eq in eqs for x in _symbols_in(eq) if x.name.endswith("⁻")}, key=str)
+    found = sp.solve(eqs, system.unknowns, dict=True)
     if len(found) != 1:
         raise Undetermined("a step in time needs every value")
     exprs = [found[0].get(u, u) for u in system.unknowns]
@@ -431,14 +530,13 @@ class Trace:
     rows: tuple[Mapping[sp.Symbol, float], ...]
     symbols: Symbols
 
-    def __call__(self, q: Quantity):
-        """``q`` in time: a function of t (linear between the steps)."""
+    def __call__(self, q: Quantity) -> Callable[[float], float]:
+        """``q`` in time: a function of t (the nearest step)."""
         x = self.symbols.of(q)
         ys = [float(subs(sp.sympify(x), row)) for row in self.rows]
 
         def at(t: float) -> float:
-            k = min(range(len(self.times)), key=lambda i: abs(self.times[i] - t))
-            return ys[k]
+            return ys[min(range(len(self.times)), key=lambda i: abs(self.times[i] - t))]
 
         return at
 
