@@ -695,11 +695,60 @@ Obok biblioteki, nic w niej nie zmienia. ~720 linii (bez eksportów): składnia 
 własne komponenty, Thévenin, szybka symulacja (dziś: sympy co krok, wolne), stan dyskretny (`Pre`).
 Dopiero z nimi da się uczciwie porównać rozmiar i prostotę z obecną biblioteką.
 
-**Następne kroki prototypu, w kolejności ryzyka:** dioda (nieliniowość, Newton bez ręcznych
-sztuczek) → przerzutnik (`Pre`, zdarzenia) → kroki rozwiązania (czy uzasadnienia z praw wystarczą)
-→ jednostki → porównanie z obecną biblioteką na jej testach.
+**Następne kroki prototypu, w kolejności ryzyka:** czarna skrzynka kawałka (bez niej warstwa metod
+z §12 nie ruszy) → superpozycja i upraszczanie szeregowo-równoległe z regułami odkrywanymi rachunkiem
+(porównać kroki z rozwiązaniem z zeszytu) → dioda (nieliniowość, Newton bez ręcznych sztuczek) →
+przerzutnik (`Pre`, zdarzenia) → jednostki → porównanie z obecną biblioteką na jej testach.
 
-## 12. Otwarte
+## 12. Warstwa metod (nad silnikiem, bez nowych praw)
+
+Metody z podręcznika nie są osobno zaprogramowanym liczeniem — to drogi przez te same równania, z
+warunkami stosowalności sprawdzanymi na prawach elementów. Silnik nie dostaje nowych praw ani wyjątków;
+udostępnia trzy operacje, a warstwa metod je składa.
+
+```
+prawa elementów + sklejanie          ← rdzeń
+czarna skrzynka kawałka, solve,      ← operacje silnika
+dopasowanie relacji do rodzaju
+superpozycja, Thévenin/Norton,       ← warstwa metod: strategia + słownictwo, zero praw
+upraszczanie, kroki „jak w zeszycie”
+```
+
+**Operacje silnika, których warstwa potrzebuje:**
+
+1. `blackbox(piece)` — relacja na zaciskach otwartego kawałka (zmienne wewnętrzne wyeliminowane). W
+   obecnej bibliotece: `analysis.blackbox`; w prototypie jeszcze nie ma (umie tylko zamknięte zadania).
+2. Rozwiązanie symboliczne małego kawałka (wzór, nie liczba) — dzielnik napięcia/prądu.
+3. `matches(relation, kind) -> parametr | None` — czy relacja to prawo danego rodzaju z jakimś
+   parametrem (`U = (R₂+R₃)·I` → rezystor, R = R₂+R₃).
+
+**Metody z tego wynikające:**
+
+| metoda | z czego | warunek stosowalności (sprawdzany na prawach) |
+|---|---|---|
+| superpozycja | po kolei: parametry pozostałych źródeł = 0, rozwiąż, zsumuj | wszystkie prawa liniowe w U, I; źródło = prawo ze składnikiem niezależnym od U, I (sterowane zostają) |
+| Thévenin / Norton | `blackbox` kawałka `1 → 1`: `U = E_th + Z·I` | liniowość |
+| szeregowo / równolegle / zamiana źródeł / gwiazda-trójkąt | `blackbox` małego kawałka + `matches` z rodzajami — **reguły odkrywane rachunkiem, nie wpisywane** | liniowość; kształt kawałka (wspólny węzeł / oba) |
+| dzielnik napięcia / prądu | symboliczne rozwiązanie kawałka | liniowość |
+| potencjały węzłowe | niewiadome = potencjały; prąd elementu z jego prawa (`I = U/R`); prawo nierozwiązywalne względem I (źródło napięcia) → superwęzeł | — |
+| prądy pętlowe | baza cykli grafu (algebraicznie) | — |
+| prądy oczkowe (oczka jak na rysunku) | **potrzebna geometria rysunku** (płaskie twarze) — kategoria jej nie ma; liczy schemat (`electro_schematic`) | płaski rysunek |
+
+**Kroki „jak w zeszycie”** (np. „R₂ i R₃ szeregowo → 30 Ω; dzielnik prądu: I₃ = J·R₁₂/(R₁₂+R₃)”) zamiast
+„rozwiązano układ 9 równań”: wyszukiwanie kolejnych uproszczeń. Każdy krok poprawny z gwarancji
+(zachowanie na zaciskach się nie zmienia). Poza prawami potrzebne są tylko:
+
+- **strategia** (który krok najpierw): szybko zmniejszać liczbę elementów, nie ruszać elementu, o który
+  pyta szukana — preferencja do strojenia, nie prawo;
+- **słownictwo** kroków („szeregowo”, „dzielnik”) — rozpoznawane z kształtu kawałka, do wyświetlania.
+
+Granice: nieliniowe elementy (brak prostej czarnej skrzynki — jak w podręczniku); duże obwody (wyszukiwanie
+rośnie szybko; dla zadań szkolnych, do ~10 elementów, bez znaczenia).
+
+Zysk: nowy rodzaj elementu wchodzi do metod sam (kondensator w AC upraszcza się z rezystorem do impedancji
+bez linijki o kondensatorze w warstwie metod — dopasowanie dzieje się na relacjach).
+
+## 13. Otwarte
 
 - Jak pokazać `Given` z wymiarem czasu w zakładce Dane (przełącznik od 1 s, przebieg z pliku).
 - `Net` a etykiety na schemacie: czy każda etykieta to `Net`, czy tylko jawnie globalne.
