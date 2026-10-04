@@ -87,7 +87,12 @@ class Across:
     b: Node | Net  # V_a − V_b
 
 
-Quantity = Current | Voltage | Parameter | Potential | Across
+@dataclass(frozen=True)
+class Power:
+    of: Element  # a two-terminal one's: U·I, what it takes (a source: minus what it gives)
+
+
+Quantity = Current | Voltage | Parameter | Potential | Across | Power
 
 
 def I(e: Element, at: str | None = None) -> Current:  # noqa: E743 — as a book writes it
@@ -96,6 +101,10 @@ def I(e: Element, at: str | None = None) -> Current:  # noqa: E743 — as a book
 
 def U(a: Element | Node | Net, b: Node | Net | None = None) -> Voltage | Across:
     return Voltage(a) if isinstance(a, Element) else Across(a, b if b is not None else GND)
+
+
+def P(e: Element) -> Power:
+    return Power(e)
 
 
 def V(p: Node | Net) -> Potential:
@@ -340,6 +349,8 @@ class Symbols:
                 return self.V(p)
             case Across(a, b):
                 return self.V(a) - self.V(b)
+            case Power(e):
+                return self.of(Voltage(e)) * self.of(Current(e))
         raise TypeError(q)
 
 
@@ -528,21 +539,29 @@ def _steps(system: System) -> tuple[dict[sp.Symbol, sp.Expr], tuple[SolutionStep
         for eq in pending:
             expr = subs(eq.expr, known)
             left = _symbols_in(expr) & unknown
-            if len(left) <= 1:
+            if not left:  # (nothing left in it: it holds — or the data contradict each other)
                 pending.remove(eq)
-                if left:
-                    (x,) = left
-                    roots = sp.solve(expr, x)
-                    if len(roots) == 1:
-                        known[x] = sp.simplify(roots[0])
-                        unknown.discard(x)
-                        out.append(SolutionStep((x,), (known[x],), (eq.origin,)))
+                if sp.simplify(expr) != 0:
+                    raise Undetermined(f"no solution: the data contradict each other ({eq.origin.what})")
                 break
+            if len(left) == 1:
+                (x,) = left
+                roots = sp.solve(expr, x)
+                if not roots:
+                    raise Undetermined(f"no solution: the data contradict each other ({eq.origin.what})")
+                if len(roots) == 1:  # (two — a resistance from its power — are for the rest together)
+                    pending.remove(eq)
+                    known[x] = sp.simplify(roots[0])
+                    unknown.discard(x)
+                    out.append(SolutionStep((x,), (known[x],), (eq.origin,)))
+                    break
         else:  # nothing with one unknown: the rest together (a loop's equations, say)
             rest = sorted({x for eq in pending for x in _symbols_in(subs(eq.expr, known))} & unknown, key=str)
             found = sp.solve([subs(eq.expr, known) for eq in pending], rest, dict=True)
             if not found:
                 raise Undetermined("no solution: the data contradict each other")
+            if len(found) > 1:  # (an unknown resistance from its power: two, both true — not ours to pick)
+                raise Undetermined(f"{len(found)} solutions: one more datum picks one")
             together = {x: sp.simplify(v) for x, v in found[0].items()}
             known |= together
             unknown -= set(together)

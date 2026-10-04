@@ -887,6 +887,36 @@ jak wbudowana. Żadna z tych rzeczy nie wymagała zmiany silnika.
 - **Arduino w tym samym kształcie:** stan procesora `s`, `s = when(takt, krok_emulatora(Pre(s), Pre(piny)),
   Pre(s))` — przerzutnik to najmniejszy taki „procesor". Wykonanie zostaje mostem (§10.1).
 
+### 13.4 Porównanie z biblioteką na jej zadaniach szkolnych (`tests/test_core_school.py`)
+
+Zadania z `test_school.py` przeniesione jedno do jednego, z tymi samymi liczbami.
+
+- **24 działają** (dzielnik z niewiadomą, dane w różnych formach, szeregowo-równolegle — reguły odkryte
+  czarną skrzynką, pętla, gałęzie równoległe, węzeł nazwany, Thévenin dzielnika, odpowiedź symboliczna,
+  mostek Wheatstone'a w obie strony, wzmacniacz odwracający, impedancja AC, kondensator w DC, sprzeczność,
+  niedookreślenie, dwa rozwiązania z mocy, trzy źródła + superpozycja, amperomierz jako dana i bez danej,
+  VCVS/VCCS/CCVS/CCCS, wzmocnienie znalezione z danych, fazory z napisu).
+- **Dopisane przy okazji (tanie):** moc `P(e)`, amperomierz (kabel, którego prąd się czyta — F5), wzmacniacz
+  operacyjny, źródła sterowane prądem, `between`/`resistance`/`thevenin` (widok z dwóch punktów — wyprowadzone
+  z czarnej skrzynki, bez osobnych reguł).
+- **Nowy fakt (F19): zachowanie ładunku wymusza drogę powrotną.** Idealny wzmacniacz z trzema końcówkami
+  (+, −, wyjście) nie może oddać prądu z wyjścia — suma prądów do elementu musi być zero. Prawdziwy oddaje go
+  przez zasilanie; nasz ma czwartą końcówkę (gnd). Biblioteka to ukrywała, rdzeń to wymusił.
+- **Złapany poważny błąd prototypu:** sprzeczne dane przechodziły po cichu (równanie bez niewiadomych było
+  wyrzucane bez sprawdzenia, równanie bez rozwiązania pomijane). „12 V, 10 Ω, a prąd 5 A" dawało wynik.
+  Naprawione: sprzeczność jest błędem, dwa rozwiązania też.
+- **8 luk (xfail, z powodem):** moc w AC (średnia, ½·Re(U·I*)); Bode / przemiatanie / tolerancje (analyzy po
+  zakresie); nazwanie, które dane są sprzeczne; nazwanie obu rozwiązań; `find` + `MissingData` (czego brakuje
+  i co by pomogło); `Hole` (nieznany element); dodatniość nieznanego oporu (prototyp daje −34 Ω bez słowa);
+  transformator, cewki sprzężone, trójfazowe. Każda to znana robota; żadna nie wymaga zmiany rdzenia.
+- **Rozmiar (nie jabłka do jabłek):** prototyp ~1800 linii (rdzeń, metody, numeryka, zapis) wobec ~4800 linii
+  odpowiadających modułów biblioteki — ale bez luk wyżej, kroków z uzasadnieniem w pełni i bez urządzeń
+  (Arduino, wyświetlacze). Uczciwe porównanie dopiero po domknięciu luk.
+- **Wygoda zapisu — tu prototyp przegrywa:** `supply(12) + Resistor(10) + Resistor() + ground` to jedna linia;
+  w prototypie trzeba nazwać elementy i węzły (`e, r1, r2 = …`; `GND >> e >> r1 >> Node() >> r2 >> GND`).
+  To cena tożsamości obiektów (F7, F8). Do rozważenia: skróty dla prostych łańcuchów, które same tworzą
+  elementy i zwracają je do danych.
+
 ## 14. Otwarte
 
 - Jak pokazać `Given` z wymiarem czasu w zakładce Dane (przełącznik od 1 s, przebieg z pliku).

@@ -342,6 +342,42 @@ CurrentSource = two_terminal("current_source", "J", "A", lambda U, I, J: I - J, 
 # the nullor's halves: a nullator neither drops nor passes anything (two laws), a norator anything (none)
 Nullator = Kind("nullator", "N", "", ("a", "b"), lambda t, _: [t.V["a"] - t.V["b"], t.I["a"]], parameters=())
 Norator = Kind("norator", "O", "", ("a", "b"), lambda t, _: [], parameters=())
+# an ideal ammeter: a wire, its current what is read (a meter is an observation: F5)
+Ammeter = Kind("ammeter", "A", "A", ("a", "b"), lambda t, _: [t.V["a"] - t.V["b"]], parameters=())
+# an ideal op-amp: its inputs at one potential, taking nothing; its output whatever it takes — returned
+# through its supply (gnd): charge is kept, so the current out of a real one comes back somewhere
+OpAmp = Kind(
+    "opamp",
+    "OA",
+    "",
+    ("+", "-", "out", "gnd"),
+    lambda t, _: [t.V["+"] - t.V["-"], t.I["+"], t.I["-"]],
+    symmetric=False,
+    parameters=(),
+)
+
+
+def _controlled(
+    name: str, prefix: str, unit: str, out: Callable[[Terminals, sp.Symbol], sp.Expr], senses_current: bool
+) -> Kind:
+    """A controlled source: its input senses a voltage (taking no current) or a current (dropping no
+    voltage); its output a voltage or a current of it."""
+
+    def laws(t: Terminals, p: Params) -> list[sp.Expr]:
+        sense = [t.V["in+"] - t.V["in-"]] if senses_current else [t.I["in+"]]
+        return [*sense, t.I["in+"] + t.I["in-"], out(t, p[""])]
+
+    return Kind(name, prefix, unit, ("in+", "in-", "out+", "out-"), laws, symmetric=False)
+
+
+def _u_in(t: Terminals) -> sp.Expr:
+    return t.V["in+"] - t.V["in-"]
+
+
+VCCS = _controlled("vccs", "VCCS", "S", lambda t, g: -t.I["out+"] - g * _u_in(t), senses_current=False)
+CCVS = _controlled("ccvs", "CCVS", "Ω", lambda t, r: t.V["out+"] - t.V["out-"] - r * t.I["in+"], senses_current=True)
+CCCS = _controlled("cccs", "CCCS", "", lambda t, k: -t.I["out+"] - k * t.I["in+"], senses_current=True)
+
 # a voltage-controlled voltage source: U_out = μ·U_in, its input takes no current
 VCVS = Kind(
     "vcvs",

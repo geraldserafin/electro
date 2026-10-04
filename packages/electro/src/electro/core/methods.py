@@ -15,12 +15,16 @@ import sympy as sp
 from .problem import (
     AC,
     DC,
+    PORT_I,
+    PORT_U,
     Analysis,
     Current,
+    Equation,
     NotLinear,
     Parameter,
     Problem,
     Quantity,
+    Relation,
     Voltage,
     is_linear,
     is_source,
@@ -30,7 +34,7 @@ from .problem import (
     subs,
     symbols,
 )
-from .syntax import GND, KINDS, Element, Net, Node, netlist, rebuild
+from .syntax import GND, KINDS, Element, Net, Node, Resistor, netlist, rebuild
 
 # --------------------------------------------------------------------------------------- what the laws say
 
@@ -148,3 +152,40 @@ def simplify(
         problem, reduction = found
         steps.append(reduction)
     return problem, tuple(steps)
+
+
+# --------------------------------------------------------------------------------------- seen from two points
+
+
+def between(problem: Problem, a: Node | Net, b: Node | Net, analysis: DC | AC | None = None) -> Relation | None:
+    """The circuit as seen from two of its points — a current let in at ``a``, out at ``b`` — its data in."""
+    s = symbols(problem.circuit)
+    pa, pb = (next(n for n, q in s.net.named if q == x) for x in (a, b))
+    values = {s.param(e): v for e, v in problem.values.items() if isinstance(e, Element)}
+    relation = port(s, range(len(s.net.parts)), pa, pb, analysis or DC())
+    if relation is None:
+        return None
+    return Relation(relation.ends, tuple(Equation(subs(eq.expr, values), eq.origin) for eq in relation.equations))
+
+
+def resistance(relation: Relation | None, analysis: DC | AC | None = None) -> sp.Expr | None:
+    """What one resistor (an impedance, in AC) a black box is, if it is one — from ``matches``, no rule of
+    its own (series, parallel: found)."""
+    return matches(relation, Resistor, analysis) if relation is not None else None
+
+
+@dataclass(frozen=True)
+class Thevenin:
+    E: sp.Expr  # the voltage at its ends with nothing taken (open)
+    Z: sp.Expr  # how it drops with the current taken
+
+
+def thevenin(relation: Relation | None) -> Thevenin | None:
+    """A black box as a source and a resistance: ``U = E − Z·I`` with I taken out of its first end."""
+    if relation is None or len(relation.equations) != 1:
+        return None
+    us = sp.solve(relation.equations[0].expr, PORT_U)
+    if len(us) != 1:
+        return None
+    u = sp.expand(us[0])
+    return Thevenin(sp.simplify(u.subs(PORT_I, 0)), sp.simplify(u.diff(PORT_I)))
