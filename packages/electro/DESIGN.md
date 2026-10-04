@@ -720,9 +720,7 @@ Dopiero z nimi da się uczciwie porównać rozmiar i prostotę z obecną bibliot
 ~~przerzutnik~~ (zrobione: §13.3) → porównanie z obecną biblioteką na jej testach → zgadywanie wariantów
 Newtonem → fazory nieliniowych (linearyzacja z prawa) → jednostki → droga powrotna upraszczania
 (dzielniki) → zamiana źródeł (szablony dwuelementowe) → LCP (Lemke) i czarna skrzynka wielu zacisków
-przy dużych układach. (Dawniej: droga powrotna upraszczania (dzielniki) → zamiana źródeł (szablony
-dwuelementowe) → ~~dioda~~ (zrobione: §13.1) → fazory nieliniowych (linearyzacja z prawa) → przerzutnik (`Pre`, zdarzenia) → jednostki → porównanie z obecną
-biblioteką na jej testach.
+przy dużych układach.
 
 **Poprzednia kolejka (już zrobione: czarna skrzynka, superpozycja, upraszczanie):** czarna skrzynka kawałka (bez niej warstwa metod
 z §12 nie ruszy) → superpozycja i upraszczanie szeregowo-równoległe z regułami odkrywanymi rachunkiem
