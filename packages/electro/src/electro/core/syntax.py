@@ -55,7 +55,27 @@ class Terminals:
 
 
 Params = Mapping[str, sp.Symbol]  # an element's parameters by name ("": its main one, R, C, E)
-Laws = Callable[[Terminals, Params], Sequence[sp.Expr]]  # -> what is zero (any number of them)
+
+
+@dataclass(frozen=True)
+class Case:
+    """One way an element may be (a diode on, or off): its laws then, and what must hold for it to be the
+    one — each ``holds`` ≥ 0 (checked once the circuit is solved in this case)."""
+
+    name: str
+    laws: tuple[sp.Expr, ...]
+    holds: tuple[sp.Expr, ...] = ()
+
+
+@dataclass(frozen=True)
+class Cases:
+    """An element that is one of several ways (piecewise: a textbook diode, a switch, a saturating amp):
+    which one, the circuit decides — the one whose ``holds`` hold."""
+
+    cases: tuple[Case, ...]
+
+
+Laws = Callable[[Terminals, Params], Sequence[sp.Expr] | Cases]  # what is zero (any number), or ways to be
 
 
 @dataclass(frozen=True)
@@ -331,6 +351,23 @@ Diode = Kind(
     symmetric=False,
     parameters=("I_S", "n"),
     defaults=(("I_S", sp.Rational(1, 10**14)), ("n", 1)),
+)
+
+# the textbook's diode: conducts at its forward drop (U_F, 0.7 V by default; any current in), or blocks
+# (no current, below U_F) — two straight pieces for Shockley's curve; which, the circuit decides
+DiodeDrop = Kind(
+    "diode_drop",
+    "D",
+    "V",
+    ("a", "b"),
+    lambda t, p: Cases(
+        (
+            Case("on", (t.V["a"] - t.V["b"] - p[""],), (t.I["a"],)),
+            Case("off", (t.I["a"],), (p[""] - (t.V["a"] - t.V["b"]),)),
+        )
+    ),
+    symmetric=False,
+    defaults=(("", sp.Rational(7, 10)),),
 )
 
 KINDS: tuple[Kind, ...] = (Resistor, Capacitor, Inductor, VoltageSource, CurrentSource)

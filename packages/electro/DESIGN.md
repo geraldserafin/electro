@@ -848,6 +848,26 @@ jak wbudowana. Żadna z tych rzeczy nie wymagała zmiany silnika.
   wyprowadzić z prawa automatycznie, `NotLinear` na razie). Szybkość symulacji dużych układów (Python,
   lambdify; dziś biblioteka generuje JS).
 
+### 13.2 Element „albo-albo": dioda podręcznikowa (28 testów)
+
+- **Ogólne pojęcie, nie dioda:** prawo elementu może być wyborem wariantów (`Cases`): każdy wariant to
+  swoje równania i warunek, który musi się zgadzać (`holds ≥ 0`). Dioda podręcznikowa: „przewodzi” (spadek
+  U_F = 0,7 V, prąd ≥ 0) albo „nie przewodzi” (prąd 0, napięcie poniżej U_F). Tak samo zapisze się idealny
+  przełącznik, komparator, wzmacniacz w nasyceniu — elementy kawałkami liniowe (Chua).
+- **Teoria bez zmian:** relacja z wariantami to suma kawałków — dalej zbiór dozwolonych przebiegów, czyli Rel.
+- **Rozwiązanie jak ręką, kroki same:** załóż wariant każdego elementu → algebra → sprawdź warunki →
+  jeśli nie, następne założenie. Próby są krokami: dioda w tył — „zakładam: przewodzi” → prąd ujemny →
+  „odrzucone” → „zakładam: nie przewodzi” → I = 0, U = −5 V → „sprawdzone”.
+- Wyniki: dioda w przód 4,3 mA (Shockley: 4,37 — różnica < 2 %); mostek z czterech: dokładnie (10 − 1,4)/1 kΩ.
+  Wariant, w którym część obwodu wisi w powietrzu (wszystkie diody zatkane), nie jest rozstrzygnięty
+  niczym — pomijany. Więcej niż jeden pasujący wariant (zatrzask, pamięć) → `Undetermined`: to układ z
+  pamięcią, nie jedno rozwiązanie.
+- **W czasie:** w każdym kroku wariant z poprzedniego, dopóki jego warunek się zgadza, potem następne;
+  symulacja ustala się na wyniku z kartki (43/11 V, do 10⁻⁴).
+- **Koszt:** warianty sprawdzane po kolei — 2ⁿ kombinacji dla n elementów. Dla zadań szkolnych nic; dla
+  dużych układów potrzebne mądrzejsze szukanie (zaczynać od wariantów sugerowanych przez Shockleya / poprzedni
+  stan, odcinać sprzeczne wcześnie).
+
 ## 14. Otwarte
 
 - Jak pokazać `Given` z wymiarem czasu w zakładce Dane (przełącznik od 1 s, przebieg z pliku).
