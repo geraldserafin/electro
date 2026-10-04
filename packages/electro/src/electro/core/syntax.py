@@ -54,7 +54,8 @@ class Terminals:
     inner: Callable[[str], sp.Symbol]
 
 
-Laws = Callable[[Terminals, sp.Symbol], Sequence[sp.Expr]]  # -> what is zero (any number of them)
+Params = Mapping[str, sp.Symbol]  # an element's parameters by name ("": its main one, R, C, E)
+Laws = Callable[[Terminals, Params], Sequence[sp.Expr]]  # -> what is zero (any number of them)
 
 
 @dataclass(frozen=True)
@@ -70,6 +71,8 @@ class Kind:
     terminals: tuple[str, ...]
     laws: Laws = field(repr=False)
     symmetric: bool = True  # turned around: the same circuit (only its arrows' signs change)
+    parameters: tuple[str, ...] = ("",)  # its parameters' names ("": the main one, given as its value)
+    defaults: tuple[tuple[str, object], ...] = ()  # what a parameter is when nothing is given for it
 
     def __call__(self, name: str | None = None) -> Element:
         return Element(self, name)
@@ -82,7 +85,7 @@ def two_terminal(
     name: str, prefix: str, unit: str, law: Callable[[sp.Expr, sp.Expr, sp.Symbol], sp.Expr], symmetric: bool = True
 ) -> Kind:
     """The shorthand: one law of ``U`` (the drop from ``a`` to ``b``) and ``I`` (from ``a`` to ``b``)."""
-    return Kind(name, prefix, unit, ("a", "b"), lambda t, p: [law(t.V["a"] - t.V["b"], t.I["a"], p)], symmetric)
+    return Kind(name, prefix, unit, ("a", "b"), lambda t, p: [law(t.V["a"] - t.V["b"], t.I["a"], p[""])], symmetric)
 
 
 @dataclass(frozen=True, eq=False)  # (eq=False: an element is itself — two are two, whatever their names)
@@ -301,20 +304,33 @@ Inductor = two_terminal("inductor", "L", "H", lambda U, I, L: U - L * D(I))
 VoltageSource = two_terminal("voltage_source", "E", "V", lambda U, I, E: U + E, symmetric=False)
 CurrentSource = two_terminal("current_source", "J", "A", lambda U, I, J: I - J, symmetric=False)
 # the nullor's halves: a nullator neither drops nor passes anything (two laws), a norator anything (none)
-Nullator = Kind("nullator", "N", "", ("a", "b"), lambda t, _: [t.V["a"] - t.V["b"], t.I["a"]])
-Norator = Kind("norator", "O", "", ("a", "b"), lambda t, _: [])
+Nullator = Kind("nullator", "N", "", ("a", "b"), lambda t, _: [t.V["a"] - t.V["b"], t.I["a"]], parameters=())
+Norator = Kind("norator", "O", "", ("a", "b"), lambda t, _: [], parameters=())
 # a voltage-controlled voltage source: U_out = μ·U_in, its input takes no current
 VCVS = Kind(
     "vcvs",
     "VCVS",
     "",
     ("in+", "in-", "out+", "out-"),
-    lambda t, mu: [
-        (t.V["out+"] - t.V["out-"]) - mu * (t.V["in+"] - t.V["in-"]),
+    lambda t, p: [
+        (t.V["out+"] - t.V["out-"]) - p[""] * (t.V["in+"] - t.V["in-"]),
         t.I["in+"],
         t.I["in-"],
     ],
     symmetric=False,
+)
+
+# a p-n junction (Shockley): I = I_S·(e^(U/(n·V_T)) − 1); V_T at 300 K; a real part's I_S, n are data
+V_T = sp.Rational(25852, 1000000)
+Diode = Kind(
+    "diode",
+    "D",
+    "",
+    ("a", "b"),
+    lambda t, p: [t.I["a"] - p["I_S"] * (sp.exp((t.V["a"] - t.V["b"]) / (p["n"] * V_T)) - 1)],
+    symmetric=False,
+    parameters=("I_S", "n"),
+    defaults=(("I_S", sp.Rational(1, 10**14)), ("n", 1)),
 )
 
 KINDS: tuple[Kind, ...] = (Resistor, Capacitor, Inductor, VoltageSource, CurrentSource)

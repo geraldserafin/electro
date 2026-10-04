@@ -20,6 +20,7 @@ import sympy as sp
 
 from electro.values import UNKNOWN, parse
 
+from .numeric import Jacobian, Residual, compiled, homotopy, newton
 from .syntax import GND, Circuit, D, Element, Kind, Net, Netlist, Node, Pre, Terminals, free, is_closed, netlist
 
 # sympy's own types are loose (``subs`` of a dict, ``replace`` gives ``Basic``): said once, here
@@ -54,6 +55,7 @@ class Voltage:
 @dataclass(frozen=True)
 class Parameter:
     of: Element  # its value
+    which: str = ""  # one of several (a diode's "I_S"); "": its main one
 
 
 @dataclass(frozen=True)
@@ -144,8 +146,18 @@ class Problem:
     find: Sequence[Quantity] = ()
 
     def __post_init__(self) -> None:
-        # (read once, as it is built — values parsed, nothing to change it after)
-        object.__setattr__(self, "given", MappingProxyType({k: parse(v) for k, v in self.given.items()}))
+        # (read once, as it is built — values parsed, nothing to change it after; an element of several
+        # parameters may be given them by name: {diode: {"I_S": "1e-14", "n": 1}})
+        object.__setattr__(
+            self,
+            "given",
+            MappingProxyType(
+                {
+                    k: MappingProxyType({w: parse(x) for w, x in v.items()}) if isinstance(v, Mapping) else parse(v)
+                    for k, v in self.given.items()
+                }
+            ),
+        )
         object.__setattr__(self, "find", tuple(self.find))
         if not is_closed(self.circuit):
             raise NotClosed()
@@ -156,8 +168,8 @@ class Problem:
 
     @property
     def values(self) -> Mapping[Key, sp.Expr]:
-        """What is given, each a value (an unknown left out)."""
-        return {k: cast(sp.Expr, v) for k, v in self.given.items() if v is not UNKNOWN}
+        """What is given of single values, each (an unknown left out)."""
+        return {k: cast(sp.Expr, v) for k, v in self.given.items() if v is not UNKNOWN and not isinstance(v, Mapping)}
 
 
 # --------------------------------------------------------------------------------------- analyses
@@ -197,6 +209,35 @@ def interpret(law: sp.Expr, analysis: Analysis) -> sp.Expr:
     raise TypeError(analysis)
 
 
+# --------------------------------------------------------------------------------------- what laws say of themselves
+
+
+def _own(kind: Kind) -> tuple[list[sp.Expr], list[sp.Symbol]]:
+    """A kind's laws over symbols of its own (a potential and a current per terminal), and those."""
+    V = {t: sp.Symbol(f"v_{t}") for t in kind.terminals}
+    I = {t: sp.Symbol(f"i_{t}") for t in kind.terminals}  # noqa: E741
+    params = {w: sp.Symbol(f"p_{w}") for w in kind.parameters}
+    laws = [sp.sympify(x) for x in kind.laws(Terminals(V, I, lambda n: sp.Symbol(f"x_{n}")), params)]
+    return laws, [*V.values(), *I.values()]
+
+
+def is_linear(e: Element, analysis: Analysis | None = None) -> bool:
+    """Its laws of degree one in its potentials and currents (a resistor, a source, a capacitor read by
+    any analysis, a controlled source — not a diode)."""
+    laws, xs = _own(e.kind)
+    try:
+        return all(sp.Poly(sp.expand(interpret(law, analysis or DC())), *xs).total_degree() <= 1 for law in laws)
+    except sp.PolynomialError:  # (exp(U), a diode's: not a polynomial at all)
+        return False
+
+
+def is_source(e: Element) -> bool:
+    """An independent source: a law keeps a term with no potential or current in it (``U + E``, ``I − J``).
+    A resistor's parameter multiplies I; a controlled source's every term is one of its quantities."""
+    laws, xs = _own(e.kind)
+    return any(sp.simplify(law.subs(dict.fromkeys(xs, 0))) != 0 for law in laws)
+
+
 # --------------------------------------------------------------------------------------- a circuit's relation
 
 
@@ -228,8 +269,12 @@ class Symbols:
             lambda name: sp.Symbol(f"{name}_{label}"),
         )
 
-    def param(self, e: Element) -> sp.Symbol:
-        return sp.Symbol(e.name or self.labels[self.index(e)])
+    def param(self, e: Element, which: str = "") -> sp.Symbol:
+        base = e.name or self.labels[self.index(e)]
+        return sp.Symbol(base if not which else f"{which}_{base}")
+
+    def params(self, e: Element) -> dict[str, sp.Symbol]:
+        return {w: self.param(e, w) for w in e.kind.parameters}
 
     def V(self, p: Node | Net) -> sp.Expr:
         return self.potentials[next(n for n, q in self.net.named if q == p)]
@@ -241,8 +286,8 @@ class Symbols:
             case Voltage(e):
                 t = self.terminals(self.index(e))
                 return t.V[e.kind.terminals[0]] - t.V[e.kind.terminals[1]]
-            case Parameter(e):
-                return self.param(e)
+            case Parameter(e, which):
+                return self.param(e, which)
             case Potential(p):
                 return self.V(p)
             case Across(a, b):
@@ -295,7 +340,7 @@ def network(
     laws = [
         Equation(sp.sympify(law), Origin("law", s.net.parts[k][0], i))
         for k in parts
-        for i, law in enumerate(s.net.parts[k][0].kind.laws(s.terminals(k), s.param(s.net.parts[k][0])))
+        for i, law in enumerate(s.net.parts[k][0].kind.laws(s.terminals(k), s.params(s.net.parts[k][0])))
     ]
     kcl = []
     for n in points:
@@ -322,21 +367,36 @@ class System:
     symbols: Symbols
 
 
-def equations(problem: Problem, analysis: Analysis) -> System:
+def equations(problem: Problem, analysis: Analysis, sources: sp.Expr | int = 1) -> System:
+    """The problem's equations read by ``analysis``, its data in. ``sources``: what every independent
+    source is scaled by (1: as given; 0…1: on the way up from nothing — for Newton, see ``solve``)."""
     s = symbols(problem.circuit)
     values: dict[sp.Symbol, sp.Expr] = {}
+    for e, _ in s.net.parts:  # (a part's own: what a parameter is when nothing is given)
+        for which, default in e.kind.defaults:
+            values[s.param(e, which)] = cast(sp.Expr, parse(default))
     conditions: list[Equation] = []
-    for key, value in problem.values.items():
+    for key, value in problem.given.items():
+        if value is UNKNOWN:
+            continue
         match key:
+            case Element() if isinstance(value, Mapping):
+                values |= {s.param(key, w): cast(sp.Expr, x) for w, x in value.items() if x is not UNKNOWN}
             case Element():
-                values[s.param(key)] = value
+                values[s.param(key)] = cast(sp.Expr, value)
             case str():
-                values[sp.Symbol(key)] = value
+                values[sp.Symbol(key)] = cast(sp.Expr, value)
             case _:
-                conditions.append(Equation(s.of(key) - value, Origin("given", key)))
+                conditions.append(Equation(s.of(key) - cast(sp.Expr, value), Origin("given", key)))
+    if sources != 1:
+        for e, _ in s.net.parts:
+            if is_source(e):
+                for p in s.params(e).values():
+                    if p in values:
+                        values[p] = sources * values[p]
     rel = relation(problem.circuit)
     eqs = tuple(Equation(subs(interpret(eq.expr, analysis), values), eq.origin) for eq in (*rel.equations, *conditions))
-    params = {s.param(e) for e, _ in s.net.parts} - set(values)
+    params = {p for e, _ in s.net.parts for p in s.params(e).values()} - set(values)
     found = {x for eq in eqs for x in _symbols_in(eq.expr)}
     in_data = {x for v in values.values() for x in _symbols_in(sp.sympify(v))}  # (a value "R": a symbol)
     unknowns = (found - in_data - {x for x in found if x.name.endswith("⁻")}) | (params & found)
@@ -353,6 +413,7 @@ class SolutionStep:
     found: tuple[sp.Symbol, ...]
     values: tuple[sp.Expr, ...]
     because: tuple[Origin, ...]
+    how: str = "alone"  # "alone" (one equation, one unknown), "together" (several at once), "numerically"
 
 
 @dataclass(frozen=True)
@@ -403,17 +464,51 @@ def _steps(system: System) -> tuple[dict[sp.Symbol, sp.Expr], tuple[SolutionStep
             together = {x: sp.simplify(v) for x, v in found[0].items()}
             known |= together
             unknown -= set(together)
-            out.append(SolutionStep(tuple(together), tuple(together.values()), tuple(eq.origin for eq in pending)))
+            origins = tuple(eq.origin for eq in pending)
+            out.append(SolutionStep(tuple(together), tuple(together.values()), origins, "together"))
             known = {x: sp.simplify(subs(v, known)) for x, v in known.items()}
             break
     return known, tuple(out)
 
 
+class NotLinear(ValueError):
+    """What is asked holds only for a linear circuit (a phasor, superposition); an element's law is not."""
+
+
+def _algebraic(system: System) -> bool:
+    """Polynomial in its unknowns (an unknown resistance times a current too): algebra solves it."""
+    try:
+        for eq in system.equations:
+            sp.Poly(eq.expr, *system.unknowns)
+        return True
+    except sp.PolynomialError:  # (exp of an unknown: a diode's)
+        return False
+
+
 def solve(problem: Problem, analysis: DC | AC | None = None) -> Solution:
-    """Where it settles (DC), or its phasors at ``AC(ω)`` — and the steps there."""
-    system = equations(problem, analysis or DC())
-    values, steps = _steps(system)
-    return Solution(problem, values, frozenset(system.unknowns) - set(values), system.symbols, steps)
+    """Where it settles (DC), or its phasors at ``AC(ω)`` — and the steps there. Linear: by algebra, step
+    by step; beyond algebra (a diode's exp): by Newton, every value needed, the sources raised from nothing."""
+    analysis = analysis or DC()
+    system = equations(problem, analysis)
+    if _algebraic(system):
+        values, steps = _steps(system)
+        return Solution(problem, values, frozenset(system.unknowns) - set(values), system.symbols, steps)
+    if isinstance(analysis, AC):
+        raise NotLinear("a phasor of a non-linear circuit: around its working point (not yet)")
+    lam = sp.Symbol("λ")
+    raised = equations(problem, analysis, sources=lam)
+    exprs = [eq.expr for eq in raised.equations]
+    unknowns = list(raised.unknowns)
+    if any(x not in {*unknowns, lam} for e in exprs for x in _symbols_in(e)):
+        raise Undetermined("a non-linear circuit is solved with every value given")
+    f, j = compiled(exprs, unknowns, (lam,))
+    found = homotopy(f, j, len(unknowns))
+    if found is None:
+        raise Undetermined("Newton did not get there")
+    values = {u: sp.Float(v) for u, v in zip(unknowns, found, strict=True)}
+    origins = tuple(eq.origin for eq in raised.equations)
+    step = SolutionStep(tuple(values), tuple(values.values()), origins, "numerically")
+    return Solution(problem, values, frozenset(), raised.symbols, (step,))
 
 
 # --------------------------------------------------------------------------------------- a piece seen from its ends
@@ -435,7 +530,7 @@ def port(s: Symbols, parts: Sequence[int], a: int, b: int, analysis: Analysis) -
     inside = network(s, parts, [n for n in points if n != b], {a: PORT_I})
     eqs = [subs(interpret(eq.expr, analysis), zero) for eq in inside.equations]
     eqs.append(PORT_U - subs(s.potentials[a], zero))
-    params = {s.param(s.net.parts[k][0]) for k in parts}
+    params = {p for k in parts for p in s.params(s.net.parts[k][0]).values()}
     inner = sorted({x for eq in eqs for x in _symbols_in(eq)} - params - {PORT_U, PORT_I}, key=str)
     for var in (PORT_U, PORT_I):  # U from I (most pieces); I from U (a current source: U is free)
         found = sp.solve(eqs, [*inner, var], dict=True)
@@ -483,72 +578,82 @@ def matches(relation: Relation, kind: Kind, analysis: Analysis | None = None) ->
 # --------------------------------------------------------------------------------------- simulate
 
 
+class NoConvergence(ArithmeticError):
+    """A step in time Newton could not take (at ``t``)."""
+
+
 @dataclass(frozen=True)
 class State:
     t: float
-    remembered: Mapping[sp.Symbol, float]  # what the last step left (x⁻ for each x under D or Pre)
+    values: Mapping[sp.Symbol, float]  # every unknown then: where the next step starts, what it remembers
 
 
 @dataclass(frozen=True)
 class Stepper:
-    """One step in time, compiled once: the next state's quantities from the last one's."""
+    """One step in time, compiled once: the equations of a step, the previous state's quantities in them."""
 
     dt: float
     unknowns: tuple[sp.Symbol, ...]
-    remembers: tuple[sp.Symbol, ...]  # the x whose x⁻ the next step needs
-    next: Callable[..., Sequence[float]] = field(repr=False)  # remembered values -> the unknowns' values
+    remembered: tuple[sp.Expr, ...]  # what each x⁻ is (a quantity of the state before)
+    f: Residual = field(repr=False)
+    j: Jacobian = field(repr=False)
 
 
 def compile_steps(problem: Problem, dt: float) -> Stepper:
-    system = equations(problem, Step(sp.Float(dt)))
-    eqs = [eq.expr for eq in system.equations]
-    remembered = sorted({x for eq in eqs for x in _symbols_in(eq) if x.name.endswith("⁻")}, key=str)
-    found = sp.solve(eqs, system.unknowns, dict=True)
-    if len(found) != 1:
+    lam = sp.Symbol("λ")
+    system = equations(problem, Step(sp.Float(dt)), sources=lam)
+    # what a step remembers: each x under D or Pre, a step ago (x⁻)
+    held: list[sp.Expr] = sorted(
+        {
+            cast(sp.Expr, a.args[0])
+            for eq in relation(problem.circuit).equations
+            for a in sp.sympify(eq.expr).atoms(D, Pre)
+        },
+        key=str,
+    )
+    before_of = [before(x) for x in held]
+    exprs = [eq.expr for eq in system.equations]
+    unknowns = [u for u in system.unknowns if u not in before_of]
+    if any(x not in {*unknowns, lam, *before_of} for e in exprs for x in _symbols_in(e)):
         raise Undetermined("a step in time needs every value")
-    exprs = [found[0].get(u, u) for u in system.unknowns]
-    return Stepper(
-        dt,
-        system.unknowns,
-        tuple(sp.Symbol(x.name[:-1]) for x in remembered),
-        sp.lambdify(remembered, exprs, "math"),
-    )
+    f, j = compiled(exprs, unknowns, (lam, *before_of))
+    return Stepper(dt, tuple(unknowns), tuple(held), f, j)
 
 
-def step(stepper: Stepper, state: State) -> tuple[State, dict[sp.Symbol, float]]:
-    """The circuit ``dt`` on: the new state, and every quantity at its end."""
-    values = dict(
-        zip(stepper.unknowns, stepper.next(*(state.remembered.get(x, 0.0) for x in stepper.remembers)), strict=True)
+def step(stepper: Stepper, state: State) -> State:
+    """The circuit ``dt`` on — from the last state (and if Newton does not get there, the sources raised)."""
+    at = {**dict.fromkeys(stepper.unknowns, 0.0), **state.values}  # (at rest before the first step)
+    prev = [float(subs(sp.sympify(x), at)) for x in stepper.remembered]
+    guess = [state.values.get(u, 0.0) for u in stepper.unknowns]
+    x = newton(stepper.f, stepper.j, guess, (1.0, *prev)) or homotopy(
+        stepper.f, stepper.j, len(guess), tuple(prev), guess
     )
-    return State(state.t + stepper.dt, {x: float(values[x]) for x in stepper.remembers}), values
+    if x is None:
+        raise NoConvergence(state.t + stepper.dt)
+    return State(state.t + stepper.dt, dict(zip(stepper.unknowns, x, strict=True)))
 
 
 @dataclass(frozen=True)
 class Trace:
     problem: Problem
-    times: tuple[float, ...]
-    rows: tuple[Mapping[sp.Symbol, float], ...]
+    states: tuple[State, ...]
     symbols: Symbols
 
     def __call__(self, q: Quantity) -> Callable[[float], float]:
         """``q`` in time: a function of t (the nearest step)."""
-        x = self.symbols.of(q)
-        ys = [float(subs(sp.sympify(x), row)) for row in self.rows]
+        x = sp.sympify(self.symbols.of(q))
+        ys = [float(subs(x, s.values)) for s in self.states]
 
         def at(t: float) -> float:
-            return ys[min(range(len(self.times)), key=lambda i: abs(self.times[i] - t))]
+            return ys[min(range(len(self.states)), key=lambda i: abs(self.states[i].t - t))]
 
         return at
 
 
 def simulate(problem: Problem, until: float, dt: float | None = None) -> Trace:
-    """From rest (every capacitor empty, every inductor still) for ``until`` seconds."""
+    """From rest (every capacitor empty, every inductor still) for ``until`` seconds: ``step`` unfolded."""
     stepper = compile_steps(problem, dt or until / 1000)
-    state = State(0.0, {})
-    times: list[float] = []
-    rows: list[Mapping[sp.Symbol, float]] = []
-    while state.t < until - 1e-12:
-        state, values = step(stepper, state)
-        times.append(state.t)
-        rows.append(values)
-    return Trace(problem, tuple(times), tuple(rows), symbols(problem.circuit))
+    states = [State(0.0, {})]
+    while states[-1].t < until - 1e-12:
+        states.append(step(stepper, states[-1]))
+    return Trace(problem, tuple(states[1:]), symbols(problem.circuit))

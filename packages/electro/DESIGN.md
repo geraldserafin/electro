@@ -717,8 +717,8 @@ Dopiero z nimi da się uczciwie porównać rozmiar i prostotę z obecną bibliot
   trzeba uogólnić, zanim dojdą — to też sprawdzian F16 („bez wyjątków”).
 
 **Następne kroki prototypu, w kolejności ryzyka:** ~~uogólnione prawo~~ (zrobione: §13) →
-droga powrotna upraszczania (dzielniki) → zamiana źródeł (szablony dwuelementowe) → dioda (nieliniowość,
-Newton bez ręcznych sztuczek) → przerzutnik (`Pre`, zdarzenia) → jednostki → porównanie z obecną
+droga powrotna upraszczania (dzielniki) → zamiana źródeł (szablony dwuelementowe) → ~~dioda~~ (zrobione:
+§13.1) → fazory nieliniowych (linearyzacja z prawa) → przerzutnik (`Pre`, zdarzenia) → jednostki → porównanie z obecną
 biblioteką na jej testach.
 
 **Poprzednia kolejka (już zrobione: czarna skrzynka, superpozycja, upraszczanie):** czarna skrzynka kawałka (bez niej warstwa metod
@@ -824,6 +824,29 @@ prawa źródła, prądy rezystorów z ich praw (Ohm), prąd źródła z Kirchhof
 niezależnego; nullator (2 równania) i norator (0) — wzmacniacz odwracający z nullora i dwóch rezystorów
 daje −R₂/R₁; cewka zapisana ogólnie przez swój strumień (zmienna własna) liczy się w czasie identycznie
 jak wbudowana. Żadna z tych rzeczy nie wymagała zmiany silnika.
+
+### 13.1 Dioda: pierwsze prawo poza algebrą (24 testy)
+
+- **Ryzyko z §10.4 („ogólny silnik a zbieżność") — na razie odparte.** Newton bez żadnej sztuczki
+  diody (dzisiejsza biblioteka ma ograniczanie napięcia złącza, `_pnjlim`, skrojone pod nią). Wystarczyły
+  dwie ogólne techniki: **narastanie źródeł** (z wyłączonymi źródłami wszystko jest zerem, potem w górę;
+  co jest źródłem — z praw elementów) i **cofanie kroku po błędzie względnym** — każde równanie mierzone
+  własną skalą (wiersz pochodnych × wielkość zmiennych), bo inaczej porównuje się ampery z woltami i
+  dobre kroki Newtona są odrzucane (tak było: 0,14 A przy 18 600 A „gorsze" niż 0,0001 V).
+- Rozwiązane: dioda w przód (zgodnie z niezależną bisekcją, do 10⁻⁹ V), w tył (−I_S), 4 szeregowo,
+  mostek prostowniczy, para antyrównoległa, dioda wprost na źródle (13 A; i absurdalne 10⁷⁰ A).
+  Po 4 wywołania Newtona, setne części sekundy.
+- **Kartka = gdzie czas się ustala, także z diodą** (§1.5): symulacja układu z diodą i kondensatorem po
+  ~20 stałych czasowych zgadza się z `solve` do 10⁻⁴.
+- **Algebra, gdzie się da:** układ wielomianowy w niewiadomych (także zadanie odwrotne: R × I) idzie
+  algebrą, z krokami; dopiero `exp` i podobne — Newtonem (jeden krok „numerycznie"). Symulacja zawsze
+  Newtonem (liniowy kończy w jednej iteracji) — jedna droga.
+- **Złapane „brakuje X" (i od razu uogólnione):** element miał jeden parametr, dioda ma kilka. Rodzaj ma
+  teraz listę parametrów z wartościami domyślnymi (część katalogowa = dane), dane podają jeden albo kilka
+  (`{d: {"I_S": "1e-12", "n": 2}}`).
+- **Jeszcze nie:** fazory układu nieliniowego (wymagają linearyzacji wokół punktu pracy — da się ją
+  wyprowadzić z prawa automatycznie, `NotLinear` na razie). Szybkość symulacji dużych układów (Python,
+  lambdify; dziś biblioteka generuje JS).
 
 ## 14. Otwarte
 

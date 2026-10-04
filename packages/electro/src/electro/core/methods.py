@@ -17,50 +17,22 @@ from .problem import (
     DC,
     Analysis,
     Current,
+    NotLinear,
     Parameter,
     Problem,
     Quantity,
     Voltage,
-    interpret,
+    is_linear,
+    is_source,
     matches,
     port,
     solve,
     subs,
     symbols,
 )
-from .syntax import GND, KINDS, Element, Net, Node, Terminals, netlist, rebuild
+from .syntax import GND, KINDS, Element, Net, Node, netlist, rebuild
 
 # --------------------------------------------------------------------------------------- what the laws say
-
-
-class NotLinear(ValueError):
-    """The method holds only for a linear circuit; this element's law is not."""
-
-
-def _laws(e: Element) -> tuple[list[sp.Expr], list[sp.Symbol]]:
-    """Its laws over symbols of its own (a potential and a current per terminal), and those symbols."""
-    ts = e.kind.terminals
-    V = {t: sp.Symbol(f"v_{t}") for t in ts}
-    I = {t: sp.Symbol(f"i_{t}") for t in ts}  # noqa: E741
-    laws = [sp.sympify(x) for x in e.kind.laws(Terminals(V, I, lambda n: sp.Symbol(f"x_{n}")), sp.Symbol("p"))]
-    return laws, [*V.values(), *I.values()]
-
-
-def is_linear(e: Element, analysis: Analysis | None = None) -> bool:
-    """Its laws of degree one in its potentials and currents (a resistor, a source, a capacitor read by
-    any analysis, a controlled source)."""
-    laws, xs = _laws(e)
-    try:
-        return all(sp.Poly(sp.expand(interpret(law, analysis or DC())), *xs).total_degree() <= 1 for law in laws)
-    except sp.PolynomialError:  # (exp(U), a diode's: not a polynomial at all)
-        return False
-
-
-def is_source(e: Element) -> bool:
-    """An independent source: a law keeps a term with no potential or current in it (``U + E``, ``I − J``).
-    A resistor's parameter multiplies I; a controlled source's every term is one of its quantities."""
-    laws, xs = _laws(e)
-    return any(sp.simplify(law.subs(dict.fromkeys(xs, 0))) != 0 for law in laws)
 
 
 # --------------------------------------------------------------------------------------- superposition

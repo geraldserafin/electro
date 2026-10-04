@@ -2,6 +2,7 @@
 
 import json
 import math
+from collections.abc import Mapping
 
 import pytest
 import sympy as sp
@@ -24,6 +25,7 @@ from electro.core import (
     U,
     V,
     VoltageSource,
+    at,
     close,
     free,
     is_closed,
@@ -237,9 +239,9 @@ def test_a_nullor_two_laws_and_none_an_inverting_amplifier_from_it_and_two_resis
 def test_an_inner_quantity_an_inductor_written_by_its_flux_is_the_inductor():
     from electro.core import Terminals
 
-    def flux(t: Terminals, L: sp.Symbol) -> list[sp.Expr]:
+    def flux(t: Terminals, p: Mapping[str, sp.Symbol]) -> list[sp.Expr]:
         phi = t.inner("phi")
-        return [t.V["a"] - t.V["b"] - D(phi), phi - L * t.I["a"]]
+        return [t.V["a"] - t.V["b"] - D(phi), phi - p[""] * t.I["a"]]
 
     FluxInductor = Kind("flux_inductor", "L", "H", ("a", "b"), flux)
     currents = []
@@ -248,3 +250,77 @@ def test_an_inner_quantity_an_inductor_written_by_its_flux_is_the_inductor():
         p = Problem(GND >> e >> r >> Node() >> coil >> GND, {e: 10, r: 10, coil: 1})
         currents.append(simulate(p, until=0.3, dt=1e-3)(I(coil))(0.1))  # τ = L/R = 0.1 s
     assert currents[0] == pytest.approx(currents[1]) and currents[0] == pytest.approx(1 - math.exp(-1), abs=0.01)
+
+
+# --- the first law beyond algebra: a diode (Newton, no trick of its own) ---------------------------
+
+
+def _bisect(f, lo: float, hi: float) -> float:
+    for _ in range(200):
+        mid = (lo + hi) / 2
+        lo, hi = (mid, hi) if f(lo) * f(mid) > 0 else (lo, mid)
+    return (lo + hi) / 2
+
+
+def test_a_diode_forward_its_drop_as_shockley_and_ohm_have_it():
+    from electro.core.syntax import V_T, Diode
+
+    e, r, d = VoltageSource("E"), Resistor("R"), Diode("D")
+    s = solve(Problem(GND >> e >> r >> Node() >> d >> GND, {e: 5, r: 1000}))
+    vt, i_s = float(V_T), 1e-14
+    drop = _bisect(lambda u: (5 - u) / 1000 - i_s * (math.exp(u / vt) - 1), 0, 1)
+    assert float(s(U(d))) == pytest.approx(drop, abs=1e-9)  # ≈ 0.63 V
+    assert float(s(I(d))) == pytest.approx((5 - drop) / 1000, rel=1e-9)
+    assert s.steps[0].how == "numerically"  # (beyond algebra: one step, Newton's)
+
+
+def test_a_diode_backwards_lets_through_only_its_saturation_current():
+    from electro.core.syntax import Diode
+
+    e, r, d = VoltageSource("E"), Resistor("R"), Diode("D")
+    b = Node()
+    s = solve(Problem((GND >> e >> r >> b) @ at(d, GND, b), {e: 5, r: 1000}))
+    assert float(s(I(d))) == pytest.approx(-1e-14, rel=1e-6)
+
+
+def test_a_diodes_own_parameters_are_data():
+    from electro.core.syntax import V_T, Diode
+
+    e, r, d = VoltageSource("E"), Resistor("R"), Diode("D")
+    s = solve(Problem(GND >> e >> r >> Node() >> d >> GND, {e: 5, r: 1000, d: {"I_S": "1e-12", "n": 2}}))
+    vt = float(V_T)
+    drop = _bisect(lambda u: (5 - u) / 1000 - 1e-12 * (math.exp(u / (2 * vt)) - 1), 0, 2)
+    assert float(s(U(d))) == pytest.approx(drop, abs=1e-9)
+
+
+def test_with_a_diode_too_the_paper_is_where_time_settles():
+    from electro.core.syntax import Diode
+
+    e, r1, r2, d, c = VoltageSource("E"), Resistor("R_1"), Resistor("R_2"), Diode("D"), Capacitor("C")
+    b, out = Node("B"), Node("OUT")
+    circuit = (GND >> e >> r1 >> b >> d >> out) @ (out >> r2 >> GND) @ (out >> c >> GND)
+    p = Problem(circuit, {e: 5, r1: 100, r2: 1000, c: "10u"})
+    settled = simulate(p, until=0.02, dt=2e-5)(V(out))(0.02)  # ≈ 20 time constants
+    assert settled == pytest.approx(float(solve(p)(V(out))), rel=1e-4)
+
+
+def test_diodes_in_a_bridge_and_one_beyond_reason_newton_gets_there_without_a_trick():
+    from electro.core.syntax import Diode
+
+    e, r, rg = VoltageSource("E"), Resistor("R"), Resistor("R_g")
+    d1, d2, d3, d4 = (Diode(f"D{k}") for k in range(1, 5))
+    p, n, a, b = Node("P"), Node("N"), Node("A"), Node("B")
+    bridge = (
+        (n >> e >> p)
+        @ at(d1, p, a)
+        @ at(d2, n, a)
+        @ at(d3, b, p)
+        @ at(d4, b, n)
+        @ (a >> r >> b)
+        @ (n >> rg >> GND)  # (the bridge's only tie to ground: through a megohm)
+    )
+    s = solve(Problem(bridge, {e: 10, r: 1000, rg: 10**6}))
+    assert float(s(I(r))) == pytest.approx(8.579e-3, rel=1e-3)  # 10 V less two diodes' drops, over 1 kΩ
+    # a diode right on 5 V: 10⁷⁰ A (no sense, but numbers: each equation weighed by its own size)
+    s = solve(Problem(GND >> e >> d1 >> GND, {e: 5}))
+    assert math.log10(float(s(I(d1)))) == pytest.approx(69.996, abs=1e-3)
