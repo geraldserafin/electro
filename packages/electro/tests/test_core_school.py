@@ -25,7 +25,7 @@ from electro.core import (
     solve,
 )
 from electro.core.methods import between, resistance, superposition, thevenin
-from electro.core.problem import P
+from electro.core.problem import Ambiguous, Contradiction, MissingData, P
 from electro.core.syntax import CCCS, CCVS, VCCS, Ammeter, OpAmp
 from electro.core.syntax import Capacitor as C
 from electro.values import parse
@@ -138,9 +138,10 @@ def test_ac_impedance():
     )
 
 
-@GAP
 def test_ac_power_is_average():
-    raise NotImplementedError("power in AC: ½·Re(U·I*) — phasors need the conjugate, not U·I")
+    e, r, c = VoltageSource("E"), Resistor("R"), Capacitor("C")
+    s = solve(Problem(GND >> e >> r >> Node() >> c >> GND, {e: 1, r: 1000, c: "1u"}), AC(sp.Integer(1000)))
+    assert s(P(r)) == sp.Rational(1, 4000) and s(P(c)) == 0  # ½·|I|²·R, |I| = 1/√2 mA
 
 
 @GAP
@@ -160,9 +161,11 @@ def test_contradiction():
         solve(Problem(loop(e, r), {e: 12, r: 10, I(r): 5}))
 
 
-@GAP
 def test_contradiction_names_the_clashing_data():
-    raise NotImplementedError("ConflictingData: which data clash, by name — the prototype only says they do")
+    e, r = VoltageSource("E"), Resistor("R")
+    with pytest.raises(Contradiction) as err:
+        solve(Problem(loop(e, r), {e: 12, r: 10, I(r): 5}))
+    assert {e, r, I(r)} == set(err.value.data)  # (without any one of them, it fits)
 
 
 def test_underdetermined_is_said_when_asked():
@@ -178,9 +181,14 @@ def test_two_solutions_from_power():
         solve(Problem(loop(e, r1, r2), {e: 12, r2: 4, P(r1): 8}))
 
 
-@GAP
 def test_two_solutions_are_named():
-    raise NotImplementedError("Ambiguous with the options (R_1 = 8 or 2) — the prototype only says there are two")
+    e, r1, r2 = VoltageSource("E"), Resistor("R_1"), Resistor("R_2")
+    with pytest.raises(Ambiguous) as err:
+        solve(Problem(loop(e, r1, r2), {e: 12, r2: 4, P(r1): 8}))
+    assert err.value.options == ({sp.Symbol("R_1"): 8}, {sp.Symbol("R_1"): 2})
+    # one more condition — a relation between two quantities — picks one
+    e, r1, r2 = VoltageSource("E"), Resistor("R_1"), Resistor("R_2")
+    assert solve(Problem(loop(e, r1, r2), {e: 12, r2: 4, P(r1): 8, U(r1): 2 * U(r2)}))(Parameter(r1)) == 8
 
 
 def test_three_sources_as_parallel_branches():
@@ -207,9 +215,48 @@ def test_three_sources_as_parallel_branches():
     assert total == sp.Rational(-18, 11) and superposition(p, I(r2)).total == total
 
 
-@GAP
-def test_find_several_unknowns_and_missing_data():
-    raise NotImplementedError("find + MissingData: what is missing to determine what is sought, and what would help")
+def _three_unknowns():
+    e1, e2, j, r1, r2, r3 = (
+        VoltageSource("E_1"),
+        VoltageSource("E_2"),
+        CurrentSource("J"),
+        Resistor("R_1"),
+        Resistor("R_2"),
+        Resistor("R_3"),
+    )
+    top, mid = Node("TOP"), Node("MID")
+    circuit = (
+        (GND >> e1 >> Node() >> r1 >> top)
+        @ (top >> r2 >> GND)
+        @ (mid >> r3 >> GND)
+        @ (GND >> j >> mid)
+        @ (top >> e2 >> mid)
+    )
+    return circuit, {e1: 12, r2: 4, j: 1}, (r1, r2, r3, e2)
+
+
+def test_find_several_unknowns():
+    circuit, given, (r1, r2, r3, e2) = _three_unknowns()
+    find = [Parameter(r1), Parameter(r3), Parameter(e2)]
+    answers = solve(Problem(circuit, {**given, I(r1): 2, U(r2): 8, U(r3): 5}, find)).answers
+    assert list(answers.values()) == [2, 5, -3]
+
+
+def test_missing_data_says_what_would_help():
+    circuit, given, (r1, r2, r3, e2) = _three_unknowns()
+    s = solve(Problem(circuit, {**given, I(r1): 2, U(r2): 8}, [Parameter(r1), Parameter(r3), Parameter(e2)]))
+    with pytest.raises(MissingData) as err:
+        _ = s.answers
+    assert err.value.needed == 1 and U(r3) in err.value.options
+    assert err.value.found == {Parameter(r1): 2}  # (the part that could be found is kept)
+
+
+def test_missing_data_counts_redundant_givens_once():
+    circuit, given, (r1, r2, r3, e2) = _three_unknowns()
+    s = solve(Problem(circuit, {**given, U(r2): 8, I(r2): 2}, [Parameter(r1), Parameter(r3), Parameter(e2)]))
+    with pytest.raises(MissingData) as err:
+        _ = s.answers
+    assert err.value.needed == 2
 
 
 @GAP
@@ -217,9 +264,15 @@ def test_hole_becomes_the_simplest_element():
     raise NotImplementedError("Hole: an unknown element, filled with the simplest that fits")
 
 
-@GAP
 def test_unknown_resistor_cannot_be_negative():
-    raise NotImplementedError("an unknown resistance is positive: the prototype gives −34 Ω without a word")
+    e, r1, r2 = VoltageSource("E"), Resistor("R_1"), Resistor("R_2")
+    with pytest.raises(Contradiction):  # (it would take −34 Ω: a resistor's law says it is never negative)
+        solve(Problem(GND >> e >> r1 >> Node() >> r2 >> GND, {e: 12, r1: 10, I(r1): "-0.5"}))
+
+
+def test_unknown_source_can_come_out_positive():
+    e, r = VoltageSource("E"), Resistor("R")
+    assert solve(Problem(loop(e, r), {r: 10, I(r): 5}))(Parameter(e)) == 50
 
 
 def test_ammeter_reading_is_a_datum():

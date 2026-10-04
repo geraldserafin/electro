@@ -59,40 +59,55 @@ def _symbols_in(x: sp.Expr) -> set[sp.Symbol]:
 # --------------------------------------------------------------------------------------- quantities
 
 
+class _Scalable:
+    """A quantity times a number: ``2 * U(r2)`` — for a condition between quantities (U_1 = 2·U_2)."""
+
+    def __rmul__(self, k: object) -> Scaled:
+        return Scaled(sp.sympify(k), cast("Quantity", self))
+
+    __mul__ = __rmul__
+
+
 @dataclass(frozen=True)
-class Current:
+class Current(_Scalable):
     of: Element
     at: str | None = None  # a terminal (an element of more than two); two: the current from a to b
 
 
 @dataclass(frozen=True)
-class Voltage:
+class Voltage(_Scalable):
     of: Element  # a two-terminal one's: the drop from a to b
 
 
 @dataclass(frozen=True)
-class Parameter:
+class Parameter(_Scalable):
     of: Element  # its value
     which: str = ""  # one of several (a diode's "I_S"); "": its main one
 
 
 @dataclass(frozen=True)
-class Potential:
+class Potential(_Scalable):
     at: Node | Net
 
 
 @dataclass(frozen=True)
-class Across:
+class Across(_Scalable):
     a: Node | Net
     b: Node | Net  # V_a − V_b
 
 
 @dataclass(frozen=True)
-class Power:
+class Power(_Scalable):
     of: Element  # a two-terminal one's: U·I, what it takes (a source: minus what it gives)
 
 
 Quantity = Current | Voltage | Parameter | Potential | Across | Power
+
+
+@dataclass(frozen=True)
+class Scaled:
+    factor: sp.Expr
+    of: Quantity
 
 
 def I(e: Element, at: str | None = None) -> Current:  # noqa: E743 — as a book writes it
@@ -179,6 +194,31 @@ class Undetermined(ValueError):
     """What is sought does not follow from what is given."""
 
 
+class Contradiction(Undetermined):
+    """No circuit fits the data. ``data``: the given ones that clash — without any one of them, it fits."""
+
+    def __init__(self, message: str, data: Sequence[object] = ()) -> None:
+        super().__init__(message)
+        self.data = tuple(data)
+
+
+class Ambiguous(Undetermined):
+    """More than one circuit fits (a resistance from its power): ``options``, each the values it takes."""
+
+    def __init__(self, options: Sequence[Mapping[sp.Symbol, sp.Expr]]) -> None:
+        super().__init__(f"{len(options)} solutions: one more datum picks one")
+        self.options = tuple(dict(o) for o in options)
+
+
+class MissingData(Undetermined):
+    """What is sought does not follow yet: ``needed`` data more; ``options``: quantities each of which,
+    given, would do (when one is needed); ``found``: what is sought and could be found."""
+
+    def __init__(self, needed: int, options: Sequence[object], found: Mapping[object, sp.Expr]) -> None:
+        super().__init__(f"{needed} more datum needed")
+        self.needed, self.options, self.found = needed, tuple(options), dict(found)
+
+
 Key = Element | str | Quantity
 
 
@@ -196,7 +236,11 @@ class Problem:
             "given",
             MappingProxyType(
                 {
-                    k: MappingProxyType({w: parse(x) for w, x in v.items()}) if isinstance(v, Mapping) else parse(v)
+                    k: MappingProxyType({w: parse(x) for w, x in v.items()})
+                    if isinstance(v, Mapping)
+                    else v
+                    if isinstance(v, (_Scalable, Scaled))
+                    else parse(v)
                     for k, v in self.given.items()
                 }
             ),
@@ -336,7 +380,7 @@ class Symbols:
     def V(self, p: Node | Net) -> sp.Expr:
         return self.potentials[next(n for n, q in self.net.named if q == p)]
 
-    def of(self, q: Quantity) -> sp.Expr:
+    def of(self, q: Quantity | Scaled) -> sp.Expr:
         match q:
             case Current(e, at):
                 return self.currents(self.index(e))[at or e.kind.terminals[0]]
@@ -351,6 +395,8 @@ class Symbols:
                 return self.V(a) - self.V(b)
             case Power(e):
                 return self.of(Voltage(e)) * self.of(Current(e))
+            case Scaled(k, x):
+                return k * self.of(x)
         raise TypeError(q)
 
 
@@ -439,6 +485,8 @@ class System:
     unknowns: tuple[sp.Symbol, ...]
     symbols: Symbols
     choices: tuple[tuple[Way, ...], ...] = ()  # (read and with the data in too)
+    positive: frozenset[sp.Symbol] = frozenset()  # unknown parameters never negative (a resistance)
+    params: frozenset[sp.Symbol] = frozenset()  # unknown parameters (what an option of several names)
 
 
 def equations(problem: Problem, analysis: Analysis, sources: sp.Expr | int = 1) -> System:
@@ -461,7 +509,8 @@ def equations(problem: Problem, analysis: Analysis, sources: sp.Expr | int = 1) 
             case str():
                 values[sp.Symbol(key)] = cast(sp.Expr, value)
             case _:
-                conditions.append(Equation(s.of(key) - cast(sp.Expr, value), Origin("given", key)))
+                other = s.of(value) if isinstance(value, (_Scalable, Scaled)) else cast(sp.Expr, value)
+                conditions.append(Equation(s.of(key) - other, Origin("given", key)))
     if sources != 1:
         for e, _ in s.net.parts:
             if is_source(e):
@@ -492,7 +541,8 @@ def equations(problem: Problem, analysis: Analysis, sources: sp.Expr | int = 1) 
     }
     in_data = {x for v in values.values() for x in _symbols_in(sp.sympify(v))}  # (a value "R": a symbol)
     unknowns = (found - in_data - {TIME} - {x for x in found if x.name.endswith("⁻")}) | (params & found)
-    return System(eqs, tuple(sorted(unknowns, key=str)), s, choices)
+    positive = frozenset(s.param(e, w) for e, _ in s.net.parts for w in e.kind.positive) & unknowns
+    return System(eqs, tuple(sorted(unknowns, key=str)), s, choices, positive, frozenset(params & found))
 
 
 # --------------------------------------------------------------------------------------- solve
@@ -516,8 +566,12 @@ class Solution:
     unknowns: frozenset[sp.Symbol]
     symbols: Symbols
     steps: tuple[SolutionStep, ...] = ()
+    analysis: Analysis = field(default_factory=DC)
 
     def __call__(self, q: Quantity) -> sp.Expr:
+        if isinstance(q, Power) and isinstance(self.analysis, AC):  # (phasors: what it takes on average)
+            u, i = self(Voltage(q.of)), self(Current(q.of))
+            return sp.simplify(sp.re(sp.expand(u * sp.conjugate(i), complex=True)) / 2)
         value = sp.simplify(subs(self.symbols.of(q), self.values))
         if value.free_symbols & self.unknowns:  # (still in what was not found)
             raise Undetermined(q)
@@ -525,7 +579,46 @@ class Solution:
 
     @property
     def answers(self) -> dict[Quantity, sp.Expr]:
-        return {q: self(q) for q in self.problem.find}
+        """What is sought, each found — or ``MissingData``: how many data more, and which would do."""
+        found: dict[Quantity, sp.Expr] = {}
+        lacking: list[sp.Expr] = []
+        for q in self.problem.find:
+            try:
+                found[q] = self(q)
+            except Undetermined:
+                lacking.append(subs(self.symbols.of(q), self.values))
+        if not lacking:
+            return found
+        free = sorted({x for e in lacking for x in _symbols_in(e)} & self.unknowns, key=str)
+        options: list[Quantity] = []
+        if len(free) == 1:  # (one datum more: each quantity that would pin it)
+            (x,) = free
+            k = sp.Dummy("k")
+            for candidate in self._measurable():
+                e = subs(self.symbols.of(candidate), self.values)
+                if x not in e.free_symbols:
+                    continue
+                roots = sp.solve(e - k, x)
+                if len(roots) == 1 and all(
+                    not (_symbols_in(sp.sympify(t).subs(x, roots[0])) & self.unknowns) for t in lacking
+                ):
+                    options.append(candidate)
+        raise MissingData(len(free), options, found)
+
+    def _measurable(self) -> list[Quantity]:
+        """Quantities one could be given: each element's value, voltage and current (two-terminal ones)."""
+        out: list[Quantity] = []
+        for e, _ in self.symbols.net.parts:
+            if len(e.kind.terminals) == 2:
+                out += [Voltage(e), Current(e)]
+            out += [Parameter(e, w) for w in e.kind.parameters]
+        return out
+
+
+def _fits(x: sp.Symbol, value: sp.Expr, positive: frozenset[sp.Symbol]) -> bool:
+    """Not a negative value of what is never negative (a resistance of −34 Ω: no such circuit)."""
+    v = sp.sympify(value)
+    return x not in positive or not (v.is_number and v.is_real and float(v) < 0)
 
 
 def _steps(system: System) -> tuple[dict[sp.Symbol, sp.Expr], tuple[SolutionStep, ...]]:
@@ -542,13 +635,13 @@ def _steps(system: System) -> tuple[dict[sp.Symbol, sp.Expr], tuple[SolutionStep
             if not left:  # (nothing left in it: it holds — or the data contradict each other)
                 pending.remove(eq)
                 if sp.simplify(expr) != 0:
-                    raise Undetermined(f"no solution: the data contradict each other ({eq.origin.what})")
+                    raise Contradiction(f"no solution: the data contradict each other ({eq.origin.what})")
                 break
             if len(left) == 1:
                 (x,) = left
-                roots = sp.solve(expr, x)
+                roots = [r for r in sp.solve(expr, x) if _fits(x, r, system.positive)]
                 if not roots:
-                    raise Undetermined(f"no solution: the data contradict each other ({eq.origin.what})")
+                    raise Contradiction(f"no solution: the data contradict each other ({eq.origin.what})")
                 if len(roots) == 1:  # (two — a resistance from its power — are for the rest together)
                     pending.remove(eq)
                     known[x] = sp.simplify(roots[0])
@@ -557,11 +650,15 @@ def _steps(system: System) -> tuple[dict[sp.Symbol, sp.Expr], tuple[SolutionStep
                     break
         else:  # nothing with one unknown: the rest together (a loop's equations, say)
             rest = sorted({x for eq in pending for x in _symbols_in(subs(eq.expr, known))} & unknown, key=str)
-            found = sp.solve([subs(eq.expr, known) for eq in pending], rest, dict=True)
+            found = [
+                f
+                for f in sp.solve([subs(eq.expr, known) for eq in pending], rest, dict=True)
+                if all(_fits(x, v, system.positive) for x, v in f.items())
+            ]
             if not found:
-                raise Undetermined("no solution: the data contradict each other")
+                raise Contradiction("no solution: the data contradict each other")
             if len(found) > 1:  # (an unknown resistance from its power: two, both true — not ours to pick)
-                raise Undetermined(f"{len(found)} solutions: one more datum picks one")
+                raise Ambiguous([{x: sp.simplify(v) for x, v in f.items() if x in system.params} for f in found])
             together = {x: sp.simplify(v) for x, v in found[0].items()}
             known |= together
             unknown -= set(together)
@@ -601,8 +698,12 @@ def solve(problem: Problem, analysis: DC | AC | None = None) -> Solution:
     if system.choices:
         return _by_cases(problem, system)
     if _algebraic(system):
-        values, steps = _steps(system)
-        return Solution(problem, values, frozenset(system.unknowns) - set(values), system.symbols, steps)
+        try:
+            values, steps = _steps(system)
+        except Contradiction as err:
+            raise Contradiction(str(err), _clashing(problem, analysis)) from None
+        unknown = frozenset(system.unknowns) - set(values)
+        return Solution(problem, values, unknown, system.symbols, steps, analysis)
     if isinstance(analysis, AC):
         raise NotLinear("a phasor of a non-linear circuit: around its working point (not yet)")
     lam = sp.Symbol("λ")
@@ -619,6 +720,19 @@ def solve(problem: Problem, analysis: DC | AC | None = None) -> Solution:
     origins = tuple(eq.origin for eq in raised.equations)
     step = SolutionStep(tuple(values), tuple(values.values()), origins, "numerically")
     return Solution(problem, values, frozenset(), raised.symbols, (step,))
+
+
+def _clashing(problem: Problem, analysis: DC | AC) -> list[object]:
+    """The given data that clash: those without which it fits."""
+    out = []
+    for key in problem.given:
+        rest = Problem(problem.circuit, {k: v for k, v in problem.given.items() if k is not key}, problem.find)
+        try:
+            _steps(equations(rest, analysis))
+        except Undetermined:
+            continue
+        out.append(key)
+    return out
 
 
 def _by_cases(problem: Problem, system: System) -> Solution:

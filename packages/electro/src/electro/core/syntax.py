@@ -109,6 +109,7 @@ class Kind:
     symmetric: bool = True  # turned around: the same circuit (only its arrows' signs change)
     parameters: tuple[str, ...] = ("",)  # its parameters' names ("": the main one, given as its value)
     defaults: tuple[tuple[str, object], ...] = ()  # what a parameter is when nothing is given for it
+    positive: tuple[str, ...] = ()  # parameters never negative (a resistance): a negative one found is a contradiction
 
     def __call__(self, name: str | None = None) -> Element:
         return Element(self, name)
@@ -118,10 +119,23 @@ class Kind:
 
 
 def two_terminal(
-    name: str, prefix: str, unit: str, law: Callable[[sp.Expr, sp.Expr, sp.Symbol], sp.Expr], symmetric: bool = True
+    name: str,
+    prefix: str,
+    unit: str,
+    law: Callable[[sp.Expr, sp.Expr, sp.Symbol], sp.Expr],
+    symmetric: bool = True,
+    positive: bool = False,
 ) -> Kind:
     """The shorthand: one law of ``U`` (the drop from ``a`` to ``b``) and ``I`` (from ``a`` to ``b``)."""
-    return Kind(name, prefix, unit, ("a", "b"), lambda t, p: [law(t.V["a"] - t.V["b"], t.I["a"], p[""])], symmetric)
+    return Kind(
+        name,
+        prefix,
+        unit,
+        ("a", "b"),
+        lambda t, p: [law(t.V["a"] - t.V["b"], t.I["a"], p[""])],
+        symmetric,
+        positive=("",) if positive else (),
+    )
 
 
 @dataclass(frozen=True, eq=False)  # (eq=False: an element is itself — two are two, whatever their names)
@@ -333,9 +347,9 @@ def is_closed(c: Circuit) -> bool:
 
 # --------------------------------------------------------------------------------------- elements
 
-Resistor = two_terminal("resistor", "R", "Ω", lambda U, I, R: U - R * I)
-Capacitor = two_terminal("capacitor", "C", "F", lambda U, I, C: I - C * D(U))
-Inductor = two_terminal("inductor", "L", "H", lambda U, I, L: U - L * D(I))
+Resistor = two_terminal("resistor", "R", "Ω", lambda U, I, R: U - R * I, positive=True)
+Capacitor = two_terminal("capacitor", "C", "F", lambda U, I, C: I - C * D(U), positive=True)
+Inductor = two_terminal("inductor", "L", "H", lambda U, I, L: U - L * D(I), positive=True)
 # a source's + on its second end: V_b − V_a = E, i.e. U = −E; a current source pushes J from a to b
 VoltageSource = two_terminal("voltage_source", "E", "V", lambda U, I, E: U + E, symmetric=False)
 CurrentSource = two_terminal("current_source", "J", "A", lambda U, I, J: I - J, symmetric=False)
