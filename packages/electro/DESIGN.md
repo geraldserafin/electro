@@ -652,7 +652,54 @@ problem = Problem(
 solution = solve(problem)
 ```
 
-## 10. Otwarte
+## 10. Ryzyka (spisane po review — patrz też §11)
+
+1. **Problem bez zgłoszenia.** Opóźnienie odczytu pinów Arduino (1 ms) nie psuje żadnej znanej
+   notatki; warianty synchronizacji (dziennik + cofanie, leniwy obwód) czekają na konkretny przykład.
+   Most `chip.ts` + `session.ts` zostaje.
+2. **Zapisane notatki użytkowników.** Usunięcie wartości z konstruktorów psuje kod w notatkach na
+   produkcji — potrzebna migracja (przepisanie kodu przy otwarciu), nie samo „twarde usunięcie”.
+3. **Koszt bez zmiany dla użytkownika.** Przebudowa to inwestycja; trzeba ją świadomie postawić
+   przed innymi pracami.
+4. **Ogólny silnik a zbieżność.** Dziś dioda ma ręczne sztuczki dla Newtona; ogólny silnik musi je
+   odtworzyć ogólnie, inaczej symulacje zaczną zgłaszać `NoConvergence`.
+5. **Synchronizacja z emulatorem**: zostaje wykonaniem (most), nie modelem — patrz 1.
+
+## 11. Prototyp rdzenia (`src/electro/core`, testy `tests/test_core.py`)
+
+Obok biblioteki, nic w niej nie zmienia. ~720 linii (bez eksportów): składnia + postać normalna
+(`syntax.py`), zadanie + analizy (`problem.py`), zapis do danych (`data.py`).
+
+**Co pokazał (12 testów):**
+
+- Zamykanie węzłem, masą i `close` (z `cup`/`cap`) daje to samo; równoległe przez wspólne węzły = `|`.
+- Element = jedno prawo z `D`: RC na kartce (DC: 10 V), w czasie (6,32 V po τ) i fazorem (|U| = E/√2)
+  z jednej definicji; nowy rodzaj (konduktancja) dopisany w teście jedną linijką działa w DC i AC.
+- Zadanie odwrotne, wspólny parametr (dwa „R”), `NotClosed`, `NoSuchParameter`.
+- **Ryzyko z review: sklejanie przez `>>`** — rozwiązane regułą: `>>` nie skleja dwóch różnych
+  węzłów (`JoinsNodes`); ósemkę pisze się przez `@` i wspólny węzeł. Jeden element w dwóch miejscach:
+  `ElementTwice`. Błędy przy budowie, nie przy pierwszym użyciu (każde `>>`/`@` liczy postać
+  normalną od razu; zapamiętaną).
+- **Ryzyko z review: tożsamość a zapis** — mniejsze, niż się zdawało: w pamięci element i węzeł są
+  sobą, w danych mają pozycję na liście (element) i numer (punkt); odczytane wracają jako świeże
+  obiekty, zadanie rozwiązuje się tak samo (test). Nazwy potrzebne są tylko na granicy.
+- Złapany błąd: podpis węzła trafiał do nazwy symbolu — dwa `Node("B")` zlewały się w równaniach.
+  Poprawione (podpis tylko, gdy jedyny) i dodany test: dokładnie ta klasa błędów, przed którą
+  chroni tożsamość obiektu.
+- **Typy:** pyright (tryb zwykły) bez błędów. Tryb ścisły blokuje głównie brak stubów sympy
+  (zamknięte w trzech funkcjach pomocniczych w `problem.py`) i niezatypowany JSON w `data.py`
+  (do zrobienia: `TypedDict`).
+
+**Czego nie ma (żeby nie porównywać jabłek z gruszkami):** kroki z uzasadnieniem, diagnoza braków
+(`MissingData`), dziury (`Hole`), mierniki, jednostki (F14), elementy nieliniowe i wielokońcówkowe,
+własne komponenty, Thévenin, szybka symulacja (dziś: sympy co krok, wolne), stan dyskretny (`Pre`).
+Dopiero z nimi da się uczciwie porównać rozmiar i prostotę z obecną biblioteką.
+
+**Następne kroki prototypu, w kolejności ryzyka:** dioda (nieliniowość, Newton bez ręcznych
+sztuczek) → przerzutnik (`Pre`, zdarzenia) → kroki rozwiązania (czy uzasadnienia z praw wystarczą)
+→ jednostki → porównanie z obecną biblioteką na jej testach.
+
+## 12. Otwarte
 
 - Jak pokazać `Given` z wymiarem czasu w zakładce Dane (przełącznik od 1 s, przebieg z pliku).
 - `Net` a etykiety na schemacie: czy każda etykieta to `Net`, czy tylko jawnie globalne.
