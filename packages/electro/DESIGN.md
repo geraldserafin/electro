@@ -717,8 +717,11 @@ Dopiero z nimi da się uczciwie porównać rozmiar i prostotę z obecną bibliot
   trzeba uogólnić, zanim dojdą — to też sprawdzian F16 („bez wyjątków”).
 
 **Następne kroki prototypu, w kolejności ryzyka:** ~~uogólnione prawo~~ (zrobione: §13) →
-droga powrotna upraszczania (dzielniki) → zamiana źródeł (szablony dwuelementowe) → ~~dioda~~ (zrobione:
-§13.1) → fazory nieliniowych (linearyzacja z prawa) → przerzutnik (`Pre`, zdarzenia) → jednostki → porównanie z obecną
+~~przerzutnik~~ (zrobione: §13.3) → porównanie z obecną biblioteką na jej testach → zgadywanie wariantów
+Newtonem → fazory nieliniowych (linearyzacja z prawa) → jednostki → droga powrotna upraszczania
+(dzielniki) → zamiana źródeł (szablony dwuelementowe) → LCP (Lemke) i czarna skrzynka wielu zacisków
+przy dużych układach. (Dawniej: droga powrotna upraszczania (dzielniki) → zamiana źródeł (szablony
+dwuelementowe) → ~~dioda~~ (zrobione: §13.1) → fazory nieliniowych (linearyzacja z prawa) → przerzutnik (`Pre`, zdarzenia) → jednostki → porównanie z obecną
 biblioteką na jej testach.
 
 **Poprzednia kolejka (już zrobione: czarna skrzynka, superpozycja, upraszczanie):** czarna skrzynka kawałka (bez niej warstwa metod
@@ -867,6 +870,24 @@ jak wbudowana. Żadna z tych rzeczy nie wymagała zmiany silnika.
 - **Koszt:** warianty sprawdzane po kolei — 2ⁿ kombinacji dla n elementów. Dla zadań szkolnych nic; dla
   dużych układów potrzebne mądrzejsze szukanie (zaczynać od wariantów sugerowanych przez Shockleya / poprzedni
   stan, odcinać sprzeczne wcześnie).
+
+### 13.3 Pamięć: przerzutnik (31 testów)
+
+- **Model wytrzymał — ostatnie ryzyko w rdzeniu.** Przerzutnik D i bramka NOT to zwykłe elementy:
+  relacje z `Pre` (pamięć) i `when` (warunek). Silnik ich nie zna.
+- **Nowy fakt (F18): pamięć bierze to, co było tuż przed.** Przerzutnik na zboczu zegara bierze `Pre(d)`,
+  nie `d` z tej samej chwili — jak prawdziwy (czas ustalenia). To nie szczegół: z `d` z tej samej chwili
+  pętla Q → NOT → D dawała równanie bez rozwiązania („s = NOT s"). Przyczynowość przerywa pętle.
+- **Dane w czasie (F11) naprawdę:** symbol czasu `t` w danych, `square`, `when`; zegar to źródło napięcia
+  z falą prostokątną jako wartością. Kartka (`solve`) uczciwie odmawia: dane zmieniają się w czasie, a układ
+  z pamięcią „zależy od tego, co było wcześniej — zasymuluj".
+- Wyniki: przerzutnik bierze D tylko na zboczu i trzyma między nimi; z NOT w pętli dzieli zegar przez dwa.
+- **Numeryka — dwie ogólne poprawki, żadna pod przerzutnik:** (1) prawa logiczne skaczą (0 albo 5 V, nic
+  pomiędzy), a cofanie kroku zakłada gładkość — przy skoku Newton bierze pełne kroki (logika liczona aż się
+  ustabilizuje); (2) błąd: Newton kończył, gdy krok skrócony do zera — to utknięcie, nie sukces; kończy
+  teraz, gdy pełny krok Newtona jest zerowy albo błąd znikomy.
+- **Arduino w tym samym kształcie:** stan procesora `s`, `s = when(takt, krok_emulatora(Pre(s), Pre(piny)),
+  Pre(s))` — przerzutnik to najmniejszy taki „procesor". Wykonanie zostaje mostem (§10.1).
 
 ## 14. Otwarte
 

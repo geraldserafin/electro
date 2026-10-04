@@ -19,6 +19,22 @@ import sympy as sp
 
 D = sp.Function("D")  # the derivative in time
 Pre = sp.Function("Pre")  # the value just before (memory)
+TIME = sp.Symbol("t")  # time, for data that changes in it (a clock, a switch closed at 1 s)
+
+
+def when(condition: sp.Basic, then: sp.Expr | float, otherwise: sp.Expr | float) -> sp.Expr:
+    """``then`` while ``condition`` holds, else ``otherwise``."""
+    return sp.Piecewise((then, condition), (otherwise, True))
+
+
+def rising(x: sp.Expr, threshold: sp.Expr | float) -> sp.Basic:
+    """``x`` crossing ``threshold`` upwards, now: above it, and not just before (an edge of a clock)."""
+    return sp.And(x > threshold, Pre(x) <= threshold)
+
+
+def square(high: sp.Expr | float, period: sp.Expr | float, low: sp.Expr | float = 0) -> sp.Expr:
+    """A square wave in time: ``low`` the first half of each period, ``high`` the second."""
+    return when(sp.Mod(TIME, period) < sp.Rational(1, 2) * period, low, high)
 
 
 class JoinsNodes(ValueError):
@@ -369,5 +385,31 @@ DiodeDrop = Kind(
     symmetric=False,
     defaults=(("", sp.Rational(7, 10)),),
 )
+
+# a D flip-flop: on a clock's rising edge it takes what was on d just before it (the instant before the
+# edge: causal — a loop through it, q back to d, never asks for its own answer), and holds it on q till
+# the next edge; inputs take no current, q is a source of the level it holds (V_HIGH or 0 against gnd)
+V_HIGH = 5
+
+
+def _flip_flop(t: Terminals, _: Params) -> list[sp.Expr]:
+    s = t.inner("s")  # what it holds: 1 or 0
+    clk, d = t.V["clk"] - t.V["gnd"], t.V["d"] - t.V["gnd"]
+    return [
+        t.I["d"],
+        t.I["clk"],
+        t.V["q"] - t.V["gnd"] - V_HIGH * s,
+        s - when(rising(clk, V_HIGH / 2), when(Pre(d) > V_HIGH / 2, 1, 0), Pre(s)),
+    ]
+
+
+def _not(t: Terminals, _: Params) -> list[sp.Expr]:
+    return [t.I["in"], t.V["out"] - t.V["gnd"] - when(t.V["in"] - t.V["gnd"] > V_HIGH / 2, 0, V_HIGH)]
+
+
+# a NOT gate: its output the other level of its input (no memory: no Pre)
+Not = Kind("not_gate", "U", "", ("in", "out", "gnd"), _not, symmetric=False, parameters=())
+
+DFlipFlop = Kind("d_flip_flop", "FF", "", ("d", "clk", "q", "gnd"), _flip_flop, symmetric=False, parameters=())
 
 KINDS: tuple[Kind, ...] = (Resistor, Capacitor, Inductor, VoltageSource, CurrentSource)

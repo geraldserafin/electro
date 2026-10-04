@@ -41,9 +41,16 @@ def _relative(f: Residual, x: Sequence[float], extra: Sequence[float], scale: Se
 
 
 def newton(
-    f: Residual, j: Jacobian, x0: Sequence[float], extra: Sequence[float] = (), max_iter: int = 100
+    f: Residual,
+    j: Jacobian,
+    x0: Sequence[float],
+    extra: Sequence[float] = (),
+    max_iter: int = 100,
+    damped: bool = True,
 ) -> list[float] | None:
-    """A root near ``x0``; None: not reached."""
+    """A root near ``x0``; None: not reached. ``damped``: a step shortened while it does not bring the
+    equations closer — right for smooth laws; across a jump (logic: 0 or 5, nothing between) it stalls at
+    the edge, so undamped: whole steps, each branch then taken as it now is, till none changes."""
     x = list(x0)
     n = len(x)
     for _ in range(max_iter):
@@ -57,15 +64,18 @@ def newton(
         if dx is None:
             return None
         t = 1.0
-        while t > 1e-12:  # (shorter, while it does not bring the equations closer)
+        while damped and t > 1e-12:  # (shorter, while it does not bring the equations closer)
             trial = [a + t * d for a, d in zip(x, dx, strict=True)]
             if _relative(f, trial, extra, scale) < here:
                 break
             t /= 2
         else:
-            return None
+            if damped:
+                return None
+            trial = [a + d for a, d in zip(x, dx, strict=True)]
         x = trial
-        if max((abs(t * d) for d in dx), default=0.0) <= TOL * (1 + max(abs(a) for a in x)):
+        # (done when Newton's own step is nothing — not when a step shortened to nothing: that is stuck)
+        if max((abs(d) for d in dx), default=0.0) <= TOL * (1 + max(abs(a) for a in x)):
             return x
     return None
 

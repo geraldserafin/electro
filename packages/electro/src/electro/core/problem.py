@@ -24,6 +24,7 @@ from electro.values import UNKNOWN, parse
 from .numeric import Jacobian, Residual, compiled, homotopy, newton
 from .syntax import (
     GND,
+    TIME,
     Case,
     Cases,
     Circuit,
@@ -279,7 +280,10 @@ def is_source(e: Element) -> bool:
     if len(cases) != 1:  # (a textbook diode's drop is no source: it is one way of a non-linear element)
         return False
     (only,) = cases
-    return any(sp.simplify(sp.sympify(law).subs(dict.fromkeys(xs, 0))) != 0 for law in only.laws)
+    zero = {x: 0 for law in only.laws for x in sp.sympify(law).free_symbols if str(x).startswith("x_")} | dict.fromkeys(
+        xs, 0
+    )
+    return any(sp.simplify(sp.sympify(law).subs(zero)) != 0 for law in only.laws)
 
 
 # --------------------------------------------------------------------------------------- a circuit's relation
@@ -476,7 +480,7 @@ def equations(problem: Problem, analysis: Analysis, sources: sp.Expr | int = 1) 
         x for choice in choices for w in choice for eq in w.equations for x in _symbols_in(eq.expr)
     }
     in_data = {x for v in values.values() for x in _symbols_in(sp.sympify(v))}  # (a value "R": a symbol)
-    unknowns = (found - in_data - {x for x in found if x.name.endswith("⁻")}) | (params & found)
+    unknowns = (found - in_data - {TIME} - {x for x in found if x.name.endswith("⁻")}) | (params & found)
     return System(eqs, tuple(sorted(unknowns, key=str)), s, choices)
 
 
@@ -567,7 +571,14 @@ def solve(problem: Problem, analysis: DC | AC | None = None) -> Solution:
     """Where it settles (DC), or its phasors at ``AC(ω)`` — and the steps there. Linear: by algebra, step
     by step; beyond algebra (a diode's exp): by Newton, every value needed, the sources raised from nothing."""
     analysis = analysis or DC()
+    rel = relation(problem.circuit)
+    if any(sp.sympify(eq.expr).has(Pre) for eq in rel.equations) or any(
+        sp.sympify(eq.expr).has(Pre) for c in rel.choices for w in c for eq in w.equations
+    ):  # (where it settles is what came before it: a flip-flop holds what it was last given)
+        raise Undetermined("it has memory — what it holds depends on what came before: simulate it")
     system = equations(problem, analysis)
+    if any(eq.expr.has(TIME) for eq in system.equations):
+        raise Undetermined("its data change in time: simulate it")
     if system.choices:
         return _by_cases(problem, system)
     if _algebraic(system):
@@ -746,9 +757,9 @@ def compile_steps(problem: Problem, dt: float) -> Stepping:
     def stepper(k: int) -> Stepper:
         exprs = [eq.expr for eq in system.equations] + [eq.expr for w in combos[k] for eq in w.equations]
         unknowns = [u for u in system.unknowns if u not in before_of]
-        if any(x not in {*unknowns, lam, *before_of} for e in exprs for x in _symbols_in(e)):
+        if any(x not in {*unknowns, lam, TIME, *before_of} for e in exprs for x in _symbols_in(e)):
             raise Undetermined("a step in time needs every value")
-        f, j = compiled(exprs, unknowns, (lam, *before_of))
+        f, j = compiled(exprs, unknowns, (lam, TIME, *before_of))
         return Stepper(tuple(unknowns), f, j, tuple(h for w in combos[k] for h in w.holds))
 
     return Stepping(dt, tuple(held), len(combos), stepper)
@@ -763,12 +774,18 @@ def step(stepping: Stepping, state: State) -> State:
     for k in (state.way, *(k for k in range(stepping.ways) if k != state.way)):
         s = stepping.stepper(k)
         guess = [at.get(u, 0.0) for u in s.unknowns]
-        x = newton(s.f, s.j, guess, (1.0, *prev)) or homotopy(s.f, s.j, len(guess), tuple(prev), guess)
+        now = state.t + stepping.dt
+        x = (
+            newton(s.f, s.j, guess, (1.0, now, *prev))
+            or newton(s.f, s.j, guess, (1.0, now, *prev), damped=False)  # (across a jump: logic)
+            or homotopy(s.f, s.j, len(guess), (now, *prev), guess)
+        )
         if x is None:
             continue
         values = dict(zip(s.unknowns, x, strict=True))
         if all(
-            float(subs(h, {**values, **dict(zip(map(before, stepping.remembered), prev))})) >= -1e-9 for h in s.holds
+            float(subs(h, {**values, TIME: now, **dict(zip(map(before, stepping.remembered), prev))})) >= -1e-9
+            for h in s.holds
         ):
             return State(state.t + stepping.dt, values, k)
     raise NoConvergence(state.t + stepping.dt)
