@@ -147,6 +147,7 @@ Każdy fakt to coś, co w rzeczywistości jest osobnym pojęciem — więc w kod
 | F14 | **Wartości mają jednostki.** `R_1 = 5 V` to błąd. | Sprawdzane przy budowie `Problem`. |
 | F16 | **Minimalny i ogólny rdzeń, bez wyjątków.** Prawa obwodu (sklejanie → Kirchhoff) nie zależą od elementów. Element to relacja między sygnałami na końcówkach i swoim stanem, zapisana raz w czasie słownikiem `D`, `Pre`, `Delay`, `when` i czystymi funkcjami. Rezystor, kondensator, dioda, przerzutnik, Arduino, linia transmisyjna — ten sam mechanizm. Dodanie elementu = jedna definicja; analiza = interpretacja słownika czasu. | §9.2: `two_terminal(…)`, `element(…)`; analiza = `interpret(law, analysis)`. |
 | F15 | **Składanie nie jest przemienne.** `a >> b ≠ b >> a` (inny brzeg, inny kierunek). Równoległe naprawdę jest przemienne. Uwaga: `R1 >> R2` i `R2 >> R1` to różne obwody (węzeł środkowy gdzie indziej), ale z zacisków zachowują się tak samo (R₁+R₂) — przemienność na poziomie zachowania, nie struktury. Biblioteka opisuje strukturę. | `>>` zamiast `+` (patrz §4). |
+| F17 | **Plan rozwiązania zależy od struktury i kształtu zadania, nie od liczb.** Które kawałki uprościć, w jakiej kolejności, gdzie dzielnik — wynika z połączeń, z tego, co dane, i z tego, co szukane (zadanie odwrotne = inny plan). Liczby wchodzą na końcu do gotowych wzorów; po drodze rozwiązanie ogólne (wzór). Wyjątek: niektóre skróty otwierają dopiero wartości (mostek w równowadze, symetrie, zera: R = 0 zwarcie, J = 0 przerwa) — plan ogólny działa zawsze, najładniejszy bywa możliwy po zobaczeniu liczb. Nieliniowe: plan wymaga punktu pracy. | `plan(problem bez wartości)`, `plan(values)`; plan liczony już przy rysowaniu (podgląd, warianty zadań, „czego brakuje” bez liczenia). |
 
 ## 3. Typy
 
@@ -744,6 +745,27 @@ upraszczanie, kroki „jak w zeszycie”
 
 Granice: nieliniowe elementy (brak prostej czarnej skrzynki — jak w podręczniku); duże obwody (wyszukiwanie
 rośnie szybko; dla zadań szkolnych, do ~10 elementów, bez znaczenia).
+
+**Upraszczanie samego schematu:** `simplify(circuit, keep=[…]) -> Circuit` — czysta funkcja; każdy krok
+podmienia kawałek na równoważny (ta sama czarna skrzynka), więc wynik zachowuje się tak samo w punktach,
+które zostały. Ciąg kroków = „układy zastępcze” z podręcznika. Krok to dane
+`(kawałek, czym go zastąpiono, wzór)` — z nich jednocześnie **tekst** („R₂ ∥ R₄ = 12 Ω”) i **rysunek**
+(podświetlony kawałek → nowy element w jego miejscu, reszta schematu bez zmian; krok wstecz przy dzielniku
+— podświetlony odzyskiwany prąd). Jeden model kroku, jedno UI dla każdej metody.
+
+Haczyki:
+
+- upraszczanie gubi informację (po R₂ ∥ R₄ nie ma I₂, I₄) — `keep` chroni szukane, reszta wraca drogą
+  powrotną (dzielnik), jak w podręczniku;
+- uproszczenie nie jest jedno — wybór to strategia, nie prawo;
+- **najwięcej pracy to rysunek i UI, nie teoria:** scalenie elementów stojących w różnych miejscach
+  zostawia wiszące kable (usunąć, przeciągnąć, uprościć); układ od zera (`electro_schematic.layout`)
+  wygląda gorzej niż podmiana w miejscu; do tego krokowy podgląd w panelu.
+
+**Uwaga, żeby nie mylić przyczyn:** te możliwości wynikają z teorii (czarna skrzynka, kompozycyjność),
+którą obecna biblioteka już ma (`analysis.blackbox`, `equivalent`) — przebudowa ich nie warunkuje, tylko
+porządkuje (reguły odkrywane z praw zamiast wpisanych, nowe elementy wchodzą do metod same). „Uprość krok
+po kroku” dla użytkowników da się zrobić także przed przebudową.
 
 Zysk: nowy rodzaj elementu wchodzi do metod sam (kondensator w AC upraszcza się z rezystorem do impedancji
 bez linijki o kondensatorze w warstwie metod — dopasowanie dzieje się na relacjach).
