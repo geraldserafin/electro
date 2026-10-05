@@ -6,24 +6,10 @@ import { drawingFromCode } from "@/features/schematic/fromCode";
 import { library } from "@/features/schematic/library";
 import { isComponent, key, pins } from "@/features/schematic/model";
 import { withParts } from "@/features/schematic/parts";
-import { elementsOf, solveData } from "@/features/schematic/problem";
+import { elementsOf, problemOf, solveData } from "@/features/schematic/problem";
 import type { LiveCircuit } from "@/features/simulation/engine";
 import type { Failure } from "@/shared/model/issues";
 import type { ElementResult, Output, Problem, SchematicData } from "@/shared/model/types";
-
-/** A circuit as data: its elements (kind as the schematic names them), each with its nodes in its
- *  terminals' order (``0``: ground). */
-export type Netlist = {
-  elements: {
-    id: string;
-    kind: string;
-    value?: string | null;
-    text?: string | null;
-    nodes: string[];
-    at?: [number, number][]; // a drawing's: where its terminals are (grid units), in the nodes' order
-  }[];
-  wires?: [number, number][][]; // a drawing's: its wires, as polylines
-};
 
 type Reply = { id: number; ok: true; result: unknown } | { id: number; ok: false; error: string };
 
@@ -145,38 +131,21 @@ class Kernel {
     return JSON.stringify({ elements: elementsOf(schematic, library).elements });
   }
 
-  /** Quantities of the drawing as it is (``steps``: each an id and its expression, ``I_R1``): each
-   *  one's number, or why it has none. */
+  /** Quantities of the drawing as it is, its marks' data with it (``steps``: each an id and its
+   *  expression, ``I_R1``): each one's number, or why it has none. */
   async taskValues(
     schematic: SchematicData,
     steps: { id: string; value: string }[],
   ): Promise<{ values: Record<string, { value: number } | { error: Failure }> } | { error: Failure }> {
-    const call = {
-      schematic: JSON.stringify(schematic),
-      steps: JSON.stringify(steps.map(({ id, value }) => ({ id, value }))),
-    };
+    let problem: string;
+    try {
+      const { marks: _, ...data } = problemOf(schematic, library);
+      problem = JSON.stringify(data);
+    } catch (error) {
+      return { error: { data: String(error) } };
+    }
+    const call = { problem, steps: JSON.stringify(steps.map(({ id, value }) => ({ id, value }))) };
     return JSON.parse((await this.call("taskValues", call)) as string);
-  }
-
-  /** A circuit described as data and drawn as a picture has it (``at``, ``wires``): drawn so, or why
-   *  not — its drawing joining other than its nodes say (``error.mismatch``). */
-  async fromDrawing(
-    drawing: Netlist,
-    strict = false, // its wires joining otherwise: said (error.mismatch), not laid anew
-  ): Promise<
-    { schematic: SchematicData; rerouted: boolean } | { error: Failure & { mismatch?: string[]; dangling?: string[] } }
-  > {
-    return JSON.parse((await this.call("fromDrawing", { drawing: JSON.stringify(drawing), strict })) as string);
-  }
-
-  /** A drawing as a picture (SVG): to set beside the one it was read from. */
-  async renderSvg(schematic: SchematicData): Promise<string> {
-    return (await this.call("renderSvg", { schematic: JSON.stringify(schematic) })) as string;
-  }
-
-  /** A drawing as data (for an AI to read): its elements and their nodes. */
-  async netlistOf(schematic: SchematicData): Promise<Netlist | { error: Failure }> {
-    return JSON.parse((await this.call("netlistOf", { schematic: JSON.stringify(schematic) })) as string);
   }
 
   async reset(): Promise<void> {

@@ -8,6 +8,7 @@ from collections.abc import Mapping
 import sympy as sp
 
 from ..circuit.tree import Element
+from ..problem.names import NoSuchQuantity
 from ..problem.problem import Problem
 from ..problem.quantities import Quantity
 from ..solver.errors import Ambiguous, Contradiction, MissingData
@@ -35,6 +36,8 @@ def issue(err: BaseException, problem: Problem | None = None, units: Mapping[str
                     "type": "Ambiguous",
                     "options": [[_equals(x, v, units.get(x.name, "")) for x, v in o.items()] for o in err.options],
                 }
+    if isinstance(err, NoSuchQuantity):
+        return {"type": "NoSuchQuantity", "name": err.name, "available": [tex.name(n) for n in err.available]}
     if type(err).__module__.startswith("electro.core") and vars(err):
         return {"type": type(err).__name__, **{k: _field(k, v) for k, v in vars(err).items()}}
     return None

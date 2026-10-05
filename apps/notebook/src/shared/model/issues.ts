@@ -116,7 +116,6 @@ export type Issue =
   | { type: "NoInput" | "NoOutput" }
   | { type: "OnlyValuesInCode"; cause: Issue }
   | { type: "PartsNotInCode" }
-  | { type: "BadDataEntry"; entry: string }
   | { type: "NoSuchSchematic"; name: string; available: string[] };
 
 /** Something that went wrong, as outputs and the code view carry it: our issue (else Python's

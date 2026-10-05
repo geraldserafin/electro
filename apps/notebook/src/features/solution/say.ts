@@ -157,8 +157,6 @@ export function sayer(t: TFunction<"solution">, lang: string) {
         return t("issue.PartsNotInCode");
       case "OnlyValuesInCode":
         return t("issue.OnlyValuesInCode", { cause: issue(i.cause) });
-      case "BadDataEntry":
-        return t("issue.BadDataEntry", { entry: i.entry });
       case "NoSuchSchematic":
         return t("issue.NoSuchSchematic", { name: code(i.name), available: names(i.available) });
       case "NoSweepRange":

@@ -1,7 +1,6 @@
 import { useLayoutEffect, useRef, useState } from "react";
-import type { ElementResult, Point, SchematicData, SymbolLibrary } from "@/shared/model/types";
-import { ElementView } from "./ElementView";
-import { besides, inTheWay, junctions } from "./model";
+import type { ElementResult, SchematicData, SymbolLibrary } from "@/shared/model/types";
+import { Drawing } from "./Drawing";
 import { withParts } from "./parts";
 import "./Canvas.css";
 
@@ -13,8 +12,6 @@ const PDF_PAD = 6;
  * the same scale whatever the zoom on screen. Hidden on screen but laid out (not display:none),
  * so it can measure itself.
  */
-const nothing = () => {};
-
 export function PdfDrawing({
   value,
   library: symbols,
@@ -25,7 +22,6 @@ export function PdfDrawing({
   results?: Record<string, ElementResult>;
 }) {
   const library = withParts(symbols, value.parts);
-  const G = library.grid;
   const content = useRef<SVGGElement>(null);
   const [box, setBox] = useState<[number, number, number, number] | null>(null);
   useLayoutEffect(() => {
@@ -40,33 +36,13 @@ export function PdfDrawing({
     if (!box || next.some((v, i) => Math.abs(v - box[i]) > 0.5)) setBox(next);
   });
   if (!value.elements.length && !value.wires.length) return null;
-  const obstacles = inTheWay(value, library);
-  const aside = besides(value, library);
-  const pointsOf = (ps: Point[]) => ps.map(([x, y]) => `${x * G},${y * G}`).join(" ");
   const [x, y, w, h] = box ?? [0, 0, 1, 1];
   return (
     <div className="pdf-drawing" aria-hidden>
       <svg className="canvas" viewBox={`${x} ${y} ${w} ${h}`} width={w * PDF_SCALE} height={h * PDF_SCALE}>
         <style>{library.style}</style>
         <g ref={content}>
-          {value.wires.map((wire, i) => (
-            <polyline key={i} className="w wire" points={pointsOf(wire.points)} />
-          ))}
-          {junctions(value, library).map(([jx, jy]) => (
-            <circle key={`j${jx},${jy}`} className="dot" cx={jx * G} cy={jy * G} r="3" />
-          ))}
-          {value.elements.map((e) => (
-            <ElementView
-              key={e.id}
-              element={e}
-              library={library}
-              wires={obstacles}
-              result={results?.[e.id]}
-              selected={false}
-              aside={aside.has(e.id)}
-              onPointerDown={nothing}
-            />
-          ))}
+          <Drawing value={value} library={library} results={results} />
         </g>
       </svg>
     </div>

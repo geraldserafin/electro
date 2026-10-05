@@ -19,10 +19,7 @@ type Request =
   | { id: number; type: "frequency"; problem: string }
   | { id: number; type: "sweep"; problem: string; element: string; lo: string; hi: string }
   | { id: number; type: "spread"; problem: string; tol: number }
-  | { id: number; type: "taskValues"; schematic: string; steps: string }
-  | { id: number; type: "fromDrawing"; drawing: string; strict: boolean }
-  | { id: number; type: "renderSvg"; schematic: string }
-  | { id: number; type: "netlistOf"; schematic: string }
+  | { id: number; type: "taskValues"; problem: string; steps: string }
   | { id: number; type: "reset" };
 
 interface Kernel {
@@ -34,10 +31,7 @@ interface Kernel {
   frequency(problem: string): string;
   sweep_plot(problem: string, element: string, lo: string, hi: string): string;
   spread(problem: string, tol: number): string;
-  task_values(schematic: string, steps: string): string;
-  from_drawing(drawing: string, strict: boolean): string;
-  render_svg(schematic: string): string;
-  netlist_of(schematic: string): string;
+  task_values(problem: string, steps: string): string;
   reset(): void;
 }
 
@@ -106,14 +100,8 @@ self.onmessage = async (event: MessageEvent<Request>) => {
                     : request.type === "spread"
                       ? k.spread(request.problem, request.tol)
                       : request.type === "taskValues"
-                        ? k.task_values(request.schematic, request.steps)
-                        : request.type === "fromDrawing"
-                          ? k.from_drawing(request.drawing, request.strict)
-                          : request.type === "renderSvg"
-                            ? k.render_svg(request.schematic)
-                            : request.type === "netlistOf"
-                              ? k.netlist_of(request.schematic)
-                              : (k.reset(), null);
+                        ? k.task_values(request.problem, request.steps)
+                        : (k.reset(), null);
     self.postMessage({ id: request.id, ok: true, result });
   } catch (error) {
     self.postMessage({ id: request.id, ok: false, error: String(error) });

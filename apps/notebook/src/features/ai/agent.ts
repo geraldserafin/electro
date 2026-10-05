@@ -5,7 +5,10 @@
 // is asked: a note from a PDF, an answer about it, help with a problem, a change to the note. What a
 // tool finds wrong goes back to it as the tool's result: it mends that itself. No tasks: a note is for
 // notes (a test's tasks are its author's).
-import { kernel, type Netlist } from "@/features/python";
+import { kernel } from "@/features/python";
+import { fromDrawing, type Netlist, netlistOf } from "@/features/schematic/fromDrawing";
+import { library } from "@/features/schematic/library";
+import { pictureOf } from "@/features/schematic/picture";
 import { newCell } from "@/shared/model/cells";
 import type { Failure } from "@/shared/model/issues";
 import type { Cell, SchematicData } from "@/shared/model/types";
@@ -287,10 +290,13 @@ async function describe(cells: Cell[]): Promise<string> {
     if (c.type === "markdown") lines.push(`[${c.id}] text: ${JSON.stringify(cut(c.source, 1500))}`);
     else if (c.type === "code") lines.push(`[${c.id}] code (Python): ${JSON.stringify(cut(c.source, 600))}`);
     else {
-      const netlist = await kernel.netlistOf(c.schematic);
-      lines.push(
-        `[${c.id}] circuit "${c.name}": ${"error" in netlist ? "(cannot be read)" : JSON.stringify(netlist.elements)}`,
-      );
+      let read: string;
+      try {
+        read = JSON.stringify(netlistOf(c.schematic, library).elements);
+      } catch {
+        read = "(cannot be read)";
+      }
+      lines.push(`[${c.id}] circuit "${c.name}": ${read}`);
     }
   }
   return lines.join("\n");
@@ -385,14 +391,13 @@ export async function turn({
     const missing = data.elements.filter((e) => !Array.isArray(e.at)).map((e) => e.id);
     if (!data.elements.length) return { why: ["no elements"] };
     if (missing.length) return { why: [`no "at" for ${missing.join(", ")}: where its terminals are drawn`] };
-    const drawn = await kernel.fromDrawing(data, true).catch(() => null);
-    if (!drawn) return { why: ["the solver could not read it"] };
+    const drawn = fromDrawing(data, library, true);
     if (!("error" in drawn)) return { schematic: drawn.schematic };
-    const e = drawn.error as Failure & { mismatch?: string[]; dangling?: string[] };
-    const anew = await kernel.fromDrawing(data, false).catch(() => null);
+    const e = drawn.error;
+    const anew = fromDrawing(data, library, false);
     return {
       why: e.mismatch ?? e.dangling ?? [said(e)],
-      ...(anew && !("error" in anew) ? { fallback: anew.schematic } : {}),
+      ...(!("error" in anew) ? { fallback: anew.schematic } : {}),
     };
   };
 
@@ -416,7 +421,8 @@ export async function turn({
     why: string[];
     step: Doing;
   }): Promise<Content> => {
-    const shown = async (s: SchematicData) => picture(await beside(theirs, await rasterize(await kernel.renderSvg(s))));
+    const shown = async (s: SchematicData) =>
+      picture(await beside(theirs, await rasterize(await pictureOf(s, library))));
     const talk: AiMessage[] = [
       { role: "system", content: MEND },
       {
