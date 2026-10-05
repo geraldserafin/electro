@@ -1,11 +1,21 @@
-"""The library of elements: each a kind, its laws and nothing else."""
+"""The library of elements: each a kind, its laws and nothing else. A kind's name is the one a schematic
+uses for it."""
 
 from .basic import Capacitor, CurrentSource, Inductor, Resistor, VoltageSource
+from .boards import MODES, Arduino, Pico
+from .chips import OPAMP_PARTS, OpAmpModel, Timer555
 from .controlled import CCCS, CCVS, VCCS, VCVS
-from .diodes import V_T, Diode, DiodeDrop
-from .ideal import Ammeter, Hole, Norator, Nullator, OpAmp, Open, Wire
-from .logic import V_HIGH, DFlipFlop, Not
+from .diodes import DIODE_PARTS, LED, LED_COLORS, RGBLED, Diode, DiodeDrop, SevenSegment, Zener
+from .ideal import Ammeter, Hole, Norator, Nullator, OpAmp, Open, Voltmeter, Wire
+from .loads import Buzzer, Lamp, Motor, PassiveBuzzer, Relay, Servo
+from .logic import AND, NAND, NOR, NOT, OR, V_HIGH, XOR, Counter, DFlipFlop, JKFlipFlop
 from .magnetic import Coupled, Transformer
+from .modules import DS1307, I2C_ADDRESSES, ILI9341, LCD1602, LCD1602I2C, SSD1306, Ultrasonic
+from .physics import V_T
+from .sensors import Photoresistor, Thermistor
+from .sources import SineSource, SquareSource
+from .switches import Button, Potentiometer, Switch
+from .transistors import BJT_PARTS, NMOS, NPN, PMOS, PNP
 
 ALL = (
     Resistor,
@@ -13,13 +23,17 @@ ALL = (
     Inductor,
     VoltageSource,
     CurrentSource,
+    SineSource,
+    SquareSource,
     Wire,
     Open,
     Nullator,
     Norator,
     Hole,
     Ammeter,
+    Voltmeter,
     OpAmp,
+    OpAmpModel,
     VCVS,
     VCCS,
     CCVS,
@@ -28,20 +42,85 @@ ALL = (
     Coupled,
     Diode,
     DiodeDrop,
-    Not,
+    LED,
+    Zener,
+    RGBLED,
+    SevenSegment,
+    Photoresistor,
+    Thermistor,
+    Lamp,
+    Buzzer,
+    PassiveBuzzer,
+    Motor,
+    Servo,
+    Relay,
+    Switch,
+    Button,
+    Potentiometer,
+    NOT,
+    AND,
+    NAND,
+    OR,
+    NOR,
+    XOR,
     DFlipFlop,
+    JKFlipFlop,
+    Counter,
+    NPN,
+    PNP,
+    NMOS,
+    PMOS,
+    Timer555,
+    Ultrasonic,
+    LCD1602,
+    LCD1602I2C,
+    SSD1306,
+    DS1307,
+    ILI9341,
+    Arduino,
+    Pico,
 )
+
+BY_NAME = {k.name: k for k in ALL}
 
 __all__ = [
     "ALL",
+    "AND",
+    "BJT_PARTS",
+    "BY_NAME",
     "CCCS",
     "CCVS",
+    "DIODE_PARTS",
+    "DS1307",
+    "I2C_ADDRESSES",
+    "ILI9341",
+    "LCD1602",
+    "LCD1602I2C",
+    "LED",
+    "LED_COLORS",
+    "MODES",
+    "NAND",
+    "NMOS",
+    "NOR",
+    "NOT",
+    "NPN",
+    "OPAMP_PARTS",
+    "OR",
+    "PMOS",
+    "PNP",
+    "RGBLED",
+    "SSD1306",
     "V_HIGH",
     "V_T",
     "VCCS",
     "VCVS",
+    "XOR",
     "Ammeter",
+    "Arduino",
+    "Button",
+    "Buzzer",
     "Capacitor",
+    "Counter",
     "Coupled",
     "CurrentSource",
     "DFlipFlop",
@@ -49,13 +128,31 @@ __all__ = [
     "DiodeDrop",
     "Hole",
     "Inductor",
+    "JKFlipFlop",
+    "Lamp",
+    "Motor",
     "Norator",
-    "Not",
     "Nullator",
     "OpAmp",
+    "OpAmpModel",
     "Open",
+    "PassiveBuzzer",
+    "Photoresistor",
+    "Pico",
+    "Potentiometer",
+    "Relay",
     "Resistor",
+    "Servo",
+    "SevenSegment",
+    "SineSource",
+    "SquareSource",
+    "Switch",
+    "Thermistor",
+    "Timer555",
     "Transformer",
+    "Ultrasonic",
     "VoltageSource",
+    "Voltmeter",
     "Wire",
+    "Zener",
 ]

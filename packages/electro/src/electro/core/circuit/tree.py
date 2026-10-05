@@ -6,6 +6,7 @@
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
 from functools import cache
 from typing import TYPE_CHECKING
@@ -14,6 +15,11 @@ from .netlist import Netlist, in_series, lone_element, lone_point, side_by_side
 
 if TYPE_CHECKING:
     from .kind import Kind
+
+
+class BadName(ValueError):
+    """A name with more than letters, digits and ``_`` in it: nothing else gets into the equations, the
+    code made of them or the formulas drawn."""
 
 
 class Circuit:
@@ -39,6 +45,10 @@ class Element(Circuit):
     kind: Kind
     name: str | None = None
 
+    def __post_init__(self) -> None:
+        if self.name is not None and not self.name.isidentifier():
+            raise BadName(self.name)
+
     def __repr__(self) -> str:
         return f"{self.kind.name}({self.name!r})"
 
@@ -49,12 +59,20 @@ class Node(Circuit):
 
     label: str | None = None
 
+    def __post_init__(self) -> None:
+        if self.label is not None and not re.fullmatch(r"\w+", self.label):
+            raise BadName(self.label)
+
 
 @dataclass(frozen=True)
 class Net(Circuit):
     """A point every ``Net`` of that name is (1 → 1): GND, VCC."""
 
     name: str
+
+    def __post_init__(self) -> None:
+        if not re.fullmatch(r"\w+", self.name):
+            raise BadName(self.name)
 
 
 @dataclass(frozen=True)

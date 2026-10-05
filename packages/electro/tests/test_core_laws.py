@@ -44,9 +44,9 @@ def test_steps_say_where_each_value_comes_from():
 def test_a_four_terminal_element_a_voltage_controlled_source():
     e, r, amp = VoltageSource("E"), Resistor("R"), VCVS("mu")
     a, out = Node("A"), Node("OUT")
-    circuit = (GND >> e >> a) @ at(amp, a, GND, out, GND) @ (out >> r >> GND)
+    circuit = (GND >> e >> a) @ at(amp, a, GND, GND, out) @ (out >> r >> GND)
     s = solve(Problem(circuit, {e: 2, r: 100, "mu": 10}))
-    assert s(V(out)) == 20 and s(I(amp, "in+")) == 0
+    assert s(V(out)) == 20 and s(I(amp, "cp")) == 0
     assert not is_source(amp) and is_source(e)
 
 

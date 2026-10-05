@@ -1,5 +1,6 @@
-"""Controlled sources: an input that senses a voltage (taking no current) or a current (dropping no
-voltage), an output that is a voltage or a current of it."""
+"""Controlled sources: the control side (``cp``, ``cn``) senses a voltage (taking no current) or the
+current through it from ``cp`` to ``cn`` (dropping no voltage); the output (``n``, ``p``) is a source of
+a voltage (its + on ``p``) or of a current (out of ``p``), the gain times what is sensed."""
 
 from __future__ import annotations
 
@@ -9,28 +10,30 @@ import sympy as sp
 
 from ..kind import Kind, Params, Terminals
 
+TERMINALS = ("cp", "cn", "n", "p")
+
 
 def _controlled(name: str, out: Callable[[Terminals, sp.Symbol], sp.Expr], senses_current: bool) -> Kind:
     def laws(t: Terminals, p: Params) -> list[sp.Expr]:
-        sense = _u_in(t) if senses_current else t.I["in+"]
-        return [sense, t.I["in+"] + t.I["in-"], out(t, p[""])]
+        sense = t.across("cp", "cn") if senses_current else t.I["cp"]
+        return [sense, t.I["cp"] + t.I["cn"], out(t, p[""])]
 
-    return Kind(name, name.upper(), ("in+", "in-", "out+", "out-"), laws)
+    return Kind(name, name.upper(), TERMINALS, laws)
 
 
 def _u_in(t: Terminals) -> sp.Expr:
-    return t.V["in+"] - t.V["in-"]
+    return t.across("cp", "cn")
 
 
 def _u_out(t: Terminals) -> sp.Expr:
-    return t.V["out+"] - t.V["out-"]
+    return t.across("p", "n")
 
 
 def _i_out(t: Terminals) -> sp.Expr:
-    return -t.I["out+"]
+    return -t.I["p"]
 
 
 VCVS = _controlled("vcvs", lambda t, mu: _u_out(t) - mu * _u_in(t), senses_current=False)
 VCCS = _controlled("vccs", lambda t, g: _i_out(t) - g * _u_in(t), senses_current=False)
-CCVS = _controlled("ccvs", lambda t, r: _u_out(t) - r * t.I["in+"], senses_current=True)
-CCCS = _controlled("cccs", lambda t, k: _i_out(t) - k * t.I["in+"], senses_current=True)
+CCVS = _controlled("ccvs", lambda t, r: _u_out(t) - r * t.I["cp"], senses_current=True)
+CCCS = _controlled("cccs", lambda t, k: _i_out(t) - k * t.I["cp"], senses_current=True)

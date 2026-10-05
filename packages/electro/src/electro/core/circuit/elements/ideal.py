@@ -1,4 +1,4 @@
-"""Ideal elements of no parameter: a wire, a break, the nullor's halves, an unknown, a meter, an op-amp."""
+"""Ideal elements: a wire, a break, the nullor's halves, an unknown, meters, an op-amp."""
 
 from __future__ import annotations
 
@@ -8,7 +8,7 @@ from ..kind import Kind, Params, Terminals
 
 
 def _same_potential(t: Terminals, _: Params) -> list[sp.Expr]:
-    return [t.V["a"] - t.V["b"]]
+    return [t.across("a", "b")]
 
 
 def _no_current(t: Terminals, _: Params) -> list[sp.Expr]:
@@ -27,7 +27,7 @@ def _nothing_through(t: Terminals, p: Params) -> list[sp.Expr]:
 def _op_amp(t: Terminals, _: Params) -> list[sp.Expr]:
     """Its inputs at one potential, taking nothing; its output whatever it takes, returned through its
     supply (gnd): charge is kept, so the current out of a real one comes back somewhere."""
-    return [t.V["+"] - t.V["-"], t.I["+"], t.I["-"]]
+    return [t.across("plus", "minus"), t.I["plus"], t.I["minus"]]
 
 
 Wire = Kind("wire", "W", ("a", "b"), _same_potential, parameters=())
@@ -38,4 +38,7 @@ Hole = Kind("hole", "X", ("a", "b"), _anything, parameters=())
 """An element not known: anything at all. ``methods.fill`` finds the simplest that fits."""
 Ammeter = Kind("ammeter", "A", ("a", "b"), _same_potential, parameters=())
 """A wire whose current is what is read."""
-OpAmp = Kind("opamp", "OA", ("+", "-", "out", "gnd"), _op_amp, parameters=())
+Voltmeter = Kind("voltmeter", "V", ("a", "b"), _no_current, parameters=())
+"""A break whose voltage is what is read."""
+OpAmp = Kind("opamp", "OA", ("plus", "minus", "out", "gnd"), _op_amp, parameters=())
+"""Ideal, with negative feedback. ``gnd``: its supply's return, not drawn on a schematic."""

@@ -23,6 +23,10 @@ class Terminals:
     I: Mapping[str, sp.Expr]
     inner: Callable[[str], sp.Symbol]
 
+    def across(self, a: str, b: str) -> sp.Expr:
+        """V_a − V_b."""
+        return self.V[a] - self.V[b]
+
 
 Params = Mapping[str, sp.Symbol]
 """An element's parameters by name; ``""`` is its main one (R, C, E)."""
@@ -55,7 +59,9 @@ class Kind:
     last terminal's is minus the others', so no law can break it.
 
     ``parameters`` are named, ``""`` being the main one, given as the element's value. ``defaults`` is
-    what a parameter is when nothing is given; ``positive`` lists those never negative (a resistance)."""
+    what a parameter is when nothing is given; ``positive`` lists those never negative (a resistance);
+    ``inputs``, those the world sets while it runs (a hand on a switch, the light on a sensor, a
+    microcontroller on its pin): on paper each is a datum like any other."""
 
     name: str
     prefix: str
@@ -64,6 +70,7 @@ class Kind:
     parameters: tuple[str, ...] = ("",)
     defaults: tuple[tuple[str, object], ...] = ()
     positive: tuple[str, ...] = ()
+    inputs: tuple[str, ...] = ()
 
     def __call__(self, name: str | None = None) -> Element:
         return Element(self, name)

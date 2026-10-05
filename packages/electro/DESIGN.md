@@ -968,3 +968,36 @@ dzielą jedną funkcję. Wszystkie źródła sterowane idą jedną drogą. Testy
 - Jak pokazać `Given` z wymiarem czasu w zakładce Dane (przełącznik od 1 s, przebieg z pliku).
 - `Net` a etykiety na schemacie: czy każda etykieta to `Net`, czy tylko jawnie globalne.
 - Element wielokońcówkowy (tranzystor, wzmacniacz) a `Sought`: o które prądy końcówek pytać.
+
+## 15. Przepięcie biblioteki na rdzeń (plan)
+
+Cel: pakiet `electro` to rdzeń (`circuit`, `problem`, `solver`, `methods`) i warstwy nad nim; stare
+moduły (`circuit.py`, `components.py`, `semantics.py`, `solver.py`, `sim.py`, `devices.py`,
+`analysis.py`, `numeric.py`, `codegen.py`, `spice.py`, `reasons.py`, `task.py`) znikają. Kod w
+komórkach notatnika pisze się nowym API (`Problem`, `solve`, `>>`), stare notatki przestają działać
+(decyzja z §7). Każdy etap kończy się zielonymi testami i pushem; aplikacja działa po każdym.
+
+Kontrakty z aplikacją zostają: program symulacji dla `engine.ts` (ten sam JSON), kroki rozwiązania
+(`Steps`: `FormulaStep`, `SystemStep`, powody jako typy), problemy jako typy z polami.
+
+**Podział Python / strona.** Python liczy, strona pokazuje; między nimi płyną tylko dane. W `electro`
+zostaje model i matematyka: obwód, elementy, zadanie, rozwiązywanie, metody, kroki i problemy jako dane
+(wzory w LaTeX: pisze je sympy), program symulacji, liczby do wykresów, kod z obwodu, SPICE, zadania.
+Do strony (TS) idzie wszystko o rysunku i wyglądzie: siatka, węzły z przewodów, znaczenie strzałek,
+rysunek → netlista, układanie obwodu na siatce, symbole, rysowanie schematów i wykresów, PDF, format
+pliku notatnika. Paczki `electro-schematic`, `electro-render`, `electro-notes` i `electro/plot.py`
+znikają; kernel notatnika zostaje cienki (uruchamia komórki, oddaje JSON). Granica: strona → Python
+zadanie jako dane (netlista, dane, szukane); Python → strona wyniki, kroki, problemy, program, serie
+liczb, struktura obwodu do ułożenia, tekst kodu.
+
+Furtka na `electro` poza notatnikiem (Jupyter, `pip`): formaty danych na granicy są opisane i stałe,
+więc ten sam renderer z TS da się kiedyś tam wpiąć. Dziś nic pod to nie budujemy.
+
+| etap | co |
+|---|---|
+| A | elementy: wszystkie urządzenia jako rodzaje (prawa w słowach czasu, bez sztuczek elementu); nazwy rodzajów = nazwy ze schematu; części i kolory jako gotowe dane; nazwy jak dotąd (`R_1`) — zrobione |
+| B | symulacja: program z równań `Step` (stany z `D`/`Pre`, wejścia = parametry ustawiane w biegu, ograniczanie złącz ogólnie dla każdego `exp`), ten sam JSON; `live` i `simulate` na rdzeniu |
+| C | granica danych: netlista z rysunku (TS) → `Problem`; wyniki, kroki, problemy jako dane; kernel na rdzeniu |
+| D | strona przejmuje rysunek: węzły, strzałki, układanie, symbole, render, wykresy z serii liczb, format pliku |
+| E | Bode, przemiatanie, tolerancje (liczby), SPICE, zadania na rdzeniu |
+| F | kursy, przykłady, prompt AI, README na nowe API; stare moduły i paczki usunięte |

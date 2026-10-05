@@ -1,5 +1,5 @@
-"""Windings on one core: a transformer, two coupled inductors. Primary ``p+ p-``, secondary ``s+ s-``,
-each winding its own loop."""
+"""Windings on one core: a transformer, two coupled inductors. The primary ``p1`` (its dot), ``p2``; the
+secondary ``s1`` (its dot), ``s2``; each winding its own loop."""
 
 from __future__ import annotations
 
@@ -7,6 +7,8 @@ import sympy as sp
 
 from ..kind import Kind, Params, Terminals
 from ..time import D
+
+WINDINGS = ("p1", "p2", "s2", "s1")
 
 
 def _transformer(t: Terminals, p: Params) -> list[sp.Expr]:
@@ -24,14 +26,12 @@ def _coupled(t: Terminals, p: Params) -> list[sp.Expr]:
 
 
 def _windings(t: Terminals) -> tuple[sp.Expr, sp.Expr, sp.Expr, sp.Expr]:
-    return t.V["p+"] - t.V["p-"], t.V["s+"] - t.V["s-"], t.I["p+"], t.I["s+"]
+    return t.across("p1", "p2"), t.across("s1", "s2"), t.I["p1"], t.I["s1"]
 
 
 def _own_loop(t: Terminals) -> sp.Expr:
-    return t.I["p+"] + t.I["p-"]
+    return t.I["p1"] + t.I["p2"]
 
-
-WINDINGS = ("p+", "p-", "s+", "s-")
 
 Transformer = Kind("transformer", "TR", WINDINGS, _transformer, parameters=("", "L_m"), defaults=(("L_m", 10**6),))
 """Of ratio n (U₁ = n·U₂); ``L_m`` its magnetizing inductance, large: magnetizing takes next to nothing."""

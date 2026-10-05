@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections import Counter
 from dataclasses import dataclass
 from functools import cache
 
@@ -77,12 +78,26 @@ def symbols(c: Circuit) -> Symbols:
 
 
 def _labels(net: Netlist) -> tuple[str, ...]:
-    """An element's name when no other element has it, else its prefix and number."""
+    """An element's name when no other element has it; the others numbered by their prefix in order
+    (``R_1``, ``R_2``), past the names taken (``R1`` takes ``R_1`` too)."""
     names = [e.name for e, _ in net.parts]
-    return tuple(
-        e.name if e.name and names.count(e.name) == 1 else f"{e.kind.prefix}{k + 1}"
-        for k, (e, _) in enumerate(net.parts)
-    )
+    unique = {n for n in names if n and names.count(n) == 1}
+    taken = {_loose(n) for n in unique}
+    counters: Counter[str] = Counter()
+
+    def numbered(prefix: str) -> str:
+        while True:
+            counters[prefix] += 1
+            label = f"{prefix}_{counters[prefix]}"
+            if _loose(label) not in taken:
+                taken.add(_loose(label))
+                return label
+
+    return tuple(e.name if e.name in unique else numbered(e.kind.prefix) for e, _ in net.parts)
+
+
+def _loose(name: str) -> str:
+    return name.replace("_", "")
 
 
 def _potentials(net: Netlist) -> tuple[sp.Expr, ...]:

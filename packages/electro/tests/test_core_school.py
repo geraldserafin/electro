@@ -368,7 +368,7 @@ def test_vcvs_amplifies_the_voltage_it_senses():
     inn, out = Node("in"), Node("out")
     s = solve(
         Problem(
-            (GND >> e >> inn) @ (inn >> rin >> GND) @ at(amp, inn, GND, out, GND) @ (out >> rout >> GND),
+            (GND >> e >> inn) @ (inn >> rin >> GND) @ at(amp, inn, GND, GND, out) @ (out >> rout >> GND),
             {e: 2, rin: 1000, rout: 50, "mu": 10},
         )
     )
@@ -378,7 +378,7 @@ def test_vcvs_amplifies_the_voltage_it_senses():
 def test_vccs_is_a_transconductance():
     e, g, r = VoltageSource("E"), VCCS("g"), Resistor("R")
     inn, out = Node("in"), Node("out")
-    s = solve(Problem((GND >> e >> inn) @ at(g, inn, GND, out, GND) @ (out >> r >> GND), {e: 2, "g": "0.5", r: 10}))
+    s = solve(Problem((GND >> e >> inn) @ at(g, inn, GND, GND, out) @ (out >> r >> GND), {e: 2, "g": "0.5", r: 10}))
     assert s(U(r)) == 10
 
 
@@ -386,7 +386,7 @@ def test_ccvs_and_cccs_sense_the_current_in_series():
     for kind, gain, want in ((CCVS, 3, 6), (CCCS, 10, 20)):
         e, r1, src, r2 = VoltageSource("E"), Resistor("R_1"), kind("k"), Resistor("R_2")
         a, b, out = Node("a"), Node("b"), Node("out")
-        circuit = (GND >> e >> a) @ (a >> r1 >> b) @ at(src, b, GND, out, GND) @ (out >> r2 >> GND)
+        circuit = (GND >> e >> a) @ (a >> r1 >> b) @ at(src, b, GND, GND, out) @ (out >> r2 >> GND)
         s = solve(Problem(circuit, {e: 10, r1: 5, "k": gain, r2: 1}))
         assert s(I(e)) == 2 and (s(V(out)) if kind is CCVS else s(I(r2))) == want
 
@@ -394,7 +394,7 @@ def test_ccvs_and_cccs_sense_the_current_in_series():
 def test_the_gain_is_found_from_the_data():
     e, rbe, beta, rc = VoltageSource("E"), Resistor("R_1"), CCCS("beta"), Resistor("R_2")
     inn, b, c = Node("in"), Node("b"), Node("c")
-    circuit = (GND >> e >> inn) @ (inn >> rbe >> b) @ at(beta, b, GND, c, GND) @ (c >> rc >> GND)
+    circuit = (GND >> e >> inn) @ (inn >> rbe >> b) @ at(beta, b, GND, GND, c) @ (c >> rc >> GND)
     s = solve(Problem(circuit, {e: "10m", rbe: 1000, rc: 2000, U(rc): 2}))
     assert s(Parameter(beta)) == 100
 
@@ -403,14 +403,14 @@ def test_ideal_transformer_steps_down():
     e, tr, r = VoltageSource("E"), Transformer("n"), Resistor("R")
     a, b = Node("A"), Node("B")
     s = solve(
-        Problem((GND >> e >> a) @ at(tr, a, GND, b, GND) @ (b >> r >> GND), {e: 10, "n": 2, r: 10}), AC(sp.Integer(100))
+        Problem((GND >> e >> a) @ at(tr, a, GND, GND, b) @ (b >> r >> GND), {e: 10, "n": 2, r: 10}), AC(sp.Integer(100))
     )
     assert (s(U(r)), s(I(r))) == (5, sp.Rational(1, 2))
-    assert complex(s(I(tr, "p+"))) == pytest.approx(0.25, abs=1e-6)
+    assert complex(s(I(tr, "p1"))) == pytest.approx(0.25, abs=1e-6)
     e, r1, tr = VoltageSource("E"), Resistor("R"), Transformer("n")
     s_, a = Node("S"), Node("A")
     assert (
-        solve(Problem((GND >> e >> s_) @ (s_ >> r1 >> a) @ at(tr, a, GND, GND, Node()), {e: 10, r1: 5, "n": 2}))(I(r1))
+        solve(Problem((GND >> e >> s_) @ (s_ >> r1 >> a) @ at(tr, a, GND, Node(), GND), {e: 10, r1: 5, "n": 2}))(I(r1))
         == 2
     )
 
@@ -418,9 +418,9 @@ def test_ideal_transformer_steps_down():
 def test_coupled_inductors():
     e, r, m, rl = VoltageSource("E"), Resistor("R"), Coupled("M"), Resistor("R_L")
     a, b, c = Node("A"), Node("B"), Node("C")
-    circuit = (GND >> e >> a) @ (a >> r >> b) @ at(m, b, GND, c, GND) @ (c >> rl >> GND)
+    circuit = (GND >> e >> a) @ (a >> r >> b) @ at(m, b, GND, GND, c) @ (c >> rl >> GND)
     s = solve(Problem(circuit, {e: 1, r: 1, m: {"": "1m", "L1": "2m", "L2": "3m"}, rl: "1G"}), AC(sp.Integer(1000)))
-    i1 = complex(s(I(m, "p+")))
+    i1 = complex(s(I(m, "p1")))
     assert i1 == pytest.approx(1 / (1 + 2j), rel=1e-6) and complex(s(V(c))) == pytest.approx(1j * i1, rel=1e-6)
 
 
