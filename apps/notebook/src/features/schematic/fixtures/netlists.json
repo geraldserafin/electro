@@ -1,0 +1,2135 @@
+{
+ "arrows_of_elements": {
+  "schematic": {
+   "version": 1,
+   "elements": [
+    {
+     "id": "i2",
+     "kind": "current_arrow",
+     "at": [
+      8,
+      9
+     ],
+     "rotation": 90,
+     "value": "2",
+     "text": "I_2",
+     "of": "R2"
+    },
+    {
+     "id": "i4",
+     "kind": "current_arrow",
+     "at": [
+      16,
+      14
+     ],
+     "rotation": 270,
+     "value": null,
+     "text": "I_4",
+     "of": "R4"
+    },
+    {
+     "id": "u",
+     "kind": "voltage_arrow",
+     "at": [
+      8,
+      -2
+     ],
+     "rotation": 180,
+     "value": null,
+     "text": "U_1",
+     "of": "R1",
+     "span": 8
+    },
+    {
+     "id": "E",
+     "kind": "voltage_source",
+     "at": [
+      0,
+      8
+     ],
+     "rotation": 270,
+     "value": null,
+     "text": null
+    },
+    {
+     "id": "R1",
+     "kind": "resistor",
+     "at": [
+      2,
+      0
+     ],
+     "rotation": 0,
+     "value": "3",
+     "text": null
+    },
+    {
+     "id": "R2",
+     "kind": "resistor",
+     "at": [
+      8,
+      3
+     ],
+     "rotation": 90,
+     "value": "18",
+     "text": null
+    },
+    {
+     "id": "R3",
+     "kind": "resistor",
+     "at": [
+      16,
+      0
+     ],
+     "rotation": 90,
+     "value": "3",
+     "text": null
+    },
+    {
+     "id": "R4",
+     "kind": "resistor",
+     "at": [
+      16,
+      6
+     ],
+     "rotation": 90,
+     "value": "6",
+     "text": null
+    },
+    {
+     "id": "GND1",
+     "kind": "ground",
+     "at": [
+      16,
+      10
+     ],
+     "rotation": 0,
+     "value": null,
+     "text": null
+    }
+   ],
+   "wires": [
+    {
+     "points": [
+      [
+       0,
+       8
+      ],
+      [
+       0,
+       9
+      ]
+     ]
+    },
+    {
+     "points": [
+      [
+       0,
+       4
+      ],
+      [
+       0,
+       3
+      ]
+     ]
+    },
+    {
+     "points": [
+      [
+       2,
+       0
+      ],
+      [
+       0,
+       0
+      ]
+     ]
+    },
+    {
+     "points": [
+      [
+       6,
+       0
+      ],
+      [
+       8,
+       0
+      ]
+     ]
+    },
+    {
+     "points": [
+      [
+       8,
+       3
+      ],
+      [
+       8,
+       2
+      ]
+     ]
+    },
+    {
+     "points": [
+      [
+       8,
+       7
+      ],
+      [
+       8,
+       8
+      ]
+     ]
+    },
+    {
+     "points": [
+      [
+       16,
+       4
+      ],
+      [
+       16,
+       5
+      ]
+     ]
+    },
+    {
+     "points": [
+      [
+       16,
+       6
+      ],
+      [
+       16,
+       5
+      ]
+     ]
+    },
+    {
+     "points": [
+      [
+       16,
+       10
+      ],
+      [
+       16,
+       12
+      ]
+     ]
+    },
+    {
+     "points": [
+      [
+       0,
+       3
+      ],
+      [
+       0,
+       0
+      ]
+     ]
+    },
+    {
+     "points": [
+      [
+       8,
+       0
+      ],
+      [
+       16,
+       0
+      ]
+     ]
+    },
+    {
+     "points": [
+      [
+       8,
+       0
+      ],
+      [
+       8,
+       2
+      ]
+     ]
+    },
+    {
+     "points": [
+      [
+       0,
+       9
+      ],
+      [
+       0,
+       12
+      ],
+      [
+       8,
+       12
+      ]
+     ]
+    },
+    {
+     "points": [
+      [
+       8,
+       12
+      ],
+      [
+       16,
+       12
+      ]
+     ]
+    },
+    {
+     "points": [
+      [
+       8,
+       8
+      ],
+      [
+       8,
+       12
+      ]
+     ]
+    }
+   ]
+  },
+  "netlist": [
+   {
+    "id": "E",
+    "kind": "voltage_source",
+    "value": null,
+    "text": null,
+    "nodes": [
+     "GND",
+     "n1"
+    ]
+   },
+   {
+    "id": "R1",
+    "kind": "resistor",
+    "value": "3",
+    "text": null,
+    "nodes": [
+     "n1",
+     "n2"
+    ]
+   },
+   {
+    "id": "R2",
+    "kind": "resistor",
+    "value": "18",
+    "text": null,
+    "nodes": [
+     "n2",
+     "GND"
+    ]
+   },
+   {
+    "id": "R3",
+    "kind": "resistor",
+    "value": "3",
+    "text": null,
+    "nodes": [
+     "n2",
+     "n3"
+    ]
+   },
+   {
+    "id": "R4",
+    "kind": "resistor",
+    "value": "6",
+    "text": null,
+    "nodes": [
+     "n3",
+     "GND"
+    ]
+   }
+  ],
+  "quantities": {
+   "i2": {
+    "I_R2": 1.0
+   },
+   "i4": {
+    "I_R4": -1.0
+   },
+   "u": {
+    "U_R1": 1.0
+   }
+  }
+ },
+ "label_potential": {
+  "schematic": {
+   "version": 1,
+   "elements": [
+    {
+     "id": "E1",
+     "kind": "voltage_source",
+     "at": [
+      0,
+      6
+     ],
+     "rotation": 270,
+     "value": "12",
+     "text": null
+    },
+    {
+     "id": "R1",
+     "kind": "resistor",
+     "at": [
+      1,
+      0
+     ],
+     "rotation": 0,
+     "value": "10",
+     "text": null
+    },
+    {
+     "id": "R2",
+     "kind": "resistor",
+     "at": [
+      6,
+      2
+     ],
+     "rotation": 90,
+     "value": "20",
+     "text": null
+    },
+    {
+     "id": "GND1",
+     "kind": "ground",
+     "at": [
+      0,
+      6
+     ],
+     "rotation": 0,
+     "value": null,
+     "text": null
+    },
+    {
+     "id": "L1",
+     "kind": "label",
+     "at": [
+      6,
+      0
+     ],
+     "rotation": 0,
+     "value": "4",
+     "text": "A"
+    }
+   ],
+   "wires": [
+    {
+     "points": [
+      [
+       0,
+       6
+      ],
+      [
+       0,
+       8
+      ]
+     ]
+    },
+    {
+     "points": [
+      [
+       0,
+       2
+      ],
+      [
+       0,
+       0
+      ]
+     ]
+    },
+    {
+     "points": [
+      [
+       1,
+       0
+      ],
+      [
+       0,
+       0
+      ]
+     ]
+    },
+    {
+     "points": [
+      [
+       5,
+       0
+      ],
+      [
+       6,
+       0
+      ]
+     ]
+    },
+    {
+     "points": [
+      [
+       6,
+       2
+      ],
+      [
+       6,
+       0
+      ]
+     ]
+    },
+    {
+     "points": [
+      [
+       6,
+       6
+      ],
+      [
+       6,
+       8
+      ]
+     ]
+    },
+    {
+     "points": [
+      [
+       6,
+       8
+      ],
+      [
+       0,
+       8
+      ]
+     ]
+    }
+   ]
+  },
+  "netlist": [
+   {
+    "id": "E1",
+    "kind": "voltage_source",
+    "value": "12",
+    "text": null,
+    "nodes": [
+     "GND",
+     "n1"
+    ]
+   },
+   {
+    "id": "R1",
+    "kind": "resistor",
+    "value": "10",
+    "text": null,
+    "nodes": [
+     "n1",
+     "A"
+    ]
+   },
+   {
+    "id": "R2",
+    "kind": "resistor",
+    "value": "20",
+    "text": null,
+    "nodes": [
+     "A",
+     "GND"
+    ]
+   }
+  ],
+  "quantities": {
+   "L1": {
+    "V_A": 1.0
+   }
+  }
+ },
+ "voltage_between": {
+  "schematic": {
+   "version": 1,
+   "elements": [
+    {
+     "id": "E1",
+     "kind": "voltage_source",
+     "at": [
+      0,
+      12
+     ],
+     "rotation": 270,
+     "value": null,
+     "text": null
+    },
+    {
+     "id": "Rw",
+     "kind": "resistor",
+     "at": [
+      0,
+      6
+     ],
+     "rotation": 270,
+     "value": "2",
+     "text": null
+    },
+    {
+     "id": "R1",
+     "kind": "resistor",
+     "at": [
+      10,
+      4
+     ],
+     "rotation": 90,
+     "value": "18",
+     "text": null
+    },
+    {
+     "id": "GND1",
+     "kind": "ground",
+     "at": [
+      0,
+      12
+     ],
+     "rotation": 0,
+     "value": null,
+     "text": null
+    },
+    {
+     "id": "U1",
+     "kind": "voltage_arrow",
+     "at": [
+      6,
+      12
+     ],
+     "rotation": 270,
+     "value": "90",
+     "text": "U",
+     "between": [
+      [
+       6,
+       12
+      ],
+      [
+       6,
+       0
+      ]
+     ]
+    }
+   ],
+   "wires": [
+    {
+     "points": [
+      [
+       0,
+       6
+      ],
+      [
+       0,
+       8
+      ]
+     ]
+    },
+    {
+     "points": [
+      [
+       0,
+       2
+      ],
+      [
+       0,
+       0
+      ]
+     ]
+    },
+    {
+     "points": [
+      [
+       10,
+       4
+      ],
+      [
+       10,
+       0
+      ]
+     ]
+    },
+    {
+     "points": [
+      [
+       10,
+       8
+      ],
+      [
+       10,
+       12
+      ]
+     ]
+    },
+    {
+     "points": [
+      [
+       0,
+       0
+      ],
+      [
+       10,
+       0
+      ]
+     ]
+    },
+    {
+     "points": [
+      [
+       0,
+       12
+      ],
+      [
+       10,
+       12
+      ]
+     ]
+    }
+   ]
+  },
+  "netlist": [
+   {
+    "id": "E1",
+    "kind": "voltage_source",
+    "value": null,
+    "text": null,
+    "nodes": [
+     "GND",
+     "n1"
+    ]
+   },
+   {
+    "id": "Rw",
+    "kind": "resistor",
+    "value": "2",
+    "text": null,
+    "nodes": [
+     "n1",
+     "n2"
+    ]
+   },
+   {
+    "id": "R1",
+    "kind": "resistor",
+    "value": "18",
+    "text": null,
+    "nodes": [
+     "n2",
+     "GND"
+    ]
+   }
+  ],
+  "quantities": {
+   "U1": {
+    "V_n2": 1.0
+   }
+  }
+ },
+ "current_along": {
+  "schematic": {
+   "version": 1,
+   "elements": [
+    {
+     "id": "E1",
+     "kind": "voltage_source",
+     "at": [
+      0,
+      6
+     ],
+     "rotation": 270,
+     "value": "12",
+     "text": null
+    },
+    {
+     "id": "R1",
+     "kind": "resistor",
+     "at": [
+      1,
+      0
+     ],
+     "rotation": 0,
+     "value": "10",
+     "text": null
+    },
+    {
+     "id": "R2",
+     "kind": "resistor",
+     "at": [
+      10,
+      2
+     ],
+     "rotation": 90,
+     "value": "20",
+     "text": null
+    },
+    {
+     "id": "GND1",
+     "kind": "ground",
+     "at": [
+      0,
+      6
+     ],
+     "rotation": 0,
+     "value": null,
+     "text": null
+    },
+    {
+     "id": "I1",
+     "kind": "current_arrow",
+     "at": [
+      7,
+      0
+     ],
+     "rotation": 0,
+     "value": null,
+     "text": "I"
+    }
+   ],
+   "wires": [
+    {
+     "points": [
+      [
+       0,
+       6
+      ],
+      [
+       0,
+       8
+      ]
+     ]
+    },
+    {
+     "points": [
+      [
+       0,
+       2
+      ],
+      [
+       0,
+       0
+      ]
+     ]
+    },
+    {
+     "points": [
+      [
+       1,
+       0
+      ],
+      [
+       0,
+       0
+      ]
+     ]
+    },
+    {
+     "points": [
+      [
+       5,
+       0
+      ],
+      [
+       6,
+       0
+      ]
+     ]
+    },
+    {
+     "points": [
+      [
+       10,
+       2
+      ],
+      [
+       10,
+       0
+      ]
+     ]
+    },
+    {
+     "points": [
+      [
+       10,
+       6
+      ],
+      [
+       10,
+       8
+      ]
+     ]
+    },
+    {
+     "points": [
+      [
+       6,
+       0
+      ],
+      [
+       10,
+       0
+      ]
+     ]
+    },
+    {
+     "points": [
+      [
+       10,
+       8
+      ],
+      [
+       0,
+       8
+      ]
+     ]
+    }
+   ]
+  },
+  "netlist": [
+   {
+    "id": "E1",
+    "kind": "voltage_source",
+    "value": "12",
+    "text": null,
+    "nodes": [
+     "GND",
+     "n1"
+    ]
+   },
+   {
+    "id": "R1",
+    "kind": "resistor",
+    "value": "10",
+    "text": null,
+    "nodes": [
+     "n1",
+     "n2"
+    ]
+   },
+   {
+    "id": "R2",
+    "kind": "resistor",
+    "value": "20",
+    "text": null,
+    "nodes": [
+     "n2",
+     "GND"
+    ]
+   }
+  ],
+  "quantities": {
+   "I1": {
+    "I_R2": 1.0
+   }
+  }
+ },
+ "current_along_back": {
+  "schematic": {
+   "version": 1,
+   "elements": [
+    {
+     "id": "E1",
+     "kind": "voltage_source",
+     "at": [
+      0,
+      6
+     ],
+     "rotation": 270,
+     "value": "12",
+     "text": null
+    },
+    {
+     "id": "R1",
+     "kind": "resistor",
+     "at": [
+      1,
+      0
+     ],
+     "rotation": 0,
+     "value": "10",
+     "text": null
+    },
+    {
+     "id": "R2",
+     "kind": "resistor",
+     "at": [
+      10,
+      2
+     ],
+     "rotation": 90,
+     "value": "20",
+     "text": null
+    },
+    {
+     "id": "GND1",
+     "kind": "ground",
+     "at": [
+      0,
+      6
+     ],
+     "rotation": 0,
+     "value": null,
+     "text": null
+    },
+    {
+     "id": "I1",
+     "kind": "current_arrow",
+     "at": [
+      8,
+      0
+     ],
+     "rotation": 180,
+     "value": null,
+     "text": "I"
+    }
+   ],
+   "wires": [
+    {
+     "points": [
+      [
+       0,
+       6
+      ],
+      [
+       0,
+       8
+      ]
+     ]
+    },
+    {
+     "points": [
+      [
+       0,
+       2
+      ],
+      [
+       0,
+       0
+      ]
+     ]
+    },
+    {
+     "points": [
+      [
+       1,
+       0
+      ],
+      [
+       0,
+       0
+      ]
+     ]
+    },
+    {
+     "points": [
+      [
+       5,
+       0
+      ],
+      [
+       6,
+       0
+      ]
+     ]
+    },
+    {
+     "points": [
+      [
+       10,
+       2
+      ],
+      [
+       10,
+       0
+      ]
+     ]
+    },
+    {
+     "points": [
+      [
+       10,
+       6
+      ],
+      [
+       10,
+       8
+      ]
+     ]
+    },
+    {
+     "points": [
+      [
+       6,
+       0
+      ],
+      [
+       10,
+       0
+      ]
+     ]
+    },
+    {
+     "points": [
+      [
+       10,
+       8
+      ],
+      [
+       0,
+       8
+      ]
+     ]
+    }
+   ]
+  },
+  "netlist": [
+   {
+    "id": "E1",
+    "kind": "voltage_source",
+    "value": "12",
+    "text": null,
+    "nodes": [
+     "GND",
+     "n1"
+    ]
+   },
+   {
+    "id": "R1",
+    "kind": "resistor",
+    "value": "10",
+    "text": null,
+    "nodes": [
+     "n1",
+     "n2"
+    ]
+   },
+   {
+    "id": "R2",
+    "kind": "resistor",
+    "value": "20",
+    "text": null,
+    "nodes": [
+     "n2",
+     "GND"
+    ]
+   }
+  ],
+  "quantities": {
+   "I1": {
+    "I_R1": -1.0
+   }
+  }
+ },
+ "current_beyond_junction": {
+  "schematic": {
+   "version": 1,
+   "elements": [
+    {
+     "id": "E1",
+     "kind": "voltage_source",
+     "at": [
+      0,
+      10
+     ],
+     "rotation": 270,
+     "value": "12",
+     "text": null
+    },
+    {
+     "id": "R1",
+     "kind": "resistor",
+     "at": [
+      4,
+      0
+     ],
+     "rotation": 0,
+     "value": "10",
+     "text": null
+    },
+    {
+     "id": "R2",
+     "kind": "resistor",
+     "at": [
+      20,
+      6
+     ],
+     "rotation": 90,
+     "value": "20",
+     "text": null
+    },
+    {
+     "id": "R3",
+     "kind": "resistor",
+     "at": [
+      28,
+      6
+     ],
+     "rotation": 90,
+     "value": "20",
+     "text": null
+    },
+    {
+     "id": "R4",
+     "kind": "resistor",
+     "at": [
+      36,
+      6
+     ],
+     "rotation": 90,
+     "value": "20",
+     "text": null
+    },
+    {
+     "id": "GND1",
+     "kind": "ground",
+     "at": [
+      0,
+      10
+     ],
+     "rotation": 0,
+     "value": null,
+     "text": null
+    },
+    {
+     "id": "I1",
+     "kind": "current_arrow",
+     "at": [
+      22,
+      0
+     ],
+     "rotation": 0,
+     "text": "I"
+    }
+   ],
+   "wires": [
+    {
+     "points": [
+      [
+       0,
+       10
+      ],
+      [
+       0,
+       16
+      ]
+     ]
+    },
+    {
+     "points": [
+      [
+       0,
+       6
+      ],
+      [
+       0,
+       0
+      ]
+     ]
+    },
+    {
+     "points": [
+      [
+       4,
+       0
+      ],
+      [
+       0,
+       0
+      ]
+     ]
+    },
+    {
+     "points": [
+      [
+       8,
+       0
+      ],
+      [
+       12,
+       0
+      ]
+     ]
+    },
+    {
+     "points": [
+      [
+       20,
+       6
+      ],
+      [
+       20,
+       0
+      ]
+     ]
+    },
+    {
+     "points": [
+      [
+       20,
+       10
+      ],
+      [
+       20,
+       16
+      ]
+     ]
+    },
+    {
+     "points": [
+      [
+       28,
+       6
+      ],
+      [
+       28,
+       0
+      ]
+     ]
+    },
+    {
+     "points": [
+      [
+       28,
+       10
+      ],
+      [
+       28,
+       16
+      ]
+     ]
+    },
+    {
+     "points": [
+      [
+       36,
+       6
+      ],
+      [
+       36,
+       0
+      ]
+     ]
+    },
+    {
+     "points": [
+      [
+       36,
+       10
+      ],
+      [
+       36,
+       16
+      ]
+     ]
+    },
+    {
+     "points": [
+      [
+       12,
+       0
+      ],
+      [
+       20,
+       0
+      ]
+     ]
+    },
+    {
+     "points": [
+      [
+       20,
+       0
+      ],
+      [
+       28,
+       0
+      ]
+     ]
+    },
+    {
+     "points": [
+      [
+       28,
+       0
+      ],
+      [
+       36,
+       0
+      ]
+     ]
+    },
+    {
+     "points": [
+      [
+       36,
+       16
+      ],
+      [
+       28,
+       16
+      ]
+     ]
+    },
+    {
+     "points": [
+      [
+       28,
+       16
+      ],
+      [
+       20,
+       16
+      ]
+     ]
+    },
+    {
+     "points": [
+      [
+       20,
+       16
+      ],
+      [
+       0,
+       16
+      ]
+     ]
+    }
+   ]
+  },
+  "netlist": [
+   {
+    "id": "E1",
+    "kind": "voltage_source",
+    "value": "12",
+    "text": null,
+    "nodes": [
+     "GND",
+     "n1"
+    ]
+   },
+   {
+    "id": "R1",
+    "kind": "resistor",
+    "value": "10",
+    "text": null,
+    "nodes": [
+     "n1",
+     "n2"
+    ]
+   },
+   {
+    "id": "R2",
+    "kind": "resistor",
+    "value": "20",
+    "text": null,
+    "nodes": [
+     "n2",
+     "GND"
+    ]
+   },
+   {
+    "id": "R3",
+    "kind": "resistor",
+    "value": "20",
+    "text": null,
+    "nodes": [
+     "n2",
+     "GND"
+    ]
+   },
+   {
+    "id": "R4",
+    "kind": "resistor",
+    "value": "20",
+    "text": null,
+    "nodes": [
+     "n2",
+     "GND"
+    ]
+   }
+  ],
+  "quantities": {
+   "I1": {
+    "I_R3": 1.0,
+    "I_R4": 1.0
+   }
+  }
+ },
+ "terminal_on_corner": {
+  "schematic": {
+   "elements": [
+    {
+     "id": "E1",
+     "kind": "voltage_source",
+     "at": [
+      0,
+      4
+     ],
+     "rotation": 270,
+     "value": "6"
+    },
+    {
+     "id": "R1",
+     "kind": "resistor",
+     "at": [
+      8,
+      0
+     ],
+     "rotation": 90,
+     "value": "12"
+    },
+    {
+     "id": "gnd1",
+     "kind": "ground",
+     "at": [
+      0,
+      4
+     ]
+    },
+    {
+     "id": "T1",
+     "kind": "terminal",
+     "at": [
+      8,
+      8
+     ]
+    }
+   ],
+   "wires": [
+    {
+     "points": [
+      [
+       0,
+       0
+      ],
+      [
+       8,
+       0
+      ]
+     ]
+    },
+    {
+     "points": [
+      [
+       8,
+       4
+      ],
+      [
+       8,
+       8
+      ],
+      [
+       0,
+       8
+      ],
+      [
+       0,
+       4
+      ]
+     ]
+    }
+   ]
+  },
+  "netlist": [
+   {
+    "id": "E1",
+    "kind": "voltage_source",
+    "value": "6",
+    "text": null,
+    "nodes": [
+     "GND",
+     "n1"
+    ]
+   },
+   {
+    "id": "R1",
+    "kind": "resistor",
+    "value": "12",
+    "text": null,
+    "nodes": [
+     "n1",
+     "GND"
+    ]
+   }
+  ],
+  "quantities": {
+   "T1": {}
+  }
+ },
+ "mesh": {
+  "schematic": {
+   "version": 1,
+   "elements": [
+    {
+     "id": "E1",
+     "kind": "voltage_source",
+     "at": [
+      0,
+      6
+     ],
+     "rotation": 270,
+     "value": "12",
+     "text": null
+    },
+    {
+     "id": "R1",
+     "kind": "resistor",
+     "at": [
+      1,
+      0
+     ],
+     "rotation": 0,
+     "value": "10",
+     "text": null
+    },
+    {
+     "id": "R2",
+     "kind": "resistor",
+     "at": [
+      10,
+      2
+     ],
+     "rotation": 90,
+     "value": "20",
+     "text": null
+    },
+    {
+     "id": "R3",
+     "kind": "resistor",
+     "at": [
+      11,
+      0
+     ],
+     "rotation": 0,
+     "value": "10",
+     "text": null
+    },
+    {
+     "id": "R4",
+     "kind": "resistor",
+     "at": [
+      20,
+      2
+     ],
+     "rotation": 90,
+     "value": "10",
+     "text": null
+    },
+    {
+     "id": "GND1",
+     "kind": "ground",
+     "at": [
+      0,
+      6
+     ],
+     "rotation": 0,
+     "value": null,
+     "text": null
+    },
+    {
+     "id": "M1",
+     "kind": "mesh_current",
+     "at": [
+      5,
+      4
+     ],
+     "rotation": 0,
+     "text": "I_I"
+    },
+    {
+     "id": "M2",
+     "kind": "mesh_current",
+     "at": [
+      15,
+      4
+     ],
+     "rotation": 0,
+     "text": "I_II",
+     "flip": true
+    }
+   ],
+   "wires": [
+    {
+     "points": [
+      [
+       0,
+       6
+      ],
+      [
+       0,
+       8
+      ]
+     ]
+    },
+    {
+     "points": [
+      [
+       0,
+       2
+      ],
+      [
+       0,
+       0
+      ]
+     ]
+    },
+    {
+     "points": [
+      [
+       1,
+       0
+      ],
+      [
+       0,
+       0
+      ]
+     ]
+    },
+    {
+     "points": [
+      [
+       5,
+       0
+      ],
+      [
+       6,
+       0
+      ]
+     ]
+    },
+    {
+     "points": [
+      [
+       10,
+       2
+      ],
+      [
+       10,
+       0
+      ]
+     ]
+    },
+    {
+     "points": [
+      [
+       10,
+       6
+      ],
+      [
+       10,
+       8
+      ]
+     ]
+    },
+    {
+     "points": [
+      [
+       11,
+       0
+      ],
+      [
+       10,
+       0
+      ]
+     ]
+    },
+    {
+     "points": [
+      [
+       15,
+       0
+      ],
+      [
+       16,
+       0
+      ]
+     ]
+    },
+    {
+     "points": [
+      [
+       20,
+       2
+      ],
+      [
+       20,
+       0
+      ]
+     ]
+    },
+    {
+     "points": [
+      [
+       20,
+       6
+      ],
+      [
+       20,
+       8
+      ]
+     ]
+    },
+    {
+     "points": [
+      [
+       6,
+       0
+      ],
+      [
+       10,
+       0
+      ]
+     ]
+    },
+    {
+     "points": [
+      [
+       16,
+       0
+      ],
+      [
+       20,
+       0
+      ]
+     ]
+    },
+    {
+     "points": [
+      [
+       20,
+       8
+      ],
+      [
+       10,
+       8
+      ]
+     ]
+    },
+    {
+     "points": [
+      [
+       10,
+       8
+      ],
+      [
+       0,
+       8
+      ]
+     ]
+    }
+   ]
+  },
+  "netlist": [
+   {
+    "id": "E1",
+    "kind": "voltage_source",
+    "value": "12",
+    "text": null,
+    "nodes": [
+     "GND",
+     "n1"
+    ]
+   },
+   {
+    "id": "R1",
+    "kind": "resistor",
+    "value": "10",
+    "text": null,
+    "nodes": [
+     "n1",
+     "n2"
+    ]
+   },
+   {
+    "id": "R2",
+    "kind": "resistor",
+    "value": "20",
+    "text": null,
+    "nodes": [
+     "n2",
+     "GND"
+    ]
+   },
+   {
+    "id": "R3",
+    "kind": "resistor",
+    "value": "10",
+    "text": null,
+    "nodes": [
+     "n2",
+     "n3"
+    ]
+   },
+   {
+    "id": "R4",
+    "kind": "resistor",
+    "value": "10",
+    "text": null,
+    "nodes": [
+     "n3",
+     "GND"
+    ]
+   }
+  ],
+  "quantities": {
+   "M1": {
+    "I_R1": 1.0
+   },
+   "M2": {
+    "I_E1": -1.0,
+    "I_R2": 1.0
+   }
+  }
+ },
+ "bridge": {
+  "schematic": {
+   "elements": [
+    {
+     "id": "E_1",
+     "kind": "voltage_source",
+     "at": [
+      0,
+      12
+     ],
+     "rotation": 270,
+     "value": "10"
+    },
+    {
+     "id": "R_1",
+     "kind": "resistor",
+     "at": [
+      4,
+      0
+     ],
+     "rotation": 90,
+     "value": "100"
+    },
+    {
+     "id": "R_2",
+     "kind": "resistor",
+     "at": [
+      4,
+      6
+     ],
+     "rotation": 90,
+     "value": null
+    },
+    {
+     "id": "R_3",
+     "kind": "resistor",
+     "at": [
+      12,
+      0
+     ],
+     "rotation": 90,
+     "value": "50"
+    },
+    {
+     "id": "R_4",
+     "kind": "resistor",
+     "at": [
+      12,
+      6
+     ],
+     "rotation": 90,
+     "value": "100"
+    },
+    {
+     "id": "A_1",
+     "kind": "ammeter",
+     "at": [
+      6,
+      5
+     ],
+     "rotation": 0
+    },
+    {
+     "id": "gnd",
+     "kind": "ground",
+     "at": [
+      0,
+      12
+     ],
+     "rotation": 0
+    }
+   ],
+   "wires": [
+    {
+     "points": [
+      [
+       0,
+       8
+      ],
+      [
+       0,
+       0
+      ],
+      [
+       4,
+       0
+      ]
+     ]
+    },
+    {
+     "points": [
+      [
+       4,
+       0
+      ],
+      [
+       12,
+       0
+      ]
+     ]
+    },
+    {
+     "points": [
+      [
+       4,
+       4
+      ],
+      [
+       4,
+       6
+      ]
+     ]
+    },
+    {
+     "points": [
+      [
+       12,
+       4
+      ],
+      [
+       12,
+       6
+      ]
+     ]
+    },
+    {
+     "points": [
+      [
+       4,
+       5
+      ],
+      [
+       6,
+       5
+      ]
+     ]
+    },
+    {
+     "points": [
+      [
+       10,
+       5
+      ],
+      [
+       12,
+       5
+      ]
+     ]
+    },
+    {
+     "points": [
+      [
+       4,
+       10
+      ],
+      [
+       4,
+       12
+      ]
+     ]
+    },
+    {
+     "points": [
+      [
+       12,
+       10
+      ],
+      [
+       12,
+       12
+      ]
+     ]
+    },
+    {
+     "points": [
+      [
+       0,
+       12
+      ],
+      [
+       12,
+       12
+      ]
+     ]
+    }
+   ]
+  },
+  "netlist": [
+   {
+    "id": "E_1",
+    "kind": "voltage_source",
+    "value": "10",
+    "text": null,
+    "nodes": [
+     "GND",
+     "n1"
+    ]
+   },
+   {
+    "id": "R_1",
+    "kind": "resistor",
+    "value": "100",
+    "text": null,
+    "nodes": [
+     "n1",
+     "n2"
+    ]
+   },
+   {
+    "id": "R_2",
+    "kind": "resistor",
+    "value": null,
+    "text": null,
+    "nodes": [
+     "n2",
+     "GND"
+    ]
+   },
+   {
+    "id": "R_3",
+    "kind": "resistor",
+    "value": "50",
+    "text": null,
+    "nodes": [
+     "n1",
+     "n3"
+    ]
+   },
+   {
+    "id": "R_4",
+    "kind": "resistor",
+    "value": "100",
+    "text": null,
+    "nodes": [
+     "n3",
+     "GND"
+    ]
+   },
+   {
+    "id": "A_1",
+    "kind": "ammeter",
+    "value": null,
+    "text": null,
+    "nodes": [
+     "n2",
+     "n3"
+    ]
+   }
+  ],
+  "quantities": {}
+ }
+}

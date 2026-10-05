@@ -166,7 +166,7 @@ class Drawing:
         if live:
             from electro_notebook import kernel
 
-            compiled = json.loads(kernel.live(sch.to_json()))  # …that runs in time
+            compiled = json.loads(kernel.live(json.dumps(_problem(sch))))  # …that runs in time
             assert "error" not in compiled, (name, compiled.get("error"))
         names = sch.node_names()
         pins = {e.id: e.pins() for e in self.elements}
@@ -351,3 +351,27 @@ UNO = {f"D{i}": i for i in range(14)} | {f"A{i}": 14 + i for i in range(6)} | {"
 PICO = {f"GP{i}": i for i in range(23)} | {"GP26": 23, "GP27": 24, "GP28": 25, "VBUS": 26, "3V3": 27, "GND": 28}
 A = lambda pin: ("ARD_1", UNO[pin])  # noqa: E731 — an Arduino's pin in a net
 PI = lambda pin: ("PICO_1", PICO[pin])  # noqa: E731
+
+
+def _problem(sch: Schematic) -> dict:
+    """The drawing as the page sends it to be run (schematic/problem.ts)."""
+    readings = {"potentiometer": "position", "photoresistor": "lux", "thermistor": "temperature"}
+    elements = []
+    for item in sch.drawn_netlist():
+        kind, text = item["kind"], (item.pop("text") or "").strip()
+        params: dict = {}
+        if kind in ("led", "diode", "npn", "pnp", "opamp") and text:
+            item["part"] = text
+        elif kind in ("sine_source", "square_source"):
+            words = text.split()
+            if words and words[-1].endswith("%"):
+                params["duty"] = float(words.pop().rstrip("%").replace(",", ".")) / 100
+            if words and words[-1].endswith("°"):
+                params["phase"] = words.pop().rstrip("°").replace(",", ".")
+            params["f"] = " ".join(words).replace("Hz", "").strip() or ("50" if kind == "sine_source" else "1k")
+        elif kind in ("switch", "button"):
+            params["closed"] = 1 if text == "closed" else 0
+        elif kind in readings and text:
+            params[readings[kind]] = text.replace(",", ".")
+        elements.append({**item, "params": params})
+    return {"elements": elements}

@@ -4,7 +4,8 @@
 "params": {...}}, ...]}`` — ``id`` is the element's name, ``kind`` its kind's (``elements.BY_NAME``),
 ``nodes`` the points of its terminals in their order (``"GND"`` or ``"0"`` is ground; a terminal its
 kind does not draw, ``gnd``, may be left out: it is ground), ``value`` its main parameter (left out or
-``"?"``: to be found), ``params`` the others by name. A meter's value is its reading.
+``"?"``: to be found), ``params`` the others by name, ``part`` a real part's name (``PARTS``) or an
+LED's colour. A meter's value is its reading.
 """
 
 from __future__ import annotations
@@ -12,7 +13,7 @@ from __future__ import annotations
 from collections.abc import Mapping
 from dataclasses import dataclass
 
-from ..circuit.elements import BY_NAME
+from ..circuit.elements import BJT_PARTS, BY_NAME, DIODE_PARTS, LED_COLORS, OPAMP_PARTS
 from ..circuit.tree import GND, Circuit, Element, Net, Node
 from ..circuit.wiring import at, beside
 from .problem import Key, Problem
@@ -22,6 +23,23 @@ READINGS = {"ammeter": I, "voltmeter": U}
 """Meters: what their value is a reading of."""
 
 GROUND_NAMES = ("GND", "0")
+
+PARTS: dict[str, Mapping[str, Mapping[str, object]]] = {
+    "diode": DIODE_PARTS,
+    "npn": BJT_PARTS,
+    "pnp": BJT_PARTS,
+    "opamp_model": OPAMP_PARTS,
+}
+"""Real parts by kind: each its parameters."""
+
+MODELS = {"opamp": "opamp_model"}
+"""A kind that, given a real part, is that part's model."""
+
+
+class UnknownPart(KeyError):
+    def __init__(self, part: str) -> None:
+        super().__init__(part)
+        self.part = part
 
 
 class UnknownKind(KeyError):
@@ -60,7 +78,8 @@ def from_netlist(data: Mapping) -> Netlist:
 
 
 def _element(item: Mapping) -> Element:
-    kind = BY_NAME.get(item["kind"])
+    name = str(item["kind"])
+    kind = BY_NAME.get(MODELS.get(name, name) if item.get("part") else name)
     if kind is None:
         raise UnknownKind(item["kind"])
     return kind(item["id"])
@@ -82,7 +101,22 @@ def _given(item: Mapping, e: Element) -> dict[Key, object]:
     if value not in (None, "", "?"):
         reading = READINGS.get(e.kind.name)
         out[reading(e) if reading else e] = value
-    params = item.get("params") or {}
+    params = {**_part(item, e), **(item.get("params") or {})}
     if params:
         out[e] = {**({"": value} if e in out else {}), **params}
     return out
+
+
+def _part(item: Mapping, e: Element) -> dict:
+    """A real part's parameters; an LED's colour is its forward voltage."""
+    part = item.get("part")
+    if not part:
+        return {}
+    if e.kind.name == "led":
+        if part not in LED_COLORS:
+            raise UnknownPart(part)
+        return {"": LED_COLORS[part]}
+    catalogue = PARTS.get(e.kind.name, {})
+    if part not in catalogue:
+        raise UnknownPart(part)
+    return dict(catalogue[part])

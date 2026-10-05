@@ -629,76 +629,18 @@ def netlist_of(schematic_json: str) -> str:
         return json.dumps({"error": _error(err)}, ensure_ascii=False)
 
 
-def live(schematic_json: str) -> str:
-    """The play button of a schematic cell: the drawing compiled for the page's engine
-    (``simulation/engine.ts``), and where on the drawing each node is.
-
-    Returns JSON ``{"program": {...}, "wires": [node per wire], "pins": {id: [node per pin]}}``
-    (``null`` for a wire that touches no element), or ``{"error": {...}}`` (an error output).
-    """
+def live(problem_json: str) -> str:
+    """The play button of a schematic cell: its problem (the drawing as data, ``schematic/problem.ts``)
+    compiled for the page's engine (``simulation/engine.ts``). Returns JSON ``{"program": {...}}`` or
+    ``{"error": {...}}``."""
     from electro.core import compile_program
     from electro.core.problem.netlist import from_netlist
 
     try:
-        sch = Schematic.from_json(schematic_json)
-        program = compile_program(from_netlist(drawn_netlist(sch)).problem)
+        program = compile_program(from_netlist(json.loads(problem_json)).problem)
     except Exception as err:  # noqa: BLE001 — shown on the board
         return json.dumps({"error": _error(err)}, ensure_ascii=False)
-    names = sch.node_names()
-    return json.dumps(
-        {
-            "program": json.loads(program.to_json()),
-            "wires": [names.get(w.points[0]) for w in sch.wires],
-            "pins": {
-                e.id: [names.get(p) for p in e.pins()]
-                for e in sch.elements
-                if e.kind == "part" or e in sch.components()
-            },
-        },
-        ensure_ascii=False,
-    )
-
-
-def drawn_netlist(sch: Schematic) -> dict:
-    """The drawing as the core reads a problem: each element's text (a colour, a part, a frequency, a
-    position) read into its parameters. (Here until the page sends it so.)"""
-    return {"elements": [_with_params(item) for item in sch.drawn_netlist()]}
-
-
-def _with_params(item: dict) -> dict:
-    from electro.core import BJT_PARTS, DIODE_PARTS, LED_COLORS, OPAMP_PARTS
-
-    kind, text = item["kind"], (item.pop("text") or "").strip()
-    params: dict = {}
-    if kind == "led" and text in LED_COLORS:
-        item["value"] = LED_COLORS[text]
-    elif kind == "diode" and text in DIODE_PARTS:
-        params = DIODE_PARTS[text]
-    elif kind in ("npn", "pnp") and text in BJT_PARTS:
-        params = BJT_PARTS[text]
-    elif kind == "opamp" and text in OPAMP_PARTS:
-        item["kind"], params = "opamp_model", OPAMP_PARTS[text]
-    elif kind in ("sine_source", "square_source"):
-        params = _wave(kind, text)
-    elif kind in ("switch", "button"):
-        params = {"closed": 1 if text == "closed" else 0}
-    elif kind in ("potentiometer", "photoresistor", "thermistor") and text:
-        which = {"potentiometer": "position", "photoresistor": "lux", "thermistor": "temperature"}[kind]
-        params = {which: text.replace(",", ".")}
-    return {**item, "params": params}
-
-
-def _wave(kind: str, text: str) -> dict:
-    """``"50"``, ``"1 kHz"``, ``"50 -120°"`` (a sine's phase), ``"1k 25%"`` (a square's duty)."""
-    words = text.split()
-    params: dict = {}
-    if words and words[-1].endswith("°"):
-        params["phase"] = words.pop().rstrip("°").replace(",", ".")
-    if words and words[-1].endswith("%"):
-        params["duty"] = float(words.pop().rstrip("%").replace(",", ".")) / 100
-    if words:
-        params["f"] = " ".join(words).replace("Hz", "").strip() or ("50" if kind == "sine_source" else "1k")
-    return params
+    return json.dumps({"program": json.loads(program.to_json())}, ensure_ascii=False)
 
 
 def to_json(x):

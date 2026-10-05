@@ -1,6 +1,10 @@
 // The page's handle on the Python worker: every call is a message and a promise.
 
 import { type Progress, report } from "@/features/downloads/store";
+import { library } from "@/features/schematic/library";
+import { isComponent, key, pins } from "@/features/schematic/model";
+import { withParts } from "@/features/schematic/parts";
+import { elementsOf } from "@/features/schematic/problem";
 import type { LiveCircuit } from "@/features/simulation/engine";
 import type { Failure } from "@/shared/model/issues";
 import type { ElementResult, Output, Problem, SchematicData } from "@/shared/model/types";
@@ -85,9 +89,21 @@ class Kernel {
     return JSON.parse((await this.call("simulate", { schematic: JSON.stringify(schematic) })) as string);
   }
 
-  /** A schematic cell's play button: the drawing compiled for the live simulation (or the error in it). */
+  /** A schematic cell's play button: the drawing compiled for the live simulation (or the error in it),
+   *  and which point each of its wires and pins is on. */
   async live(schematic: SchematicData): Promise<LiveCircuit | { error: Failure }> {
-    return JSON.parse((await this.call("live", { schematic: JSON.stringify(schematic) })) as string);
+    const { elements, names } = elementsOf(schematic, library);
+    const reply = JSON.parse((await this.call("live", { problem: JSON.stringify({ elements }) })) as string);
+    if ("error" in reply) return reply;
+    const at = (p: [number, number]) => names.get(key(p)) ?? null;
+    const lib = withParts(library, schematic.parts);
+    return {
+      program: reply.program,
+      wires: schematic.wires.map((w) => at(w.points[0])),
+      pins: Object.fromEntries(
+        schematic.elements.filter((e) => isComponent(e.kind)).map((e) => [e.id, pins(e, lib).map(at)]),
+      ),
+    };
   }
 
   /** A schematic cell's frequency button: the Bode plot of the drawing (or the error in it). */
