@@ -1,8 +1,6 @@
 """Kurs 2: poznaj aplikację — notatki, rysowanie, liczenie, symulacja, płytki, własne komponenty, zapis."""
 
-from electro_schematic import Schematic, Wire
-from electro_schematic.model import Part, PartPin
-from lib import A, Drawing, Lesson, course
+from lib import A, Drawing, Lesson, Part, PartPin, course
 
 C = "2-aplikacja"
 
@@ -410,12 +408,11 @@ def switch_part() -> Part:
     inner.wire((12, 0), (12, -2))
     inner.wire((12, 4), (12, 9))
     inner.wire((7, 7), (7, 9), (12, 9))
-    sch = Schematic(inner.elements, [Wire(w) for w in inner.wires])
     return Part(
         "Klucz",
         (4, 4),
         [PartPin("IN", "left", 2), PartPin("OUT", "top", 2), PartPin("GND", "bottom", 2)],
-        sch,
+        inner,
     )
 
 
@@ -446,7 +443,7 @@ Poniżej jest klucz z lekcji o tranzystorach — już z trzema wyprowadzeniami: 
     inner = switch_part().schematic
     d = Drawing()
     d.elements = list(inner.elements)
-    d.wires = [list(w.points) for w in inner.wires]
+    d.wires = list(inner.wires)
     L.drawing("klucz_srodek", d, exercise=True)
     L.md("""
 ## Komponent na schemacie

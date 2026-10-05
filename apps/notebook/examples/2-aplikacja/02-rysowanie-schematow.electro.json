@@ -24,7 +24,6 @@
       "type": "schematic",
       "name": "do_dokonczenia",
       "schematic": {
-        "version": 1,
         "elements": [
           {
             "id": "E_1",

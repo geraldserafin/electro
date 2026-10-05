@@ -24,7 +24,6 @@
       "type": "schematic",
       "name": "mostek",
       "schematic": {
-        "version": 1,
         "elements": [
           {
             "id": "E_1",
@@ -263,14 +262,16 @@
         "A_1": {
           "value": "0 A",
           "solved": false,
-          "U": "0 V",
-          "I": "0 A",
-          "P": "0 W",
+          "U": null,
+          "I": null,
+          "P": null,
           "reversed": false
         }
       },
       "problems": [],
-      "found": {},
+      "found": {
+        "value:R_x": "200 Ω"
+      },
       "stale": false
     },
     {
@@ -283,7 +284,6 @@
       "type": "schematic",
       "name": "za_malo_danych",
       "schematic": {
-        "version": 1,
         "elements": [
           {
             "id": "E_1",
@@ -412,9 +412,9 @@
         "A_1": {
           "value": "500 mA",
           "solved": false,
-          "U": "0 V",
-          "I": "500 mA",
-          "P": "0 W",
+          "U": null,
+          "I": null,
+          "P": null,
           "reversed": false
         },
         "R_1": {
@@ -438,20 +438,33 @@
         {
           "kind": "warning",
           "issue": {
-            "type": "Underdetermined",
+            "type": "MissingData",
             "targets": [
-              "U_{R_{1}}",
               "R_{1}",
-              "U_{R_{2}}",
-              "R_{2}",
-              "V_{n3}"
+              "R_{2}"
             ],
-            "needed": null,
-            "options": []
+            "needed": 1,
+            "options": [
+              [
+                "U_{R_{1}}"
+              ],
+              [
+                "R_{1}"
+              ],
+              [
+                "V_{n3}"
+              ],
+              [
+                "R_{2}"
+              ]
+            ]
           }
         }
       ],
-      "found": {},
+      "found": {
+        "value:R_1": null,
+        "value:R_2": null
+      },
       "stale": false
     },
     {

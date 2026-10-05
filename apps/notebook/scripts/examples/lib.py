@@ -1,21 +1,23 @@
 """What the example notebooks are built with (apps/notebook/examples/<course>/NN-name.electro.json):
-a ``Lesson`` of Markdown, code and drawings, run through the notebook's kernel as "Run all" would
-(so it opens with its results) and checked; a ``Drawing`` placed by hand on the grid, its wires
-drawn by hand or routed between pins (``connect``). Run from the repo root with PYTHONPATH set
-(devenv shell): ``python apps/notebook/scripts/examples/make.py``."""
+a ``Lesson`` of Markdown, code and drawings, written as plain data; a ``Drawing`` placed by hand on the
+grid, its wires drawn by hand or routed between pins (``connect``). ``run.ts`` then runs each through the
+notebook's kernel as "Run all" would (so it opens with its results) and checks its drawings. Run from the
+repo root in devenv shell: ``python apps/notebook/scripts/examples/make.py``."""
 
 from __future__ import annotations
 
 import hashlib
 import heapq
 import json
+from dataclasses import dataclass, field, replace
 from pathlib import Path
-
-from electro_schematic import Element, Schematic, Wire, layout
 
 EXAMPLES = Path(__file__).parents[2] / "examples"
 SKETCHES = Path(__file__).parent / "sketches"
+SYMBOLS = json.loads((Path(__file__).parents[2] / "src/features/schematic/symbols.json").read_text(encoding="utf-8"))
 DATE = "2026-10-01T00:00:00Z"
+WRITTEN: list[Path] = []
+"""Every lesson saved, for ``run.ts`` to run."""
 
 
 def sketch(name: str) -> str:
@@ -33,6 +35,79 @@ def course(slug: str, title: str, description: str) -> None:
     folder.mkdir(parents=True, exist_ok=True)
     text = json.dumps({"title": title, "description": description}, ensure_ascii=False, indent=1)
     (folder / "course.json").write_text(text + "\n", encoding="utf-8")
+
+
+def _rotated(x: float, y: float, rotation: int) -> tuple[float, float]:
+    for _ in range(rotation // 90 % 4):
+        x, y = -y, x
+    return x, y
+
+
+@dataclass
+class PartPin:
+    name: str
+    side: str  # "left", "right", "top", "bottom"
+    at: int  # grid squares from the top (left, right) or the left (top, bottom)
+
+
+@dataclass
+class Part:
+    """One's own component: a box of ``size`` with ``pins`` round it, ``schematic`` inside."""
+
+    name: str
+    size: tuple[int, int]
+    pins: list[PartPin]
+    schematic: Drawing
+
+    def offsets(self) -> list[tuple[int, int]]:
+        """Each pin's place, grid squares from the box's top left corner (as ``parts.ts``)."""
+        w, h = self.size
+        place = {"left": lambda a: (-1, a), "right": lambda a: (w + 1, a), "top": lambda a: (a, -1)}
+        return [place.get(p.side, lambda a: (a, h + 1))(p.at) for p in self.pins]
+
+    def to_data(self) -> dict:
+        return {
+            "name": self.name,
+            "size": list(self.size),
+            "pins": [{"name": p.name, "side": p.side, "at": p.at} for p in self.pins],
+            "schematic": self.schematic.to_data(),
+        }
+
+
+@dataclass
+class Element:
+    """An element on the grid as the page keeps it (``ElementData``); ``definition``: a part's."""
+
+    id: str
+    kind: str
+    at: tuple[int, int]
+    rotation: int = 0
+    value: str | None = None
+    text: str | None = None
+    definition: Part | None = field(default=None, repr=False)
+
+    def pins(self) -> list[tuple[int, int]]:
+        """Where its pins are (as ``model.ts``'s ``pins``)."""
+        if self.definition is not None:
+            offsets = self.definition.offsets()
+        else:
+            grid = SYMBOLS["grid"]
+            offsets = [(px / grid, py / grid) for px, py in SYMBOLS["kinds"][self.kind]["pins"]]
+        out = []
+        for px, py in offsets:
+            dx, dy = _rotated(px, py, self.rotation)
+            out.append((round(self.at[0] + dx), round(self.at[1] + dy)))
+        return out
+
+    def to_data(self) -> dict:
+        return {
+            "id": self.id,
+            "kind": self.kind,
+            "at": list(self.at),
+            "rotation": self.rotation,
+            "value": self.value,
+            "text": self.text,
+        }
 
 
 class Lesson:
@@ -58,30 +133,19 @@ class Lesson:
         self, name: str, d: Drawing, *, joined=(), live: bool | None = None, solve: bool = False, exercise=False
     ) -> None:
         """A schematic cell with a hand-placed drawing. ``live``: it must run in time (default: unless it
-        is solved on paper); ``solve``: solved on paper, its results on it; ``exercise``: left unfinished
-        on purpose (for the reader to finish), so not checked."""
-        sch = d.finish(name, joined, not solve if live is None else live, exercise)
-        self._cell({"type": "schematic", "name": name, "schematic": json.loads(sch.to_json()), "_solve": solve})
+        is solved on paper); ``solve``: solved on paper, its results on it; ``joined``: groups of (element
+        id, pin index) that must be one point; ``exercise``: left unfinished on purpose (for the reader to
+        finish), so not checked."""
+        checks = None if exercise else {"live": not solve if live is None else live, "joined": joined, "nets": d.nets}
+        self._cell({"type": "schematic", "name": name, "schematic": d.finish(), "_solve": solve, "_checks": checks})
 
-    def circuit(self, name: str, circuit, *, solve: bool = False) -> None:
-        """A schematic cell laid out from a circuit in code (electro_schematic.layout)."""
-        sch = layout(circuit)
-        self._cell({"type": "schematic", "name": name, "schematic": json.loads(sch.to_json()), "_solve": solve})
+    def circuit(self, name: str, code: str, *, solve: bool = False) -> None:
+        """A schematic cell laid out from a circuit in code (the code view's way back)."""
+        drawing = {"elements": [], "wires": []}
+        self._cell({"type": "schematic", "name": name, "schematic": drawing, "_code": code, "_solve": solve})
 
     def save(self, *, errors_ok: bool = False) -> Path:
-        from electro_notebook import kernel
-
-        kernel.reset()
-        schematics = {c["name"]: json.dumps(c["schematic"]) for c in self.cells if c["type"] == "schematic"}
-        for cell in self.cells:
-            if cell["type"] == "code" and cell.pop("_run"):
-                cell["outputs"] = json.loads(kernel.run(cell["source"], json.dumps(schematics)))
-                bad = [o.get("data") for o in cell["outputs"] if o["type"] == "error"]
-                assert errors_ok or not bad, f"{self.name}: {cell['source']}\n→ {bad}"
-            if cell["type"] == "schematic" and cell.pop("_solve"):  # as if its run button was clicked
-                cell.update(json.loads(kernel.simulate(json.dumps(cell["schematic"]))), stale=False)
-                bad = [p for p in cell["problems"] if p["kind"] == "error"]
-                assert not bad, f"{self.name}: {cell['name']} → {bad}"
+        """Written as it is; ``run.ts`` runs it (``errors_ok``: its code may fail, on purpose)."""
         notebook = json.dumps(
             {
                 "format": "electro-notebook",
@@ -92,12 +156,14 @@ class Lesson:
                 "modified": DATE,
                 "settings": {"codeInPdf": True},
                 "cells": self.cells,
+                **({"_errors_ok": True} if errors_ok else {}),
             },
             ensure_ascii=False,
             indent=2,
         )
         path = EXAMPLES / self.course / f"{self.name}.electro.json"
         path.write_text(notebook + "\n", encoding="utf-8")
+        WRITTEN.append(path)
         print(path.relative_to(EXAMPLES.parent), len(self.cells), "cells")
         return path
 
@@ -111,12 +177,12 @@ class Drawing:
         self.wires: list[list] = []
         self.labels = 0
         self.nets: dict[str, list] = {}
-        self.parts: dict = {}  # one's own components on it (electro_schematic.Part), by key
+        self.parts: dict[str, Part] = {}  # one's own components on it, by key
 
     def add(self, *args) -> Element:
         e = Element(*args)
         if e.kind == "part":
-            e.__dict__["_definition"] = self.parts[e.text]
+            e.definition = self.parts[e.text or ""]
         self.elements.append(e)
         return e
 
@@ -144,58 +210,27 @@ class Drawing:
         return next(e for e in self.elements if e.id == id).pins()[k]
 
     def connect(self, nets: dict[str, list]):
-        """Wires for the nets (name → [(element id, pin index), …]), routed (Router); checked in finish()."""
+        """Wires for the nets (name → [(element id, pin index), …]), routed (Router); checked by ``run.ts``."""
         self.nets |= nets
         Router(self).route(nets)
 
-    def finish(self, name, joined=(), live=True, exercise=False) -> Schematic:
-        # where the drawing starts: every point a few squares from the top left (a symbol may reach
-        # 5 squares above its pins, as an HC-SR04's)
+    def to_data(self) -> dict:
+        data: dict = {
+            "elements": [e.to_data() for e in self.elements],
+            "wires": [{"points": [list(p) for p in w]} for w in self.wires],
+        }
+        if self.parts:
+            data["parts"] = {key: part.to_data() for key, part in self.parts.items()}
+        return data
+
+    def finish(self) -> dict:
+        """Moved to where a drawing starts: every point a few squares from the top left (a symbol may reach
+        5 squares above its pins, as an HC-SR04's)."""
         points = [p for e in self.elements for p in e.pins()] + [p for w in self.wires for p in w]
         dx, dy = 4 - min(x for x, _ in points), 7 - min(y for _, y in points)
-        self.elements = [
-            Element(e.id, e.kind, (e.at[0] + dx, e.at[1] + dy), e.rotation, e.value, e.text) for e in self.elements
-        ]
+        self.elements = [replace(e, at=(e.at[0] + dx, e.at[1] + dy)) for e in self.elements]
         self.wires = [[(x + dx, y + dy) for x, y in w] for w in self.wires]
-        sch = Schematic(self.elements, [Wire(w) for w in self.wires], dict(self.parts))
-        if exercise:
-            return sch
-        sch.to_circuit()  # it must be a circuit
-        from electro.devices import Board
-
-        if live:
-            from electro_notebook import kernel
-
-            compiled = json.loads(kernel.live(json.dumps(_problem(sch))))  # …that runs in time
-            assert "error" not in compiled, (name, compiled.get("error"))
-        names = sch.node_names()
-        pins = {e.id: e.pins() for e in self.elements}
-        for group in joined:  # (element id, pin index), all on one node
-            nodes = {names.get(pins[i][k]) for i, k in group}
-            assert len(nodes) == 1 and None not in nodes, (name, group, nodes)
-        # each routed net on a node of its own: no wire crossing another has joined it
-        found = {net: {names.get(pins[i][k]) for i, k in group} for net, group in self.nets.items()}
-        for net, nodes in found.items():
-            assert len(nodes) == 1 and None not in nodes, (name, net, nodes)
-        assert len({next(iter(n)) for n in found.values()}) == len(found), (name, found)
-        # every label and ground on a pin or a wire's end (on a bend or a wire's middle it joins nothing)
-        ends = {p for w in self.wires for p in (w[0], w[-1])}
-        pin_points = {p for e in self.elements if e.kind not in ("label", "ground", "port") for p in e.pins()}
-        for e in self.elements:
-            if e.kind in ("label", "ground", "port"):
-                assert e.pins()[0] in ends | pin_points, (name, e.id, e.text, "joins nothing")
-        # nothing left hanging: every pin of a component on a wire or another pin (a board's may be free)
-        touched = {p for w in self.wires for p in (w[0], w[-1])}
-        at = {}
-        for e in self.elements:
-            for p in e.pins():
-                at[p] = at.get(p, 0) + 1
-        for e in self.elements:
-            if e.kind == "part" or e.component() is None or isinstance(e.component(), Board):
-                continue
-            for p in e.pins():
-                assert p in touched or at[p] > 1, (name, e.id, "pin not connected", p)
-        return sch
+        return self.to_data()
 
 
 # ------------------------------------------------------------------ wires routed between pins
@@ -346,32 +381,8 @@ class Router:
         return None
 
 
-# a board's pins by name → index (electro_schematic: KINDS["arduino"], KINDS["pico"])
+# a board's pins by name → index (their order in symbols.json)
 UNO = {f"D{i}": i for i in range(14)} | {f"A{i}": 14 + i for i in range(6)} | {"5V": 20, "GND": 21}
 PICO = {f"GP{i}": i for i in range(23)} | {"GP26": 23, "GP27": 24, "GP28": 25, "VBUS": 26, "3V3": 27, "GND": 28}
 A = lambda pin: ("ARD_1", UNO[pin])  # noqa: E731 — an Arduino's pin in a net
 PI = lambda pin: ("PICO_1", PICO[pin])  # noqa: E731
-
-
-def _problem(sch: Schematic) -> dict:
-    """The drawing as the page sends it to be run (schematic/problem.ts)."""
-    readings = {"potentiometer": "position", "photoresistor": "lux", "thermistor": "temperature"}
-    elements = []
-    for item in sch.drawn_netlist():
-        kind, text = item["kind"], (item.pop("text") or "").strip()
-        params: dict = {}
-        if kind in ("led", "diode", "npn", "pnp", "opamp") and text:
-            item["part"] = text
-        elif kind in ("sine_source", "square_source"):
-            words = text.split()
-            if words and words[-1].endswith("%"):
-                params["duty"] = float(words.pop().rstrip("%").replace(",", ".")) / 100
-            if words and words[-1].endswith("°"):
-                params["phase"] = words.pop().rstrip("°").replace(",", ".")
-            params["f"] = " ".join(words).replace("Hz", "").strip() or ("50" if kind == "sine_source" else "1k")
-        elif kind in ("switch", "button"):
-            params["closed"] = 1 if text == "closed" else 0
-        elif kind in readings and text:
-            params[readings[kind]] = text.replace(",", ".")
-        elements.append({**item, "params": params})
-    return {"elements": elements}

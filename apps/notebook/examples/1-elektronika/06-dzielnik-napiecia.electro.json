@@ -19,7 +19,6 @@
       "type": "schematic",
       "name": "dzielnik",
       "schematic": {
-        "version": 1,
         "elements": [
           {
             "id": "E_1",
@@ -160,14 +159,16 @@
         "V_1": {
           "value": "8 V",
           "solved": true,
-          "U": "8 V",
-          "I": "0 A",
-          "P": "0 W",
+          "U": null,
+          "I": null,
+          "P": null,
           "reversed": false
         }
       },
       "problems": [],
-      "found": {},
+      "found": {
+        "value:V_1": "8 V"
+      },
       "stale": false
     },
     {
@@ -196,7 +197,6 @@
       "type": "schematic",
       "name": "suwak",
       "schematic": {
-        "version": 1,
         "elements": [
           {
             "id": "E_1",
@@ -313,7 +313,6 @@
       "type": "schematic",
       "name": "swiatlo",
       "schematic": {
-        "version": 1,
         "elements": [
           {
             "id": "E_1",
@@ -440,28 +439,30 @@
           "solved": false,
           "U": "4.168 V",
           "I": "416.8 µA",
-          "P": "1.738 mW",
+          "P": "1.737 mW",
           "reversed": false
         },
         "LDR_1": {
           "value": "10 kΩ",
           "solved": false,
-          "U": "831.6 mV",
+          "U": "831.7 mV",
           "I": "416.8 µA",
-          "P": "346.6 µW",
+          "P": "346.7 µW",
           "reversed": false
         },
         "V_1": {
-          "value": "831.6 mV",
+          "value": "831.7 mV",
           "solved": true,
-          "U": "831.6 mV",
-          "I": "0 A",
-          "P": "0 W",
+          "U": null,
+          "I": null,
+          "P": null,
           "reversed": false
         }
       },
       "problems": [],
-      "found": {},
+      "found": {
+        "value:V_1": "831.7 mV"
+      },
       "stale": false
     },
     {

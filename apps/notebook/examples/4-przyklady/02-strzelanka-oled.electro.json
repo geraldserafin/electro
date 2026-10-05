@@ -19,7 +19,6 @@
       "type": "schematic",
       "name": "strzelanka",
       "schematic": {
-        "version": 1,
         "elements": [
           {
             "id": "PICO_1",

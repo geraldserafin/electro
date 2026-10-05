@@ -8,6 +8,7 @@ import sympy as sp
 from electro.core import (
     AC,
     GND,
+    Ammeter,
     Capacitor,
     ElementTwice,
     I,
@@ -20,11 +21,13 @@ from electro.core import (
     Resistor,
     U,
     V,
+    Voltage,
     VoltageSource,
     close,
     free,
     from_netlist,
     is_closed,
+    loop,
     simulate,
     solve,
     to_netlist,
@@ -127,3 +130,11 @@ def test_written_down_and_read_back_it_solves_the_same():
     data = json.loads(json.dumps(to_netlist(p)))
     again = from_netlist(data).problem
     assert list(solve(again).answers.values()) == list(solve(p).answers.values()) == [sp.Rational(2, 5), 8]
+
+
+def test_a_meters_reading_is_written_down_as_its_value():
+    e, r, a = VoltageSource("E"), Resistor("R"), Ammeter("A_1")
+    data = to_netlist(Problem(loop(e, r, a), {r: 3, I(a): 2}))
+    assert [x.get("value") for x in data["elements"]] == [None, "3", "2"] and data["given"] == []
+    again = from_netlist(data)
+    assert solve(again.problem)(Voltage(again.elements["R"])) == 6

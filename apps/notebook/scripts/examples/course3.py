@@ -1,7 +1,6 @@
 """Kurs 3: biblioteka electro — obwody jako kod, rozwiązywanie, netlisty, prąd zmienny, twierdzenia,
-symulacja, schematy w kodzie i teoria pod spodem. (Lekcja 3, niewiadome i dziury: make_examples.py.)"""
+symulacja, schematy w kodzie i teoria pod spodem."""
 
-from electro import Capacitor, Resistor, ground, node, supply
 from lib import Lesson, course
 
 C = "3-biblioteka"
@@ -130,6 +129,241 @@ Solver najpierw **propaguje**: szuka równania z jedną niewiadomą (prawo Ohma,
 źródła…), wylicza ją i zapisuje krok — dokładnie jak na kartce. Gdy to nie wystarcza (np. w mostku),
 rozwiązuje pozostały układ równań naraz. Wszystkie liczby są dokładne (`sympy`): $\\frac{1}{3}$ zostaje
 ułamkiem, a nie 0,333….
+""")
+    L.save()
+
+
+def lesson03():
+    L = Lesson(C, "03-niewiadome-i-dziury", "3. Niewiadome i dziury")
+    L.md("""
+Każdy przykład to osobna komórka — uruchom wszystko przyciskiem **▶ Uruchom wszystko** albo pojedynczo (`Shift+Enter`).
+Wartość elementu, której nie znasz, zostawiasz pustą: `Resistor()`. Solver szuka jej z dodatkowych danych
+(`I_R_1=…`, `U_R_2=…`, `P_R_1=…`). Każda niewiadoma potrzebuje jednej **niezależnej** danej.
+""")
+
+    L.md("## 1. Nieznany opór z pomiaru napięcia")
+    L.code("""
+dzielnik = supply(12) + Resistor(100) + Resistor() + ground
+sol = dzielnik.solve(U_R_2=4, find="R_2")
+steps(sol)
+""")
+
+    L.md("""
+## 2. Nieznane źródło
+Napięcie źródła też może być niewiadomą. Tu wychodzi dodatnie — źródło jest skierowane tak, jak je narysowaliśmy.
+""")
+    L.code("""
+petla = loop(VoltageSource(), Resistor(10), Resistor(20))
+petla.solve(I_R_1="0,5", find="E_1")
+""")
+
+    L.md("""
+## 3. Minus w wyniku = odwrotna polaryzacja
+Dwa źródła w jednej pętli. Prąd 2 A przez 4 Ω daje 8 V, a pierwsze źródło ma 12 V — więc drugie musi
+*odbierać* 4 V. Ujemny wynik znaczy: to źródło jest w rzeczywistości skierowane odwrotnie niż w zapisie.
+""")
+    L.code("""
+dwa_zrodla = loop(VoltageSource(12), Resistor(4), VoltageSource())
+dwa_zrodla.solve(I_R_1=2, find="E_2")
+""")
+
+    L.md("""
+## 4. Kilka niewiadomych naraz
+Trzy niewiadome (R₁, R₃, E₂) i trzy pomiary. Gałęzie są czytane od masy w górę, a `.transpose()` przy R₂ i R₃
+sprawia, że ich napięcie i prąd liczymy „w dół” — tak, jak mierzyliśmy.
+""")
+    L.code("""
+uklad = (
+    (VoltageSource(12) + Resistor())
+    | Resistor(4).transpose()
+    | ((Resistor().transpose() | CurrentSource(1)) + VoltageSource().transpose())
+)
+sol = uklad.solve(I_R_1=2, U_R_2=8, U_R_3=5, find=["R_1", "R_3", "E_2"])
+display(schematic(uklad, sol))
+sol
+""")
+
+    L.md("""
+### 4a. Uwaga na zwrot pomiaru
+Ten sam układ **bez** `.transpose()` przy R₂ i R₃ liczy ich napięcia w górę. Te same liczby oznaczają wtedy
+co innego — i przestają do siebie pasować. Znak danej zależy od kierunku elementu.
+""")
+    L.code("""
+bez_transpose = (
+    (VoltageSource(12) + Resistor())
+    | Resistor(4)
+    | ((Resistor() | CurrentSource(1)) + VoltageSource().transpose())
+)
+try:
+    bez_transpose.solve(I_R_1=2, U_R_2=8, U_R_3=5)
+except CircuitError as e:
+    display(e)
+
+bez_transpose.solve(I_R_1=2, U_R_2=-8, U_R_3=-5, find=["R_1", "R_3", "E_2"])  # te same pomiary „w górę”
+""")
+
+    L.md("""
+## 5. Za mało danych
+Bez pomiaru na R₃ solver nie zgaduje — mówi, ilu danych brakuje i które wystarczą.
+""")
+    L.code("""
+try:
+    uklad.solve(I_R_1=2, U_R_2=8, find=["R_1", "R_3", "E_2"])
+except MissingData as e:
+    display(e)
+    print("Udało się wyznaczyć:", e.solution.answers["R_1"], "Ω")
+""")
+
+    L.md("""
+## 6. Dane, które niczego nie wnoszą
+Przy znanym R₂ = 4 Ω napięcie 4 V i prąd 1 A na R₂ to **ta sama** informacja. Dwie dane, ale jedna wiedza —
+więc przy dwóch niewiadomych dalej czegoś brakuje.
+""")
+    L.code("""
+try:
+    (supply() + Resistor() + Resistor(4) + ground).solve(U_R_2=4, I_R_2=1, find=["E_1", "R_1"])
+except MissingData as e:
+    display(e)
+""")
+
+    L.md("## 7. Sprzeczne dane\nSolver wskazuje, które dane się wykluczają.")
+    L.code("""
+try:
+    (supply(12) + Resistor(10) + Resistor(20) + ground).solve(I_R_1=1)
+except Contradiction as e:
+    display(e)
+""")
+
+    L.md("""
+## 8. Dwa rozwiązania
+Moc to $P = U \\cdot I$ — równanie kwadratowe. Opornik 2 Ω i 8 Ω dają w tej pętli tę samą moc 8 W.
+Jedna dodatkowa równość rozstrzyga.
+""")
+    L.code("""
+dwa = loop(VoltageSource(12), Resistor(), Resistor(4))
+try:
+    dwa.solve(P_R_1=8, find="R_1")
+except Ambiguous as e:
+    display(e)
+
+dwa.solve(Eq(P("R_1"), 8), Eq(U("R_1"), 2 * U("R_2")), find="R_1")  # R₁ ma dwa razy więcej napięcia niż R₂
+""")
+
+    L.md("## 9. Wynik literowy\nZamiast liczby — litera. Wynik wychodzi jako wzór.")
+    L.code("""
+(supply("E") + Resistor("R_a") + Resistor("R_b") + ground).solve(find="U_R_2")
+""")
+
+    L.md("## 10. Mostek z niewiadomą (nie da się zapisać przez `+` i `|`)")
+    L.code("""
+mostek = net(
+    (VoltageSource(10), "0", "A"),
+    (Resistor(100), "A", "B"), (Resistor(), "B", "0"),
+    (Resistor(50), "A", "C"), (Resistor(100), "C", "0"),
+    (Ammeter(), "B", "C"),
+)
+mostek.solve(I_A_1=0, find="R_2")
+""")
+
+    L.md("## 11. Nieznane źródło prądu")
+    L.code("""
+rownolegle = net((CurrentSource(), "0", "A"), (Resistor(10), "A", "0"), (Resistor(40), "A", "0"))
+rownolegle.solve(U_R_1=8, find="J_1")
+""")
+
+    L.md("""
+# Dziury: `Hole()`
+Dziura to element, o którym nie wiemy nawet, **czym** jest. Każdy liniowy dwójnik to źródło $E$ szeregowo
+z oporem $Z$, ale z jednego pomiaru nie da się ich rozdzielić — więc solver bierze **najprostszy** pasujący
+element: rezystor, potem przerwę, potem źródło. Przyjęte założenie widać w rozwiązaniu.
+""")
+
+    L.md("""
+## 12. Dziura → rezystor
+Żarówka 12 Ω ma dostać 0,5 A z akumulatora 12 V (tyle pokazuje amperomierz). Co wstawić? Uruchom schemat
+przyciskiem ▶ — albo policz to kodem, jak niżej: schemat to zmienna `zarowka`.
+""")
+    L.circuit(
+        "zarowka",
+        """E_1 = VoltageSource("E_1")
+R_1 = Resistor("R_1")
+A_1 = Ammeter("A_1")
+X_1 = Hole("X_1")
+zarowka = Problem(loop(E_1, R_1, A_1, X_1), {E_1: 12, R_1: 12, I(A_1): "0,5"})""",
+        solve=True,
+    )
+    L.code("""
+sol = zarowka.solve()
+display(schematic(zarowka, sol))
+steps(sol)
+""")
+
+    L.md(
+        "## 13. Dziura → źródło\nPrąd płynie „pod prąd” akumulatora (−1 A) — żaden opornik tego nie zrobi, to musi być ładowarka."
+    )
+    L.code("""
+ladowanie = loop(VoltageSource(12), Resistor(2), Hole())
+sol = ladowanie.solve(I_R_1=-1)
+sol["X_1"]
+""")
+
+    L.md("## 14. Dziura → przewód\nCałe 12 V odkłada się na 10 Ω (1,2 A) — w dziurze nie ma żadnego spadku napięcia.")
+    L.code("""
+loop(VoltageSource(12), Resistor(10), Hole()).solve(I_R_1="1,2")["X_1"]
+""")
+
+    L.md("## 15. Dziura → przerwa\nPrąd nie płynie wcale, a całe napięcie jest na dziurze.")
+    L.code("""
+przerwa = loop(VoltageSource(12), Resistor(10), Hole())
+sol = przerwa.solve(I_R_1=0)
+print(sol["X_1"])
+print(code(przerwa.fill(sol)))  # po wstawieniu przerwy pętla przestaje być pętlą
+""")
+
+    L.md("""
+## 16. Dwie dziury w szeregu
+Znając tylko prąd, nie da się rozdzielić, ile napięcia przypada na którą dziurę. Jedno napięcie więcej — i już.
+""")
+    L.code("""
+dwie = loop(VoltageSource(12), Hole(), Hole())
+try:
+    dwie.solve(I_E_1=1, find="U_X_1")
+except MissingData as e:
+    display(e)
+
+sol = dwie.solve(I_E_1=1, U_X_1=5)
+sol["X_1"], sol["X_2"]
+""")
+
+    L.md("## 17. Dziura i zwykła niewiadoma naraz")
+    L.code("""
+sol = loop(VoltageSource(12), Resistor(), Hole()).solve(I_E_1=1, U_R_1=4)
+sol
+""")
+
+    L.md("""
+## 18. Pomiar na schemacie: amperomierz z odczytem
+Zadanie: $I_2 = 2\\,\\mathrm{A}$, $R_1 = 3\\,Ω$, $R_2 = 18\\,Ω$, $R_3 = 3\\,Ω$, $R_4 = 6\\,Ω$ — jakie jest napięcie
+zasilające i rezystancja zastępcza? Znany prąd to **amperomierz z odczytem** `Ammeter(2)`: dana pomiarowa, a nie źródło
+prądu (`CurrentSource(2)` wymusza prąd, ale jego napięcie byłoby kolejną niewiadomą). Amperomierz bez odczytu
+(`Ammeter()`) solver sam „odczyta”. W edytorze odczyt wpisujesz w polu **Odczyt** amperomierza.
+""")
+    L.circuit(
+        "zadanie4",
+        """E = VoltageSource("E")
+R_1 = Resistor("R_1")
+R_2 = Resistor("R_2")
+A_1 = Ammeter("A_1")
+R_3 = Resistor("R_3")
+R_4 = Resistor("R_4")
+zadanie4 = Problem(loop(E, R_1, (R_2 >> A_1) | (R_3 >> R_4)), {R_1: 3, R_2: 18, I(A_1): 2, R_3: 3, R_4: 6})""",
+        solve=True,
+    )
+    L.code("""
+obciazenie = Resistor(3) + ((Resistor(18) + Ammeter(2)) | (Resistor(3) + Resistor(6)))
+zadanie = loop(VoltageSource(label="E"), obciazenie)
+print("Rz =", resistance(obciazenie), "Ω")  # odczyt amperomierza nie zmienia rezystancji
+zadanie.solve(find="E")
 """)
     L.save()
 
@@ -430,7 +664,13 @@ r = bode(filtr)
 print("f_g =", round(r.cutoffs()[0]), "Hz")
 r
 """)
-    L.circuit("filtr_rc", supply(1) + Resistor("1k") + node("wy") + Capacitor("1u") + ground)
+    L.circuit(
+        "filtr_rc",
+        """E_1 = VoltageSource("E_1")
+R_1 = Resistor("R_1")
+C_1 = Capacitor("C_1")
+filtr_rc = Problem(GND >> E_1 >> R_1 >> Node("wy") >> C_1 >> GND, {E_1: 1, R_1: "1k", C_1: "1u"})""",
+    )
     L.md("""
 ## Zmiana wartości elementu
 
@@ -483,5 +723,5 @@ task(supply(12) + Resistor(10) + Resistor(20) + ground, "I_R_1", "Jaki prąd pł
 
 if __name__ == "__main__":
     intro()
-    for lesson in (lesson01, lesson02, lesson04, lesson05, lesson06, lesson07, lesson08, lesson09, lesson10):
+    for lesson in (lesson01, lesson02, lesson03, lesson04, lesson05, lesson06, lesson07, lesson08, lesson09, lesson10):
         lesson()

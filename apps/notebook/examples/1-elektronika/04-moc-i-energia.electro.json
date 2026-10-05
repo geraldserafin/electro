@@ -24,7 +24,6 @@
       "type": "schematic",
       "name": "dwie_zarowki",
       "schematic": {
-        "version": 1,
         "elements": [
           {
             "id": "E_1",

@@ -24,7 +24,6 @@
       "type": "schematic",
       "name": "pomiar",
       "schematic": {
-        "version": 1,
         "elements": [
           {
             "id": "E_1",
@@ -169,9 +168,9 @@
         "A_1": {
           "value": "9 mA",
           "solved": true,
-          "U": "0 V",
-          "I": "9 mA",
-          "P": "0 W",
+          "U": null,
+          "I": null,
+          "P": null,
           "reversed": false
         },
         "R_1": {
@@ -185,14 +184,17 @@
         "V_1": {
           "value": "9 V",
           "solved": true,
-          "U": "9 V",
-          "I": "0 A",
-          "P": "0 W",
+          "U": null,
+          "I": null,
+          "P": null,
           "reversed": false
         }
       },
       "problems": [],
-      "found": {},
+      "found": {
+        "value:A_1": "9 mA",
+        "value:V_1": "9 V"
+      },
       "stale": false
     },
     {
@@ -221,7 +223,6 @@
       "type": "schematic",
       "name": "nieznany",
       "schematic": {
-        "version": 1,
         "elements": [
           {
             "id": "E_1",
@@ -327,9 +328,9 @@
         "A_1": {
           "value": "20 mA",
           "solved": false,
-          "U": "0 V",
-          "I": "20 mA",
-          "P": "0 W",
+          "U": null,
+          "I": null,
+          "P": null,
           "reversed": false
         },
         "R_1": {
@@ -342,7 +343,9 @@
         }
       },
       "problems": [],
-      "found": {},
+      "found": {
+        "value:R_1": "450 Ω"
+      },
       "stale": false
     },
     {

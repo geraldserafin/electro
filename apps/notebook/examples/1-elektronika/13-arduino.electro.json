@@ -24,7 +24,6 @@
       "type": "schematic",
       "name": "mruganie",
       "schematic": {
-        "version": 1,
         "elements": [
           {
             "id": "ARD_1",
@@ -110,7 +109,6 @@
       "type": "schematic",
       "name": "wejscia",
       "schematic": {
-        "version": 1,
         "elements": [
           {
             "id": "ARD_1",

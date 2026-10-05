@@ -1,17 +1,7 @@
 // Runs the notebook kernel in real Pyodide (Node), the same way the browser worker does.
-import { readFileSync } from "node:fs";
-import { loadPyodide } from "pyodide";
+import { loadKernel } from "./kernel.mjs";
 
-const bundle = JSON.parse(readFileSync(new URL("../public/py/bundle.json", import.meta.url), "utf8"));
-const py = await loadPyodide();
-await py.loadPackage(["sympy"]);
-for (const [path, source] of Object.entries(bundle)) {
-  const full = `/home/pyodide/lib/${path}`;
-  py.FS.mkdirTree(full.slice(0, full.lastIndexOf("/")));
-  py.FS.writeFile(full, source);
-}
-py.runPython("import sys; sys.path.insert(0, '/home/pyodide/lib')");
-const kernel = py.pyimport("electro_notebook.kernel");
+const kernel = await loadKernel();
 
 const run = (code) => JSON.parse(kernel.run(code, "{}"));
 const check = (name, ok, got) => {

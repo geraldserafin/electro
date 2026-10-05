@@ -19,8 +19,8 @@ i lekcje `NN-nazwa.electro.json`. Lekcja otwiera się do czytania i próbowania,
 (`/examples/<kurs>/<lekcja>`): zmiany się nie zapisują, dopóki nie dodasz jej do notatek; cały kurs
 można dodać do notatek jako folder. Lekcje generują skrypty
 w `scripts/examples/` (`python apps/notebook/scripts/examples/make.py` z katalogu głównego, w devenv shell):
-każdy schemat jest sprawdzany (obwód, symulacja w czasie, połączenia), a komórki z kodem uruchamiane.
-Lekcję „Niewiadome i dziury” (17 przypadków brzegowych solvera) generuje `scripts/make_examples.py`.
+Python zapisuje lekcje jako dane, a `run.ts` uruchamia je jak „Uruchom wszystko” (jądro w Pyodide) i sprawdza
+każdy schemat (obwód, symulacja w czasie, połączenia).
 `python/test_examples.py` pilnuje, że każda komórka działa, a `examples.test.ts` — że każdy szkic się kompiluje.
 
 ## Uruchomienie

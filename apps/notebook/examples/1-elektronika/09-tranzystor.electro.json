@@ -24,7 +24,6 @@
       "type": "schematic",
       "name": "klucz",
       "schematic": {
-        "version": 1,
         "elements": [
           {
             "id": "E_1",
@@ -238,7 +237,6 @@
       "type": "schematic",
       "name": "lampka_nocna",
       "schematic": {
-        "version": 1,
         "elements": [
           {
             "id": "E_1",

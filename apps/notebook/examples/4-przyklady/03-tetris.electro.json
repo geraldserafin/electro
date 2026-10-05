@@ -19,7 +19,6 @@
       "type": "schematic",
       "name": "tetris",
       "schematic": {
-        "version": 1,
         "elements": [
           {
             "id": "PICO_1",

@@ -24,7 +24,6 @@
       "type": "schematic",
       "name": "bramki",
       "schematic": {
-        "version": 1,
         "elements": [
           {
             "id": "E_1",
@@ -530,7 +529,6 @@
       "type": "schematic",
       "name": "zatrzask",
       "schematic": {
-        "version": 1,
         "elements": [
           {
             "id": "E_1",

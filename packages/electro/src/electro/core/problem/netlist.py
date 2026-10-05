@@ -137,12 +137,19 @@ def to_netlist(problem: Problem) -> dict:
     def q(x) -> list:
         return quantity_data(x, by, {p: names[n] for n, p in net.named})
 
+    readings = {r(e): e for e, _ in net.parts if (r := READINGS.get(e.kind.name))}
     elements = [
-        {"id": id, "kind": e.kind.name, "nodes": [names[n] for n in ns], **_value(problem.given.get(e))}
+        {"id": id, "kind": e.kind.name, "nodes": [names[n] for n in ns], **_value(_given_of(problem, e))}
         for id, (e, ns) in zip(ids, net.parts)
     ]
-    given = [[q(k), to_text(v)] for k, v in problem.given.items() if isinstance(k, Quantity)]
+    given = [[q(k), to_text(v)] for k, v in problem.given.items() if isinstance(k, Quantity) and k not in readings]
     return {"elements": elements, "given": given, "find": [q(x) for x in problem.find]}
+
+
+def _given_of(problem: Problem, e: Element) -> object:
+    """What is given of an element: its value, or a meter's reading."""
+    reading = READINGS.get(e.kind.name)
+    return problem.given.get(reading(e)) if reading else problem.given.get(e)
 
 
 def quantity_data(q, elements: Mapping[Element, str], points: Mapping[Node | Net, str]) -> list:

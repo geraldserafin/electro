@@ -19,7 +19,6 @@
       "type": "schematic",
       "name": "mostek_h",
       "schematic": {
-        "version": 1,
         "elements": [
           {
             "id": "ARD_1",
