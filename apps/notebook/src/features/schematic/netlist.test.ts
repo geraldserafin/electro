@@ -1,5 +1,5 @@
-// The drawings of the kernel's tests, read here as Python read them (fixtures/netlists.json: what
-// electro_schematic made of them before the drawing moved to the page).
+// The test drawings read as circuits (fixtures/netlists.json: what Python made of them before the drawing
+// moved to the page, kept as the answer).
 import { describe, expect, it } from "vitest";
 import type { SchematicData } from "@/shared/model/types";
 import golden from "./fixtures/netlists.json";

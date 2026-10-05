@@ -5,28 +5,23 @@ schematy, a docelowo notatnik webowy z eksportem sprawozdań do PDF.
 
 | katalog | co to jest |
 |---|---|
-| [`packages/electro`](packages/electro) | rdzeń: obwody jako morfizmy kategorii, kombinatory `+`/`\|`, solver, `find`, `Hole` |
-| [`packages/electro-schematic`](packages/electro-schematic) | rysunek na siatce: model (JSON), rysunek → obwód, auto-layout kodu, edycja (`move`, `rotate`) |
-| [`packages/electro-render`](packages/electro-render) | wygląd: biblioteka symboli (też jako JSON dla edytora), schemat → SVG, ślad rozwiązania → Markdown + LaTeX |
+| [`packages/electro`](packages/electro) | biblioteka (Python): obwody jako morfizmy kategorii (`>>`, `\|`, `@`), zadania, solver z rozwiązaniem krok po kroku, prąd zmienny, symulacja w czasie, metody (Thévenin, superpozycja, upraszczanie, Bode, tolerancje), SPICE |
 | [`packages/notes-api`](packages/notes-api) | kontrakt front ↔ backend notatek (TypeScript): schematy Effect Schema i `HttpApi` z błędami |
 | [`apps/auth-worker`](apps/auth-worker) | Cloudflare Worker: połączenie z GitHubem (code → token) i proxy gita do GitHuba (którego git nie ma CORS) |
 | [`apps/server`](apps/server) | dawny backend notatek (Effect, Postgres) — na razie nieużywany: notatki są w przeglądarce |
-| [`apps/notebook`](apps/notebook) | notatnik w przeglądarce (React + Pyodide): Markdown, kod, edytor schematów na siatce, eksport PDF |
+| [`apps/notebook`](apps/notebook) | notatnik w przeglądarce (React + Pyodide): Markdown, kod, edytor schematów na siatce, symulacja na żywo, eksport PDF |
 
-```
-electro  ◀──  electro-schematic  ◀──  electro-render  ◀──  apps/notebook (Pyodide + edytor w TS)
-solver        gdzie co leży            jak to wygląda
-```
+Python liczy, strona pokazuje: `electro` to model i matematyka, a rysunek, układanie schematu, symbole,
+wykresy i plik notatki są w TypeScripcie. Między nimi płyną tylko dane (netlista, wyniki, kroki, serie liczb).
 
 ```python
 from electro import *
-from electro_render import schematic, steps
 
-uklad = supply(12) + Resistor(10) + node("A") + shunt(Resistor()) + Resistor(5) + ground
-sol = uklad.solve(I_R_1=1, find="R_2")
-
-schematic(uklad, sol).save("uklad.svg")   # w notatniku wystarczy samo schematic(uklad, sol)
-print(steps(sol))                           # Markdown z $...$
+E, R_1, R_2, A = VoltageSource("E"), Resistor("R_1"), Resistor("R_2"), Node("A")
+uklad = Problem(GND >> E >> R_1 >> A >> R_2 >> GND, {E: 12, R_1: 10, I(R_1): 1}, [Parameter(R_2)])
+sol = solve(uklad)
+sol(Parameter(R_2))   # 2
+sol.steps             # kroki, każdy z równaniem i jego powodem
 ```
 
 ## Notatki: w przeglądarce, kopia na GitHubie

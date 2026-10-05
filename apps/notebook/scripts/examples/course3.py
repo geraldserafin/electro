@@ -1,5 +1,5 @@
-"""Kurs 3: biblioteka electro — obwody jako kod, rozwiązywanie, netlisty, prąd zmienny, twierdzenia,
-symulacja, schematy w kodzie i teoria pod spodem."""
+"""Kurs 3: biblioteka electro — obwody jako kod, rozwiązywanie, niewiadome i dziury, węzły, prąd zmienny,
+twierdzenia, symulacja, schematy w kodzie, teoria pod spodem, analizy i zadania."""
 
 from lib import Lesson, course
 
@@ -10,9 +10,10 @@ def intro():
     course(
         C,
         "Biblioteka electro",
-        "Obwody zapisane w Pythonie: szeregowo to +, równolegle to |, a solver rozwiązuje je krok po kroku, "
-        "z niewiadomymi, literami i prądem zmiennym. Do tego netlisty, twierdzenia Thévenina i Nortona, "
-        "symulacja w czasie z kodu i trochę teorii kategorii, na której to wszystko stoi.",
+        "Obwody zapisane w Pythonie: elementy łączone >> (szeregowo) i | (równolegle), zadanie z danymi "
+        "i szukanymi, a solver rozwiązuje je krok po kroku — z niewiadomymi, literami i prądem zmiennym. Do "
+        "tego twierdzenia Thévenina i superpozycji, symulacja w czasie z kodu, SPICE i trochę teorii "
+        "kategorii, na której to wszystko stoi.",
     )
 
 
@@ -21,61 +22,71 @@ def lesson01():
     L.md("""
 # Obwody jako kod
 
-W każdej komórce z kodem jest już załadowana biblioteka `electro`. Obwód buduje się z **klocków**
-(elementów) i dwóch działań:
+W każdej komórce z kodem jest już załadowana biblioteka `electro`. Najpierw tworzysz **elementy** —
+każdy z nazwą:
 
-- `a + b` — **szeregowo**: jeden za drugim,
-- `a | b` — **równolegle**: obok siebie, między tymi samymi węzłami.
+```python
+E = VoltageSource("E")
+R_1 = Resistor("R_1")
+```
 
-Każdy klocek ma zaciski z lewej i z prawej. Opornik to „1 → 1”: jeden zacisk wchodzi, jeden wychodzi.
-`supply(12)` to źródło 12 V wychodzące z masy (0 → 1), a `ground` wraca do masy (1 → 0). Cały obwód
-od masy do masy jest zamknięty (0 → 0).
+Potem łączysz je w **obwód**. To sama budowa, bez żadnych liczb:
+
+- `a >> b` — **szeregowo**: jeden za drugim,
+- `a | b` — **równolegle**: obok siebie, między tymi samymi punktami,
+- `loop(a, b, c)` — zamknięta pętla z elementów po kolei,
+- `Node("A")` — nazwany punkt, `GND` — masa.
+
+Liczby dochodzą dopiero w **zadaniu**: `Problem(obwód, {element: wartość})`. Zadanie pokazane w komórce
+to jego schemat.
 """)
     L.code("""
-uklad = supply(12) + Resistor(100) + (Resistor(200) | Resistor(300)) + ground
+E, R_1, R_2, R_3 = VoltageSource("E"), Resistor("R_1"), Resistor("R_2"), Resistor("R_3")
+uklad = Problem(loop(E, R_1, R_2 | R_3), {E: 12, R_1: 100, R_2: 200, R_3: 300})
 uklad
 """)
     L.md("""
-Wartości można pisać tak jak na schemacie: `"4.7k"`, `"4k7"`, `"0,5"`, `"100n"`. Każdy element dostaje
-nazwę sam (`R_1`, `R_2`, …), w kolejności wpisania; własną nadaje `label=`.
-
-`schematic()` rysuje obwód z kodu, a `code()` robi odwrotnie — z każdego obwodu (także
-narysowanego) pisze kod, który go buduje:
+Wartości można pisać tak jak na schemacie: `"4.7k"`, `"4k7"`, `"0,5"`, `"100n"`. Ten sam obwód da się
+rozwiązać z różnymi danymi — budowa i liczby są osobno:
 """)
     L.code("""
-schematic(uklad)
-""")
-    L.code("""
-print(code(uklad))
+for r in [100, 1000]:
+    sol = solve(Problem(loop(E, R_1, R_2 | R_3), {E: 12, R_1: r, R_2: 200, R_3: 300}))
+    print(f"R_1 = {r} Ω: prąd ze źródła {sol(I(R_1))} A")
 """)
     L.md("""
 ## Klocki
 
 | zapis | co to |
 |---|---|
-| `Resistor(10)`, `Capacitor("1u")`, `Inductor("2m")` | opornik, kondensator, cewka |
-| `VoltageSource(12)`, `CurrentSource("0,5")` | źródło napięcia (+ z prawej), źródło prądu (pcha w prawo) |
-| `Ammeter()`, `Voltmeter()` | idealne mierniki; argument to odczyt z zadania |
-| `supply(v)`, `ground` | źródło od masy; powrót do masy |
-| `shunt(x)` | element od linii do masy (linia biegnie dalej) |
-| `loop(a, b, c)` | zamknięta pętla z elementów po kolei |
-| `x.transpose()` | ten sam element odwrócony (źródło — zmiana biegunowości) |
-| `node("A")` | nazwany punkt: potem `sol.V("A")` |
+| `Resistor`, `Capacitor`, `Inductor` | opornik, kondensator, cewka |
+| `VoltageSource`, `CurrentSource` | źródło napięcia (+ na drugim końcu), źródło prądu (pcha od pierwszego do drugiego) |
+| `Ammeter`, `Voltmeter` | idealne mierniki; ich odczyt to dana `I(A_1)` albo `U(V_1)` |
+| `GND >> a >> b >> GND` | od masy do masy: zamknięty obwód |
+| `Node("A")` | nazwany punkt; ten sam obiekt w dwóch miejscach to jeden punkt |
+| `loop(a, b, c)` | pętla |
+| `flip(a)` | ten sam element odwrócony (źródło — zmiana biegunowości) |
+| `at(e, a, b)`, `beside(...)` | element między danymi punktami; kawałki obok siebie |
 
-`loop` jest najwygodniejszy do zadań z jedną pętlą, a `shunt` do „drabinek”:
+Drabinka: każdy szczebel to opornik od linii do masy. Punkty `A` i `B` są nazwane, więc łatwo zapisać,
+co gdzie dochodzi:
 """)
     L.code("""
-drabinka = supply(10) + Resistor(1) + shunt(Resistor(2)) + Resistor(1) + shunt(Resistor(2)) + Resistor(2) + ground
-print("prąd ze źródła:", drabinka.solve()["R_1"].I, "A")
-schematic(drabinka)
+E, A, B = VoltageSource("E"), Node("A"), Node("B")
+R = [Resistor(f"R_{k}") for k in range(1, 6)]
+drabinka = Problem(
+    beside(GND >> E >> R[0] >> A >> R[1] >> GND, A >> R[2] >> B >> R[3] >> GND, B >> R[4] >> GND),
+    {E: 10, R[0]: 1, R[1]: 2, R[2]: 1, R[3]: 2, R[4]: 2},
+)
+print("prąd ze źródła:", solve(drabinka)(I(R[0])), "A")
+drabinka
 """)
     L.md("""
 ## Ze schematu do kodu i z powrotem
 
-Każdy schemat w notatce jest w kodzie zmienną o swojej nazwie (np. `uklad1`) — obiektem, na którym
-działa wszystko z tej lekcji: `.solve()`, `code()`, `schematic()`. A każdy obwód z kodu można
-**narysować jako schemat do edycji**: dodaj komórkę Schemat, otwórz jej kartę **Kod**, wklej kod
-i wróć do rysunku.
+Każdy schemat w notatce jest w kodzie zmienną o swojej nazwie (np. `uklad1`) — zadaniem, na którym działa
+wszystko z tej lekcji. A każdy obwód z kodu można **narysować jako schemat do edycji**: w komórce Schemat
+otwórz kartę **Kod**, wklej kod i wróć do rysunku.
 """)
     L.save()
 
@@ -85,50 +96,57 @@ def lesson02():
     L.md("""
 # Rozwiązywanie
 
-`obwod.solve()` rozwiązuje obwód i zwraca **rozwiązanie**. Z niego odczytujesz wszystko, czego
-potrzebujesz:
+`solve(zadanie)` zwraca **rozwiązanie**. Pytasz je o wielkości:
 
-- `sol["R_1"]` — element: jego wartość, napięcie `U`, prąd `I`, moc `P`,
-- `sol["R_1"].I`, `.U`, `.P` — pojedyncze wielkości (dokładne: ułamki, pierwiastki),
-- `sol.V("A")` — potencjał nazwanego węzła, `sol.U("A", "B")` — napięcie między dwoma.
+- `sol(I(R_1))`, `sol(U(R_1))`, `sol(P(R_1))` — prąd, napięcie, moc elementu,
+- `sol(V(A))` — potencjał punktu, `sol(U(A, B))` — napięcie między dwoma,
+- `sol(Parameter(R_1))` — wartość elementu,
+- `sol("I_R_1")`, `sol("U_E / I_E")` — to samo po nazwach, także wyrażenia.
+
+Liczby są dokładne (`sympy`): $\\frac{1}{3}$ zostaje ułamkiem, a nie 0,333….
 """)
     L.code("""
-dzielnik = supply(12) + Resistor(1000) + node("wy") + shunt(Resistor(2000))
-sol = dzielnik.solve()
-print(sol["R_1"])
-print("V_wy =", sol.V("wy"), "V")
-print("moc R_2:", sol["R_2"].P, "W  ≈", float(sol["R_2"].P), "W")
+E, R_1, R_2, wy = VoltageSource("E"), Resistor("R_1"), Resistor("R_2"), Node("wy")
+dzielnik = Problem(GND >> E >> R_1 >> wy >> R_2 >> GND, {E: 12, R_1: 1000, R_2: 2000})
+sol = solve(dzielnik)
+print("V_wy =", sol(V(wy)), "V")
+print("moc R_2:", sol(P(R_2)), "W  ≈", float(sol(P(R_2))), "W")
 """)
     L.md("""
-## Dane i niewiadome
+## Dane i szukane
 
-Element bez wartości (`Resistor()`) to niewiadoma. Dane z zadania podaje się jako argumenty: nazwa
-wielkości to litera i nazwa elementu — `I_R_1` (prąd), `U_R_2` (napięcie), `P_R_1` (moc). `find=` mówi,
-czego szukasz — wtedy wynik to odpowiedź, a `steps()` pokazuje tylko potrzebne kroki.
+Element bez wartości to niewiadoma. Danymi mogą być też **wielkości**: `I(R_1): "0,5"` znaczy, że przez
+$R_1$ płynie 0,5 A. Trzeci argument `Problem` to lista **szukanych** — wtedy `sol.answers` daje odpowiedzi,
+a `steps(sol)` pokazuje rozwiązanie krok po kroku, każdy krok z uzasadnieniem.
 """)
     L.code("""
-zadanie = loop(VoltageSource(label="E"), Resistor(3), (Resistor(18) + Ammeter(2)) | (Resistor(3) + Resistor(6)))
-sol = zadanie.solve(find="E")
-sol
+E, R_1, R_2, R_3, R_4, A_1 = (VoltageSource("E"), Resistor("R_1"), Resistor("R_2"), Resistor("R_3"),
+                              Resistor("R_4"), Ammeter("A_1"))
+zadanie = Problem(
+    loop(E, R_1, (R_2 >> A_1) | (R_3 >> R_4)),
+    {R_1: 3, R_2: 18, R_3: 3, R_4: 6, I(A_1): 2},
+    [Parameter(E)],
+)
+sol = solve(zadanie)
+sol(Parameter(E))
 """)
     L.code("""
 steps(sol)
 """)
     L.md("""
-Dane mogą też być dowolnym równaniem — `Eq(...)` z wielkości `U("R_1")`, `I("R_1")`, `P("R_1")`,
-`V("A")`. Tu wiemy tylko, że na $R_1$ jest dwa razy większe napięcie niż na $R_2$:
+Danych może nie być wcale — litery też są wartościami. Wtedy wynik to wzór:
 """)
     L.code("""
-dwa = supply(9) + Resistor(300) + Resistor() + ground
-dwa.solve(Eq(U("R_1"), 2 * U("R_2")), find="R_2")
+E, R_1, R_2 = VoltageSource("E"), Resistor("R_1"), Resistor("R_2")
+solve(Problem(loop(E, R_1, R_2), {E: "E", R_1: "R_1", R_2: "R_2"}))(U(R_2))
 """)
     L.md("""
 ## Jak to działa
 
-Solver najpierw **propaguje**: szuka równania z jedną niewiadomą (prawo Ohma, prawa Kirchhoffa, prawo
-źródła…), wylicza ją i zapisuje krok — dokładnie jak na kartce. Gdy to nie wystarcza (np. w mostku),
-rozwiązuje pozostały układ równań naraz. Wszystkie liczby są dokładne (`sympy`): $\\frac{1}{3}$ zostaje
-ułamkiem, a nie 0,333….
+Każdy element to **prawo** (opornik: $U = R \\cdot I$), a punkty dokładają prawa Kirchhoffa. Solver szuka
+równania z jedną niewiadomą, wylicza ją i zapisuje krok — jak na kartce. Gdy to nie wystarcza (np.
+w mostku), rozwiązuje pozostałe równania naraz. Napięcie elementu to spadek od jego pierwszego końca do
+drugiego — także źródła: źródło 12 V ma $U = -12$ V, bo napięcie na nim rośnie.
 """)
     L.save()
 
@@ -136,152 +154,72 @@ ułamkiem, a nie 0,333….
 def lesson03():
     L = Lesson(C, "03-niewiadome-i-dziury", "3. Niewiadome i dziury")
     L.md("""
-Każdy przykład to osobna komórka — uruchom wszystko przyciskiem **▶ Uruchom wszystko** albo pojedynczo (`Shift+Enter`).
-Wartość elementu, której nie znasz, zostawiasz pustą: `Resistor()`. Solver szuka jej z dodatkowych danych
-(`I_R_1=…`, `U_R_2=…`, `P_R_1=…`). Każda niewiadoma potrzebuje jednej **niezależnej** danej.
-""")
+# Niewiadome i dziury
 
-    L.md("## 1. Nieznany opór z pomiaru napięcia")
+Wartość, której nie znasz, zostawiasz bez danej. Solver szuka jej z innych danych — każda niewiadoma
+potrzebuje jednej **niezależnej** danej.
+
+## Nieznany opór z pomiaru
+""")
     L.code("""
-dzielnik = supply(12) + Resistor(100) + Resistor() + ground
-sol = dzielnik.solve(U_R_2=4, find="R_2")
-steps(sol)
+E, R_1, R_2 = VoltageSource("E"), Resistor("R_1"), Resistor("R_2")
+dzielnik = Problem(loop(E, R_1, R_2), {E: 12, R_1: 100, U(R_2): 4}, [Parameter(R_2)])
+steps(solve(dzielnik))
 """)
-
     L.md("""
-## 2. Nieznane źródło
-Napięcie źródła też może być niewiadomą. Tu wychodzi dodatnie — źródło jest skierowane tak, jak je narysowaliśmy.
-""")
-    L.code("""
-petla = loop(VoltageSource(), Resistor(10), Resistor(20))
-petla.solve(I_R_1="0,5", find="E_1")
-""")
+## Minus w wyniku
 
-    L.md("""
-## 3. Minus w wyniku = odwrotna polaryzacja
-Dwa źródła w jednej pętli. Prąd 2 A przez 4 Ω daje 8 V, a pierwsze źródło ma 12 V — więc drugie musi
-*odbierać* 4 V. Ujemny wynik znaczy: to źródło jest w rzeczywistości skierowane odwrotnie niż w zapisie.
+Dwa źródła w jednej pętli; prąd 2 A przez 4 Ω daje 8 V, a pierwsze źródło ma 12 V. Ujemny wynik znaczy,
+że drugie źródło jest naprawdę skierowane odwrotnie niż w zapisie:
 """)
     L.code("""
-dwa_zrodla = loop(VoltageSource(12), Resistor(4), VoltageSource())
-dwa_zrodla.solve(I_R_1=2, find="E_2")
+E_1, R, E_2 = VoltageSource("E_1"), Resistor("R"), VoltageSource("E_2")
+solve(Problem(loop(E_1, R, E_2), {E_1: 12, R: 4, I(R): 2}))(Parameter(E_2))
 """)
+    L.md("""
+## Za mało danych
 
-    L.md("""
-## 4. Kilka niewiadomych naraz
-Trzy niewiadome (R₁, R₃, E₂) i trzy pomiary. Gałęzie są czytane od masy w górę, a `.transpose()` przy R₂ i R₃
-sprawia, że ich napięcie i prąd liczymy „w dół” — tak, jak mierzyliśmy.
+Solver nie zgaduje — mówi, ilu danych brakuje i które by wystarczyły:
 """)
     L.code("""
-uklad = (
-    (VoltageSource(12) + Resistor())
-    | Resistor(4).transpose()
-    | ((Resistor().transpose() | CurrentSource(1)) + VoltageSource().transpose())
-)
-sol = uklad.solve(I_R_1=2, U_R_2=8, U_R_3=5, find=["R_1", "R_3", "E_2"])
-display(schematic(uklad, sol))
-sol
-""")
-
-    L.md("""
-### 4a. Uwaga na zwrot pomiaru
-Ten sam układ **bez** `.transpose()` przy R₂ i R₃ liczy ich napięcia w górę. Te same liczby oznaczają wtedy
-co innego — i przestają do siebie pasować. Znak danej zależy od kierunku elementu.
-""")
-    L.code("""
-bez_transpose = (
-    (VoltageSource(12) + Resistor())
-    | Resistor(4)
-    | ((Resistor() | CurrentSource(1)) + VoltageSource().transpose())
-)
+E, R_1, R_2 = VoltageSource("E"), Resistor("R_1"), Resistor("R_2")
 try:
-    bez_transpose.solve(I_R_1=2, U_R_2=8, U_R_3=5)
-except CircuitError as e:
-    display(e)
-
-bez_transpose.solve(I_R_1=2, U_R_2=-8, U_R_3=-5, find=["R_1", "R_3", "E_2"])  # te same pomiary „w górę”
-""")
-
-    L.md("""
-## 5. Za mało danych
-Bez pomiaru na R₃ solver nie zgaduje — mówi, ilu danych brakuje i które wystarczą.
-""")
-    L.code("""
-try:
-    uklad.solve(I_R_1=2, U_R_2=8, find=["R_1", "R_3", "E_2"])
-except MissingData as e:
-    display(e)
-    print("Udało się wyznaczyć:", e.solution.answers["R_1"], "Ω")
-""")
-
-    L.md("""
-## 6. Dane, które niczego nie wnoszą
-Przy znanym R₂ = 4 Ω napięcie 4 V i prąd 1 A na R₂ to **ta sama** informacja. Dwie dane, ale jedna wiedza —
-więc przy dwóch niewiadomych dalej czegoś brakuje.
-""")
-    L.code("""
-try:
-    (supply() + Resistor() + Resistor(4) + ground).solve(U_R_2=4, I_R_2=1, find=["E_1", "R_1"])
+    solve(Problem(loop(E, R_1, R_2), {E: 12, R_1: 100}, [Parameter(R_2)])).answers
 except MissingData as e:
     display(e)
 """)
+    L.md("""
+## Sprzeczne dane
 
-    L.md("## 7. Sprzeczne dane\nSolver wskazuje, które dane się wykluczają.")
+Gdy danych jest za dużo i nie pasują do siebie, solver wskazuje te, które się wykluczają:
+""")
     L.code("""
 try:
-    (supply(12) + Resistor(10) + Resistor(20) + ground).solve(I_R_1=1)
+    solve(Problem(loop(E, R_1, R_2), {E: 12, R_1: 10, R_2: 20, I(R_1): 1}))
 except Contradiction as e:
     display(e)
 """)
-
     L.md("""
-## 8. Dwa rozwiązania
-Moc to $P = U \\cdot I$ — równanie kwadratowe. Opornik 2 Ω i 8 Ω dają w tej pętli tę samą moc 8 W.
-Jedna dodatkowa równość rozstrzyga.
+## Dwa rozwiązania
+
+Moc to $P = U \\cdot I$ — równanie kwadratowe. Oporniki 2 Ω i 8 Ω dają w tej pętli tę samą moc 8 W;
+jedna dana więcej rozstrzyga:
 """)
     L.code("""
-dwa = loop(VoltageSource(12), Resistor(), Resistor(4))
 try:
-    dwa.solve(P_R_1=8, find="R_1")
+    solve(Problem(loop(E, R_1, R_2), {E: 12, R_2: 4, P(R_1): 8}, [Parameter(R_1)])).answers
 except Ambiguous as e:
     display(e)
-
-dwa.solve(Eq(P("R_1"), 8), Eq(U("R_1"), 2 * U("R_2")), find="R_1")  # R₁ ma dwa razy więcej napięcia niż R₂
 """)
-
-    L.md("## 9. Wynik literowy\nZamiast liczby — litera. Wynik wychodzi jako wzór.")
-    L.code("""
-(supply("E") + Resistor("R_a") + Resistor("R_b") + ground).solve(find="U_R_2")
-""")
-
-    L.md("## 10. Mostek z niewiadomą (nie da się zapisać przez `+` i `|`)")
-    L.code("""
-mostek = net(
-    (VoltageSource(10), "0", "A"),
-    (Resistor(100), "A", "B"), (Resistor(), "B", "0"),
-    (Resistor(50), "A", "C"), (Resistor(100), "C", "0"),
-    (Ammeter(), "B", "C"),
-)
-mostek.solve(I_A_1=0, find="R_2")
-""")
-
-    L.md("## 11. Nieznane źródło prądu")
-    L.code("""
-rownolegle = net((CurrentSource(), "0", "A"), (Resistor(10), "A", "0"), (Resistor(40), "A", "0"))
-rownolegle.solve(U_R_1=8, find="J_1")
-""")
-
     L.md("""
-# Dziury: `Hole()`
-Dziura to element, o którym nie wiemy nawet, **czym** jest. Każdy liniowy dwójnik to źródło $E$ szeregowo
-z oporem $Z$, ale z jednego pomiaru nie da się ich rozdzielić — więc solver bierze **najprostszy** pasujący
-element: rezystor, potem przerwę, potem źródło. Przyjęte założenie widać w rozwiązaniu.
-""")
+# Dziury: `Hole`
 
-    L.md("""
-## 12. Dziura → rezystor
+Dziura to element, o którym nie wiemy nawet, **czym** jest. Każdy liniowy dwójnik to źródło z oporem,
+ale z jednego pomiaru nie da się ich rozdzielić — więc `fill` wstawia **najprostszy** pasujący element:
+przewód, przerwę, rezystor, a dopiero potem źródło.
+
 Żarówka 12 Ω ma dostać 0,5 A z akumulatora 12 V (tyle pokazuje amperomierz). Co wstawić? Uruchom schemat
-przyciskiem ▶ — albo policz to kodem, jak niżej: schemat to zmienna `zarowka`.
+przyciskiem ▶ — albo policz to kodem: schemat to zmienna `zarowka`.
 """)
     L.circuit(
         "zarowka",
@@ -293,60 +231,22 @@ zarowka = Problem(loop(E_1, R_1, A_1, X_1), {E_1: 12, R_1: 12, I(A_1): "0,5"})""
         solve=True,
     )
     L.code("""
-sol = zarowka.solve()
-display(schematic(zarowka, sol))
-steps(sol)
+f = fill(zarowka, zarowka["X_1"])
+print("w dziurze:", f.by.kind.name, "=", f.solution(Parameter(f.by)))
 """)
-
-    L.md(
-        "## 13. Dziura → źródło\nPrąd płynie „pod prąd” akumulatora (−1 A) — żaden opornik tego nie zrobi, to musi być ładowarka."
-    )
-    L.code("""
-ladowanie = loop(VoltageSource(12), Resistor(2), Hole())
-sol = ladowanie.solve(I_R_1=-1)
-sol["X_1"]
-""")
-
-    L.md("## 14. Dziura → przewód\nCałe 12 V odkłada się na 10 Ω (1,2 A) — w dziurze nie ma żadnego spadku napięcia.")
-    L.code("""
-loop(VoltageSource(12), Resistor(10), Hole()).solve(I_R_1="1,2")["X_1"]
-""")
-
-    L.md("## 15. Dziura → przerwa\nPrąd nie płynie wcale, a całe napięcie jest na dziurze.")
-    L.code("""
-przerwa = loop(VoltageSource(12), Resistor(10), Hole())
-sol = przerwa.solve(I_R_1=0)
-print(sol["X_1"])
-print(code(przerwa.fill(sol)))  # po wstawieniu przerwy pętla przestaje być pętlą
-""")
-
     L.md("""
-## 16. Dwie dziury w szeregu
-Znając tylko prąd, nie da się rozdzielić, ile napięcia przypada na którą dziurę. Jedno napięcie więcej — i już.
+Prąd płynący „pod prąd” akumulatora (−1 A) zrobi tylko źródło — ładowarka:
 """)
     L.code("""
-dwie = loop(VoltageSource(12), Hole(), Hole())
-try:
-    dwie.solve(I_E_1=1, find="U_X_1")
-except MissingData as e:
-    display(e)
-
-sol = dwie.solve(I_E_1=1, U_X_1=5)
-sol["X_1"], sol["X_2"]
+E, R, X = VoltageSource("E"), Resistor("R"), Hole("X")
+f = fill(Problem(loop(E, R, X), {E: 12, R: 2, I(R): -1}), X)
+print(f.by.kind.name, f.solution(Parameter(f.by)))
 """)
-
-    L.md("## 17. Dziura i zwykła niewiadoma naraz")
-    L.code("""
-sol = loop(VoltageSource(12), Resistor(), Hole()).solve(I_E_1=1, U_R_1=4)
-sol
-""")
-
     L.md("""
-## 18. Pomiar na schemacie: amperomierz z odczytem
-Zadanie: $I_2 = 2\\,\\mathrm{A}$, $R_1 = 3\\,Ω$, $R_2 = 18\\,Ω$, $R_3 = 3\\,Ω$, $R_4 = 6\\,Ω$ — jakie jest napięcie
-zasilające i rezystancja zastępcza? Znany prąd to **amperomierz z odczytem** `Ammeter(2)`: dana pomiarowa, a nie źródło
-prądu (`CurrentSource(2)` wymusza prąd, ale jego napięcie byłoby kolejną niewiadomą). Amperomierz bez odczytu
-(`Ammeter()`) solver sam „odczyta”. W edytorze odczyt wpisujesz w polu **Odczyt** amperomierza.
+## Pomiar na schemacie: amperomierz z odczytem
+
+Znany prąd to **amperomierz z odczytem**: dana pomiarowa, a nie źródło prądu (źródło prądu wymusza prąd,
+ale jego napięcie byłoby kolejną niewiadomą). W edytorze odczyt wpisujesz w polu **Odczyt** amperomierza.
 """)
     L.circuit(
         "zadanie4",
@@ -359,60 +259,52 @@ R_4 = Resistor("R_4")
 zadanie4 = Problem(loop(E, R_1, (R_2 >> A_1) | (R_3 >> R_4)), {R_1: 3, R_2: 18, I(A_1): 2, R_3: 3, R_4: 6})""",
         solve=True,
     )
-    L.code("""
-obciazenie = Resistor(3) + ((Resistor(18) + Ammeter(2)) | (Resistor(3) + Resistor(6)))
-zadanie = loop(VoltageSource(label="E"), obciazenie)
-print("Rz =", resistance(obciazenie), "Ω")  # odczyt amperomierza nie zmienia rezystancji
-zadanie.solve(find="E")
-""")
     L.save()
 
 
 def lesson04():
-    L = Lesson(C, "04-netlisty", "4. Netlisty: net() i node()")
+    L = Lesson(C, "04-wezly", "4. Węzły i netlisty")
     L.md("""
-# Netlisty
+# Węzły
 
-Nie każdy obwód da się zapisać przez `+` i `|` — mostek Wheatstone'a albo trójkąt oporników nie są ani
-szeregowe, ani równoległe (i dlatego `schematic()` nie umie ich sam ułożyć — narysuj je na schemacie).
-Na to jest `net(...)`: lista elementów, każdy z nazwami węzłów, do których
-dochodzą jego zaciski — tak jak w SPICE. Węzeł `"0"` albo `"GND"` to masa.
+Nie każdy obwód jest szeregowo-równoległy — mostek Wheatstone'a albo trójkąt oporników nie są ani jednym,
+ani drugim. Wtedy łączysz przez **nazwane punkty**: ten sam `Node` w kilku miejscach to jeden punkt.
+`at(element, a, b)` stawia element między punktami, a `beside(...)` zbiera kawałki — tak jak netlista
+w SPICE.
 """)
     L.code("""
-mostek = net(
-    (VoltageSource(10), "GND", "A"),
-    (Resistor(100), "A", "B"), (Resistor(200), "B", "GND"),
-    (Resistor(150), "A", "C"), (Resistor(150), "C", "GND"),
-    (Resistor(50), "B", "C"),
+A, B, C = Node("A"), Node("B"), Node("C")
+E, R = VoltageSource("E"), [Resistor(f"R_{k}") for k in range(1, 6)]
+mostek = Problem(
+    beside(at(E, GND, A), at(R[0], A, B), at(R[1], B, GND), at(R[2], A, C), at(R[3], C, GND), at(R[4], B, C)),
+    {E: 10, R[0]: 100, R[1]: 200, R[2]: 150, R[3]: 150, R[4]: 50},
 )
-sol = mostek.solve()
-print("U_BC =", sol.U("B", "C"), "V,  prąd przez mostek:", sol["R_5"].I, "A")
+sol = solve(mostek)
+print("U_BC =", sol(U(B, C)), "V,  prąd przez mostek:", sol(I(R[4])), "A")
 """)
     L.md("""
-Elementy o więcej niż dwóch zaciskach podaje się tak samo — węzeł na każdy zacisk. Wzmacniacz
-operacyjny (`OpAmp`) ma trzy: wejście nieodwracające, odwracające i wyjście. Tu wzmacniacz odwracający
+Elementy o więcej niż dwóch zaciskach podaje się tak samo — punkt na każdy zacisk. Idealny wzmacniacz
+operacyjny `OpAmp` ma wejście nieodwracające, odwracające i wyjście. Tu wzmacniacz odwracający
 o wzmocnieniu $-\\frac{R_2}{R_1} = -10$:
 """)
     L.code("""
-wzmacniacz = net(
-    (VoltageSource("0,5"), "GND", "we"),
-    (Resistor(1000), "we", "minus"),
-    (Resistor(10000), "minus", "wy"),
-    (OpAmp(), "GND", "minus", "wy"),
-    (Resistor(2000), "wy", "GND"),
+we, minus, wy = Node("we"), Node("minus"), Node("wy")
+E, R_1, R_2, R_L, OA = VoltageSource("E"), Resistor("R_1"), Resistor("R_2"), Resistor("R_L"), OpAmp("OA")
+wzmacniacz = Problem(
+    beside(at(E, GND, we), at(R_1, we, minus), at(R_2, minus, wy), at(OA, GND, minus, wy), at(R_L, wy, GND)),
+    {E: "0,5", R_1: 1000, R_2: 10000, R_L: 2000},
 )
-print("U_wy =", wzmacniacz.solve().V("wy"), "V")
+print("U_wy =", solve(wzmacniacz)(V(wy)), "V")
 """)
     L.md("""
-## `node()` w zapisie z `+`
+## Netlista
 
-W zapisie szeregowym `node("A")` nazywa punkt, żeby potem odczytać jego potencjał. Dwa punkty o tej
-samej nazwie są jednym węzłem — także wtedy, gdy leżą w różnych częściach wyrażenia:
+Każdy obwód ma swoją **netlistę**: elementy i punkty, do których dochodzą ich zaciski. `to_netlist`
+zapisuje zadanie jako dane (tak schemat w notatce rozmawia z biblioteką), `from_netlist` czyta je z
+powrotem:
 """)
     L.code("""
-z_nazwami = supply(12) + Resistor(10) + node("A") + shunt(Resistor(20)) + Resistor(5) + node("B") + shunt(Resistor(15))
-sol = z_nazwami.solve()
-print("V_A =", sol.V("A"), " V_B =", sol.V("B"))
+to_netlist(mostek)
 """)
     L.save()
 
@@ -422,33 +314,35 @@ def lesson05():
     L.md("""
 # Prąd zmienny: wskazy
 
-Przy napięciu sinusoidalnym kondensator i cewka zachowują się jak „opory”, które zależą od
-częstotliwości — **impedancje**:
+Przy napięciu sinusoidalnym kondensator i cewka zachowują się jak „opory” zależne od częstotliwości —
+**impedancje**:
 
 $$Z_C = \\frac{1}{j\\omega C} \\qquad Z_L = j\\omega L \\qquad \\omega = 2\\pi f$$
 
-`solve(omega=...)` liczy obwód metodą **wskazów** (liczb zespolonych): moduł to amplituda, a argument —
-przesunięcie fazy. Bez `omega` liczony jest stan ustalony przy prądzie stałym (kondensator to przerwa,
-cewka — przewód).
+Zadanie ze źródłem sinusoidalnym (`SineSource`: amplituda, częstotliwość `f` i faza `phase` w stopniach)
+liczy się samo metodą **wskazów** — liczb zespolonych: moduł to amplituda, a argument to przesunięcie fazy.
 """)
     L.code("""
-import math
-f = 50
-rc = supply(10) + Resistor(1000) + node("wy") + shunt(Capacitor("3.3u"))
-wy = rc.solve(omega=2 * math.pi * f).V("wy")
-print("U_wy =", complex(wy))
-print(f"amplituda {abs(complex(wy)):.2f} V, faza {math.degrees(math.atan2(complex(wy).imag, complex(wy).real)):.1f}°")
+import cmath, math
+S, R, C, wy = SineSource("S"), Resistor("R"), Capacitor("C"), Node("wy")
+rc = Problem(GND >> S >> R >> wy >> C >> GND, {S: {"": 10, "f": 50}, R: 1000, C: "3.3u"})
+u = complex(solve(rc)(V(wy)))
+print(f"amplituda {abs(u):.2f} V, faza {math.degrees(cmath.phase(u)):.1f}°")
 """)
     L.md("""
 ## Charakterystyka filtru
 
-Filtr RC przepuszcza niskie częstotliwości, a tłumi wysokie. Częstotliwość graniczna
-$f_g = \\frac{1}{2\\pi RC} \\approx 48$ Hz — tam zostaje $\\frac{1}{\\sqrt 2} \\approx 71\\%$ amplitudy:
+Częstotliwość można też podać wprost: `solve(zadanie, AC(ω))` liczy wskazy przy $\\omega$, a zwykłe
+źródło napięcia jest wtedy wskazem o swojej wartości. Filtr RC przepuszcza niskie częstotliwości, a tłumi
+wysokie; częstotliwość graniczna $f_g = \\frac{1}{2\\pi RC} \\approx 48$ Hz — tam zostaje
+$\\frac{1}{\\sqrt 2} \\approx 71\\%$ amplitudy:
 """)
     L.code("""
+E = VoltageSource("E")
+filtr = Problem(GND >> E >> R >> wy >> C >> GND, {E: 10, R: 1000, C: "3.3u"})
 for f in [5, 20, 48, 100, 500, 2000]:
-    wy = complex(rc.solve(omega=2 * math.pi * f).V("wy"))
-    print(f"{f:>5} Hz: {abs(wy) / 10 * 100:5.1f}% ", "█" * round(abs(wy) * 4))
+    u = abs(complex(solve(filtr, AC(2 * math.pi * f))(V(wy))))
+    print(f"{f:>5} Hz: {u / 10 * 100:5.1f}% ", "█" * round(u * 4))
 """)
     L.md("""
 ## Rezonans
@@ -457,56 +351,72 @@ Cewka i kondensator razem mają częstotliwość, przy której ich impedancje si
 $f_0 = \\frac{1}{2\\pi\\sqrt{LC}}$. W obwodzie szeregowym RLC prąd jest wtedy największy:
 """)
     L.code("""
-L_, C_ = 0.01, 1e-6
-f0 = 1 / (2 * math.pi * math.sqrt(L_ * C_))
+E, R, L_, C_ = VoltageSource("E"), Resistor("R"), Inductor("L"), Capacitor("C")
+rlc = Problem(loop(E, R, L_, C_), {E: 1, R: 10, L_: 0.01, C_: 1e-6})
+f0 = 1 / (2 * math.pi * math.sqrt(0.01 * 1e-6))
 print(f"f0 = {f0:.0f} Hz")
-rlc = loop(VoltageSource(1), Resistor(10), Inductor(L_), Capacitor(C_))
 for f in [0.5 * f0, 0.9 * f0, f0, 1.1 * f0, 2 * f0]:
-    i = abs(complex(rlc.solve(omega=2 * math.pi * f)["R_1"].I))
+    i = abs(complex(solve(rlc, AC(2 * math.pi * f))(I(R))))
     print(f"{f:7.0f} Hz: I = {i * 1000:6.2f} mA")
 """)
     L.save()
 
 
 def lesson06():
-    L = Lesson(C, "06-twierdzenia", "6. Thévenin, Norton i czarne skrzynki")
+    L = Lesson(C, "06-twierdzenia", "6. Thévenin, superpozycja i czarne skrzynki")
     L.md("""
 # Twierdzenia o obwodach
 
-**Twierdzenie Thévenina:** każdy liniowy obwód widziany z dwóch zacisków zachowuje się jak jedno źródło
-napięcia $E_{th}$ z jednym opornikiem $R_{th}$. **Norton:** albo jak źródło prądu z opornikiem
-równolegle. To ogromne uproszczenie: zamiast liczyć cały obwód dla każdego obciążenia, liczysz go raz.
-
-`equivalent(obwod)` znajduje $E_{th}$ i $R_{th}$ obwodu „1 zacisk wychodzi”, a `resistance()` — opór
-zastępczy.
+**Twierdzenie Thévenina:** każdy liniowy obwód widziany z dwóch punktów zachowuje się jak jedno źródło
+napięcia $E_{th}$ z jednym opornikiem $R_{th}$. To ogromne uproszczenie: zamiast liczyć cały obwód dla
+każdego obciążenia, liczysz go raz. `between(zadanie, A, B)` patrzy na zadanie z punktów `A` i `B`,
+a `thevenin(...)` daje $E_{th}$ i $R_{th}$:
 """)
     L.code("""
-zrodlo = supply(12) + Resistor(10) + shunt(Resistor(10)) + Resistor(5)
-equivalent(zrodlo)
+E, R_1, R_2, A = VoltageSource("E"), Resistor("R_1"), Resistor("R_2"), Node("A")
+dzielnik = Problem(GND >> E >> R_1 >> A >> R_2 >> GND, {E: 12, R_1: 10, R_2: 10})
+thevenin(between(dzielnik, A, GND))
 """)
     L.md("""
-Dzielnik 12 V z dwóch oporników 10 Ω i szeregowy 5 Ω to dla obciążenia po prostu 6 V przez 10 Ω.
-Sprawdź: obciążenie 10 Ω dostanie połowę z 6 V — 3 V.
+Dzielnik 12 V z dwóch oporników 10 Ω to dla obciążenia po prostu 6 V przez 5 Ω.
+
+## Superpozycja
+
+W obwodzie liniowym każde źródło działa niezależnie: wynik to suma tego, co daje każde źródło samo
+(pozostałe wyłączone). `superposition` liczy te części:
 """)
     L.code("""
-(zrodlo + Resistor(10, label="R_obc") + ground).solve()["R_obc"]
+J = CurrentSource("J")
+dwa_zrodla = Problem(beside(GND >> E >> R_1 >> A, A >> R_2 >> GND, GND >> J >> A), {E: 12, R_1: 10, R_2: 10, J: 1})
+s = superposition(dwa_zrodla, U(R_2))
+for zrodlo, czesc in s.parts:
+    print(f"samo {zrodlo.name}: {czesc} V")
+print("razem:", s.total, "V")
 """)
     L.md("""
 ## Czarna skrzynka
 
-`blackbox(obwod)` eliminuje wszystko, co jest w środku, i zostawia tylko **relację na zaciskach**:
-równania wiążące napięcia i prądy na brzegach. Dwa obwody są równoważne dokładnie wtedy, gdy mają tę
-samą czarną skrzynkę — tak wyrażają się twierdzenia Thévenina i Nortona.
+`blackbox(kawałek)` eliminuje wszystko, co jest w środku, i zostawia tylko **relację na końcach**:
+równanie wiążące napięcie i prąd na brzegach. Dwa kawałki są równoważne dokładnie wtedy, gdy mają tę samą
+czarną skrzynkę. `resistance` mówi, jakim jednym opornikiem jest kawałek — liczy to, a nie zna wzoru:
 """)
     L.code("""
-blackbox(Resistor(10) | Resistor(10))
-""")
-    L.code("""
-blackbox(Resistor(5))
+R_1, R_2 = Resistor("R_1"), Resistor("R_2")
+print("szeregowo: ", resistance(blackbox(R_1 >> R_2)))
+print("równolegle:", resistance(blackbox(R_1 | R_2)))
 """)
     L.md("""
-Obie skrzynki są identyczne: dwa oporniki 10 Ω równolegle i jeden opornik 5 Ω są — widziane z zacisków —
-tym samym obwodem.
+## Upraszczanie jak w zeszycie
+
+`simplify` zastępuje dwa elementy jednym — szeregowo, równolegle, źródła szeregowo — dopóki się da,
+i zapisuje każdy krok:
+""")
+    L.code("""
+E, R_1, R_2, R_3 = VoltageSource("E"), Resistor("R_1"), Resistor("R_2"), Resistor("R_3")
+mniejszy, kroki = simplify(Problem(loop(E, R_1, R_2 | R_3), {E: 12, R_1: 4, R_2: 2, R_3: 3}, [I(R_1)]))
+for k in kroki:
+    print(f"{k.how}: {' i '.join(e.name for e in k.replaced)} → {k.by.name} = {k.amount} Ω")
+mniejszy
 """)
     L.save()
 
@@ -516,55 +426,58 @@ def lesson07():
     L.md("""
 # `simulate()`
 
-Obwody z diodami, tranzystorami i układami scalonymi liczy się w czasie. `simulate(obwod, t=...)` liczy
-przebiegi od chwili włączenia (kondensatory puste) do czasu `t` sekund i zwraca **ślad**:
+Obwody z diodami, tranzystorami i układami scalonymi liczy się w czasie. `simulate(zadanie, until=...)`
+liczy przebiegi od chwili włączenia (kondensatory puste) do `until` sekund i zwraca **ślad**:
 
-- `slad.at(0.5)` — wszystkie wielkości w chwili 0,5 s (słownik),
-- `slad["I_R_1"]`, `slad.V("A")`, `slad.U("C_1")` — cały przebieg jednej wielkości,
-- `slad.plot("V_A", "I_R_1")` — wykres.
+- `slad(V(A))`, `slad("I_R_1")` — cały przebieg jednej wielkości,
+- `slad.at("V_A", 0.5)` — wartość w chwili 0,5 s,
+- `plot(slad, "V_A", "I_R_1")` — wykres.
 
-Elementy „tylko w czasie” to m.in. `Diode()`, `LED("green")`, `Zener(5.1)`, `NPN()`, `PNP()`, `NMOS()`,
-`PMOS()`, `Timer555()`, `Lamp(12)`, `Motor()`, `Relay()`, bramki `AND()`, `OR()`, `NOT()`, `XOR()`,
-`NAND()`, `NOR()` i źródła `SineSource(amplituda, frequency=...)`, `SquareSource(poziom, frequency=..., duty=...)`.
+Elementy „tylko w czasie” to m.in. `Diode`, `LED`, `Zener`, `NPN`, `PNP`, `NMOS`, `PMOS`, `Timer555`,
+`Lamp`, `Motor`, `Relay`, bramki `AND`, `OR`, `NOT`, `XOR`, `NAND`, `NOR` i źródła `SineSource`,
+`SquareSource`.
 """)
     L.code("""
-prostownik = net(
-    (SineSource(10, frequency=50), "GND", "we"),
-    (Diode(), "we", "wy"),
-    (Capacitor("220u"), "wy", "GND"),
-    (Resistor(1000), "wy", "GND"),
+S, D, C, R = SineSource("S"), Diode("D"), Capacitor("C"), Resistor("R")
+we, wy = Node("we"), Node("wy")
+prostownik = Problem(
+    beside(at(S, GND, we), at(D, we, wy), at(C, wy, GND), at(R, wy, GND)),
+    {S: {"": 10, "f": 50}, C: "220u", R: 1000},
 )
-slad = simulate(prostownik, t=0.1)
-print("tętnienia:", round(max(slad.V("wy")[-400:]) - min(slad.V("wy")[-400:]), 2), "V")
-slad.plot("V_we", "V_wy")
+slad = simulate(prostownik, until=0.1)
+koniec = slad(V(wy))[-400:]
+print("tętnienia:", round(max(koniec) - min(koniec), 2), "V")
+plot(slad, "V_we", "V_wy")
 """)
     L.md("""
 ## Wejścia
 
 Łączniki, przyciski, potencjometry i czujniki mają **wejścia**, które podajesz w `inputs`: liczbą albo
-funkcją czasu. Nazwy: `S_1_closed` (0/1), `P_1_position` (0–1), `LDR_1_lux`, `RT_1_temperature`.
-Tu łącznik zamyka się po 10 ms, a silnik rusza:
+funkcją czasu. Nazwy: `S_1_closed` (0/1), `P_1_position` (0–1), `LDR_1_lux`, `RT_1_temperature`. Tu
+łącznik zamyka się po 10 ms, a silnik rusza:
 """)
     L.code("""
-naped = net((VoltageSource(6), "GND", "a"), (Switch(), "a", "b"), (Motor(), "b", "GND"))
-slad = simulate(naped, t=0.3, inputs={"S_1_closed": lambda t: 1 if t > 0.01 else 0})
-print(f"obroty po 0,3 s: {slad.at(0.3)['w_M_1'] * 60 / 6.283:.0f} obr./min")
-slad.plot("I_M_1")
+E, S_1, M_1 = VoltageSource("E"), Switch("S_1"), Motor("M_1")
+naped = Problem(loop(E, S_1, M_1), {E: 6})
+slad = simulate(naped, until=0.3, inputs={"S_1_closed": lambda t: 1 if t > 0.01 else 0})
+print(f"prąd po 0,3 s: {slad.at('I_M_1', 0.3) * 1000:.0f} mA")
+plot(slad, "I_M_1")
 """)
     L.md("""
 ## Bramki logiczne
 
-Bramki pracują przy 5 V względem masy. Pierścień z trzech negacji i kondensatorów to **generator**:
-każda bramka odwraca sygnał poprzedniej, a kondensatory opóźniają zmiany — więc stan nigdy się nie
-ustala.
+Bramki pracują przy 5 V względem masy. Pierścień z trzech negacji i kondensatorów to **generator**: każda
+bramka odwraca sygnał poprzedniej, a kondensatory opóźniają zmiany — więc stan nigdy się nie ustala.
 """)
     L.code("""
-pierscien = net(
-    (NOT(), "a", "b1"), (Resistor(1000), "b1", "b"), (Capacitor("1u"), "b", "GND"),
-    (NOT(), "b", "c1"), (Resistor(1000), "c1", "c"), (Capacitor("1u"), "c", "GND"),
-    (NOT(), "c", "a1"), (Resistor(1000), "a1", "a"), (Capacitor("1u"), "a", "GND"),
-)
-simulate(pierscien, t=0.02).plot("V_a")
+a, b, c = Node("a"), Node("b"), Node("c")
+kawalki, dane = [], {}
+for k, (z, do) in enumerate([(a, b), (b, c), (c, a)], 1):
+    n, r, cap, srodek = NOT(f"N_{k}"), Resistor(f"R_{k}"), Capacitor(f"C_{k}"), Node()
+    kawalki += [at(n, z, srodek), at(r, srodek, do), at(cap, do, GND)]
+    dane |= {r: 1000, cap: "1u"}
+pierscien = Problem(beside(*kawalki), dane)
+plot(simulate(pierscien, until=0.02), "V_a")
 """)
     L.save()
 
@@ -574,28 +487,25 @@ def lesson08():
     L.md("""
 # Schematy w kodzie
 
-Każdy schemat z notatki jest w kodzie zmienną o swojej nazwie — obiektem `Schematic`. Działa na nim
-wszystko, co na obwodzie z kodu: `.solve()`, `simulate()`, `code()`, `schematic()`. Nazwa ze spacjami
-i polskimi znakami zamienia się w zmienną bez nich: „Układ 1” to `układ1`. Można też sięgnąć po
-schemat po nazwie: `schemat("Układ 1")`.
+Każdy schemat z notatki jest w kodzie zmienną o swojej nazwie — zadaniem (`Problem`) z tym, co na
+rysunku: wartościami, odczytami mierników, strzałkami z danymi i szukanymi. Nazwa ze spacjami i polskimi
+znakami zamienia się w zmienną bez nich: „Układ 1” to `układ1`. Można też sięgnąć po schemat po nazwie:
+`schemat("Układ 1")`. Jego elementy mają nazwy z rysunku: `uklad1["R_1"]` to opornik, a `sol("I_R_1")` jego
+prąd.
 
-`schematic(obwod, sol)` rysuje obwód z wynikami rozwiązania przy elementach — do sprawozdania:
+`schematic(zadanie, sol)` rysuje obwód z wynikami przy elementach — do sprawozdania:
 """)
     L.code("""
-zadanie = loop(VoltageSource(12), Resistor(4), Resistor(2) | Resistor(3))
-schematic(zadanie, zadanie.solve())
+E, R_1, R_2, R_3 = VoltageSource("E"), Resistor("R_1"), Resistor("R_2"), Resistor("R_3")
+zadanie = Problem(loop(E, R_1, R_2 | R_3), {E: 12, R_1: 4, R_2: 2, R_3: 3})
+schematic(zadanie, solve(zadanie))
 """)
     L.md("""
-## `layout()`: kod → rysunek
+## Widok kodu
 
-`layout(obwod)` układa obwód z kodu na siatce i zwraca `Schematic` — ten sam rodzaj obiektu, co
-narysowany ręcznie. Można go dalej zmieniać: przesuwać elementy, obracać, zapisać do JSON-a:
-""")
-    L.code("""
-rys = layout(supply(9) + Resistor(100) + (Resistor(200) | Resistor(300)) + ground)
-print([(e.id, e.kind, e.at) for e in rys.elements])
-rys.move("R_1", (6, -2))
-rys
+Karta **Kod** w komórce schematu pokazuje rysunek jako kod — taki jak w tych lekcjach — a po zmianie kodu
+rysuje go z powrotem. Gdy zmieniasz tylko wartości, rysunek zostaje, jaki był. Działa też netlista SPICE:
+wklej `uklad = from_spice(\"\"\"...\"\"\")` (z LTspice: *View → SPICE Netlist*).
 """)
     L.save()
 
@@ -605,40 +515,37 @@ def lesson09():
     L.md("""
 # Co jest pod spodem
 
-Ta lekcja jest dla ciekawych — nie trzeba jej znać, żeby korzystać z biblioteki. `electro` traktuje
-obwody jako **morfizmy kategorii hipergrafowej**. Brzmi groźnie, ale znaczy coś prostego: obwód to
-„pudełko z zaciskami po lewej i prawej”, a jedyne, co z pudełkami robimy, to składanie.
+Ta lekcja jest dla ciekawych — nie trzeba jej znać, żeby korzystać z biblioteki. `electro` traktuje obwody
+jako **morfizmy kategorii hipergrafowej**. Brzmi groźnie, ale znaczy coś prostego: obwód to „pudełko
+z końcami po lewej i prawej”, a jedyne, co z pudełkami robimy, to składanie.
 
-```
-Obwód (drzewo składni)  ──netlista──►  Netlista (kospan)  ──semantyka──►  równania / relacje
-```
-
-- **Obiekty** to liczby naturalne — ile zacisków. **Morfizmy** to obwody: $m \\to n$.
-- `f + g` to **złożenie** (szeregowo): prawe zaciski `f` sklejone z lewymi `g`.
+- **Obiekty** to liczby naturalne — ile końców. **Morfizmy** to obwody: $m \\to n$. Opornik to $1 \\to 1$.
+- `f >> g` to **złożenie** (szeregowo): prawe końce `f` sklejone z lewymi `g`.
 - `f @ g` to **iloczyn monoidalny**: obok siebie, bez połączenia.
-- **Węzeł** to *pająk* algebry Frobeniusa: `split` rozdziela jeden przewód na dwa, `join` łączy dwa
-  w jeden. Równanie $\\mathrm{split} + \\mathrm{join} = \\mathrm{wire}$ to fizycznie I prawo Kirchhoffa
-  (prądy się sumują) i to, że węzeł ma jeden potencjał.
-- **Równolegle** nie jest osobnym działaniem, tylko skrótem: `f | g = split + (f @ g) + join`.
-- `f.transpose()` zamienia lewą stronę z prawą (*sztylet*).
+- **Punkt** to *pająk* algebry Frobeniusa: `wire` ($1 \\to 1$), `cap` ($0 \\to 2$), `cup` ($2 \\to 0$)
+  i każdy inny z dowolną liczbą końców. Że pająki się sklejają, to fizycznie I prawo Kirchhoffa (prądy się
+  sumują) i jeden potencjał w punkcie.
+- **Pętla** nie jest osobnym działaniem: `loop(a, b)` to `cap >> ((a >> b) @ wire) >> cup`, a `flip(f)`
+  to `f` zgięty przez `cap` i `cup` — transpozycja.
 """)
     L.code("""
-rownolegle = split + (Resistor(10) @ Resistor(10)) + join
-print("split + (R @ R) + join:", resistance(rownolegle), "Ω")
-print("R | R:                 ", resistance(Resistor(10) | Resistor(10)), "Ω")
+R_1, R_2 = Resistor("R_1"), Resistor("R_2")
+petla = cap >> ((R_1 >> R_2) @ wire) >> cup
+print(netlist(petla).parts)
+print(netlist(loop(R_1, R_2)).parts)
 """)
     L.md("""
 ## Semantyka
 
-Każdy element to **relacja** między potencjałami i prądami na zaciskach (opornik: $U = RI$), a obwód
-złożony z elementów — relacja złożona z relacji. `blackbox` eliminuje zmienne wewnętrzne i zostawia
-relację na brzegu: dwa obwody są równoważne, gdy mają tę samą czarną skrzynkę. Złożenie w kategorii
-obwodów przechodzi na złożenie relacji — dlatego solver może pracować na dowolnie złożonych kawałkach
-i zawsze dostanie ten sam wynik, jakby liczył całość.
+Każdy element to **relacja** między potencjałami i prądami na końcach (opornik: $U = RI$), a obwód złożony
+z elementów — relacja złożona z relacji. `blackbox` eliminuje zmienne wewnętrzne i zostawia relację na
+brzegu: dwa obwody są równoważne, gdy mają tę samą czarną skrzynkę. Złożenie w kategorii obwodów przechodzi
+na złożenie relacji — dlatego solver może pracować na dowolnie złożonych kawałkach i zawsze dostanie ten
+sam wynik, jakby liczył całość.
 
-**Netlista** to kospan: zaciski lewe → węzły ← zaciski prawe. Złożenie `+` to wypchnięcie (*pushout*):
-sklejenie węzłów. Schemat narysowany na siatce jest jeszcze jedną składnią tego samego — dwa zaciski
-w tym samym punkcie siatki to jeden węzeł, dokładnie jak dwa zaciski z tą samą nazwą w `net(...)`.
+**Netlista** to kospan: końce lewe → punkty ← końce prawe. Złożenie `>>` to wypchnięcie (*pushout*):
+sklejenie punktów. Schemat narysowany na siatce jest jeszcze jedną składnią tego samego — dwa zaciski
+w tym samym punkcie siatki to jeden punkt, dokładnie jak ten sam `Node` w dwóch miejscach kodu.
 
 Po więcej: John Baez i Brendan Fong, *A Compositional Framework for Passive Linear Networks* (2015).
 """)
@@ -650,19 +557,18 @@ def lesson10():
     L.md("""
 # Analizy i zadania
 
-Poza rozwiązaniem jednego układu `electro` robi kilka analiz, które liczą ten sam układ setki razy —
-szybko, bo układ jest kompilowany raz, a potem tylko podstawiane są liczby.
+Poza rozwiązaniem jednego układu `electro` robi analizy, które liczą ten sam układ setki razy — szybko, bo
+układ jest rozwiązany raz, z literą w miejscu tego, co się zmienia, a potem tylko podstawiane są liczby.
 
 ## Charakterystyka częstotliwościowa
 
-`bode(układ)` rysuje wzmocnienie w dB i fazę od 10 Hz do 1 MHz, z zaznaczoną częstotliwością graniczną
-$f_g$ (−3 dB). Domyślnie dla nazwanych węzłów, względem źródła. Na schemacie to samo robi przycisk ∿.
+`bode(zadanie)` rysuje wzmocnienie w dB i fazę od 10 Hz do 1 MHz, z zaznaczoną częstotliwością graniczną
+$f_g$ (−3 dB) — dla nazwanych punktów, względem źródła. Na schemacie to samo robi przycisk ∿.
 """)
     L.code("""
-filtr = supply(1) + Resistor("1k") + node("wy") + Capacitor("1u") + ground
-r = bode(filtr)
-print("f_g =", round(r.cutoffs()[0]), "Hz")
-r
+E, R, C, wy = VoltageSource("E"), Resistor("R"), Capacitor("C"), Node("wy")
+filtr = Problem(GND >> E >> R >> wy >> C >> GND, {E: 1, R: "1k", C: "1u"})
+bode(filtr)
 """)
     L.circuit(
         "filtr_rc",
@@ -674,36 +580,29 @@ filtr_rc = Problem(GND >> E_1 >> R_1 >> Node("wy") >> C_1 >> GND, {E_1: 1, R_1: 
     L.md("""
 ## Zmiana wartości elementu
 
-`sweep(układ, "R_2", (od, do))` pokazuje, jak wyjścia zależą od wartości jednego elementu:
+`sweep(zadanie, element, wartości, wielkość)` pokazuje, jak wynik zależy od wartości jednego elementu:
 """)
     L.code("""
-dzielnik = supply(12) + Resistor("1k") + node("A") + Resistor() + ground
-sweep(dzielnik, "R_2", ("100", "10k"))
+E, R_1, R_2, A = VoltageSource("E"), Resistor("R_1"), Resistor("R_2"), Node("A")
+dzielnik = Problem(GND >> E >> R_1 >> A >> R_2 >> GND, {E: 12, R_1: "1k", R_2: "1k"})
+s = sweep(dzielnik, R_2, [100, 1000, 10000], V(A))
+for r, u in zip(s.values, s.results):
+    print(f"R_2 = {int(r):>5} Ω: V_A = {float(u):.2f} V")
 """)
     L.md("""
 ## Tolerancje
 
-Prawdziwe oporniki mają tolerancję (np. ±5 %). `tolerance()` buduje układ setki razy z losowymi
-wartościami w tych granicach i pokazuje, jak bardzo rozrzuca się wynik:
+Prawdziwe oporniki mają tolerancję (np. ±5 %). `spread` buduje układ 500 razy z losowymi wartościami
+w tych granicach i pokazuje, jak bardzo rozrzuca się wynik:
 """)
     L.code("""
-tolerance(supply(12) + Resistor("10k") + node("A") + Resistor("10k") + ground, tol=0.05)
-""")
-    L.md("""
-## Trójfazówka
-
-`three_phase(230)` to źródło w gwiazdę (fazy 0°, −120°, 120°), a `star(...)` i `delta(...)` to odbiorniki.
-Łączą się po nazwach węzłów `L1`, `L2`, `L3` i `N`. Fazory wpisuje się też wprost: `"230∠-120"`.
-""")
-    L.code("""
-nierowna = three_phase(230) | star(Resistor(10), Resistor(20), Resistor(30))
-nierowna.solve(omega=314)
+spread(dzielnik, "V_A", tol=0.05)
 """)
     L.md("""
 ## SPICE
 
-`to_spice()` zapisuje układ jako netlistę dla ngspice albo LTspice, a `from_spice()` wczytuje netlistę
-(w LTspice: *View → SPICE Netlist*). Wklejona w widok kodu schematu od razu się rysuje.
+`to_spice()` zapisuje zadanie jako netlistę dla ngspice albo LTspice, a `from_spice()` wczytuje netlistę
+(w LTspice: *View → SPICE Netlist*).
 """)
     L.code("""
 print(to_spice(filtr))
@@ -711,12 +610,13 @@ print(to_spice(filtr))
     L.md("""
 ## Zadania do sprawdzenia
 
-`task(układ, "I_R_1", "treść")` pokazuje treść i pole na odpowiedź. Odpowiedź jest sprawdzana w
+`task(zadanie, "I_R_1", "treść")` pokazuje treść i pole na odpowiedź. Odpowiedź jest sprawdzana w
 przeglądarce z dokładnością 1 %, a w notatce zapisany jest tylko jej skrót — nie widać jej ani na stronie,
 ani w pliku. Wpisz wynik (np. `0,4` albo `400 mA`) i kliknij **Sprawdź**.
 """)
     L.code("""
-task(supply(12) + Resistor(10) + Resistor(20) + ground, "I_R_1", "Jaki prąd płynie przez oba oporniki?")
+E, R_1, R_2 = VoltageSource("E"), Resistor("R_1"), Resistor("R_2")
+task(Problem(loop(E, R_1, R_2), {E: 12, R_1: 10, R_2: 20}), "I_R_1", "Jaki prąd płynie przez oba oporniki?")
 """)
     L.save()
 

@@ -1,16 +1,11 @@
-// Packs the Python packages (and the notebook kernel) into public/py/bundle.json,
+// Packs electro (and the notebook kernel) into public/py/bundle.json,
 // a {path: source} map the Pyodide worker writes into its file system.
 import { mkdirSync, readdirSync, readFileSync, statSync, watch, writeFileSync } from "node:fs";
 import { dirname, join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const repo = join(dirname(fileURLToPath(import.meta.url)), "../../..");
-const roots = [
-  "packages/electro/src",
-  "packages/electro-schematic/src",
-  "packages/electro-render/src",
-  "apps/notebook/python",
-];
+const roots = ["packages/electro/src", "apps/notebook/python"];
 
 let files = {};
 function walk(root, dir) {

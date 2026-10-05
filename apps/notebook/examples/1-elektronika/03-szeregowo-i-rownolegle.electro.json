@@ -311,16 +311,16 @@
     {
       "id": "6cb41a70",
       "type": "markdown",
-      "source": "## Opór zastępczy w kodzie\n\nW kodzie `+` łączy szeregowo, a `|` równolegle. `resistance()` liczy opór zastępczy całości:"
+      "source": "## Opór zastępczy w kodzie\n\nW kodzie `>>` łączy szeregowo, a `|` równolegle. `blackbox()` patrzy na kawałek obwodu od jego\nkońców, a `resistance()` mówi, jakim jednym opornikiem jest — najpierw wzorem, potem liczbą:"
     },
     {
       "id": "dca255f9",
       "type": "code",
-      "source": "print(\"szeregowo: \", resistance(Resistor(100) + Resistor(200)), \"Ω\")\nprint(\"równolegle:\", resistance(Resistor(100) | Resistor(100)), \"Ω\")\nprint(\"mieszane:  \", resistance(Resistor(100) + (Resistor(300) | Resistor(600))), \"Ω\")",
+      "source": "R_1, R_2, R_3 = Resistor(\"R_1\"), Resistor(\"R_2\"), Resistor(\"R_3\")\nwartosci = {\"R_1\": 100, \"R_2\": 300, \"R_3\": 600}\nfor nazwa, kawalek in [(\"szeregowo\", R_1 >> R_2), (\"równolegle\", R_2 | R_3), (\"mieszane\", R_1 >> (R_2 | R_3))]:\n    wzor = resistance(blackbox(kawalek))\n    print(f\"{nazwa}: {wzor} = {wzor.subs(wartosci)} Ω\")",
       "outputs": [
         {
           "type": "stream",
-          "data": "szeregowo:  300 Ω\nrównolegle: 50 Ω\nmieszane:   300 Ω\n"
+          "data": "szeregowo: R_1 + R_2 = 400 Ω\nrównolegle: R_2*R_3/(R_2 + R_3) = 200 Ω\nmieszane: (R_1*R_2 + R_1*R_3 + R_2*R_3)/(R_2 + R_3) = 300 Ω\n"
         }
       ]
     },

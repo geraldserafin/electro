@@ -1,4 +1,4 @@
-// A drawing as a problem, as electro reads one (electro.core.problem.netlist): each element between
+// A drawing as a problem, as electro reads one (electro.problem.netlist): each element between
 // named points with its value and parameters — what its text says read into them (a source's frequency,
 // a switch's position), a real part or an LED's colour by its name — and what is given and sought, as
 // quantities.

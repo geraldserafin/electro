@@ -1,8 +1,7 @@
 import type { SymbolLibrary, SymbolStandard } from "@/shared/model/types";
 import symbols from "./symbols.json";
 
-// generated from electro_render.symbol_library() (scripts/make_symbols.py), so drawings
-// show before Python has loaded
+// How every kind looks (symbols.json, kept by hand): the editor's, the pictures', the PDF's
 export const library = symbols as unknown as SymbolLibrary;
 
 const byStandard = new Map<SymbolStandard, SymbolLibrary>();

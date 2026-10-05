@@ -6,10 +6,34 @@ import ast
 import re
 from decimal import Decimal
 from fractions import Fraction
+from typing import cast
 
 import sympy as sp
 
-from .issues import BadExpression, BadValue, NotAValue
+
+class BadValue(ValueError):
+    """Text that is not a value (examples of ones that are: 10, 4.7, '4.7k', '4k7', '0,5 A', 'R')."""
+
+    def __init__(self, value: str) -> None:
+        super().__init__(value)
+        self.value = value
+
+
+class BadExpression(ValueError):
+    """Text that is not an expression of quantities (examples of ones that are: 'I_R_1', 'U_C_1 / E_1')."""
+
+    def __init__(self, expression: str) -> None:
+        super().__init__(expression)
+        self.expression = expression
+
+
+class NotAValue(TypeError):
+    """An object of a type no value is made of."""
+
+    def __init__(self, value: str) -> None:
+        super().__init__(value)
+        self.value = value
+
 
 PREFIXES = {
     "p": sp.Rational(1, 10**12),
@@ -104,7 +128,8 @@ def to_text(value) -> str | None:
                 if abs(value) < sp.Rational(1, 1000)
                 else (1, "")
             )
-            scaled = Decimal(int((value / factor).p)) / Decimal(int((value / factor).q))
+            ratio = cast(sp.Rational, value / factor)
+            scaled = Decimal(int(ratio.p)) / Decimal(int(ratio.q))
             return f"{scaled.normalize():f}{prefix}"
         return f"{value.p}/{value.q}"
     return str(value)
@@ -125,9 +150,7 @@ _ENG = [
 def _eng_real(x: float, unit: str) -> str:
     if x == 0:
         return f"0 {unit}".strip()
-    for scale, prefix in _ENG:  # noqa: B007 — prefix: the one the loop stops at
-        if abs(x) >= float(scale) * 0.9995:
-            break
+    scale, prefix = next(((s, p) for s, p in _ENG if abs(x) >= float(s) * 0.9995), _ENG[-1])
     mantissa = x / float(scale)
     text = f"{mantissa:.4g}"
     return f"{text} {prefix}{unit}".strip()
@@ -187,4 +210,4 @@ def expression(text: str) -> sp.Expr:
         tree = ast.parse(text.strip(), mode="eval")
     except (SyntaxError, RecursionError, MemoryError):
         raise BadExpression(text) from None
-    return walk(tree.body)
+    return cast(sp.Expr, walk(tree.body))

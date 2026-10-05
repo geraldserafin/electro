@@ -1,6 +1,6 @@
 // One's own components on a drawing (kind "part", its text the key of its definition in the
-// drawing's ``parts``): drawn as a box with its pins around it, the same as Python draws it
-// (electro_render.symbols.part_symbol). The editor sees them through the symbol library: each
+// drawing's ``parts``): drawn as a box with its pins around it. The editor sees them through the symbol
+// library: each
 // definition is a kind of its own there, "part:<key>".
 import type { ElementData, PartDef, PartPin, Point, SchematicData, SymbolLibrary } from "@/shared/model/types";
 

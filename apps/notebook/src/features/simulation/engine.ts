@@ -1,10 +1,10 @@
-// The circuit in time, in the page: the same loop as electro.sim.Simulation, on a program the
+// The circuit in time, in the page: the same loop as electro.simulation.run.Simulation, on a program the
 // Python side compiled (sympy wrote its residuals and Jacobian as JavaScript). Kept step for step
 // like the Python one, so both give the same numbers (within Newton's tolerance: when the inputs
 // change, this one starts from the circuit as it last was with them); here it is JIT-compiled and
 // fast enough to run live, next to an emulated Arduino.
 
-/** electro.sim.Program.to_json() */
+/** electro.simulation.program.Program.to_json() */
 export interface ProgramData {
   unknowns: string[];
   params: string[];
@@ -282,7 +282,7 @@ export class Simulation {
   }
 }
 
-/** What electro.sim.simulate() calls in Pyodide (as ``js.electroSim.run``): the whole run at once. */
+/** What electro.simulate() calls in Pyodide (as ``js.electroSim.run``): the whole run at once. */
 export function runProgram(json: string, tEnd: number, dtMax: number, schedule?: Schedule | null) {
   const sim = new Simulation(JSON.parse(json));
   const times: number[] = [];

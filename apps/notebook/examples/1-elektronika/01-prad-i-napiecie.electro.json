@@ -155,11 +155,11 @@
     {
       "id": "aa24fee4",
       "type": "code",
-      "source": "sol = latarka.solve()\nsol[\"H_1\"]",
+      "source": "sol = solve(latarka)\nprint(\"prąd żarówki:\", sol(\"I_H_1\"), \"A\")\nprint(\"napięcie na żarówce:\", sol(\"U_H_1\"), \"V\")",
       "outputs": [
         {
-          "type": "text",
-          "data": "H_1 = 12 Ω        U = 6 V   I = 500 mA   P = 3 W"
+          "type": "stream",
+          "data": "prąd żarówki: 1/2 A\nnapięcie na żarówce: 6 V\n"
         }
       ]
     },

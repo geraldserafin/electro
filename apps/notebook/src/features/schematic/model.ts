@@ -1,6 +1,4 @@
-// Editing helpers for the schematic JSON. They mirror electro_schematic.model
-// (pins, rotation, wires following a moved element) so dragging needs no round trip
-// to Python; connectivity and solving stay on the Python side.
+// Editing helpers for the schematic JSON: pins, rotation, wires following a moved element.
 import type { ElementData, Point, SchematicData, SymbolLibrary, WireData } from "@/shared/model/types";
 import { symbolOf } from "./parts";
 
@@ -46,7 +44,7 @@ export const KINDS = [
   { kind: "label", prefix: "lbl", group: "connections" },
   { kind: "port", prefix: "pin", group: "connections" },
   { kind: "terminal", prefix: "T", group: "connections" }, // an open circle: a point a voltage is between
-  // what a drawing marks, not of the circuit (electro_schematic: ARROWS): a current, a voltage
+  // what a drawing marks, not of the circuit: a current, a voltage
   { kind: "current_arrow", prefix: "I", group: "connections" },
   { kind: "voltage_arrow", prefix: "U", group: "connections" },
   { kind: "mesh_current", prefix: "M", group: "connections" }, // a loop's current: round, inside it
@@ -218,7 +216,7 @@ export const hasValue = (kind: string) => kindInfo(kind)?.unit !== undefined;
 /** A drawing with a non-linear element (a diode, a transistor, a 555, an Arduino): it can only run in time. */
 export const inTimeOnly = (sch: SchematicData) => sch.elements.some((e) => kindInfo(e.kind)?.live);
 /**
- * Can it run in time? (as electro.sim.compile_sim asks) No hole in it, and every value known — a
+ * Can it run in time? (as electro.compile_program asks) No hole in it, and every value known — a
  * meter's reading apart, the simulation measures that.
  */
 export const canRunInTime = (sch: SchematicData) =>
@@ -293,7 +291,7 @@ export function reversed(e: ElementData): Partial<ElementData> {
 }
 /** What a drawing marks of its circuit, a quantity with a name and maybe a given value: an arrow, a loop's. */
 export const isMark = (kind: string) => isArrow(kind) || kind === "mesh_current";
-/** An arrow's length in grid units (electro_schematic.arrow_length): a current's 1, a voltage's as set. */
+/** An arrow's length in grid units: a current's 1, a voltage's as set. */
 export const arrowLength = (e: ElementData) =>
   e.kind === "current_arrow" ? 1 : Math.max(1, Math.min(40, Math.trunc(e.span ?? 4) || 4));
 
@@ -507,7 +505,7 @@ export function updateElement(
 }
 
 /**
- * Connection rules (same as electro_schematic.Schematic.nodes): pins on the same point;
+ * Connection rules (as netlist.ts reads them): pins on the same point;
  * a wire end on a pin; a wire end that is not on a pin touching another wire (T-junction).
  * A wire passing over a pin, or crossing another wire, does not connect.
  */

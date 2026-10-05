@@ -1,12 +1,16 @@
-import type { SchematicData, SymbolLibrary } from "@/shared/model/types";
+import type { ElementResult, SchematicData, SymbolLibrary } from "@/shared/model/types";
 import { Drawing } from "./Drawing";
 import { bounds } from "./model";
 import { withParts } from "./parts";
 
 const PAD = 4; // grid units round what is drawn: room for the texts beside it
 
-/** A drawing as a picture (SVG, its styles in it): for an AI to set beside the one it was read from. */
-export async function pictureOf(sch: SchematicData, lib: SymbolLibrary): Promise<string> {
+/** A drawing as a picture (SVG, its styles in it), with what was found on it (``results``). */
+export async function pictureOf(
+  sch: SchematicData,
+  lib: SymbolLibrary,
+  results?: Record<string, ElementResult>,
+): Promise<string> {
   const { renderToStaticMarkup } = await import("react-dom/server");
   const library = withParts(lib, sch.parts);
   const G = library.grid;
@@ -20,7 +24,7 @@ export async function pictureOf(sch: SchematicData, lib: SymbolLibrary): Promise
       height={h}
     >
       <style>{library.style}</style>
-      <Drawing value={sch} library={library} />
+      <Drawing value={sch} library={library} results={results} />
     </svg>,
   );
 }

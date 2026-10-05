@@ -1,35 +1,38 @@
-"""Text from a drawing or a query never runs as code: labels, node names and quantity expressions
-come from notes other people send (a link, a course), so nothing in them may reach eval or exec."""
+"""Text from a drawing, a query or a netlist never runs as code: labels, point names and expressions come
+from notes other people send (a link, a course), so nothing in them may reach eval or exec."""
 
-import electro as e
 import pytest
-from electro.issues import BadExpression, BadName
-from electro.values import expression
+import sympy as sp
+from electro import GND, BadName, I, Node, Problem, Resistor, VoltageSource, from_netlist, from_spice, loop, solve
+from electro.values import BadExpression, expression
 
 RUN = "__import__('os').system('echo pwned')"
+BAD = [f"a+{RUN}", f"x)+{RUN}+(1", "R 1", "R'", "1R", "\\href{javascript:alert(1)}{x}"]
 
 
-@pytest.mark.parametrize("label", [f"a+{RUN}", f"x)+{RUN}+(1", "R 1", "R'", "1R", "\\href{javascript:alert(1)}{x}"])
-def test_a_label_that_is_not_a_name_is_refused(label):
-    c = e.supply(12) + e.Resistor(10, label=label) + e.Capacitor("1u") + e.ground
-    for run in (c.solve, lambda: e.bode(c), lambda: e.tolerance(c, runs=2), lambda: e.code(c)):
-        with pytest.raises(BadName):
-            run()
-
-
-def test_a_node_name_that_is_not_a_name_is_refused():
-    c = e.net((e.VoltageSource(12), "0", f"A+{RUN}"), (e.Resistor(10), f"A+{RUN}", "0"))
+@pytest.mark.parametrize("name", BAD)
+def test_a_name_that_is_not_a_name_is_refused(name):
     with pytest.raises(BadName):
-        c.solve()
+        Resistor(name)
+    if not name[0].isdigit():  # a point may be called "3", as SPICE calls them
+        with pytest.raises(BadName):
+            Node(name)
+    loop_ = {"elements": [{"id": name, "kind": "resistor", "nodes": ["GND", "A"]}]}
+    with pytest.raises(BadName):
+        from_netlist(loop_)
+    if not name[0].isdigit():
+        with pytest.raises(BadName):
+            from_netlist({"elements": [{"id": "R_1", "kind": "resistor", "nodes": ["GND", name]}]})
+
+
+def test_a_spice_netlist_names_nothing_but_names():
+    with pytest.raises(BadName):
+        from_spice(f"* x\nR1+{RUN} a 0 1k\n")
 
 
 def test_names_as_people_write_them_still_work():
-    c = e.net(
-        (e.VoltageSource(12, label="V_zas"), "0", "3"),
-        (e.Resistor(10, label="R1"), "3", "wyjście"),
-        (e.Resistor(20), "wyjście", "0"),
-    )
-    assert c.solve().V("wyjście") == 8
+    e, r1, r2, out = VoltageSource("V_zas"), Resistor("R1"), Resistor("R_2"), Node("wyjście")
+    assert solve(Problem(GND >> e >> r1 >> out >> r2 >> GND, {e: 12, r1: 10, r2: 20}))(I(r1)) == sp.Rational(2, 5)
 
 
 @pytest.mark.parametrize(
@@ -42,8 +45,8 @@ def test_an_expression_is_read_not_run(text):
 
 
 def test_queries_as_people_write_them_still_work():
-    s = (e.supply(12) + e.Resistor(10) + e.ground).solve()
-    assert s("U_R_1 / I_R_1") == 10
-    assert s("sqrt(P_R_1 * R_1)") == 12
+    e, r = VoltageSource("E"), Resistor("R_1")
+    s = solve(Problem(loop(e, r), {e: 12, r: 10}))
+    assert s("U_R_1 / I_R_1") == 10 and s("sqrt(P_R_1 * R_1)") == 12
     with pytest.raises(BadExpression):
         s(RUN)

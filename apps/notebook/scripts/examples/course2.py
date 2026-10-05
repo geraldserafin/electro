@@ -83,8 +83,8 @@ Schemat ma **nazwę** (na pasku nad nim) — i pod tą nazwą jest zmienną w ko
     d.ground((0, 6))
     L.drawing("przyklad", d)
     L.code("""
-wynik = simulate(przyklad, t=0.01)
-print("prąd diody:", round(wynik.at(0.01)["I_LED_1"] * 1000, 1), "mA")
+wynik = simulate(przyklad, until=0.01)
+print("prąd diody:", round(wynik.at("I_LED_1", 0.01) * 1000, 1), "mA")
 """)
     L.md("""
 ## Spis treści i PDF
@@ -216,11 +216,11 @@ oba opory są już znane.
 ## Krok po kroku
 
 W komórce z kodem `steps(...)` pokazuje całe rozwiązanie: dane, każdy krok z wzorem i uzasadnieniem
-(prawo Ohma, prawa Kirchhoffa…) i odpowiedź. `find=` mówi, czego szukamy — wtedy kroki niepotrzebne do
-odpowiedzi są pominięte.
+(prawo Ohma, prawa Kirchhoffa…) i odpowiedź na to, czego szukamy (na schemacie: wartości zostawione
+puste i wielkości z listy **Szukane**).
 """)
     L.code("""
-steps(mostek.solve(find="R_x"))
+steps(solve(mostek))
 """)
     L.md("""
 ## Wzory zamiast liczb
@@ -228,8 +228,9 @@ steps(mostek.solve(find="R_x"))
 Wartość może być literą. Wtedy wynik jest wzorem — dobrze to sprawdza rozwiązania z zeszytu:
 """)
     L.code("""
-uklad = supply("E") + Resistor("R_1") + (Resistor("R_2") | Resistor("R_3")) + ground
-uklad.solve(find="I_R_1")
+E, R_1, R_2, R_3 = VoltageSource("E"), Resistor("R_1"), Resistor("R_2"), Resistor("R_3")
+uklad = Problem(loop(E, R_1, R_2 | R_3), {E: "E", R_1: "R_1", R_2: "R_2", R_3: "R_3"})
+solve(uklad)(I(R_1))
 """)
     L.save()
 
@@ -294,16 +295,16 @@ a dioda zapala się, dopóki go trzymasz.
     L.md("""
 ## Symulacja w kodzie
 
-To samo da się zrobić w komórce z kodem: `simulate(obwod, t=...)` liczy przebiegi, a `.plot(...)` je
+To samo da się zrobić w komórce z kodem: `simulate(obwod, until=...)` liczy przebiegi, a `plot(...)` je
 rysuje. Wejścia (łączniki, przyciski, suwaki) podajesz w `inputs` — liczbą albo funkcją czasu:
 """)
     L.code("""
-przebieg = simulate(filtr_rc, t=0.1)
-przebieg.plot("V_we", "V_wy")
+przebieg = simulate(filtr_rc, until=0.1)
+plot(przebieg, "V_we", "V_wy")
 """)
     L.code("""
 wcisniety = lambda t: 1 if 0.02 < t < 0.06 else 0
-simulate(spacja, t=0.08, inputs={"B_1_closed": wcisniety}).plot("I_LED_1")
+plot(simulate(spacja, until=0.08, inputs={"B_1_closed": wcisniety}), "I_LED_1")
 """)
     L.save()
 
@@ -479,8 +480,8 @@ w środku. W kodzie elementy ze środka mają nazwy z przedrostkiem: tranzystor 
     d.ground(d.pin("E_1", 0))
     L.drawing("dwa_klucze", d)
     L.code("""
-p = simulate(dwa_klucze, t=2)
-p.plot("I_U_1_Q_1_C", "I_U_2_Q_1_C")
+p = simulate(dwa_klucze, until=2)
+plot(p, "I_U_1_Q_1_c", "I_U_2_Q_1_c")
 """)
     L.md("""
 ## Dobrze wiedzieć

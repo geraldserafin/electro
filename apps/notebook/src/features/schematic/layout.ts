@@ -1,4 +1,4 @@
-// A circuit laid out on the grid from the series and parallel it is made of (electro.core.code.structure,
+// A circuit laid out on the grid from the series and parallel it is made of (electro.code.structure,
 // sent with the code view's circuit): series goes along the line, parallel stacks branches side by side, a
 // loop closes back under itself. Laid out in "flow" coordinates (u along the current, v across it); the
 // page's orientation only maps (u, v) to the screen, so one layout gives horizontal and vertical drawings.

@@ -820,7 +820,7 @@ przełączeniu i powoli wracają — to ładujące się kondensatory.
     d.label("b2", d.pin("Q_2", 0))
     L.drawing("multiwibrator", d)
     L.code("""
-simulate(multiwibrator, t=4).plot("V_b1", "V_b2")
+plot(simulate(multiwibrator, until=4), "V_b1", "V_b2")
 """)
     L.save()
 
@@ -869,11 +869,11 @@ Uruchom ⚡ i dodaj na oscyloskopie `V_we` i `V_wy` — albo spójrz na wykres p
     d.label("wy", d.pin("R_L", 0))
     L.drawing("wzmacniacz", d)
     L.code("""
-p = simulate(wzmacniacz, t=0.2, dt=2e-5)
-koniec = p.t.index(next(t for t in p.t if t >= 0.195))
-we, wy = p.V("we")[koniec:], p.V("wy")[koniec:]
+p = simulate(wzmacniacz, until=0.2, dt=2e-5)
+koniec = next(k for k, t in enumerate(p.t) if t >= 0.195)
+we, wy = p("V_we")[koniec:], p("V_wy")[koniec:]
 print(f"wzmocnienie ≈ {(max(wy) - min(wy)) / (max(we) - min(we)):.0f} razy")
-p.plot("V_we", "V_wy")
+plot(p, "V_we", "V_wy")
 """)
     L.save()
 

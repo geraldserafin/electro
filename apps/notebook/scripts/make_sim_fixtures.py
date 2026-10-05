@@ -6,8 +6,8 @@ in devenv shell) after changing how electro compiles a circuit in time.
 import json
 from pathlib import Path
 
-from electro.core import Arduino, Pico, compile_program
-from electro.core.problem.netlist import from_netlist
+from electro import Arduino, Pico, compile_program
+from electro.problem.netlist import from_netlist
 
 here = Path(__file__).parent.parent / "src/features/simulation/fixtures"
 ARDUINO_PINS = Arduino.terminals[:-2]

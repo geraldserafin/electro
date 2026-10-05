@@ -1,0 +1,61 @@
+{
+  "format": "electro-notebook",
+  "version": 2,
+  "id": "39214c816b205f65",
+  "title": "4. Węzły i netlisty",
+  "created": "2026-10-01T00:00:00Z",
+  "modified": "2026-10-01T00:00:00Z",
+  "settings": {
+    "codeInPdf": true
+  },
+  "cells": [
+    {
+      "id": "b31dd769",
+      "type": "markdown",
+      "source": "# Węzły\n\nNie każdy obwód jest szeregowo-równoległy — mostek Wheatstone'a albo trójkąt oporników nie są ani jednym,\nani drugim. Wtedy łączysz przez **nazwane punkty**: ten sam `Node` w kilku miejscach to jeden punkt.\n`at(element, a, b)` stawia element między punktami, a `beside(...)` zbiera kawałki — tak jak netlista\nw SPICE."
+    },
+    {
+      "id": "03a5328f",
+      "type": "code",
+      "source": "A, B, C = Node(\"A\"), Node(\"B\"), Node(\"C\")\nE, R = VoltageSource(\"E\"), [Resistor(f\"R_{k}\") for k in range(1, 6)]\nmostek = Problem(\n    beside(at(E, GND, A), at(R[0], A, B), at(R[1], B, GND), at(R[2], A, C), at(R[3], C, GND), at(R[4], B, C)),\n    {E: 10, R[0]: 100, R[1]: 200, R[2]: 150, R[3]: 150, R[4]: 50},\n)\nsol = solve(mostek)\nprint(\"U_BC =\", sol(U(B, C)), \"V,  prąd przez mostek:\", sol(I(R[4])), \"A\")",
+      "outputs": [
+        {
+          "type": "stream",
+          "data": "U_BC = 10/23 V,  prąd przez mostek: 1/115 A\n"
+        }
+      ]
+    },
+    {
+      "id": "2ae3a16c",
+      "type": "markdown",
+      "source": "Elementy o więcej niż dwóch zaciskach podaje się tak samo — punkt na każdy zacisk. Idealny wzmacniacz\noperacyjny `OpAmp` ma wejście nieodwracające, odwracające i wyjście. Tu wzmacniacz odwracający\no wzmocnieniu $-\\frac{R_2}{R_1} = -10$:"
+    },
+    {
+      "id": "ced523d7",
+      "type": "code",
+      "source": "we, minus, wy = Node(\"we\"), Node(\"minus\"), Node(\"wy\")\nE, R_1, R_2, R_L, OA = VoltageSource(\"E\"), Resistor(\"R_1\"), Resistor(\"R_2\"), Resistor(\"R_L\"), OpAmp(\"OA\")\nwzmacniacz = Problem(\n    beside(at(E, GND, we), at(R_1, we, minus), at(R_2, minus, wy), at(OA, GND, minus, wy), at(R_L, wy, GND)),\n    {E: \"0,5\", R_1: 1000, R_2: 10000, R_L: 2000},\n)\nprint(\"U_wy =\", solve(wzmacniacz)(V(wy)), \"V\")",
+      "outputs": [
+        {
+          "type": "stream",
+          "data": "U_wy = -5 V\n"
+        }
+      ]
+    },
+    {
+      "id": "41569d40",
+      "type": "markdown",
+      "source": "## Netlista\n\nKażdy obwód ma swoją **netlistę**: elementy i punkty, do których dochodzą ich zaciski. `to_netlist`\nzapisuje zadanie jako dane (tak schemat w notatce rozmawia z biblioteką), `from_netlist` czyta je z\npowrotem:"
+    },
+    {
+      "id": "9a0d4285",
+      "type": "code",
+      "source": "to_netlist(mostek)",
+      "outputs": [
+        {
+          "type": "text",
+          "data": "{'elements': [{'id': 'E', 'kind': 'voltage_source', 'nodes': ['GND', 'A'], 'value': '10'}, {'id': 'R_1', 'kind': 'resistor', 'nodes': ['A', 'B'], 'value': '100'}, {'id': 'R_2', 'kind': 'resistor', 'nodes': ['B', 'GND'], 'value': '200'}, {'id': 'R_3', 'kind': 'resistor', 'nodes': ['A', 'C'], 'value': '150'}, {'id': 'R_4', 'kind': 'resistor', 'nodes': ['C', 'GND'], 'value': '150'}, {'id': 'R_5', 'kind': 'resistor', 'nodes': ['B', 'C'], 'value': '50'}], 'given': [], 'find': []}"
+        }
+      ]
+    }
+  ]
+}

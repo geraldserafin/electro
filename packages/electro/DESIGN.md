@@ -666,7 +666,7 @@ solution = solve(problem)
    odtworzyć ogólnie, inaczej symulacje zaczną zgłaszać `NoConvergence`.
 5. **Synchronizacja z emulatorem**: zostaje wykonaniem (most), nie modelem — patrz 1.
 
-## 11. Prototyp rdzenia (`src/electro/core`, testy `tests/test_core_*.py`)
+## 11. Prototyp rdzenia (dziś cały pakiet `electro`; testy w `tests/`)
 
 Obok biblioteki, nic w niej nie zmienia. ~720 linii (bez eksportów): składnia + postać normalna
 (`syntax.py`), zadanie + analizy (`problem.py`), zapis do danych (`data.py`).
@@ -887,7 +887,7 @@ jak wbudowana. Żadna z tych rzeczy nie wymagała zmiany silnika.
 - **Arduino w tym samym kształcie:** stan procesora `s`, `s = when(takt, krok_emulatora(Pre(s), Pre(piny)),
   Pre(s))` — przerzutnik to najmniejszy taki „procesor". Wykonanie zostaje mostem (§10.1).
 
-### 13.4 Porównanie z biblioteką na jej zadaniach szkolnych (`tests/test_core_school.py`)
+### 13.4 Porównanie z biblioteką na jej zadaniach szkolnych (`tests/test_school.py`)
 
 Zadania z `test_school.py` przeniesione jedno do jednego, z tymi samymi liczbami.
 
@@ -997,15 +997,15 @@ więc ten sam renderer z TS da się kiedyś tam wpiąć. Dziś nic pod to nie bu
 |---|---|
 | A | elementy: wszystkie urządzenia jako rodzaje (prawa w słowach czasu, bez sztuczek elementu); nazwy rodzajów = nazwy ze schematu; części i kolory jako gotowe dane; nazwy jak dotąd (`R_1`) — zrobione |
 | B | symulacja: program z równań `Step` (stany z `D`/`Pre`, wejścia = parametry ustawiane w biegu, ograniczanie złącz ogólnie dla każdego `exp`), ten sam JSON; `live` i `simulate` na rdzeniu — zrobione |
-| C | granica danych: netlista z rysunku (TS) → `Problem`; wyniki, kroki, problemy jako dane; kernel na rdzeniu |
-| D | strona przejmuje rysunek: węzły, strzałki, układanie, symbole, render, wykresy z serii liczb, format pliku |
-| E | Bode, przemiatanie, tolerancje (liczby), SPICE, zadania na rdzeniu |
-| F | kursy, przykłady, prompt AI, README na nowe API; stare moduły i paczki usunięte |
+| C | granica danych: netlista z rysunku (TS) → `Problem`; wyniki, kroki, problemy jako dane; kernel na rdzeniu — zrobione |
+| D | strona przejmuje rysunek: węzły, strzałki, układanie, symbole, render, wykresy z serii liczb, format pliku — zrobione |
+| E | Bode, przemiatanie, tolerancje (liczby), SPICE, zadania na rdzeniu — zrobione |
+| F | kursy, przykłady, prompt AI, README na nowe API; stare moduły i paczki usunięte — zrobione |
 
 **Etap B — co wyszło.** Program symulacji liczy się z równań rdzenia (`simulation/program.py`), ten sam
 JSON co dotąd; `live` w notatniku idzie przez netlistę jako dane (`problem/netlist.py`), którą na razie
 robi z rysunku kernel. Wszystkie testy symulacji starej biblioteki działają na rdzeniu
-(`test_core_simulation.py`). Ustalenia:
+(`test_simulation.py`). Ustalenia:
 
 - Pomoc dla Newtona jest ogólna, w kompilatorze: szept przewodności do masy w każdym punkcie, `limexp`
   dla każdej wykładniczej, a dla tej z maleńkim prądem w zerze (złącze) krok jak w SPICE.
@@ -1017,3 +1017,20 @@ robi z rysunku kernel. Wszystkie testy symulacji starej biblioteki działają na
 - Dioda podręcznikowa (przypadki) jest tylko na kartkę: w czasie `NotSimulated`.
 - Sinus w czasie w analizie AC to jego wskaz; zadanie ze sinusami jednej częstotliwości liczy się na
   kartce samo jej wskazami.
+
+**Etapy C–F — co wyszło.** Rdzeń jest pakietem `electro` (stare moduły, `electro-schematic`, `electro-render`
+i `electro-notes` usunięte). Strona robi z rysunku netlistę i zadanie jako dane (`schematic/netlist.ts`,
+`problem.ts`), układa obwód z kodu (`layout.ts` ze struktury `code/structure.py`), rysuje schematy
+(`Drawing`, `picture.tsx`) i wykresy z serii liczb (`plots/svg.ts`), czyta obwód z danych i obrazka AI
+(`fromDrawing.ts`). Kernel notatnika jest cienki (`electro_notebook`: komórki, przyciski schematu, widok
+kodu, narzędzie AI, zadania) i oddaje tylko dane. Kursy pisze Python jako dane, a uruchamia i sprawdza je
+`scripts/examples/run.ts` tym samym kodem co strona. Ustalenia:
+
+- Napięcie elementu to zawsze spadek od pierwszego końca do drugiego, także źródła (12 V źródło ma
+  $U = -12$ V); rysunek pokazuje źródło po swojemu (wzrost, moc oddawana).
+- Odczyt miernika to wartość elementu w danych i dana `I(A)`/`U(V)` w zadaniu, w obie strony.
+- Wielkość po nazwie (`"I_R_1"`, `"V_A"`, wyrażenia) czyta `problem/names.py` bez `eval`; element po
+  nazwie: `zadanie["R_1"]` (schemat z notatki nie ma zmiennych na elementy).
+- Kroki: jedno równanie z jedną niewiadomą to łańcuch wzór = liczby = wynik, kilka naraz to układ;
+  powód z pochodzenia równania (prawo elementu wg rodzaju, Kirchhoff w punkcie).
+

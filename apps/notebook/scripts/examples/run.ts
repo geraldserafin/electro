@@ -3,8 +3,10 @@
 // marked code cell run (`_run`), a drawing solved on paper (`_solve`), and each hand-placed drawing whole
 // (`_checks`: it runs in time if `live`, the pins `joined` are one point, each routed net one point of its
 // own, every label on something, no pin left hanging). The markers are taken out as it goes.
-// Run by make.py; or: pnpm python && tsx scripts/examples/run.ts examples/1-elektronika/01-*.json
+// Run by make.py; or: pnpm python && tsx scripts/examples/run.ts examples/1-elektronika/01-*.json.
+// --check (pnpm test:examples): every example run again as it is, nothing written — the kernel still runs them.
 import { readdirSync, readFileSync, writeFileSync } from "node:fs";
+import { given, shown } from "../../src/features/python/outputs";
 import { drawingFromCode, type FromCode } from "../../src/features/schematic/fromCode";
 import { library } from "../../src/features/schematic/library";
 import { isBoard, isComponent, key, pins } from "../../src/features/schematic/model";
@@ -58,7 +60,7 @@ function check(where: string, sch: SchematicData, { live, joined, nets }: Checks
   }
 }
 
-function run(path: URL) {
+async function run(path: URL) {
   const notebook = JSON.parse(readFileSync(path, "utf8"));
   const cells: Cell[] = notebook.cells;
   const errorsOk = Boolean(notebook._errors_ok);
@@ -73,12 +75,11 @@ function run(path: URL) {
     delete c._code;
   }
   kernel.reset();
-  const schematics = JSON.stringify(
-    Object.fromEntries(cells.filter((c) => c.type === "schematic").map((c) => [c.name, JSON.stringify(c.schematic)])),
-  );
+  const drawings = Object.fromEntries(cells.filter((c) => c.type === "schematic").map((c) => [c.name, c.schematic!]));
+  const { problems, units } = given(drawings, library);
   for (const c of cells) {
-    if (c.type === "code" && c._run) {
-      c.outputs = JSON.parse(kernel.run(c.source, schematics));
+    if (c.type === "code" && (checking ? (c.outputs as unknown[]).length > 0 : c._run)) {
+      c.outputs = await shown(JSON.parse(kernel.run(c.source, problems, units)), library);
       const bad = (c.outputs as { type: string; data?: string }[]).filter((o) => o.type === "error");
       if (bad.length && !errorsOk)
         fail(
@@ -87,7 +88,7 @@ function run(path: URL) {
         );
     }
     if (c.type === "schematic" && c._checks) check(where(c), c.schematic!, c._checks as Checks);
-    if (c.type === "schematic" && c._solve) {
+    if (c.type === "schematic" && (checking ? c.results : c._solve)) {
       const solved = JSON.parse(kernel.solve(JSON.stringify(solveData(c.schematic!, library))));
       const bad = solved.problems.filter((p: { kind: string }) => p.kind === "error");
       if (bad.length) fail(where(c), bad);
@@ -95,10 +96,14 @@ function run(path: URL) {
     }
     for (const marker of ["_run", "_solve", "_checks"]) delete c[marker];
   }
-  writeFileSync(path, `${JSON.stringify(notebook, null, 2)}\n`);
+  if (!checking) writeFileSync(path, `${JSON.stringify(notebook, null, 2)}\n`);
 }
 
-const given = process.argv.slice(2).map((p) => new URL(p, `file://${process.cwd()}/`));
+const checking = process.argv.includes("--check");
+const named = process.argv
+  .slice(2)
+  .filter((a) => a !== "--check")
+  .map((p) => new URL(p, `file://${process.cwd()}/`));
 const all = readdirSync(examples, { withFileTypes: true })
   .filter((d) => d.isDirectory())
   .flatMap((d) =>
@@ -106,4 +111,4 @@ const all = readdirSync(examples, { withFileTypes: true })
       .filter((f) => f.endsWith(".electro.json"))
       .map((f) => new URL(`${d.name}/${f}`, examples)),
   );
-for (const path of given.length ? given : all) run(path);
+for (const path of named.length ? named : all) await run(path);

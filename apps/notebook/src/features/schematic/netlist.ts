@@ -1,5 +1,5 @@
 // A drawing as the circuit it shows: which pins and wires are one point (as KiCad has it), each point's
-// name, every element between named points — the netlist electro reads (electro.core.problem.netlist) —
+// name, every element between named points — the netlist electro reads (electro.problem.netlist) —
 // and what each mark on it (an arrow, a loop's current, a point) is a quantity of.
 import type { ElementData, Point, SchematicData, SymbolLibrary, WireData } from "@/shared/model/types";
 import { isArrow, isComponent, key, onSegment, pins, rotate } from "./model";

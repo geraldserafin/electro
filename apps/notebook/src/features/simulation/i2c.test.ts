@@ -58,5 +58,5 @@ describe("a DS1307 (RTClib)", () => {
     uno.onSerial = (c) => (serial += c);
     uno.runUntil(2.2);
     expect(serial.trim()).toMatch(/^2024-5-17 13:45:3[12]$/);
-  });
+  }, 30_000); // 2.2 s of an emulated Uno: seconds of work, more beside the other test files
 });

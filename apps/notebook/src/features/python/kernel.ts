@@ -3,13 +3,14 @@
 import { type Progress, report } from "@/features/downloads/store";
 import { bodeSvg, histogramSvg, traceSvg } from "@/features/plots/svg";
 import { drawingFromCode } from "@/features/schematic/fromCode";
-import { library } from "@/features/schematic/library";
+import { library, libraryFor } from "@/features/schematic/library";
 import { isComponent, key, pins } from "@/features/schematic/model";
 import { withParts } from "@/features/schematic/parts";
 import { elementsOf, problemOf, solveData } from "@/features/schematic/problem";
 import type { LiveCircuit } from "@/features/simulation/engine";
 import type { Failure } from "@/shared/model/issues";
-import type { ElementResult, Output, Problem, SchematicData } from "@/shared/model/types";
+import type { ElementResult, Output, Problem, SchematicData, SymbolStandard } from "@/shared/model/types";
+import { given, shown } from "./outputs";
 
 type Reply = { id: number; ok: true; result: unknown } | { id: number; ok: false; error: string };
 
@@ -42,16 +43,15 @@ class Kernel {
     });
   }
 
-  /** A code cell; its schematics drawn with `standard`'s symbols (the note's). */
-  async run(code: string, schematics: Record<string, SchematicData>, standard = "iec"): Promise<Output[]> {
-    const text = (await this.call("run", {
-      code,
-      standard,
-      schematics: JSON.stringify(
-        Object.fromEntries(Object.entries(schematics).map(([name, s]) => [name, JSON.stringify(s)])),
-      ),
-    })) as string;
-    return JSON.parse(text);
+  /** A code cell, the schematic cells' problems as its variables; what it shows drawn with `standard`'s
+   *  symbols (the note's). */
+  async run(
+    code: string,
+    schematics: Record<string, SchematicData>,
+    standard: SymbolStandard = "iec",
+  ): Promise<Output[]> {
+    const text = (await this.call("run", { code, ...given(schematics, library) })) as string;
+    return shown(JSON.parse(text), libraryFor(standard));
   }
 
   /** The drawing as electro code (`>>`/`|` where it is made of them, else each element at its points). */

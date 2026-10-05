@@ -11,7 +11,7 @@ const PYODIDE = "https://cdn.jsdelivr.net/pyodide/v314.0.7/full/";
 
 type Request =
   | { id: number; type: "init"; bundleUrl: string }
-  | { id: number; type: "run"; code: string; schematics: string; standard: string }
+  | { id: number; type: "run"; code: string; problems: string; units: string }
   | { id: number; type: "code"; problem: string; name: string }
   | { id: number; type: "fromCode"; source: string; name: string }
   | { id: number; type: "solve"; problem: string }
@@ -23,7 +23,7 @@ type Request =
   | { id: number; type: "reset" };
 
 interface Kernel {
-  run(code: string, schematics: string, standard: string): string;
+  run(code: string, problems: string, units: string): string;
   code(problem: string, name: string): string;
   from_code(source: string, name: string): string;
   solve(problem: string): string;
@@ -35,7 +35,7 @@ interface Kernel {
   reset(): void;
 }
 
-// electro.sim.simulate() runs its steps here, in JavaScript, when there is this (js.electroSim):
+// electro.simulate() runs its steps here, in JavaScript, when there is this (js.electroSim):
 // the same loop as its own, many times faster than in Pyodide
 type PyList = { toJs(): [number, number][]; destroy?(): void };
 (self as unknown as { electroSim: unknown }).electroSim = {
@@ -84,7 +84,7 @@ self.onmessage = async (event: MessageEvent<Request>) => {
     const k = await kernel;
     const result =
       request.type === "run"
-        ? k.run(request.code, request.schematics, request.standard)
+        ? k.run(request.code, request.problems, request.units)
         : request.type === "code"
           ? k.code(request.problem, request.name)
           : request.type === "fromCode"

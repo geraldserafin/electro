@@ -174,12 +174,12 @@
     {
       "id": "b81e8052",
       "type": "markdown",
-      "source": "Solver umie też liczyć na literach. Zamiast liczb wpisz symbole — dostaniesz wzór. `node(\"wy\")` nazywa\npunkt między opornikami, a `shunt(...)` wstawia element od tego punktu do masy:"
+      "source": "Solver umie też liczyć na literach. Zamiast liczb wpisz symbole — dostaniesz wzór. `Node(\"wy\")` to\nnazwany punkt między opornikami, `GND` to masa, a `>>` łączy elementy jeden za drugim:"
     },
     {
       "id": "9cef51b7",
       "type": "code",
-      "source": "dz = supply(\"U\") + Resistor(\"R_a\") + node(\"wy\") + shunt(Resistor(\"R_b\"))\ndz.solve().V(\"wy\")",
+      "source": "U_z, R_a, R_b, wy = VoltageSource(\"U\"), Resistor(\"R_a\"), Resistor(\"R_b\"), Node(\"wy\")\ndz = Problem(GND >> U_z >> R_a >> wy >> R_b >> GND, {U_z: \"U\", R_a: \"R_a\", R_b: \"R_b\"})\nsolve(dz)(V(wy))",
       "outputs": [
         {
           "type": "markdown",
@@ -468,7 +468,7 @@
     {
       "id": "f4c880a7",
       "type": "markdown",
-      "source": "## Spróbuj sam\n\n1. W dzielniku zamień $R_2$ na 1 kΩ. Ile wychodzi teraz? (Równe oporniki dzielą napięcie na pół.)\n2. Zamień miejscami opornik i fotorezystor w ostatnim schemacie. Co się dzieje z napięciem, gdy robi się\n   ciemniej?\n3. W kodzie zamień litery na liczby — `supply(12) + Resistor(1000) + Resistor(2000) + ground` — i sprawdź\n   wzór."
+      "source": "## Spróbuj sam\n\n1. W dzielniku zamień $R_2$ na 1 kΩ. Ile wychodzi teraz? (Równe oporniki dzielą napięcie na pół.)\n2. Zamień miejscami opornik i fotorezystor w ostatnim schemacie. Co się dzieje z napięciem, gdy robi się\n   ciemniej?\n3. W kodzie zamień litery na liczby — `{U_z: 12, R_a: 1000, R_b: 2000}` — i sprawdź wzór."
     }
   ]
 }

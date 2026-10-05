@@ -69,8 +69,9 @@ Te same wyniki możesz dostać w komórce z kodem. Schemat ma nazwę `latarka` i
 w kodzie:
 """)
     L.code("""
-sol = latarka.solve()
-sol["H_1"]
+sol = solve(latarka)
+print("prąd żarówki:", sol("I_H_1"), "A")
+print("napięcie na żarówce:", sol("U_H_1"), "V")
 """)
     L.md("""
 ## Przedrostki
@@ -138,13 +139,15 @@ Kliknij ▶ **Oblicz**, żeby zobaczyć, co pokazują.
     L.md("""
 ## Im większy opór, tym mniejszy prąd
 
-Ten sam obwód można zapisać kodem — tu dla kilku różnych oporników naraz. `supply(9)` to bateria 9 V
-od masy, `+` łączy elementy jeden za drugim, a `ground` wraca do masy:
+Ten sam obwód można zapisać kodem — tu dla kilku różnych oporników naraz. Najpierw elementy: bateria
+`E` i opornik `R`. `loop(E, R)` to pętla z nich, a `Problem(obwód, {dane})` daje im wartości; `solve`
+rozwiązuje, a `I(R)` to prąd opornika:
 """)
     L.code("""
+E, R = VoltageSource("E"), Resistor("R")
 for r in [100, 470, 1000, 4700, 10000]:
-    sol = (supply(9) + Resistor(r) + ground).solve()
-    print(f"R = {r:>6} Ω   I = {float(sol['R_1'].I) * 1000:6.2f} mA")
+    sol = solve(Problem(loop(E, R), {E: 9, R: r}))
+    print(f"R = {r:>6} Ω   I = {float(sol(I(R))) * 1000:6.2f} mA")
 """)
     L.md("""
 ## Opór nieznany
@@ -164,7 +167,7 @@ użyje prawa Ohma: $R = \\frac{U}{I} = \\frac{9\\,\\mathrm{V}}{0{,}02\\,\\mathrm
     L.drawing("nieznany", d, solve=True)
     L.md("A tak wygląda to samo rozwiązanie krok po kroku, z uzasadnieniem każdego kroku:")
     L.code("""
-steps(nieznany.solve(find="R_1"))
+steps(solve(nieznany))
 """)
     L.md("""
 ## Spróbuj sam
@@ -230,12 +233,15 @@ bez względu na to, ile urządzeń już działa.
     L.md("""
 ## Opór zastępczy w kodzie
 
-W kodzie `+` łączy szeregowo, a `|` równolegle. `resistance()` liczy opór zastępczy całości:
+W kodzie `>>` łączy szeregowo, a `|` równolegle. `blackbox()` patrzy na kawałek obwodu od jego
+końców, a `resistance()` mówi, jakim jednym opornikiem jest — najpierw wzorem, potem liczbą:
 """)
     L.code("""
-print("szeregowo: ", resistance(Resistor(100) + Resistor(200)), "Ω")
-print("równolegle:", resistance(Resistor(100) | Resistor(100)), "Ω")
-print("mieszane:  ", resistance(Resistor(100) + (Resistor(300) | Resistor(600))), "Ω")
+R_1, R_2, R_3 = Resistor("R_1"), Resistor("R_2"), Resistor("R_3")
+wartosci = {"R_1": 100, "R_2": 300, "R_3": 600}
+for nazwa, kawalek in [("szeregowo", R_1 >> R_2), ("równolegle", R_2 | R_3), ("mieszane", R_1 >> (R_2 | R_3))]:
+    wzor = resistance(blackbox(kawalek))
+    print(f"{nazwa}: {wzor} = {wzor.subs(wartosci)} Ω")
 """)
     L.md("""
 ## Spróbuj sam
@@ -280,9 +286,9 @@ schematem. Która świeci jaśniej, gdy uruchomisz ⚡?
     d.ground((0, 6))
     L.drawing("dwie_zarowki", d, solve=True, live=True)
     L.code("""
-sol = dwie_zarowki.solve()
+sol = solve(dwie_zarowki)
 for h in ["H_1", "H_2"]:
-    print(h, "P =", sol[h].P, "W")
+    print(h, "P =", sol(f"P_{h}"), "W")
 """)
     L.md("""
 ## Opornik też się grzeje
@@ -292,8 +298,9 @@ Każdy opornik ma dopuszczalną moc — zwykłe, małe oporniki tylko **0,25 W**
 12 V byłoby to 1,44 W: prawdziwy opornik by się przypalił.
 """)
     L.code("""
+E, R = VoltageSource("E"), Resistor("R")
 for u in [5, 9, 12]:
-    p = (supply(u) + Resistor(100) + ground).solve()["R_1"].P
+    p = solve(Problem(loop(E, R), {E: u, R: 100}))(P(R))
     print(f"{u:>2} V na 100 Ω: {float(p):.2f} W", "— za dużo!" if p > 0.25 else "")
 """)
     L.md("""
@@ -349,7 +356,7 @@ Każdy krok ma swoje uzasadnienie — przy niektórych zobaczysz właśnie „I 
 „II prawo Kirchhoffa”:
 """)
     L.code("""
-steps(dwa_zrodla.solve(find=["I_R_1", "I_R_2", "I_R_3"]))
+steps(solve(dwa_zrodla))
 """)
     L.md("""
 ## Sprawdź I prawo sam
@@ -357,8 +364,8 @@ steps(dwa_zrodla.solve(find=["I_R_1", "I_R_2", "I_R_3"]))
 Prąd z $R_1$ wpływa do węzła u góry i rozdziela się na $R_2$ i $R_3$. Ich suma musi się zgadzać:
 """)
     L.code("""
-sol = dwa_zrodla.solve()
-print("I_R_1 =", sol["R_1"].I, " I_R_2 + I_R_3 =", sol["R_2"].I + sol["R_3"].I)
+sol = solve(dwa_zrodla)
+print("I_R_1 =", sol("I_R_1"), " I_R_2 + I_R_3 =", sol("I_R_2 + I_R_3"))
 """)
     L.md("""
 ## Spróbuj sam
@@ -394,12 +401,13 @@ odczytuje się większość czujników.
     d.ground((0, 8))
     L.drawing("dzielnik", d, solve=True)
     L.md("""
-Solver umie też liczyć na literach. Zamiast liczb wpisz symbole — dostaniesz wzór. `node("wy")` nazywa
-punkt między opornikami, a `shunt(...)` wstawia element od tego punktu do masy:
+Solver umie też liczyć na literach. Zamiast liczb wpisz symbole — dostaniesz wzór. `Node("wy")` to
+nazwany punkt między opornikami, `GND` to masa, a `>>` łączy elementy jeden za drugim:
 """)
     L.code("""
-dz = supply("U") + Resistor("R_a") + node("wy") + shunt(Resistor("R_b"))
-dz.solve().V("wy")
+U_z, R_a, R_b, wy = VoltageSource("U"), Resistor("R_a"), Resistor("R_b"), Node("wy")
+dz = Problem(GND >> U_z >> R_a >> wy >> R_b >> GND, {U_z: "U", R_a: "R_a", R_b: "R_b"})
+solve(dz)(V(wy))
 """)
     L.md("""
 ## Potencjometr
@@ -441,8 +449,7 @@ Arduino. Uruchom ⚡, kliknij fotorezystor i zmieniaj światło.
 1. W dzielniku zamień $R_2$ na 1 kΩ. Ile wychodzi teraz? (Równe oporniki dzielą napięcie na pół.)
 2. Zamień miejscami opornik i fotorezystor w ostatnim schemacie. Co się dzieje z napięciem, gdy robi się
    ciemniej?
-3. W kodzie zamień litery na liczby — `supply(12) + Resistor(1000) + Resistor(2000) + ground` — i sprawdź
-   wzór.
+3. W kodzie zamień litery na liczby — `{U_z: 12, R_a: 1000, R_b: 2000}` — i sprawdź wzór.
 """)
     L.save()
 
@@ -497,10 +504,11 @@ $\\tau = 10\\,000 \\cdot 0{,}0001 = 1$ s. Na wykresie widać, że po sekundzie n
 czyli 3,16 V.
 """)
     L.code("""
-rc = supply(5) + Resistor("10k") + node("c") + Capacitor("100u") + ground
-przebieg = simulate(rc, t=5)
-print("po 1 s:", round(przebieg.at(1)["V_c"], 2), "V")
-przebieg.plot("V_c")
+E, R, C, c = VoltageSource("E"), Resistor("R"), Capacitor("C"), Node("c")
+rc = Problem(GND >> E >> R >> c >> C >> GND, {E: 5, R: "10k", C: "100u"})
+przebieg = simulate(rc, until=5)
+print("po 1 s:", round(przebieg.at("V_c", 1), 2), "V")
+plot(przebieg, "V_c")
 """)
     L.md("""
 ## Do czego to służy?
@@ -599,7 +607,7 @@ połówki w jedną stronę, a kondensator wygładza dziury między nimi. Na oscy
     d.label("wy", (10, 0))
     L.drawing("prostownik", d)
     L.code("""
-simulate(prostownik, t=0.1).plot("V_we", "V_wy")
+plot(simulate(prostownik, until=0.1), "V_we", "V_wy")
 """)
     L.save()
 
@@ -712,8 +720,8 @@ i naciśnij dwa razy R), a silnik zakręci się w drugą stronę.
     d.ground((0, 6))
     L.drawing("silnik", d)
     L.code("""
-rozruch = simulate(silnik, t=0.4, inputs={"S_1_closed": 1})
-rozruch.plot("I_M_1")
+rozruch = simulate(silnik, until=0.4, inputs={"S_1_closed": 1})
+plot(rozruch, "I_M_1")
 """)
     L.md("""
 ## Przekaźnik
@@ -780,7 +788,7 @@ skacze na setki woltów. Prawdziwy tranzystor by tego nie przeżył. Wykres poka
         name = "z_dioda" if diode else "bez_diody"
         L.drawing(name, d)
         L.code(f"""
-simulate({name}, t=0.4).plot("V_c")
+plot(simulate({name}, until=0.4), "V_c")
 """)
     L.save()
 
@@ -928,7 +936,7 @@ Uruchom ⚡: dioda mruga ok. 0,7 razy na sekundę, a oscyloskop pokazuje piłę 
 R1, R2, C1 = 1_000, 10_000, 100e-6
 f = 1.44 / ((R1 + 2 * R2) * C1)
 print(f"f = {f:.2f} Hz, okres {1 / f:.2f} s")
-simulate(migacz, t=6).plot("V_c")
+plot(simulate(migacz, until=6), "V_c")
 """)
     L.md("""
 ## Spróbuj sam

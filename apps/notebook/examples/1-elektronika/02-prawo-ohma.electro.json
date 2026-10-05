@@ -200,12 +200,12 @@
     {
       "id": "81efaff4",
       "type": "markdown",
-      "source": "## Im większy opór, tym mniejszy prąd\n\nTen sam obwód można zapisać kodem — tu dla kilku różnych oporników naraz. `supply(9)` to bateria 9 V\nod masy, `+` łączy elementy jeden za drugim, a `ground` wraca do masy:"
+      "source": "## Im większy opór, tym mniejszy prąd\n\nTen sam obwód można zapisać kodem — tu dla kilku różnych oporników naraz. Najpierw elementy: bateria\n`E` i opornik `R`. `loop(E, R)` to pętla z nich, a `Problem(obwód, {dane})` daje im wartości; `solve`\nrozwiązuje, a `I(R)` to prąd opornika:"
     },
     {
       "id": "b571a1f9",
       "type": "code",
-      "source": "for r in [100, 470, 1000, 4700, 10000]:\n    sol = (supply(9) + Resistor(r) + ground).solve()\n    print(f\"R = {r:>6} Ω   I = {float(sol['R_1'].I) * 1000:6.2f} mA\")",
+      "source": "E, R = VoltageSource(\"E\"), Resistor(\"R\")\nfor r in [100, 470, 1000, 4700, 10000]:\n    sol = solve(Problem(loop(E, R), {E: 9, R: r}))\n    print(f\"R = {r:>6} Ω   I = {float(sol(I(R))) * 1000:6.2f} mA\")",
       "outputs": [
         {
           "type": "stream",
@@ -356,7 +356,7 @@
     {
       "id": "ecdd597b",
       "type": "code",
-      "source": "steps(nieznany.solve(find=\"R_1\"))",
+      "source": "steps(solve(nieznany))",
       "outputs": [
         {
           "type": "solution",
@@ -364,21 +364,13 @@
             "type": "Steps",
             "data": [
               "E_{1} = 9\\,\\mathrm{V}",
-              "A_{1} = 20\\,\\mathrm{mA}"
+              "I_{A_{1}} = 20\\,\\mathrm{mA}"
             ],
             "assumed": [],
             "steps": [
               {
                 "type": "FormulaStep",
-                "chain": "I_{A_{1}} = A_{1} = 20\\,\\mathrm{mA}",
-                "reason": {
-                  "type": "AmmeterReading",
-                  "label": "A_{1}"
-                }
-              },
-              {
-                "type": "FormulaStep",
-                "chain": "U_{E_{1}} = E_{1} = 9\\,\\mathrm{V}",
+                "chain": "V_{n1} = 9\\,\\mathrm{V}",
                 "reason": {
                   "type": "SourceVoltage",
                   "label": "E_{1}"
@@ -386,7 +378,7 @@
               },
               {
                 "type": "FormulaStep",
-                "chain": "U_{A_{1}} = 0\\,\\mathrm{V}",
+                "chain": "V_{n2} = V_{n1} = 9\\,\\mathrm{V}",
                 "reason": {
                   "type": "IdealAmmeter",
                   "label": "A_{1}"
@@ -394,26 +386,10 @@
               },
               {
                 "type": "FormulaStep",
-                "chain": "V_{n1} = U_{E_{1}} + V_{\\mathrm{GND}} = 9 + 0 = 9\\,\\mathrm{V}",
+                "chain": "I_{E_{1}} = I_{A_{1}} = 20\\,\\mathrm{mA}",
                 "reason": {
-                  "type": "VoltageAcross",
-                  "label": "E_{1}"
-                }
-              },
-              {
-                "type": "FormulaStep",
-                "chain": "V_{n2} = V_{n1} - U_{A_{1}} = 9 - 0 = 9\\,\\mathrm{V}",
-                "reason": {
-                  "type": "VoltageAcross",
-                  "label": "A_{1}"
-                }
-              },
-              {
-                "type": "FormulaStep",
-                "chain": "U_{R_{1}} = V_{n2} - V_{\\mathrm{GND}} = 9 - 0 = 9\\,\\mathrm{V}",
-                "reason": {
-                  "type": "VoltageAcross",
-                  "label": "R_{1}"
+                  "type": "KirchhoffCurrent",
+                  "node": "n1"
                 }
               },
               {
@@ -426,16 +402,14 @@
               },
               {
                 "type": "FormulaStep",
-                "chain": "R_{1} = \\frac{U_{R_{1}}}{I_{R_{1}}} = \\frac{9}{0.02} = 450\\,\\mathrm{\\Omega}",
+                "chain": "R_{1} = \\frac{V_{n2}}{I_{R_{1}}} = \\frac{9}{0.02} = 450\\,\\mathrm{\\Omega}",
                 "reason": {
                   "type": "OhmsLaw",
                   "label": "R_{1}"
                 }
               }
             ],
-            "answer": [
-              "R_{1} = 450\\,\\mathrm{\\Omega}"
-            ],
+            "answer": null,
             "missing": null
           }
         }

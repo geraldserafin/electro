@@ -1,177 +1,91 @@
 # electro
 
-Obwody elektryczne jako morfizmy **kategorii hipergrafowej** + solver, który rozwiązuje
-zadania krok po kroku (z uzasadnieniem każdego kroku) i radzi sobie z niewiadomymi.
+Obwody elektryczne jako morfizmy **kategorii hipergrafowej** i solver, który rozwiązuje zadania krok po kroku
+(każdy krok z równaniem i jego powodem) i radzi sobie z niewiadomymi, literami, prądem zmiennym i czasem.
 
 ```python
 from electro import *
 
-c = supply(12) + Resistor(10) + Resistor() + ground  # Resistor() = niewiadoma
-sol = c.solve(I_R1=0.5)
+E, R_1, R_2, A = VoltageSource("E"), Resistor("R_1"), Resistor("R_2"), Node("A")
+uklad = Problem(GND >> E >> R_1 >> A >> R_2 >> GND, {E: 12, R_1: 10, I(R_1): "500m"}, [Parameter(R_2)])
 
-sol["R2"]  # R2 = 14 Ω   U = 7 V   I = 500 mA   P = 3.5 W
-sol.shown_steps()  # kroki: co wyliczono, z którego równania; każde prawo ma powód, np. OhmsLaw(R_2)
+sol = solve(uklad)
+sol(Parameter(R_2))   # 14
+sol(V(A))             # 7
+sol("U_R_1 / I_R_1")  # 10 — po nazwach też, wyrażenia bez eval
+sol.steps             # co wyliczono, z którego równania i dlaczego
 ```
 
-Solver nie mówi nic słowami: powód kroku to typ z `electro.reasons` (`OhmsLaw`, `KirchhoffCurrent`, …),
-a to, co poszło nie tak — typ z `electro.issues` (`MissingData`, `ConflictingData`, …) z danymi, które
-mówią, co i gdzie. Słowami mówi to ten, kto pokazuje wynik — notatnik po polsku albo po angielsku.
-Cały ślad jako dane (wzory w LaTeX) daje `electro_render.steps(sol)`.
+Obwód to sama budowa, bez liczb; liczby i pytania dochodzą w **zadaniu** (`Problem`). Ten sam obwód
+rozwiązuje się z różnymi danymi, a analizy (prąd stały, wskazy, czas) tylko inaczej czytają te same prawa.
 
-## Klocki i kombinatory
+Biblioteka nie mówi nic słowami: powód kroku i to, co poszło nie tak, to dane (`report.steps`,
+`report.issues`, wzory w LaTeX). Słowami mówi ten, kto pokazuje wynik — notatnik po polsku albo po angielsku.
 
-Każdy obwód ma typ `m → n`: `m` zacisków z lewej, `n` z prawej.
+## Klocki
 
-| zapis | typ | znaczenie |
-|---|---|---|
-| `Resistor(10)`, `Capacitor("1u")`, `Inductor("2m")` | 1 → 1 | elementy; `Resistor()` = niewiadoma, `Resistor("R")` = symbol |
-| `VoltageSource(12)`, `CurrentSource("0,5")` | 1 → 1 | źródło napięcia (`+` z prawej), źródło prądu (pcha w prawo) |
-| `Ammeter(odczyt)`, `Voltmeter(odczyt)` | 1 → 1 | idealne mierniki; odczyt to dana pomiarowa, bez niego — wynik do policzenia |
-| `OpAmp()` | 2 → 1 | idealny wzmacniacz operacyjny: (+, −) → wyjście |
-| `Hole()` | 1 → 1 | nieznany element; solver dobiera najprostszy pasujący |
-| `wire`, `wires(n)`, `swap` | | przewody, skrzyżowanie |
-| `split`, `join`, `spider(m, n)` | | węzeł (pająk Frobeniusa) |
-| `ground` / `ground.transpose()` | 1 → 0 / 0 → 1 | masa |
-| `node("A")` | 1 → 1 | nazwany punkt (ta sama nazwa = ten sam węzeł) |
-| `f + g` | | szeregowo (złożenie) |
-| `f \| g` | | równolegle; `a + b \| c` znaczy `(a + b) \| c` (priorytety Pythona) |
-| `f @ g` | | obok siebie, bez połączenia (iloczyn monoidalny) |
-| `f.transpose()` | | transpozycja (sztylet): zamiana lewej i prawej strony; dla źródła zmiana biegunowości |
-| `f.close()`, `loop(...)` | n → n ⇒ 0 → 0 | zamknięcie w pętlę (ślad) |
-| `shunt(x)` | 1 → 1 | element od linii do masy |
-| `supply(v)` | 0 → 1 | `ground.transpose() + VoltageSource(v)` |
-| `net((x, "A", "B"), ...)` | 0 → 0 | dowolny graf, np. mostek (netlista jak w SPICE) |
+Każdy obwód ma typ `m → n`: `m` końców z lewej, `n` z prawej. Element ma nazwę; jego tożsamość to ten obiekt.
 
-Etykieta jest opcjonalna: `Resistor(10)` dostanie nazwę automatycznie (R1, R2, …),
-`Resistor(10, label="Rx")` własną.
+| zapis | znaczenie |
+|---|---|
+| `Resistor("R_1")`, `Capacitor`, `Inductor` | elementy dwukońcowe, 1 → 1 |
+| `VoltageSource`, `CurrentSource`, `SineSource`, `SquareSource` | źródła (`+` na drugim końcu; prąd pchany od pierwszego do drugiego) |
+| `Ammeter`, `Voltmeter` | idealne mierniki; odczyt to dana `I(A_1)`, `U(V_1)` |
+| `OpAmp`, `VCVS`, `VCCS`, `CCVS`, `CCCS`, `Transformer`, `Coupled` | wielokońcowe: `at(e, a, b, c…)` |
+| `Diode`, `LED`, `Zener`, `NPN`, `PNP`, `NMOS`, `PMOS`, bramki, `Timer555`, `Motor`, `Relay`, płytki… | nieliniowe i z pamięcią: w czasie |
+| `Hole` | nieznany element: `fill` wstawia najprostszy pasujący |
+| `f >> g` | szeregowo (złożenie) |
+| `f \| g` | równolegle |
+| `f @ g` | obok siebie, bez połączenia (iloczyn monoidalny) |
+| `Node("A")`, `GND` | punkt (ten sam obiekt w dwóch miejscach = jeden punkt), masa |
+| `loop(a, b, …)`, `close(f)` | pętla |
+| `flip(f)` | odwrócony (transpozycja przez `cap` i `cup`) |
+| `at(e, a, b)`, `beside(…)` | element między punktami, kawałki obok siebie — dowolny graf (mostek) |
+| `wire`, `cap`, `cup` | pająki: 1 → 1, 0 → 2, 2 → 0 |
 
-Wartości: `10`, `4.7`, `"4.7k"`, `"4k7"`, `"0,5 A"`, `"12V"`, `"R"` (symbol).
+Wartości: `10`, `4.7`, `"4.7k"`, `"4k7"`, `"0,5 A"`, `"230∠-120"`, `"R"` (litera). Element o kilku
+parametrach dostaje słownik: `{S: {"": 10, "f": 50}}`, `{D: part("1N4148")}`.
 
-## Rozwiązywanie
+## Zadanie i rozwiązanie
 
 ```python
-sol = c.solve(I_R1=0.5)  # dane jako kwargs
-sol = c.solve({I("R1"): "500m"})  # albo słownik
-sol = c.solve(Eq(U("R1"), 2 * U("R2")))  # albo dowolne równanie
-sol = c.solve(P_R1=8)  # moc P = U·I
-
-sol["R1"].I, sol.V("A"), sol.U("A", "B"), sol(U("R1") / I("R1"))
-steps(sol)  # ślad rozwiązania (electro_render)
+Problem(obwod, given={element: wartość, wielkość: wartość}, find=[wielkość, …])
 ```
 
-### Zadanie typu „dane są…, oblicz X, Y, Z”
+Wielkości: `I(e)`, `U(e)`, `P(e)`, `Parameter(e)`, `V(punkt)`, `U(a, b)`; dana może też być inną wielkością
+(`U(R_1): 2 * U(R_2)`). `solve(zadanie)` zwraca `Solution`: `sol(q)`, `sol.answers` (szukane), `sol.steps`.
+Czego nie da się wyznaczyć — `MissingData` (ile danych brakuje i które by wystarczyły); dane sprzeczne —
+`Contradiction` (które się wykluczają); dwa rozwiązania — `Ambiguous`.
 
-```python
-sol = uklad.solve(I_R_1=2, U_R_2=8, U_R_3=5, find=["R_1", "R_3", "E_2"])
-sol  # R_1 = 2 Ω, R_3 = 5 Ω, E_2 = -3 V
-sol.answers  # {"R_1": 2, "R_3": 5, "E_2": -3}
-steps(sol)  # tylko kroki potrzebne do odpowiedzi, i odpowiedź
-```
+Prąd zmienny: zadanie z sinusami jednej częstotliwości liczy się samo ich wskazami; `solve(zadanie,
+AC(ω))` przy danej częstotliwości. W czasie: `simulate(zadanie, until=…, dt=…, inputs={…})` zwraca ślad:
+`slad(q)`, `slad.at(q, t)`, `slad.spectrum(q)`.
 
-Etykieta w `find` oznacza wartość elementu (`"R_1"` → rezystancja). Każda inna nazwa to wielkość
-(`"I_R_2"`, `"U_R_1"`, `"V_A"`). Gdy danych brakuje, dostajesz `MissingData`: czego nie da się
-wyznaczyć, ilu danych brakuje i które by wystarczyły:
+## Metody
 
-```
-MissingData(targets=[R_3, E_2], needed=1, options=[(U_R_3,), (U_J_1,), (U_E_2,)])
-```
+| | |
+|---|---|
+| `blackbox(kawałek)`, `resistance(…)`, `matches(…, Kind)` | kawałek 1 → 1 widziany z końców: relacja, jaki to jeden element |
+| `thevenin(between(zadanie, A, B))` | Thévenin widziany z dwóch punktów |
+| `superposition(zadanie, q)` | wkład każdego źródła z osobna |
+| `simplify(zadanie)` | upraszczanie jak w zeszycie, krok po kroku |
+| `fill(zadanie, dziura)` | najprostszy element w miejsce `Hole` |
+| `respond`/`responses`, `sweep`/`sweeps`, `tolerance`/`spreads` | charakterystyka częstotliwościowa, przemiatanie wartości, rozrzut z tolerancji — każde rozwiązane raz, z literą |
+| `to_spice`, `from_spice` | netlisty SPICE w obie strony (porównane z ngspice w testach) |
+| `to_netlist`, `from_netlist` | zadanie jako dane (tak rozmawia z nim notatnik) |
+| `compile_program` | program symulacji dla silnika na stronie (ten sam JSON) |
 
-Częściowe wyniki są w `err.solution`. Bez `find` to samo pojawia się jako ostrzeżenie (`Underdetermined`).
-Zawsze można też zapytać wprost: `sol.diagnose(["R_3"])`.
+## Pakiet
 
-Solver najpierw **propaguje więzy**: szuka równania z jedną niewiadomą, wylicza ją
-i zapisuje krok z nazwą prawa. Tak liczy się na kartce. Kiedy to nie wystarcza
-(np. mostek), rozwiązuje pozostały **układ równań** naraz. Wykrywa też sytuacje brzegowe:
+| | |
+|---|---|
+| `circuit/` | budowa: drzewo, netlista (kospan), rodzaje elementów i ich prawa, części z katalogów |
+| `problem/` | zadanie: wielkości, dane, nazwy, netlista jako dane, SPICE |
+| `solver/` | równania z praw, rozwiązanie krok po kroku, przypadki, Newton |
+| `methods/` | metody nad solverem, bez nowych praw |
+| `simulation/` | program kroku w czasie, przebieg, wejścia |
+| `report/` | kroki i problemy jako dane, LaTeX |
+| `code/` | zadanie jako kod (`>>` i `\|`, gdzie się da) i jego struktura |
+| `values.py` | liczby z jednostkami i przedrostkami, wyrażenia bez `eval` |
 
-- `Contradiction`, gdy dane są sprzeczne,
-- `Ambiguous`, gdy jest kilka rozwiązań (np. moc daje równanie kwadratowe),
-- brak danych: ile danych brakuje i jakie pomiary by wystarczyły (rozwiązanie parametryczne + rząd gradientów).
-
-Analiza AC: `c.solve(omega=...)` używa wskazów, bo C i L dostają impedancje 1/(jωC) i jωL.
-Bez `omega` liczony jest stan ustalony DC.
-
-```python
-resistance(Resistor(10) + (Resistor(20) | Resistor(30)))  # 22
-equivalent(supply(12) + Resistor(10) + shunt(Resistor(10)))  # E_th = 6 V, R_th = 5 Ω
-blackbox(Resistor(10) | Resistor(10))  # relacja na zaciskach
-```
-
-### Brakujący element: `Hole()`
-
-```python
-uklad = supply(12) + Resistor(10) + Hole() + ground
-sol = uklad.solve(I_R_1=0.5)
-sol["X_1"]  # X_1 → R = 14 Ω   U = 7 V   I = 500 mA
-uklad.fill(sol)  # ... + Resistor(10 Ω) + Resistor(14 Ω) + ground
-```
-
-Dziura to nieznany dwójnik. Każdy liniowy dwójnik to `VoltageSource(E) + Resistor(Z)` (Thévenin),
-więc dziura ma dwie niewiadome: E i Z ≥ 0. Jeden punkt pracy (jedno U i jedno I) nie wystarcza,
-żeby je rozróżnić. Dlatego solver wybiera **najprostszy element, który pasuje do danych**:
-najpierw rezystor (E = 0), potem źródło (Z = 0). Przyjęte założenie jest w `sol.assumed` (i w `steps(sol)`).
-Z = 0 i E = 0 daje przewód. Rozwarcia (Z = ∞) ta postać nie wyraża.
-
-### Obwód → kod: `code()`
-
-```python
-code(uklad)  # czysty kod electro, który buduje ten sam obwód
-sch.to_code()  # to samo dla rysunku z electro-schematic
-```
-
-Układy szeregowo-równoległe wracają jako `+` / `|`. Obwód z jednym źródłem wraca jako `loop(...)`,
-a kilka gałęzi ze źródłami jako gałęzie. Resztę (mostek, wzmacniacz) generator zapisuje jako `net(...)`.
-Etykiety pisze tylko tam, gdzie automatyczna numeracja dałaby inne.
-
-## Teoria, czyli co jest czym
-
-Trzy warstwy połączone funktorami:
-
-```
-Circuit (drzewo składni)  ──netlist──►  Netlist (kospan)  ──semantyka──►  równania / relacje
-   wolna kategoria                        Cospan(FinSet)                     LinRel (afiniczne)
-   hipergrafowa                           dekorowany elementami
-```
-
-- **Obiekty** to liczby naturalne (liczba zacisków). **Morfizmy** to obwody.
-- **Drzewo składni** (`Seq`, `Par`, `Tensor`, `Atom`, …) jest zachowane dokładnie tak, jak je zbudowano.
-  Z niego rysuje się schemat.
-- **Netlista** to kospan `lewe zaciski → węzły ← prawe zaciski`, udekorowany elementami.
-  Złożenie `+` to wypchnięcie (pushout): sklejenie węzłów. Etykiety `node("A")` to kolimit po nazwach.
-- **Węzeł** to pająk specjalnej przemiennej algebry Frobeniusa. `split`/`join` spełniają
-  `split + join = wire` oraz prawo Frobeniusa. Fizycznie oznacza to I prawo Kirchhoffa
-  (prądy się sumują) i jeden potencjał w węźle (potencjał się kopiuje).
-- **Połączenie równoległe** jest wyprowadzone, a nie pierwotne: `f | g = split + (f @ g) + join`.
-- **Semantyka**: każdy element to relacja między potencjałami i prądami na swoich zaciskach.
-  Obwód to relacja (układ równań), a złożenie to złożenie relacji.
-  `blackbox` eliminuje zmienne wewnętrzne. Dwa obwody są równoważne,
-  gdy mają ten sam `blackbox`, i tak wyrażają się twierdzenia Thévenina i Nortona.
-- **Masa** działa jak niejawny przewód w każdym morfizmie. Prąd może odpłynąć do masy,
-  dlatego I prawa Kirchhoffa nie pisze się w węźle masy.
-
-`tests/test_laws.py` sprawdza te prawa: łączność, prawo zamiany, naturalność `swap`,
-prawa Frobeniusa, zygzak (yanking), sztylet, a także fizykę jako równania między obwodami
-(`Resistor(x) + Resistor(y) ≅ Resistor(x+y)`, Norton ≅ Thévenin).
-
-## Własne elementy
-
-Element jest od razu obwodem (morfizmem). Wystarczy dziedziczyć po `TwoTerminal`
-(albo po `Component`, gdy element ma więcej zacisków) i napisać jego prawa:
-
-```python
-import sympy as sp
-from electro import NoValue, TwoTerminal
-
-
-class Diode(NoValue, TwoTerminal):  # model ze stałym spadkiem napięcia
-    prefix = "D"
-
-    def law(self, U, I, x, ctx):
-        return [(U - sp.Rational(7, 10), "dioda przewodząca: U = 0.7 V ({label})")]
-
-
-(supply(5) + Resistor(430) + Diode() + ground).solve()
-```
-
-## Uruchomienie
-
-Z katalogu głównego repo: `devenv shell`, potem `pytest`. Schematy i ślad w Markdown są w [`electro-render`](../electro-render).
+Projekt i decyzje: [`DESIGN.md`](DESIGN.md). Testy: `devenv shell`, potem `pytest` w katalogu głównym repo.

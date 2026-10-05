@@ -200,8 +200,7 @@ export const ElementView = memo(
     sameLook(a.look, b.look),
 );
 
-/** Where an arrow's name goes, from its middle: on its left as it points (above one pointing right),
- *  as electro_render draws it. */
+/** Where an arrow's name goes, from its middle: on its left as it points (above one pointing right). */
 const ARROW_NAME: Record<number, [number, number, "middle" | "start" | "end"]> = {
   0: [0, -8, "middle"],
   90: [8, 4, "start"],

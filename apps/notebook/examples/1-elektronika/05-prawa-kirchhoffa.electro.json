@@ -241,7 +241,7 @@
     {
       "id": "a9322d89",
       "type": "code",
-      "source": "steps(dwa_zrodla.solve(find=[\"I_R_1\", \"I_R_2\", \"I_R_3\"]))",
+      "source": "steps(solve(dwa_zrodla))",
       "outputs": [
         {
           "type": "solution",
@@ -258,7 +258,7 @@
             "steps": [
               {
                 "type": "FormulaStep",
-                "chain": "U_{E_{1}} = E_{1} = 12\\,\\mathrm{V}",
+                "chain": "V_{n1} = 12\\,\\mathrm{V}",
                 "reason": {
                   "type": "SourceVoltage",
                   "label": "E_{1}"
@@ -266,37 +266,18 @@
               },
               {
                 "type": "FormulaStep",
-                "chain": "U_{E_{2}} = E_{2} = 6\\,\\mathrm{V}",
+                "chain": "V_{n3} = 6\\,\\mathrm{V}",
                 "reason": {
                   "type": "SourceVoltage",
-                  "label": "E_{2}"
-                }
-              },
-              {
-                "type": "FormulaStep",
-                "chain": "V_{n1} = U_{E_{1}} + V_{\\mathrm{GND}} = 12 + 0 = 12\\,\\mathrm{V}",
-                "reason": {
-                  "type": "VoltageAcross",
-                  "label": "E_{1}"
-                }
-              },
-              {
-                "type": "FormulaStep",
-                "chain": "V_{n3} = U_{E_{2}} + V_{\\mathrm{GND}} = 6 + 0 = 6\\,\\mathrm{V}",
-                "reason": {
-                  "type": "VoltageAcross",
                   "label": "E_{2}"
                 }
               },
               {
                 "type": "SystemStep",
                 "equations": [
-                  "U_{R_{1}} - I_{R_{1}} \\cdot R_{1} = 0",
-                  "U_{R_{2}} - I_{R_{2}} \\cdot R_{2} = 0",
-                  "U_{R_{3}} - I_{R_{3}} \\cdot R_{3} = 0",
-                  "U_{R_{1}} + V_{n2} - V_{n1} = 0",
-                  "U_{R_{2}} + V_{\\mathrm{GND}} - V_{n2} = 0",
-                  "U_{R_{3}} + V_{n3} - V_{n2} = 0",
+                  "V_{n1} - 4 \\cdot I_{R_{1}} - V_{n2} = 0",
+                  "V_{n2} - 6 \\cdot I_{R_{2}} = 0",
+                  "V_{n2} - 3 \\cdot I_{R_{3}} - V_{n3} = 0",
                   "I_{R_{1}} - I_{E_{1}} = 0",
                   "I_{R_{2}} + I_{R_{3}} - I_{R_{1}} = 0",
                   "- I_{E_{2}} - I_{R_{3}} = 0"
@@ -307,18 +288,11 @@
                   "I_{R_{1}} = 1.333\\,\\mathrm{A}",
                   "I_{R_{2}} = 1.111\\,\\mathrm{A}",
                   "I_{R_{3}} = 222.2\\,\\mathrm{mA}",
-                  "U_{R_{1}} = 5.333\\,\\mathrm{V}",
-                  "U_{R_{2}} = 6.667\\,\\mathrm{V}",
-                  "U_{R_{3}} = 666.7\\,\\mathrm{mV}",
                   "V_{n2} = 6.667\\,\\mathrm{V}"
                 ]
               }
             ],
-            "answer": [
-              "I_{R_{1}} = 1.333\\,\\mathrm{A}",
-              "I_{R_{2}} = 1.111\\,\\mathrm{A}",
-              "I_{R_{3}} = 222.2\\,\\mathrm{mA}"
-            ],
+            "answer": null,
             "missing": null
           }
         }
@@ -332,7 +306,7 @@
     {
       "id": "ece9f61a",
       "type": "code",
-      "source": "sol = dwa_zrodla.solve()\nprint(\"I_R_1 =\", sol[\"R_1\"].I, \" I_R_2 + I_R_3 =\", sol[\"R_2\"].I + sol[\"R_3\"].I)",
+      "source": "sol = solve(dwa_zrodla)\nprint(\"I_R_1 =\", sol(\"I_R_1\"), \" I_R_2 + I_R_3 =\", sol(\"I_R_2 + I_R_3\"))",
       "outputs": [
         {
           "type": "stream",

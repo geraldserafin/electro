@@ -32,7 +32,11 @@ export function useRunner(latest: RefObject<Notebook>, update: (id: string, patc
     if (cell?.type !== "code") return Promise.resolve();
     return busy(id, async () => {
       try {
-        const outputs = await kernel.run(cell.source, schematics(), String(latest.current.settings.symbols ?? "iec"));
+        const outputs = await kernel.run(
+          cell.source,
+          schematics(),
+          latest.current.settings.symbols === "ieee" ? "ieee" : "iec",
+        );
         update(id, { outputs, execution: ++executions.current });
       } catch (error) {
         update(id, { outputs: [{ type: "error", data: String(error) }] });

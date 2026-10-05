@@ -3,7 +3,7 @@ import type { PartMark } from "./parts";
 
 export type Point = [number, number];
 
-/** Mirrors electro_schematic.Element / Wire / Schematic (the JSON the Python side reads). */
+/** A drawing on the grid as a note keeps it: its elements, its wires. */
 export interface ElementData {
   id: string;
   kind: string;
@@ -35,7 +35,7 @@ export interface PartPin {
   at: number; // grid squares from the top (left, right) or the left (top, bottom)
 }
 
-/** One's own component (electro_schematic.Part): a box of `size` grid squares, its pins sticking out
+/** One's own component: a box of `size` grid squares, its pins sticking out
  *  a square from its sides, and inside a drawing whose ports are the pins. */
 export interface PartDef {
   name: string;
@@ -45,7 +45,7 @@ export interface PartDef {
   prefix?: string; // its elements' ids: U_1, U_2…
 }
 
-/** electro_render.symbol_library(): how every element kind looks. */
+/** How every element kind looks (symbols.json). */
 export interface SymbolLibrary {
   grid: number;
   style: string;

@@ -22,8 +22,6 @@ export function sayer(t: TFunction<"solution">, lang: string) {
     switch (r.type) {
       case "Given":
         return t("reason.Given");
-      case "Terminal":
-        return t("reason.Terminal", { side: r.side, index: r.index });
       case "KirchhoffCurrent":
         return t("reason.KirchhoffCurrent", { node: math(r.node) });
       default:
@@ -56,28 +54,8 @@ export function sayer(t: TFunction<"solution">, lang: string) {
         if (i.conditions.length) return t("issue.conflictConditions", { conditions });
         return t("issue.conflictAll");
       }
-      case "LawBroken":
-        return t("issue.LawBroken", {
-          equation: math(i.law.equation),
-          reason: reason(i.law.reason),
-          rest: math(i.rest),
-        });
-      case "NoSolutionFor":
-        return t("issue.NoSolutionFor", {
-          variable: math(i.variable),
-          equation: math(i.law.equation),
-          reason: reason(i.law.reason),
-        });
-      case "NoSystemSolution":
-        return t("issue.NoSystemSolution", {
-          laws: i.laws.map((l) => `${math(l.equation)} (${reason(l.reason)})`).join("; "),
-        });
       case "Ambiguous":
         return t("issue.Ambiguous", { count: i.options.length, options: or(i.options.map(maths)) });
-      case "Undetermined":
-        return t("issue.Undetermined", { symbols: maths(i.symbols) });
-      case "HoleUndetermined":
-      case "NeedsSimulation":
       case "NotSimulated":
       case "ValueNeeded":
         return t(`issue.${i.type}`, { label: math(i.label) });
@@ -85,68 +63,21 @@ export function sayer(t: TFunction<"solution">, lang: string) {
         return t("issue.NoConvergence", { time: i.time.toPrecision(4) });
       case "NoSuchInput":
         return t("issue.NoSuchInput", { name: code(i.name), available: names(i.available) });
-      case "BadCondition":
-        return t("issue.BadCondition", { condition: code(i.condition) });
-      case "NotInCircuit":
-        return t("issue.NotInCircuit", { name: code(i.name) });
-      case "ComponentRepeated":
-        return t("issue.ComponentRepeated", { count: i.count });
       case "NoSuchQuantity":
         return t("issue.NoSuchQuantity", { name: code(i.name), available: maths(i.available) });
-      case "NoSuchElement":
-        return t("issue.NoSuchElement", { label: code(i.label), available: maths(i.available) });
-      case "DuplicateLabel":
-        return t("issue.DuplicateLabel", { label: math(i.label) });
       case "BadExpression":
         return t("issue.BadExpression", { expression: code(i.expression) });
       case "BadName":
         return t("issue.BadName", { name: code(i.name) });
       case "BadValue":
       case "NotAValue":
-      case "NotACircuit":
         return t(`issue.${i.type}`, { value: code(i.value) });
-      case "SeriesMismatch":
-        return t("issue.SeriesMismatch", {
-          left: code(i.left),
-          right: code(i.right),
-          outputs: i.outputs,
-          inputs: i.inputs,
-        });
-      case "ParallelMismatch":
-        return t("issue.ParallelMismatch", {
-          first: code(i.first),
-          firstShape: i.first_shape,
-          other: code(i.other),
-          otherShape: i.other_shape,
-        });
-      case "ShuntNeedsOneToOne":
-        return t("issue.ShuntNeedsOneToOne", { part: code(i.part), shape: i.shape });
-      case "CloseNeedsNToN":
-      case "NotAPort":
-        return t(`issue.${i.type}`, { shape: i.shape });
       case "WrongNodeCount":
         return t("issue.WrongNodeCount", { part: code(i.part), terminals: i.terminals, nodes: names(i.nodes) });
-      case "NotLinear":
-      case "NoThevenin":
-      case "EmptySchematic":
-        return t(`issue.${i.type}`);
       case "CannotLayOut":
         return t("issue.CannotLayOut", { circuit: code(i.circuit) });
-      case "CannotLayOutElement":
-        return t("issue.CannotLayOutElement", { element: code(i.element), shape: i.shape });
-      case "CannotLayOutParallel":
-      case "CannotLayOutLoop":
-        return t(`issue.${i.type}`, { shape: i.shape });
-      case "NoKindFor":
-        return t("issue.NoKindFor", { component: code(i.component) });
       case "UnknownKind":
         return t("issue.UnknownKind", { kind: code(i.kind), available: names(i.available) });
-      case "BadRotation":
-        return t("issue.BadRotation", { rotation: i.rotation });
-      case "SkewedWire":
-        return t("issue.SkewedWire", { start: `(${i.start.join(", ")})`, end: `(${i.end.join(", ")})` });
-      case "NotOnSchematic":
-        return t("issue.NotOnSchematic", { id: code(i.id) });
       case "NoCircuitInCode":
         return t("issue.NoCircuitInCode", { variable: i.variable });
       case "UnknownPart":
