@@ -1,41 +1,61 @@
 """The library's school problems (test_school.py), each again on the prototype (electro.core), with the
-same numbers — side by side: what it does as well, and (xfail, with why) what it does not do yet."""
+same numbers."""
 
 import pytest
 import sympy as sp
 from electro.core import (
     AC,
+    CCCS,
+    CCVS,
     GND,
+    VCCS,
     VCVS,
+    Ambiguous,
+    Ammeter,
     Capacitor,
+    Contradiction,
+    Coupled,
     CurrentSource,
+    Hole,
     I,
+    Inductor,
+    MissingData,
     Node,
+    OpAmp,
+    Open,
+    P,
     Parameter,
     Problem,
     Resistor,
+    Transformer,
     U,
     Undetermined,
     V,
     VoltageSource,
+    Wire,
     at,
     beside,
+    between,
     blackbox,
     close,
+    fill,
     loop,
+    resistance,
+    respond,
     solve,
+    superposition,
+    sweep,
+    thevenin,
+    tolerance,
 )
-from electro.core.methods import between, resistance, superposition, thevenin
-from electro.core.problem import Ambiguous, Contradiction, MissingData, P
-from electro.core.syntax import CCCS, CCVS, VCCS, Ammeter, OpAmp
-from electro.core.syntax import Capacitor as C
+from electro.core import Capacitor as C
 from electro.values import parse
 
 
 def test_divider_with_unknown_resistor():
     e, r1, r2 = VoltageSource("E"), Resistor("R_1"), Resistor("R_2")
     s = solve(Problem(GND >> e >> r1 >> Node() >> r2 >> GND, {e: 12, r1: 10, I(r1): "0.5"}))
-    assert (s(Parameter(r2)), s(U(r2)), -s(P(e))) == (14, 7, 6)  # (a source's power: minus what it gives)
+    assert (s(Parameter(r2)), s(U(r2)), -s(P(e))) == (14, 7, 6)
 
 
 def test_givens_in_many_forms():
@@ -47,7 +67,6 @@ def test_givens_in_many_forms():
 
 
 def test_series_parallel_resistance():
-    # (rules found by black boxes — series, parallel — none written)
     assert (
         resistance(blackbox(Resistor("a") >> (Resistor("b") | Resistor("c")))).subs({"a": 10, "b": 20, "c": 30}) == 22
     )
@@ -127,8 +146,6 @@ def test_ac_impedance():
         resistance(blackbox(Resistor("R") >> C("C"), AC(sp.Integer(1))), AC(sp.Integer(1))).subs({"R": 1, "C": 1})
         == 1 - sp.I
     )
-    from electro.core import Inductor
-
     assert (
         resistance(blackbox(Resistor("R") >> Inductor("L"), AC(sp.Integer(2))), AC(sp.Integer(2))).subs(
             {"R": 1, "L": 1}
@@ -140,7 +157,7 @@ def test_ac_impedance():
 def test_ac_power_is_average():
     e, r, c = VoltageSource("E"), Resistor("R"), Capacitor("C")
     s = solve(Problem(GND >> e >> r >> Node() >> c >> GND, {e: 1, r: 1000, c: "1u"}), AC(sp.Integer(1000)))
-    assert s(P(r)) == sp.Rational(1, 4000) and s(P(c)) == 0  # ½·|I|²·R, |I| = 1/√2 mA
+    assert s(P(r)) == sp.Rational(1, 4000) and s(P(c)) == 0
 
 
 def _rc(c_value="1u"):
@@ -150,8 +167,6 @@ def _rc(c_value="1u"):
 
 
 def test_bode_rc_low_pass():
-    from electro.core.methods import respond
-
     p, e, _, _, a = _rc()
     resp = respond(p, V(a), e)
 
@@ -161,14 +176,12 @@ def test_bode_rc_low_pass():
     fc = 1 / (2 * 3.14159265 * 1e-3)
     assert resp.gain_db[0] == pytest.approx(0, abs=0.05)
     assert resp.gain_db[at(fc)] == pytest.approx(-3, abs=0.1) and resp.phase_deg[at(fc)] == pytest.approx(-45, abs=1)
-    assert resp.gain_db[at(1e5)] - resp.gain_db[at(1e4)] == pytest.approx(-20, abs=0.5)  # −20 dB a decade
+    assert resp.gain_db[at(1e5)] - resp.gain_db[at(1e4)] == pytest.approx(-20, abs=0.5)
     [corner] = resp.cutoffs()
     assert corner == pytest.approx(fc, rel=0.01)
 
 
 def test_sweep_a_divider():
-    from electro.core.methods import sweep
-
     e, r1, r2 = VoltageSource("E"), Resistor("R_1"), Resistor("R_2")
     a = Node("A")
     p = Problem((GND >> e >> r1 >> a) @ (a >> r2 >> GND), {e: 12, r1: "1k"})
@@ -177,23 +190,19 @@ def test_sweep_a_divider():
 
 
 def test_sweep_at_a_frequency_gives_amplitudes():
-    from electro.core.methods import sweep
-
     p, e, _, c, _ = _rc()
     out = sweep(Problem(p.circuit, {**p.given, e: 1}), c, ("1u", "1n"), U(c), AC(sp.Integer(1000)))
     assert [abs(complex(x)) for x in out.results] == pytest.approx([1 / abs(1 + 1j), 1 / abs(1 + 1e-3j)])
 
 
 def test_tolerance_of_a_divider():
-    from electro.core.methods import tolerance
-
     e, r1, r2 = VoltageSource("E"), Resistor("R_1"), Resistor("R_2")
     a = Node("A")
     p = Problem((GND >> e >> r1 >> a) @ (a >> r2 >> GND), {e: 12, r1: "10k", r2: "10k"})
     s = tolerance(p, V(a), tol=0.05, runs=400).stats()
     assert s["mean"] == pytest.approx(6, abs=0.03) and 5.7 <= s["min"] and s["max"] <= 6.3
-    assert tolerance(p, V(a), tol=0.05, runs=400) == tolerance(p, V(a), tol=0.05, runs=400)  # (a seed: the same)
-    assert tolerance(p, V(a), tol={"C": 0.1}, runs=5).stats()["std"] == 0  # (no resistor varies)
+    assert tolerance(p, V(a), tol=0.05, runs=400) == tolerance(p, V(a), tol=0.05, runs=400)
+    assert tolerance(p, V(a), tol={"C": 0.1}, runs=5).stats()["std"] == 0
 
 
 def test_dc_capacitor_blocks():
@@ -212,7 +221,7 @@ def test_contradiction_names_the_clashing_data():
     e, r = VoltageSource("E"), Resistor("R")
     with pytest.raises(Contradiction) as err:
         solve(Problem(loop(e, r), {e: 12, r: 10, I(r): 5}))
-    assert {e, r, I(r)} == set(err.value.data)  # (without any one of them, it fits)
+    assert {e, r, I(r)} == set(err.value.data)
 
 
 def test_underdetermined_is_said_when_asked():
@@ -233,13 +242,11 @@ def test_two_solutions_are_named():
     with pytest.raises(Ambiguous) as err:
         solve(Problem(loop(e, r1, r2), {e: 12, r2: 4, P(r1): 8}))
     assert err.value.options == ({sp.Symbol("R_1"): 8}, {sp.Symbol("R_1"): 2})
-    # one more condition — a relation between two quantities — picks one
     e, r1, r2 = VoltageSource("E"), Resistor("R_1"), Resistor("R_2")
     assert solve(Problem(loop(e, r1, r2), {e: 12, r2: 4, P(r1): 8, U(r1): 2 * U(r2)}))(Parameter(r1)) == 8
 
 
 def test_three_sources_as_parallel_branches():
-    # E1+R1 | R2 | E2+(R3 | J) between the top node and ground; superposition from the laws
     e1, e2, j, r1, r2, r3 = (
         VoltageSource("E_1"),
         VoltageSource("E_2"),
@@ -249,7 +256,6 @@ def test_three_sources_as_parallel_branches():
         Resistor("R_3"),
     )
     top, mid = Node("TOP"), Node("MID")
-    # (the third branch: R3 ∥ J from the bottom to MID, then E2 turned, its + at MID, up to the top)
     circuit = (
         (GND >> e1 >> Node() >> r1 >> top)
         @ (GND >> r2 >> top)
@@ -295,7 +301,7 @@ def test_missing_data_says_what_would_help():
     with pytest.raises(MissingData) as err:
         _ = s.answers
     assert err.value.needed == 1 and U(r3) in err.value.options
-    assert err.value.found == {Parameter(r1): 2}  # (the part that could be found is kept)
+    assert err.value.found == {Parameter(r1): 2}
 
 
 def test_missing_data_counts_redundant_givens_once():
@@ -307,46 +313,34 @@ def test_missing_data_counts_redundant_givens_once():
 
 
 def _with_hole(given_current):
-    from electro.core.syntax import Hole
-
     e, r, x = VoltageSource("E"), Resistor("R_1"), Hole("X")
     return Problem(GND >> e >> r >> Node() >> x >> GND, {e: 12, r: 10, I(r): given_current}), x
 
 
 def test_hole_becomes_the_simplest_element():
-    from electro.core.methods import fill
-
     filled = fill(*_with_hole("0.5"))
     assert filled.by.kind is Resistor and filled.solution(Parameter(filled.by)) == 14
-    assert solve(filled.problem)(I(filled.by)) == sp.Rational(1, 2)  # (the filled circuit gives the data back)
+    assert solve(filled.problem)(I(filled.by)) == sp.Rational(1, 2)
 
 
 def test_hole_needs_a_source_when_current_flows_backwards():
-    from electro.core.methods import fill
-
-    filled = fill(*_with_hole("-0.5"))  # (a resistor would be −34 Ω: never)
-    assert filled.by.kind is VoltageSource and filled.solution(Parameter(filled.by)) == -17  # (+ at its first end)
+    filled = fill(*_with_hole("-0.5"))
+    assert filled.by.kind is VoltageSource and filled.solution(Parameter(filled.by)) == -17
 
 
 def test_hole_can_be_a_plain_wire():
-    from electro.core.methods import fill
-    from electro.core.syntax import Wire
-
-    assert fill(*_with_hole("1,2")).by.kind is Wire  # (12 V on 10 Ω alone: nothing else in the way)
+    assert fill(*_with_hole("1,2")).by.kind is Wire
 
 
 def test_hole_with_no_current_is_a_break():
-    from electro.core.methods import fill
-    from electro.core.syntax import Hole, Open
-
     e, r, x = VoltageSource("E"), Resistor("R_1"), Hole("X")
     filled = fill(Problem(loop(e, r, x), {e: 12, r: 10, I(r): 0}), x)
-    assert filled.by.kind is Open and filled.solution(U(filled.by)) == 12  # (all the voltage across the break)
+    assert filled.by.kind is Open and filled.solution(U(filled.by)) == 12
 
 
 def test_unknown_resistor_cannot_be_negative():
     e, r1, r2 = VoltageSource("E"), Resistor("R_1"), Resistor("R_2")
-    with pytest.raises(Contradiction):  # (it would take −34 Ω: a resistor's law says it is never negative)
+    with pytest.raises(Contradiction):
         solve(Problem(GND >> e >> r1 >> Node() >> r2 >> GND, {e: 12, r1: 10, I(r1): "-0.5"}))
 
 
@@ -358,7 +352,6 @@ def test_unknown_source_can_come_out_positive():
 def test_ammeter_reading_is_a_datum():
     e, r1, r2, r3, r4, a2 = (VoltageSource("E"), *(Resistor(f"R_{k}") for k in range(1, 5)), Ammeter())
     a, b, c = Node("A"), Node("B"), Node("C")
-    # E, R1 = 3, then (R2 = 18 + ammeter) ∥ (R3 = 3 + R4 = 6); the ammeter reads 2 A
     circuit = (GND >> e >> a) @ (a >> r1 >> b) @ (b >> r2 >> c) @ (c >> a2 >> GND) @ (b >> r3 >> Node() >> r4 >> GND)
     s = solve(Problem(circuit, {r1: 3, r2: 18, r3: 3, r4: 6, I(a2): 2}))
     assert s(Parameter(e)) == 54
@@ -407,16 +400,13 @@ def test_the_gain_is_found_from_the_data():
 
 
 def test_ideal_transformer_steps_down():
-    from electro.core.syntax import Transformer
-
     e, tr, r = VoltageSource("E"), Transformer("n"), Resistor("R")
     a, b = Node("A"), Node("B")
     s = solve(
         Problem((GND >> e >> a) @ at(tr, a, GND, b, GND) @ (b >> r >> GND), {e: 10, "n": 2, r: 10}), AC(sp.Integer(100))
     )
-    assert (s(U(r)), s(I(r))) == (5, sp.Rational(1, 2))  # half the voltage, twice the current…
-    assert complex(s(I(tr, "p+"))) == pytest.approx(0.25, abs=1e-6)  # …and the core's own next to nothing
-    # DC: the flux does not change — a winding is a short
+    assert (s(U(r)), s(I(r))) == (5, sp.Rational(1, 2))
+    assert complex(s(I(tr, "p+"))) == pytest.approx(0.25, abs=1e-6)
     e, r1, tr = VoltageSource("E"), Resistor("R"), Transformer("n")
     s_, a = Node("S"), Node("A")
     assert (
@@ -426,8 +416,6 @@ def test_ideal_transformer_steps_down():
 
 
 def test_coupled_inductors():
-    from electro.core.syntax import Coupled
-
     e, r, m, rl = VoltageSource("E"), Resistor("R"), Coupled("M"), Resistor("R_L")
     a, b, c = Node("A"), Node("B"), Node("C")
     circuit = (GND >> e >> a) @ (a >> r >> b) @ at(m, b, GND, c, GND) @ (c >> rl >> GND)
@@ -445,9 +433,6 @@ def _three_phase(loads):
 
 
 def test_three_phase_star_and_delta():
-    from electro.core import beside
-
-    # a balanced star with its neutral: nothing flows in the neutral
     r = [Resistor(f"R_{k}") for k in (1, 2, 3)]
     supply, lines, sources, given = _three_phase(r)
     star = Node("S")
@@ -461,7 +446,6 @@ def test_three_phase_star_and_delta():
         AC(sp.Integer(314)),
     )
     assert sp.simplify(s(V(star))) == 0
-    # unbalanced, three wires: the star point floats away from the neutral
     r = [Resistor(f"R_{k}") for k in (1, 2, 3)]
     supply, lines, sources, given = _three_phase(r)
     star = Node("S")
@@ -473,7 +457,6 @@ def test_three_phase_star_and_delta():
         AC(sp.Integer(314)),
     )
     assert abs(complex(s(V(star)))) > 1
-    # delta: each load between two lines, at √3 the phase voltage and 30° ahead
     r = [Resistor(f"R_{k}") for k in (1, 2, 3)]
     supply, (l1, l2, l3), sources, given = _three_phase(r)
     delta = (l1 >> r[0] >> l2) @ (l2 >> r[1] >> l3) @ (l3 >> r[2] >> l1)
@@ -482,7 +465,7 @@ def test_three_phase_star_and_delta():
 
 
 def test_phasor_strings():
-    assert parse("230∠-120") == -115 - 115 * sp.sqrt(3) * sp.I  # (the same parser: data read once, as given)
+    assert parse("230∠-120") == -115 - 115 * sp.sqrt(3) * sp.I
     e, r = VoltageSource("E"), Resistor("R")
     s = solve(Problem(close(e >> r), {e: "10∠90", r: 1}), AC(sp.Integer(1)))
-    assert s(I(r)) == 10 * sp.I  # (10∠90° V on 1 Ω: 10∠90° A)
+    assert s(I(r)) == 10 * sp.I

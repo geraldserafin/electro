@@ -666,7 +666,7 @@ solution = solve(problem)
    odtworzyć ogólnie, inaczej symulacje zaczną zgłaszać `NoConvergence`.
 5. **Synchronizacja z emulatorem**: zostaje wykonaniem (most), nie modelem — patrz 1.
 
-## 11. Prototyp rdzenia (`src/electro/core`, testy `tests/test_core.py`)
+## 11. Prototyp rdzenia (`src/electro/core`, testy `tests/test_core_*.py`)
 
 Obok biblioteki, nic w niej nie zmienia. ~720 linii (bez eksportów): składnia + postać normalna
 (`syntax.py`), zadanie + analizy (`problem.py`), zapis do danych (`data.py`).
@@ -940,6 +940,28 @@ trafiać do niewiadomych; dane opisane zapisem elektroniki („1u") czyta jeden 
 **Czego prototyp dalej nie ma (względem biblioteki):** kroków podanych jako wzory do wyświetlenia (są kroki
 z pochodzeniem, bez ładnego formatu), generowania kodu, importu SPICE, rysowania, urządzeń (Arduino, Pico,
 wyświetlacze, czujniki), szybkiej symulacji w JS. To już nie luki modelu, tylko warstwy nad nim.
+
+### 13.6 Układ kodu
+
+Pliki opisane w §11–13 (`syntax.py`, `problem.py`, `methods.py`, `numeric.py`, `data.py`) rozbite według
+warstw. Kierunek zależności jest jeden: `circuit` ← `problem` ← `solver` ← `methods`.
+
+- **`circuit/`**: czym jest układ. Drzewo i operatory (`tree.py`), postać normalna i sklejanie
+  (`netlist.py`), łączenie kawałków (`wiring.py`), rodzaj elementu (`kind.py`), słowa czasu (`time.py`),
+  biblioteka elementów (`elements/`, plik na rodzinę).
+- **`problem/`**: o co pytamy. Wielkości (`quantities.py`), zadanie (`problem.py`), zapis do danych
+  (`data.py`).
+- **`solver/`**: liczenie. Relacja (`relation.py`), analizy (`analysis.py`), co prawa mówią o sobie
+  (`laws.py`), nazwy zmiennych (`symbols.py`), równania zadania (`system.py`), rozwiązywanie ręczne
+  (`by_hand.py`), przez przypadki (`by_cases.py`), Newton (`newton.py`), wybór drogi (`solve.py`),
+  czarna skrzynka (`port.py`), symulacja (`simulate.py`).
+- **`methods/`**: metody podręcznikowe, po pliku na metodę.
+
+Zasady: w kodzie nie ma komentarzy, jest tylko dokumentacja (docstringi). Gdy coś trzeba objaśnić, staje
+się funkcją o nazwie, która to mówi; gdy plik ma części, każda staje się plikiem. Pola, których nikt nie
+czytał (`unit`, `symmetric`), usunięte. Tak samo napisane prawa (kabel = amperomierz, norator = dziura)
+dzielą jedną funkcję. Wszystkie źródła sterowane idą jedną drogą. Testy podzielone tematycznie
+(`test_core_*.py`).
 
 ## 14. Otwarte
 
