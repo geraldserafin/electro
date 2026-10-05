@@ -40,6 +40,12 @@ def loop(*parts: Circuit) -> Circuit:
     return close(series(*parts))
 
 
+def flip(f: Circuit) -> Circuit:
+    """A 1 → 1 piece the other way round, its left end on the right: bent back through a ``cap`` and a
+    ``cup``, as any transpose is in a hypergraph category."""
+    return (wire @ cap) >> (wire @ f @ wire) >> (cup @ wire)
+
+
 def at(e: Element, *points: Circuit) -> Circuit:
     """An element with each terminal on a point, in its terminals' order: ``at(t, b, c, e)``."""
     if len(e.kind.terminals) == 2:

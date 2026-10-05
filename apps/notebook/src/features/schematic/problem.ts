@@ -17,6 +17,10 @@ export interface ProblemElement {
   unit: string; // its value's, as written beside it
 }
 
+/** An element as electro's netlist data has it (``to_netlist``): no unit, its parameters when it has any. */
+export type NetlistElement = Pick<ProblemElement, "id" | "kind" | "nodes"> &
+  Partial<Pick<ProblemElement, "value" | "params" | "part">>;
+
 export interface ProblemData {
   elements: ProblemElement[];
   given: [Quantity, string][];

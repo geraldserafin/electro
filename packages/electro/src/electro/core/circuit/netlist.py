@@ -7,6 +7,7 @@ wherever it appears.
 
 from __future__ import annotations
 
+from collections import Counter
 from collections.abc import Iterable
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, TypeAlias
@@ -132,3 +133,26 @@ def _each_element_once(net: Netlist) -> Netlist:
     if len(set(elements)) != len(elements):
         raise ElementTwice(next(e for e in elements if elements.count(e) > 1).name or "an element")
     return net
+
+
+def labels(net: Netlist) -> tuple[str, ...]:
+    """An element's name when no other element has it; the others numbered by their prefix in order
+    (``R_1``, ``R_2``), past the names taken (``R1`` takes ``R_1`` too)."""
+    names = [e.name for e, _ in net.parts]
+    unique = {n for n in names if n and names.count(n) == 1}
+    taken = {_loose(n) for n in unique}
+    counters: Counter[str] = Counter()
+
+    def numbered(prefix: str) -> str:
+        while True:
+            counters[prefix] += 1
+            label = f"{prefix}_{counters[prefix]}"
+            if _loose(label) not in taken:
+                taken.add(_loose(label))
+                return label
+
+    return tuple(e.name if e.name in unique else numbered(e.kind.prefix) for e, _ in net.parts)
+
+
+def _loose(name: str) -> str:
+    return name.replace("_", "")

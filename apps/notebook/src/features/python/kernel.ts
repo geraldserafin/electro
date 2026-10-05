@@ -2,6 +2,7 @@
 
 import { type Progress, report } from "@/features/downloads/store";
 import { bodeSvg, histogramSvg, traceSvg } from "@/features/plots/svg";
+import { drawingFromCode } from "@/features/schematic/fromCode";
 import { library } from "@/features/schematic/library";
 import { isComponent, key, pins } from "@/features/schematic/model";
 import { withParts } from "@/features/schematic/parts";
@@ -67,9 +68,9 @@ class Kernel {
     return JSON.parse(text);
   }
 
-  /** The drawing as plain electro code (`+`/`|` when possible, else `net(...)`). */
+  /** The drawing as electro code (`>>`/`|` where it is made of them, else each element at its points). */
   async code(schematic: SchematicData, name: string): Promise<string> {
-    return (await this.call("code", { schematic: JSON.stringify(schematic), name })) as string;
+    return (await this.call("code", { problem: this.problem(schematic), name })) as string;
   }
 
   /** Code edited in a schematic's code view, laid out back into a drawing (or the error in it). */
@@ -78,7 +79,8 @@ class Kernel {
     name: string,
     old: SchematicData,
   ): Promise<{ schematic: SchematicData } | { error: Failure }> {
-    return JSON.parse((await this.call("fromCode", { source, name, old: JSON.stringify(old) })) as string);
+    const back = JSON.parse((await this.call("fromCode", { source, name })) as string);
+    return "error" in back ? back : drawingFromCode(back, old, library);
   }
 
   /** A schematic cell's run button: every element's values, each mark's, what is sought (``sought.ts``),

@@ -36,13 +36,13 @@ def is_linear(e: Element, analysis: Analysis | None = None) -> bool:
 
 def is_source(e: Element) -> bool:
     """An independent source: a law keeps a term with none of the element's own quantities in it
-    (``U + E``, ``I − J``)."""
+    (``U + E``, ``I − J``), read in DC (a capacitor's ``I − C·dU/dt`` keeps none)."""
     own = _own_laws(e.kind)
     if own is None:
         return False
     laws, quantities = own
     zero = dict.fromkeys(quantities, sp.Integer(0))
-    return any(sp.simplify(subs(law, zero)) != 0 for law in laws)
+    return any(sp.simplify(subs(interpret(law, DC()), zero)) != 0 for law in laws)
 
 
 def inner_names(kind: Kind) -> tuple[str, ...]:

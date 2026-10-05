@@ -23,11 +23,11 @@ from electro.core import (
     VoltageSource,
     close,
     free,
+    from_netlist,
     is_closed,
-    problem_from_data,
-    problem_to_data,
     simulate,
     solve,
+    to_netlist,
     two_terminal,
 )
 
@@ -124,6 +124,6 @@ def test_written_down_and_read_back_it_solves_the_same():
     e, r1, r2 = VoltageSource("E"), Resistor("R_1"), Resistor("R_2")
     b = Node("B")
     p = Problem((GND >> e >> r1 >> b) @ (b >> r2 >> GND), {e: 12, r1: 10, r2: 20}, [I(r1), V(b)])
-    data = json.loads(json.dumps(problem_to_data(p)))
-    again, _ = problem_from_data(data)
+    data = json.loads(json.dumps(to_netlist(p)))
+    again = from_netlist(data).problem
     assert list(solve(again).answers.values()) == list(solve(p).answers.values()) == [sp.Rational(2, 5), 8]

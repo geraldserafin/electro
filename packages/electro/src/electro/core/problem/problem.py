@@ -11,6 +11,7 @@ import sympy as sp
 
 from electro.values import UNKNOWN, parse
 
+from ..circuit.elements.parts import Part
 from ..circuit.tree import Circuit, Element, is_closed, netlist
 from .quantities import Quantity, Scaled
 
@@ -46,13 +47,15 @@ class Problem:
     @property
     def values(self) -> Mapping[Key, sp.Expr]:
         """What is given as single values (unknowns left out)."""
-        return {k: cast(sp.Expr, v) for k, v in self.given.items() if v is not UNKNOWN and not isinstance(v, Mapping)}
+        return {
+            k: cast(sp.Expr, v) for k, v in self.given.items() if v is not UNKNOWN and not isinstance(v, Mapping | Part)
+        }
 
 
 def _read(value: object) -> object:
     if isinstance(value, Mapping):
         return MappingProxyType({w: parse(x) for w, x in value.items()})
-    if isinstance(value, Quantity | Scaled):
+    if isinstance(value, Quantity | Scaled | Part):
         return value
     return parse(value)
 

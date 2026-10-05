@@ -14,6 +14,7 @@ import sympy as sp
 
 from electro.values import UNKNOWN, parse
 
+from ..circuit.elements.parts import Part
 from ..circuit.kind import Case
 from ..circuit.time import TIME
 from ..circuit.tree import Circuit, Element
@@ -97,6 +98,8 @@ def parameter_values(problem: Problem, s: Symbols) -> dict[sp.Symbol, sp.Expr]:
         if value is UNKNOWN:
             continue
         match key:
+            case Element() if isinstance(value, Part):
+                values |= {s.param(key, w): expr(parse(x)) for w, x in value.parameters(key.kind.name).items()}
             case Element() if isinstance(value, Mapping):
                 values |= {s.param(key, w): cast(sp.Expr, x) for w, x in value.items() if x is not UNKNOWN}
             case Element():

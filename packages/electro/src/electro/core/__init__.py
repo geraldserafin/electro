@@ -5,11 +5,12 @@
 
 from .circuit.elements import *
 from .circuit.elements import __all__ as _elements
+from .circuit.elements.parts import Part, part
 from .circuit.kind import Case, Cases, Kind, Terminals, two_terminal
 from .circuit.netlist import ElementTwice, JoinsNodes, Netlist
 from .circuit.time import TIME, D, Pre, rising, square, when
 from .circuit.tree import GND, Circuit, Element, Net, Node, free, is_closed, netlist
-from .circuit.wiring import at, beside, cap, close, cup, loop, parallel, rebuild, series, wire
+from .circuit.wiring import at, beside, cap, close, cup, flip, loop, parallel, rebuild, series, wire
 from .methods.fill import Filled, fill
 from .methods.response import Response, respond, responses
 from .methods.simplify import Reduction, simplify
@@ -17,9 +18,10 @@ from .methods.superposition import Superposition, superposition
 from .methods.sweep import Sweep, sweep, sweeps
 from .methods.tolerance import Spread, spreads, tolerance
 from .methods.two_points import Thevenin, between, resistance, thevenin
-from .problem.data import problem_from_data, problem_to_data
+from .problem.netlist import from_netlist, to_netlist
 from .problem.problem import NoSuchParameter, NotClosed, Problem
 from .problem.quantities import Across, Current, I, P, Parameter, Potential, Power, U, V, Voltage
+from .problem.spice import NoSpice, from_spice, to_spice
 from .simulation.errors import NoConvergence, NoSuchInput, NotSimulated, ValueNeeded
 from .simulation.program import Program, compile_program
 from .simulation.simulate import simulate
@@ -72,6 +74,7 @@ __all__ = [
     "NotSimulated",
     "Origin",
     "P",
+    "Part",
     "Parameter",
     "Potential",
     "Power",
@@ -105,7 +108,9 @@ __all__ = [
     "compile_program",
     "cup",
     "fill",
+    "flip",
     "free",
+    "from_netlist",
     "hide",
     "is_closed",
     "is_linear",
@@ -115,8 +120,7 @@ __all__ = [
     "matches",
     "netlist",
     "parallel",
-    "problem_from_data",
-    "problem_to_data",
+    "part",
     "rebuild",
     "relation",
     "resistance",
@@ -133,6 +137,10 @@ __all__ = [
     "sweeps",
     "thevenin",
     "spreads",
+    "to_netlist",
+    "from_spice",
+    "to_spice",
+    "NoSpice",
     "tolerance",
     "two_terminal",
     "when",

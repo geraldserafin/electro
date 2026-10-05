@@ -52,12 +52,13 @@ def test_schematic_cells_are_available_by_name():
 
 
 def test_code_of_a_drawing():
-    from electro import Resistor, VoltageSource, loop
-    from electro_schematic import layout
-
-    drawing = layout(loop(VoltageSource(12), Resistor(4))).to_json()
-    assert kernel.code(drawing, "petla") == "petla = loop(VoltageSource(12), Resistor(4))"
-    assert kernel.code(drawing, "nie nazwa").startswith("nienazwa = ")
+    drawing = _loop(("E_1", "voltage_source", "12"), ("R_1", "resistor", "4"))
+    assert kernel.code(drawing, "petla").splitlines() == [
+        'E_1 = VoltageSource("E_1")',
+        'R_1 = Resistor("R_1")',
+        "petla = Problem(loop(E_1, R_1), {E_1: 12, R_1: 4})",
+    ]
+    assert "\nnienazwa = " in kernel.code(drawing, "nie nazwa")
 
 
 def test_the_editors_symbol_file_is_up_to_date():
@@ -110,10 +111,9 @@ def test_simulate_a_sine_source_with_phasors():
 
 def test_a_spice_netlist_in_the_code_view():
     source = 'uklad = from_spice("""* rc\nV1 in 0 SIN(0 1 1k)\nR1 in out 1k\nC1 out 0 100n\nD1 out 0 1N4148\n""")'
-    out = json.loads(kernel.from_code(source, "uklad"))
-    elements = {e["id"]: e for e in out["schematic"]["elements"]}
-    assert elements["C1"]["value"] == "100n" and elements["D1"]["text"] == "1N4148"
-    assert {e["text"] for e in elements.values() if e["kind"] == "label"} == {"in", "out"}
+    elements = {e["id"]: e for e in json.loads(kernel.from_code(source, "uklad"))["netlist"]["elements"]}
+    assert elements["C1"]["value"] == "100n" and elements["D1"]["part"] == "1N4148"
+    assert elements["R1"]["nodes"] == ["in", "out"]
 
 
 def _loop(*elements) -> str:
@@ -156,15 +156,13 @@ def test_sweep_and_spread_of_a_drawing():
 
 
 def test_code_view_round_trip():
-    from electro import Ammeter, Resistor, VoltageSource, loop
-    from electro_schematic import Schematic, layout
-
-    drawing = layout(loop(VoltageSource(12), Resistor(4) + Ammeter())).to_json()
-    source = kernel.code(drawing, "uklad").replace("Resistor(4)", "Resistor(6)")
-    back = Schematic.from_json(json.dumps(json.loads(kernel.from_code(source, "uklad"))["schematic"]))
-    assert back.to_code("uklad") == source
+    drawing = _loop(("E_1", "voltage_source", "12"), ("R_1", "resistor", "4"), ("C_1", "capacitor", "1u"))
+    source = kernel.code(drawing, "uklad").replace("R_1: 4", "R_1: 6")
+    back = json.loads(kernel.from_code(source, "uklad"))
+    assert kernel.code(json.dumps(back["netlist"]), "uklad") == source
+    assert [p["element"] for p in back["shape"]["loop"]] == ["E_1", "R_1", "C_1"]
     # no variable called like the schematic: the last circuit the code defines
-    assert "schematic" in json.loads(kernel.from_code("a = Resistor(1)\nb = loop(VoltageSource(1), a)", "x"))
+    assert "netlist" in json.loads(kernel.from_code('a = Resistor("R")\nb = loop(VoltageSource("E"), a)', "x"))
 
 
 def test_code_view_errors_name_the_line():
@@ -174,24 +172,6 @@ def test_code_view_errors_name_the_line():
         "type": "NoCircuitInCode",
         "variable": "uklad",
     }
-
-
-def test_code_view_keeps_the_drawing_when_only_values_change():
-    import sys
-    from pathlib import Path
-
-    sys.path.insert(0, str(Path(__file__).parents[3] / "packages/electro-schematic/tests"))
-    from test_schematic import bridge
-
-    old = bridge()
-    source = kernel.code(old.to_json(), "mostek")
-    changed = source.replace("Resistor(100)", "Resistor(150)", 1)
-    back = json.loads(kernel.from_code(changed, "mostek", old.to_json()))["schematic"]
-    assert [e["at"] for e in back["elements"]] == [list(e.at) for e in old.elements]
-    assert "150" in [e["value"] for e in back["elements"]]
-    # a new element in a net(...) (no automatic layout for it): says to add elements on the drawing
-    grown = source.replace("Resistor(100)", "Resistor(100) + Resistor(1)", 1)
-    assert json.loads(kernel.from_code(grown, "mostek", old.to_json()))["error"]["issue"]["type"] == "OnlyValuesInCode"
 
 
 def test_a_schematic_is_a_variable_named_after_it():
@@ -213,7 +193,7 @@ def test_a_schematic_is_a_variable_named_after_it():
     )
     assert out[0]["type"] == "svg" and "6" in out[1]["data"]
     assert json.loads(kernel.run("układ1", json.dumps({"Układ 1": drawing})))[0]["type"] == "svg"
-    assert kernel.code(drawing, "Układ 1").startswith("układ1 = ")
+    assert "\nukład1 = " in kernel.code(_loop(("E_1", "voltage_source", "12")), "Układ 1")
 
 
 def _divider():

@@ -4,7 +4,7 @@
 "params": {...}}, ...]}`` — ``id`` is the element's name, ``kind`` its kind's (``elements.BY_NAME``),
 ``nodes`` the points of its terminals in their order (``"GND"`` or ``"0"`` is ground; a terminal its
 kind does not draw, ``gnd``, may be left out: it is ground), ``value`` its main parameter (left out or
-``"?"``: to be found), ``params`` the others by name, ``part`` a real part's name (``PARTS``) or an
+``"?"``: to be found), ``params`` the others by name, ``part`` a real part's name (``elements.parts``) or an
 LED's colour. A meter's value is its reading. ``given``: ``[[quantity, value], ...]``, conditions on
 quantities; ``find``: quantities sought. A quantity is ``["I" | "U" | "P" | "value", element]``,
 ``["V", point]``, ``["U_between", point, point]`` or ``["sum", [[number, quantity], ...]]``.
@@ -17,8 +17,12 @@ from dataclasses import dataclass
 
 import sympy as sp
 
-from ..circuit.elements import BJT_PARTS, BY_NAME, DIODE_PARTS, LED_COLORS, OPAMP_PARTS
-from ..circuit.tree import GND, Circuit, Element, Net, Node
+from electro.values import UNKNOWN, to_text
+
+from ..circuit.elements import BY_NAME
+from ..circuit.elements.parts import Part
+from ..circuit.netlist import labels
+from ..circuit.tree import GND, Circuit, Element, Net, Node, netlist
 from ..circuit.wiring import at, beside
 from .problem import Key, Problem
 from .quantities import Across, Current, I, Parameter, Potential, Power, Quantity, Scaled, Sum, U, Voltage
@@ -28,22 +32,8 @@ READINGS = {"ammeter": I, "voltmeter": U}
 
 GROUND_NAMES = ("GND", "0")
 
-PARTS: dict[str, Mapping[str, Mapping[str, object]]] = {
-    "diode": DIODE_PARTS,
-    "npn": BJT_PARTS,
-    "pnp": BJT_PARTS,
-    "opamp_model": OPAMP_PARTS,
-}
-"""Real parts by kind: each its parameters."""
-
 MODELS = {"opamp": "opamp_model"}
 """A kind that, given a real part, is that part's model."""
-
-
-class UnknownPart(KeyError):
-    def __init__(self, part: str) -> None:
-        super().__init__(part)
-        self.part = part
 
 
 class UnknownKind(KeyError):
@@ -127,22 +117,77 @@ def _given(item: Mapping, e: Element) -> dict[Key, object]:
     if value not in (None, "", "?"):
         reading = READINGS.get(e.kind.name)
         out[reading(e) if reading else e] = value
-    params = {**_part(item, e), **(item.get("params") or {})}
-    if params:
-        out[e] = {**({"": value} if e in out else {}), **params}
+    params = item.get("params") or {}
+    part = item.get("part")
+    if part and not params and e not in out:
+        out[e] = Part(part)
+    elif part or params:
+        out[e] = {**({"": value} if e in out else {}), **(Part(part).parameters(e.kind.name) if part else {}), **params}
     return out
 
 
-def _part(item: Mapping, e: Element) -> dict:
-    """A real part's parameters; an LED's colour is its forward voltage."""
-    part = item.get("part")
-    if not part:
-        return {}
-    if e.kind.name == "led":
-        if part not in LED_COLORS:
-            raise UnknownPart(part)
-        return {"": LED_COLORS[part]}
-    catalogue = PARTS.get(e.kind.name, {})
-    if part not in catalogue:
-        raise UnknownPart(part)
-    return dict(catalogue[part])
+def to_netlist(problem: Problem) -> dict:
+    """The problem as data, read back by ``from_netlist``: each element named by its label, each point by
+    its ``Node``'s or ``Net``'s name, the others ``n1``, ``n2``…"""
+    net = netlist(problem.circuit)
+    ids = labels(net)
+    names = point_names(net)
+    by = {e: id for id, (e, _) in zip(ids, net.parts)}
+
+    def q(x) -> list:
+        return quantity_data(x, by, {p: names[n] for n, p in net.named})
+
+    elements = [
+        {"id": id, "kind": e.kind.name, "nodes": [names[n] for n in ns], **_value(problem.given.get(e))}
+        for id, (e, ns) in zip(ids, net.parts)
+    ]
+    given = [[q(k), to_text(v)] for k, v in problem.given.items() if isinstance(k, Quantity)]
+    return {"elements": elements, "given": given, "find": [q(x) for x in problem.find]}
+
+
+def quantity_data(q, elements: Mapping[Element, str], points: Mapping[Node | Net, str]) -> list:
+    match q:
+        case Current(e):
+            return ["I", elements[e]]
+        case Voltage(e):
+            return ["U", elements[e]]
+        case Power(e):
+            return ["P", elements[e]]
+        case Parameter(e):
+            return ["value", elements[e]]
+        case Potential(p):
+            return ["V", points[p]]
+        case Across(a, b):
+            return ["U_between", points[a], points[b]]
+        case Sum(terms):
+            return ["sum", [[float(t.factor), quantity_data(t.of, elements, points)] for t in terms]]
+    raise TypeError(q)
+
+
+def point_names(net) -> list[str]:
+    """Each point's name: its ``Node``'s or ``Net``'s, else ``n1``, ``n2``…"""
+    named = {n: p.name if isinstance(p, Net) else p.label for n, p in net.named}
+    taken = {x for x in named.values() if x}
+    out, k = [], 0
+    for n in range(net.size):
+        if named.get(n):
+            out.append(named[n])
+            continue
+        k += 1
+        while f"n{k}" in taken:
+            k += 1
+        out.append(f"n{k}")
+    return out
+
+
+def _value(given: object) -> dict:
+    """An element's value, its other parameters, its part, as data."""
+    if given is None or given is UNKNOWN:
+        return {"value": None}
+    if isinstance(given, Part):
+        return {"value": None, "part": given.name}
+    if isinstance(given, Mapping):
+        main = given.get("")
+        others = {w: to_text(v) for w, v in given.items() if w}
+        return {"value": None if main in (None, UNKNOWN) else to_text(main), "params": others}
+    return {"value": to_text(given)}

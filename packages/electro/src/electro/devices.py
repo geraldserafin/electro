@@ -68,9 +68,6 @@ def _paper_only(label: str, ctx: Context) -> None:
         raise NeedsSimulation(sp.Symbol(label))
 
 
-# ------------------------------------------------------------------ sources in time
-
-
 def _frequency(text) -> sp.Expr:
     """``"50"``, ``"1k"``, ``"1 kHz"`` → Hz."""
     f = parse(text or None)
@@ -171,9 +168,6 @@ class SquareSource(SineSource):
             except ValueError:
                 raise BadValue(text) from None
         return cls(parse(value), " ".join(words) or 1000, duty, label=label)
-
-
-# ------------------------------------------------------------------ diodes
 
 
 class Diode(Parts, NoValue, TwoTerminal):

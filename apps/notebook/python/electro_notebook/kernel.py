@@ -29,7 +29,6 @@ from electro.issues import Equals, Issue, IsZero, issue
 from electro.task import Task
 from electro_render import Steps, symbol_library
 from electro_schematic import Schematic
-from electro_schematic.issues import Unsupported
 from sympy import I as sp_I
 
 CELL = "<cell>"
@@ -54,20 +53,6 @@ class NoCircuitInCode(Issue, ValueError):
     """The code view defines no circuit: it should assign one, e.g. ``variable = loop(...)``."""
 
     variable: str
-
-
-@issue
-class OnlyValuesInCode(Issue, ValueError):
-    """The code view made a circuit layout() cannot draw: in code, change only the values
-    (add elements on the drawing)."""
-
-    cause: Unsupported
-
-
-@issue
-class PartsNotInCode(Issue, ValueError):
-    """A drawing with one's own components edited in its code view: there they are taken apart
-    already (their insides are plain elements), so the drawing would lose them."""
 
 
 @issue
@@ -101,66 +86,41 @@ def variable(name: str) -> str:
     return f"_{v}" if v[0].isdigit() else v
 
 
-def code(schematic_json: str, name: str) -> str:
-    """A drawing as plain electro code, for the code view."""
-    return Schematic.from_json(schematic_json).to_code(variable(name))
+def code(problem_json: str, name: str) -> str:
+    """A drawing (its problem, ``schematic/problem.ts``) as electro code, for the code view."""
+    from electro.core.code.write import code as written
+    from electro.core.problem.netlist import from_netlist
+
+    return written(from_netlist(json.loads(problem_json)).problem, variable(name))
 
 
-def from_code(source: str, name: str, old_json: str = "") -> str:
-    """The code view edited back into a drawing: run ``source`` and lay out its circuit.
-
-    The circuit is the variable called like the schematic (``uklad``), else the last one the
-    code defines. When only values changed, the old drawing (``old_json``) keeps its layout
-    with the new values; otherwise the circuit is laid out anew.
-    Returns JSON ``{"schematic": ...}`` or ``{"error": {...}}`` (an error output).
-    """
-    from electro import Circuit
-    from electro_schematic import Unsupported, layout
+def from_code(source: str, name: str) -> str:
+    """The code view edited back: ``source`` run, its problem (the variable called like the schematic,
+    ``uklad``, else the last one it makes; a circuit alone is a problem with no data) as data, and the
+    series and parallel it is made of, for the page to lay out. Returns JSON ``{"netlist": {...},
+    "shape": {...} | null}`` or ``{"error": {...}}``."""
+    from electro.core import Circuit, Problem, to_netlist
+    from electro.core.code.structure import shape, to_data
 
     var = variable(name)
-    if old_json and Schematic.from_json(old_json).parts:
-        return json.dumps({"error": _error(PartsNotInCode())}, ensure_ascii=False)
     scope: dict = {}
-    exec(PRELUDE, scope)
+    exec("from electro.core import *", scope)
     prelude = set(scope)
     try:
         exec(compile(source, CELL, "exec"), scope)
         found = scope.get(var)
-        if not isinstance(found, Circuit):
-            defined = [v for k, v in scope.items() if k not in prelude and isinstance(v, Circuit)]
-            if not defined:
+        if not isinstance(found, Problem | Circuit):
+            made = [v for k, v in scope.items() if k not in prelude and isinstance(v, Problem | Circuit)]
+            if not made:
                 raise NoCircuitInCode(var)
-            found = defined[-1]
-        kept = _same_but_values(Schematic.from_json(old_json), found, var) if old_json else None
-        if kept is not None:
-            return json.dumps({"schematic": json.loads(kept.to_json())}, ensure_ascii=False)
-        try:
-            fresh = layout(found)
-        except Unsupported as err:
-            raise OnlyValuesInCode(err) from None
-        return json.dumps({"schematic": json.loads(fresh.to_json())}, ensure_ascii=False)
+            found = made[-1]
+        problem = found if isinstance(found, Problem) else Problem(found)
+        laid = shape(problem)
+        return json.dumps(
+            {"netlist": to_netlist(problem), "shape": to_data(laid) if laid is not None else None}, ensure_ascii=False
+        )
     except Exception as err:  # noqa: BLE001 — any mistake in the code is shown to the user
         return json.dumps({"error": _error(err)}, ensure_ascii=False)
-
-
-def _same_but_values(old: Schematic, circuit, variable: str) -> Schematic | None:
-    """``old`` with the values from ``circuit``, if that makes it the same circuit (else None)."""
-    from electro.codegen import code
-    from electro.semantics import structure
-    from electro.values import UNKNOWN, to_text
-
-    parts = structure(circuit).parts
-    ids = {e.id for e in old.elements}
-    if not set(parts) <= ids:
-        return None
-    for e in old.elements:
-        if e.id in parts:
-            c = parts[e.id].component
-            e.value = to_text(c.value) if c.has_value and c.value is not UNKNOWN else None
-    try:
-        return old if old.to_code(variable) == code(circuit, variable) else None
-    except Exception:  # noqa: BLE001 — an unfinished old drawing: lay out the new circuit instead
-        return None
 
 
 def _parse_data(text: str) -> dict[str, str]:

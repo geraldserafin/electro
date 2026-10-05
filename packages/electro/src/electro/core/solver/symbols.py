@@ -2,14 +2,13 @@
 
 from __future__ import annotations
 
-from collections import Counter
 from dataclasses import dataclass
 from functools import cache
 
 import sympy as sp
 
 from ..circuit.kind import Terminals
-from ..circuit.netlist import Netlist, pieces
+from ..circuit.netlist import Netlist, labels, pieces
 from ..circuit.tree import GND, Circuit, Element, Net, Node, netlist
 from ..problem.quantities import Across, Current, Parameter, Potential, Power, Quantity, Scaled, Sum, Voltage
 
@@ -76,30 +75,7 @@ class Symbols:
 @cache
 def symbols(c: Circuit) -> Symbols:
     net = netlist(c)
-    return Symbols(net, _labels(net), _potentials(net))
-
-
-def _labels(net: Netlist) -> tuple[str, ...]:
-    """An element's name when no other element has it; the others numbered by their prefix in order
-    (``R_1``, ``R_2``), past the names taken (``R1`` takes ``R_1`` too)."""
-    names = [e.name for e, _ in net.parts]
-    unique = {n for n in names if n and names.count(n) == 1}
-    taken = {_loose(n) for n in unique}
-    counters: Counter[str] = Counter()
-
-    def numbered(prefix: str) -> str:
-        while True:
-            counters[prefix] += 1
-            label = f"{prefix}_{counters[prefix]}"
-            if _loose(label) not in taken:
-                taken.add(_loose(label))
-                return label
-
-    return tuple(e.name if e.name in unique else numbered(e.kind.prefix) for e, _ in net.parts)
-
-
-def _loose(name: str) -> str:
-    return name.replace("_", "")
+    return Symbols(net, labels(net), _potentials(net))
 
 
 def _potentials(net: Netlist) -> tuple[sp.Expr, ...]:
