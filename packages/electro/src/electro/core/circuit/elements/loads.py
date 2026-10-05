@@ -14,7 +14,7 @@ RELAY_PULL, RELAY_DROP = sp.Rational(5, 100), sp.Rational(15, 1000)
 CONTACT_ON, CONTACT_OFF = 1000, sp.Rational(1, 10**10)
 
 
-def _resistance(r: sp.Expr):
+def _resistance(r: sp.Expr | float):
     def laws(t: Terminals, _: Params) -> list[sp.Expr]:
         return [t.across("a", "b") - r * t.I["a"]]
 

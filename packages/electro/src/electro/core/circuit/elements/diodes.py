@@ -3,6 +3,8 @@ seven-segment digit)."""
 
 from __future__ import annotations
 
+from collections.abc import Mapping
+
 import sympy as sp
 
 from ..kind import Case, Cases, Kind, Params, Terminals
@@ -31,7 +33,7 @@ def _on_or_off(t: Terminals, p: Params) -> Cases:
     return Cases((Case("on", (u - drop,), (i,)), Case("off", (i,), (drop - u,))))
 
 
-def led(u: sp.Expr, forward: sp.Expr) -> sp.Expr:
+def led(u: sp.Expr, forward: sp.Expr | float) -> sp.Expr:
     """The current through an LED of ``forward`` volts at ``LED_RATED``."""
     nvt = LED_N * V_T
     return LED_RATED * (sp.exp((u - forward) / nvt) - sp.exp(-forward / nvt))
@@ -49,7 +51,7 @@ def _zener(t: Terminals, p: Params) -> list[sp.Expr]:
     return [t.I["a"] - (junction(u, ZENER_I_S) - breakdown)]
 
 
-def _leds(forward: dict[str, sp.Expr], common: str):
+def _leds(forward: Mapping[str, sp.Expr | float], common: str):
     """LEDs from each of ``forward``'s terminals to one ``common`` cathode."""
 
     def laws(t: Terminals, _: Params) -> list[sp.Expr]:
