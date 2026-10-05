@@ -45,18 +45,35 @@ def is_source(e: Element) -> bool:
     return any(sp.simplify(subs(law, zero)) != 0 for law in laws)
 
 
+def inner_names(kind: Kind) -> tuple[str, ...]:
+    """The names of a kind's own inner quantities (a flux, a state)."""
+    return tuple(_read(kind)[2])
+
+
+def of_ways(kind: Kind) -> bool:
+    """One of several ways (a textbook diode): piecewise, decided by assuming."""
+    return len(_read(kind)[0]) != 1
+
+
 def _own_laws(kind: Kind) -> tuple[tuple[sp.Expr, ...], list[sp.Symbol]] | None:
     """A kind's laws over quantities of its own (each terminal's potential and current, its inner ones)
     and those quantities; None when it is of several ways."""
+    cases, quantities, inner = _read(kind)
+    if len(cases) != 1:
+        return None
+    return cases[0].laws, [*quantities, *inner.values()]
+
+
+def _read(kind: Kind) -> tuple[tuple[Case, ...], list[sp.Symbol], dict[str, sp.Symbol]]:
+    """A kind's ways over symbols of its own: each terminal's potential and current, and its inner ones by
+    name."""
     V = {t: sp.Symbol(f"v_{t}") for t in kind.terminals}
     I = {t: sp.Symbol(f"i_{t}") for t in kind.terminals}
     inner: dict[str, sp.Symbol] = {}
     params = {w: sp.Symbol(f"p_{w}") for w in kind.parameters}
     terminals = Terminals(V, I, lambda name: inner.setdefault(name, sp.Symbol(f"x_{name}")))
     cases = ways(kind.laws(terminals, params))
-    if len(cases) != 1:
-        return None
-    return cases[0].laws, [*V.values(), *I.values(), *inner.values()]
+    return cases, [*V.values(), *I.values()], inner
 
 
 def _exprs(xs: Sequence[object]) -> tuple[sp.Expr, ...]:

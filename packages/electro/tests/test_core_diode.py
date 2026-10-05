@@ -58,7 +58,7 @@ def test_with_a_diode_too_the_paper_is_where_time_settles():
     b, out = Node("B"), Node("OUT")
     circuit = (GND >> e >> r1 >> b >> d >> out) @ (out >> r2 >> GND) @ (out >> c >> GND)
     p = Problem(circuit, {e: 5, r1: 100, r2: 1000, c: "10u"})
-    settled = simulate(p, until=0.02, dt=2e-5)(V(out))(0.02)
+    settled = simulate(p, until=0.02, dt=2e-5).at(V(out), 0.02)
     assert settled == pytest.approx(float(solve(p)(V(out))), rel=1e-4)
 
 

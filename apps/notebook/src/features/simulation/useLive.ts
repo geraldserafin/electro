@@ -96,10 +96,10 @@ const partsOf = (sch: SchematicData): Part[] => sch.elements.map(({ id, kind, te
 function defaultScope(circuit: LiveCircuit): string[] {
   const { kinds, unknowns } = circuit.program;
   const leds = Object.keys(kinds)
-    .filter((k) => kinds[k] === "LED")
+    .filter((k) => kinds[k] === "led")
     .map((k) => `I_${k}`);
   const caps = Object.keys(kinds)
-    .filter((k) => kinds[k] === "Capacitor")
+    .filter((k) => kinds[k] === "capacitor")
     .map((k) => `U_${k}`);
   return [...caps, ...leds].filter((n) => unknowns.includes(n)).slice(0, 4);
 }
@@ -253,7 +253,7 @@ export function useLive(schematic: SchematicData) {
           }
         };
         const { kinds } = compiled.program;
-        setHasSound(Object.values(kinds).some((k) => k === "Buzzer" || k === "PassiveBuzzer"));
+        setHasSound(Object.values(kinds).some((k) => k === "buzzer" || k === "passive_buzzer"));
         serialText.current = "";
         setSerial("");
         setSketches({});

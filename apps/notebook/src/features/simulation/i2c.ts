@@ -358,7 +358,7 @@ export class Clock implements Device {
 
 // ------------------------------------------------------------------ on a board
 
-const MODULES: Record<string, number> = { LCD1602I2C: 0x27, SSD1306: 0x3c, DS1307: 0x68 }; // electro's kinds, the address they come set to
+const MODULES: Record<string, number> = { lcd1602_i2c: 0x27, ssd1306: 0x3c, ds1307: 0x68 }; // electro's kinds, the address they come set to
 
 /**
  * The I²C modules on ``board``'s bus: those whose SDA and SCL are wired to its chip's (an Uno's A4 and A5,
@@ -381,16 +381,16 @@ export function modulesOn(
   for (const [id, kind] of Object.entries(program.kinds)) {
     if (!MODULES[kind]) continue;
     const [gnd, vcc, a, b] = [0, 1, 2, 3].map((i) => at(id, i));
-    const [dsa, dcl] = kind === "SSD1306" ? [b, a] : [a, b]; // an OLED's pins: SCL before SDA
+    const [dsa, dcl] = kind === "ssd1306" ? [b, a] : [a, b]; // an OLED's pins: SCL before SDA
     if (dsa !== sda || dcl !== scl) continue;
     const powered = () => s.sim.node(vcc ?? "") - s.sim.node(gnd ?? "") > 3;
     const address = Number(i2cParts(addresses[id]).address) || MODULES[kind];
     let m = kept.get(id);
     if (!m || m.address !== address) {
       m =
-        kind === "LCD1602I2C"
+        kind === "lcd1602_i2c"
           ? new Backpack(id, address, powered)
-          : kind === "SSD1306"
+          : kind === "ssd1306"
             ? new Oled(id, address, powered)
             : new Clock(id, address, powered, () => s.clock(board));
       kept.set(id, m);

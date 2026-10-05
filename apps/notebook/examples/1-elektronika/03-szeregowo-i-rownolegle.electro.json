@@ -20,6 +20,7 @@
       "source": "## Dwie żarówki szeregowo\n\nKażda żarówka dostaje tylko połowę napięcia, 3 V, więc płynie przez nie połowa prądu i świecą słabo —\nkażda bierze tylko ćwierć swojej mocy. Uruchom ⚡ i porównaj z następnym schematem."
     },
     {
+      "found": {},
       "id": "78bbce3b",
       "type": "schematic",
       "name": "szeregowo",
@@ -157,6 +158,7 @@
       "source": "## Dwie żarówki równolegle\n\nTu każda dostaje pełne 6 V i świeci jasno. Za to bateria oddaje dwa razy więcej prądu niż do jednej\nżarówki — i szybciej się rozładuje. Tak podłączone jest wszystko w domu: każde gniazdko ma pełne 230 V,\nbez względu na to, ile urządzeń już działa."
     },
     {
+      "found": {},
       "id": "d5056904",
       "type": "schematic",
       "name": "rownolegle",

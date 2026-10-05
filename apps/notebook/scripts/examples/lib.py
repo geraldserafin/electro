@@ -11,7 +11,6 @@ import heapq
 import json
 from pathlib import Path
 
-from electro.sim import compile_sim
 from electro_schematic import Element, Schematic, Wire, layout
 
 EXAMPLES = Path(__file__).parents[2] / "examples"
@@ -160,11 +159,14 @@ class Drawing:
         sch = Schematic(self.elements, [Wire(w) for w in self.wires], dict(self.parts))
         if exercise:
             return sch
-        circuit = sch.to_circuit()  # it must be a circuit
+        sch.to_circuit()  # it must be a circuit
         from electro.devices import Board
 
         if live:
-            compile_sim(circuit)  # …that runs in time
+            from electro_notebook import kernel
+
+            compiled = json.loads(kernel.live(sch.to_json()))  # …that runs in time
+            assert "error" not in compiled, (name, compiled.get("error"))
         names = sch.node_names()
         pins = {e.id: e.pins() for e in self.elements}
         for group in joined:  # (element id, pin index), all on one node

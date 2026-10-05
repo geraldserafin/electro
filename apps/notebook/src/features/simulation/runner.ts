@@ -71,15 +71,15 @@ export interface Frame {
 }
 
 const SCOPE_POINTS = 600;
-// electro.devices: what glows (each LED's channels: its current's name, "" for I)
+// electro's kinds: what glows (each LED's channels: its current's name, "" for I)
 const LIGHTS: Record<string, string[]> = {
-  LED: [""],
-  RGBLED: ["r", "g", "b"],
-  SevenSegment: ["a", "b", "c", "d", "e", "f", "g", "dp"],
+  led: [""],
+  rgb_led: ["r", "g", "b"],
+  seven_segment: ["a", "b", "c", "d", "e", "f", "g", "dp"],
 };
 const LCD_DATA = ["d0", "d1", "d2", "d3", "d4", "d5", "d6", "d7"];
 const LED_RATED = 0.02; // A: full brightness
-const LAMP_RATED = 3; // W: a bulb's full glow, unless its text says otherwise (electro.devices.Lamp)
+const LAMP_RATED = 3; // W: a bulb's full glow, unless its text says otherwise
 const SPIN = 0.02; // a motor's drawing turns this much slower than the motor (5700 rpm: about 2 turns a second)
 
 /** The inputs an element sets: [input name, value]. */
@@ -133,11 +133,11 @@ export class Runner {
         return i === undefined ? [] : [[id, channel, i] as [string, string, number]];
       }),
     );
-    this.buzzers = [...having("Buzzer"), ...having("PassiveBuzzer")].flatMap(([id, q]) =>
-      q?.U !== undefined ? [buzzing(id, q.U, kinds[id] === "Buzzer")] : [],
+    this.buzzers = [...having("buzzer"), ...having("passive_buzzer")].flatMap(([id, q]) =>
+      q?.U !== undefined ? [buzzing(id, q.U, kinds[id] === "buzzer")] : [],
     );
-    this.servos = having("Servo").flatMap(([id, q]) => (q?.U_sig !== undefined ? [servoing(id, q.U_sig)] : []));
-    this.lcds = having("LCD1602").flatMap(([id, q]) =>
+    this.servos = having("servo").flatMap(([id, q]) => (q?.U_sig !== undefined ? [servoing(id, q.U_sig)] : []));
+    this.lcds = having("lcd1602").flatMap(([id, q]) =>
       q
         ? [
             lcd(id, {
@@ -152,13 +152,13 @@ export class Runner {
           ]
         : [],
     );
-    this.lamps = having("Lamp").flatMap(([id, q]) =>
+    this.lamps = having("lamp").flatMap(([id, q]) =>
       q?.U !== undefined && q.I !== undefined ? [{ id, u: q.U, i: q.I }] : [],
     );
-    this.motors = having("Motor").flatMap(([id, q]) => (q?.w !== undefined ? [{ id, w: q.w, angle: 0 }] : []));
-    this.relays = having("Relay").flatMap(([id, q]) => (q?.on !== undefined ? [{ id, on: q.on }] : []));
+    this.motors = having("motor").flatMap(([id, q]) => (q?.w !== undefined ? [{ id, w: q.w, angle: 0 }] : []));
+    this.relays = having("relay").flatMap(([id, q]) => (q?.on !== undefined ? [{ id, on: q.on }] : []));
     this.carried = new Float64Array(this.session.sim.flowing.length);
-    this.sonars = having("Ultrasonic").flatMap(([id, q]) => (q?.U_trig !== undefined ? [sonar(id, q.U_trig)] : []));
+    this.sonars = having("ultrasonic").flatMap(([id, q]) => (q?.U_trig !== undefined ? [sonar(id, q.U_trig)] : []));
     this.setParts(parts);
   }
 

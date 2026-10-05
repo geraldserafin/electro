@@ -8,7 +8,7 @@ from collections.abc import Callable, Sequence
 
 import sympy as sp
 
-from electro.sim import _solve_linear
+from ..simulation.linear import solve_linear
 
 Residual = Callable[..., Sequence[float]]
 """``(x, *extra)`` → each equation's value."""
@@ -44,7 +44,7 @@ def newton(
         here = _distance(f, x, extra, scale)
         if here < TOL:
             return x
-        dx = _solve_linear(jac, [-v for v in f(x, *extra)], len(x))
+        dx = solve_linear(jac, [-v for v in f(x, *extra)], len(x))
         if dx is None:
             return None
         moved = _closer(f, x, dx, extra, scale, here) if damped else _moved(x, dx, 1.0)

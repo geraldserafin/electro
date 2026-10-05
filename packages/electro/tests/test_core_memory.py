@@ -34,14 +34,16 @@ def test_a_flip_flop_takes_d_only_on_the_clocks_edge_and_holds_it_between():
     p = Problem(
         circuit @ (GND >> d_src >> d), {clk_src: square(5, period), d_src: when(TIME < 0.0018, 5, 0), load: 1000}
     )
-    q_at = simulate(p, until=0.003, dt=1e-5)(V(q))
+    trace = simulate(p, until=0.003, dt=1e-5)
+    q_at = lambda t: trace.at(V(q), t)
     assert [round(q_at(t)) for t in (0.0003, 0.0007, 0.0019, 0.0024, 0.0027)] == [0, 5, 5, 5, 0]
 
 
 def test_a_flip_flop_and_a_not_gate_in_a_loop_halve_the_clock():
     clk_src, _, load, _, d, q, circuit = _clocked()
     p = Problem(circuit @ at(NOT(), q, d, GND), {clk_src: square(5, sp.Rational(1, 1000)), load: 1000})
-    q_at = simulate(p, until=0.005, dt=1e-5)(V(q))
+    trace = simulate(p, until=0.005, dt=1e-5)
+    q_at = lambda t: trace.at(V(q), t)
     assert [round(q_at(t)) for t in (0.0003, 0.0008, 0.0018, 0.0028, 0.0038, 0.0048)] == [0, 5, 0, 5, 0, 5]
 
 

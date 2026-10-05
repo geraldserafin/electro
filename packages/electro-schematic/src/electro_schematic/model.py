@@ -422,7 +422,17 @@ class Schematic:
         _, named = self._netlist_items()
         return named
 
-    def _netlist_items(self, prefix: str = "", outside: dict[str, str] | None = None, within: tuple = ()):
+    def drawn_netlist(self) -> list[dict]:
+        """Its elements as drawn, between named points — the data ``electro.core.problem.netlist`` reads
+        (each one's text not yet read: an LED's colour, a source's frequency)."""
+        items, _ = self._netlist_items(drawn=True)
+        return [
+            {"id": e.id, "kind": e.kind, "value": e.value, "text": e.text, "nodes": list(nodes)} for e, *nodes in items
+        ]
+
+    def _netlist_items(
+        self, prefix: str = "", outside: dict[str, str] | None = None, within: tuple = (), drawn: bool = False
+    ):
         """The netlist's items (component, node names…) and every point's node name. Inside a part
         (``prefix``: its label and "_"), labels and elements are its own (prefixed), a port is the
         outside's node (``outside``: port name → node name), ground is everyone's."""
@@ -461,12 +471,12 @@ class Schematic:
                 if e.text in within or len(within) > 16:
                     raise PartInItself(e.text or "")
                 ports = {pin.name: name(p) for pin, p in zip(d.pins, e.pins())}
-                inner, _ = d.schematic._netlist_items(f"{prefix}{e.id}_", ports, (*within, e.text))
+                inner, _ = d.schematic._netlist_items(f"{prefix}{e.id}_", ports, (*within, e.text), drawn)
                 items += inner
             elif KINDS[e.kind].component is not None:
                 node_names = [name(p) for p in e.pins()]
                 own = e if not prefix else Element(prefix + e.id, e.kind, e.at, e.rotation, e.value, e.text)
-                items.append((own.component(), *node_names))
+                items.append((own if drawn else own.component(), *node_names))
         return items, {p: names[root] for p, root in nodes.items() if root in names}
 
     def to_code(self, name: str = "uklad") -> str:

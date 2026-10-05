@@ -15,6 +15,7 @@
       "source": "# Dzielnik napięcia\n\nDwa oporniki szeregowo dzielą napięcie w proporcji swoich oporów. Napięcie na dolnym:\n\n$$U_{wy} = U \\cdot \\frac{R_2}{R_1 + R_2}$$\n\nTo jeden z najważniejszych układów: tak zmniejsza się napięcie, tak działają potencjometry i tak\nodczytuje się większość czujników."
     },
     {
+      "found": {},
       "id": "6453a523",
       "type": "schematic",
       "name": "dzielnik",
@@ -309,6 +310,7 @@
       "source": "## Czujnik światła\n\n**Fotorezystor** to opornik, którego opór maleje, gdy pada na niego światło: w ciemności ma dziesiątki\nkiloomów, w słońcu kilkaset omów. W dzielniku zmienia się więc napięcie — i to napięcie może odczytać\nArduino. Uruchom ⚡, kliknij fotorezystor i zmieniaj światło."
     },
     {
+      "found": {},
       "id": "f4ff3619",
       "type": "schematic",
       "name": "swiatlo",

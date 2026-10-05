@@ -19,7 +19,7 @@ from ..circuit.time import TIME
 from ..circuit.tree import Circuit, Element
 from ..problem.problem import Problem
 from ..problem.quantities import Quantity, Scaled
-from .analysis import AC, Analysis, interpret, is_before
+from .analysis import AC, Analysis, Step, interpret, is_before, phasors
 from .expressions import expr, subs, symbols_in
 from .laws import is_source, ways
 from .relation import Equation, Origin, Relation, Way, all_equations
@@ -66,11 +66,16 @@ def relation(c: Circuit) -> Relation:
     return network(s, range(len(s.net.parts)), [n for n in range(s.net.size) if s.potentials[n] != 0])
 
 
-def equations(problem: Problem, analysis: Analysis, sources: sp.Expr | int = 1) -> System:
+def equations(
+    problem: Problem,
+    analysis: Analysis,
+    sources: sp.Expr | int = 1,
+    letters: Mapping[sp.Symbol, sp.Symbol] | None = None,
+) -> System:
     """The problem's equations read by ``analysis``, its data in; every independent source scaled by
-    ``sources``."""
+    ``sources``; the parameters in ``letters`` left as those letters (what is set while it runs)."""
     s = symbols(problem.circuit)
-    values = parameter_values(problem, s)
+    values = {**parameter_values(problem, s), **(letters or {})}
     if sources != 1:
         values = _sources_scaled(values, s, sources)
     rel = relation(problem.circuit)
@@ -140,11 +145,16 @@ def _parameters(s: Symbols) -> set[sp.Symbol]:
 
 
 def _read(eq: Equation, analysis: Analysis, values: Mapping[sp.Symbol, sp.Expr]) -> Equation:
-    return Equation(subs(interpret(eq.expr, analysis), values), eq.origin)
+    return Equation(_reading(eq.expr, analysis, values), eq.origin)
+
+
+def _reading(e: sp.Expr, analysis: Analysis, values: Mapping[sp.Symbol, sp.Expr]) -> sp.Expr:
+    read = subs(interpret(e, analysis), values)
+    return phasors(read, analysis.omega) if isinstance(analysis, AC) else read
 
 
 def _read_way(w: Way, analysis: Analysis, values: Mapping[sp.Symbol, sp.Expr]) -> Way:
-    holds = tuple(subs(interpret(h, analysis), values) for h in w.holds)
+    holds = tuple(_reading(h, analysis, values) for h in w.holds)
     return Way(w.element, w.name, tuple(_read(eq, analysis, values) for eq in w.equations), holds)
 
 
@@ -152,6 +162,16 @@ def _letters(appearing: set[sp.Symbol], values: Mapping[sp.Symbol, sp.Expr], ana
     """Symbols that appear but are not to be found: letters in the data (a value given as ``R``), ω of a
     response, time, what a step remembers."""
     in_data = {x for v in values.values() for x in symbols_in(expr(v))}
-    of_analysis = symbols_in(expr(analysis.omega)) if isinstance(analysis, AC) else set()
+    of_analysis = _of_analysis(analysis)
     remembered = {x for x in appearing if is_before(x)}
     return in_data | of_analysis | remembered | {TIME}
+
+
+def _of_analysis(analysis: Analysis) -> set[sp.Symbol]:
+    """ω of a response, a step's length as a letter."""
+    match analysis:
+        case AC(omega):
+            return symbols_in(expr(omega))
+        case Step(dt):
+            return symbols_in(expr(dt))
+    return set()

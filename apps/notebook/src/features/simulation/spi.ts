@@ -62,7 +62,7 @@ export function spiDevicesOn(s: Session, board: Board, kept: Map<string, Ili9341
   for (const [pin, node] of Object.entries(board.pins)) if (node && !pinOf.has(node)) pinOf.set(node, pin);
   for (const spi of chip.spi) spi.devices = [];
   for (const [id, kind] of Object.entries(program.kinds)) {
-    if (kind !== "ILI9341") continue;
+    if (kind !== "ili9341") continue;
     const at = (i: number) => pins[id]?.[i] ?? null;
     const on = (i: number) => {
       const node = at(i);

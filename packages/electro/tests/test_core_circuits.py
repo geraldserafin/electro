@@ -108,7 +108,7 @@ def test_rc_on_paper_where_it_ends_in_time_how_it_gets_there_at_omega_its_phasor
     p = Problem((GND >> e >> r >> b) @ (b >> c >> GND), {e: 10, r: 1000, c: "100u"}, [U(c)])
     assert solve(p)(U(c)) == 10
     trace = simulate(p, until=0.5, dt=1e-4)
-    assert abs(trace(U(c))(0.1) - 10 * (1 - math.exp(-1))) < 0.05
+    assert abs(trace.at(U(c), 0.1) - 10 * (1 - math.exp(-1))) < 0.05
     phasor = solve(p, AC(sp.Integer(10)))(U(c))
     assert abs(complex(phasor)) == pytest.approx(10 / math.sqrt(2))
 

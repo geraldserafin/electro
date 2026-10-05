@@ -20,6 +20,7 @@
       "source": "## Mierniki\n\nŻeby to sprawdzić, potrzebujemy mierników:\n\n- **amperomierz** ($A$) mierzy prąd, więc wstawia się go **w** obwód, szeregowo — prąd musi przez niego\n  przepłynąć,\n- **woltomierz** ($V$) mierzy napięcie między dwoma punktami, więc dołącza się go **obok** elementu,\n  równolegle.\n\nKliknij ▶ **Oblicz**, żeby zobaczyć, co pokazują."
     },
     {
+      "found": {},
       "id": "7823daa1",
       "type": "schematic",
       "name": "pomiar",
@@ -216,6 +217,7 @@
       "source": "## Opór nieznany\n\nCzęsto jest odwrotnie: znamy napięcie, zmierzyliśmy prąd, a chcemy wiedzieć, jaki to opornik. Zostaw\nwartość opornika **pustą** — to znaczy „nie wiem” — a w amperomierzu wpisz odczyt, 20 mA. Solver sam\nużyje prawa Ohma: $R = \\frac{U}{I} = \\frac{9\\,\\mathrm{V}}{0{,}02\\,\\mathrm{A}} = 450\\,Ω$."
     },
     {
+      "found": {},
       "id": "b929e192",
       "type": "schematic",
       "name": "nieznany",

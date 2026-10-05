@@ -996,8 +996,24 @@ więc ten sam renderer z TS da się kiedyś tam wpiąć. Dziś nic pod to nie bu
 | etap | co |
 |---|---|
 | A | elementy: wszystkie urządzenia jako rodzaje (prawa w słowach czasu, bez sztuczek elementu); nazwy rodzajów = nazwy ze schematu; części i kolory jako gotowe dane; nazwy jak dotąd (`R_1`) — zrobione |
-| B | symulacja: program z równań `Step` (stany z `D`/`Pre`, wejścia = parametry ustawiane w biegu, ograniczanie złącz ogólnie dla każdego `exp`), ten sam JSON; `live` i `simulate` na rdzeniu |
+| B | symulacja: program z równań `Step` (stany z `D`/`Pre`, wejścia = parametry ustawiane w biegu, ograniczanie złącz ogólnie dla każdego `exp`), ten sam JSON; `live` i `simulate` na rdzeniu — zrobione |
 | C | granica danych: netlista z rysunku (TS) → `Problem`; wyniki, kroki, problemy jako dane; kernel na rdzeniu |
 | D | strona przejmuje rysunek: węzły, strzałki, układanie, symbole, render, wykresy z serii liczb, format pliku |
 | E | Bode, przemiatanie, tolerancje (liczby), SPICE, zadania na rdzeniu |
 | F | kursy, przykłady, prompt AI, README na nowe API; stare moduły i paczki usunięte |
+
+**Etap B — co wyszło.** Program symulacji liczy się z równań rdzenia (`simulation/program.py`), ten sam
+JSON co dotąd; `live` w notatniku idzie przez netlistę jako dane (`problem/netlist.py`), którą na razie
+robi z rysunku kernel. Wszystkie testy symulacji starej biblioteki działają na rdzeniu
+(`test_core_simulation.py`). Ustalenia:
+
+- Pomoc dla Newtona jest ogólna, w kompilatorze: szept przewodności do masy w każdym punkcie, `limexp`
+  dla każdej wykładniczej, a dla tej z maleńkim prądem w zerze (złącze) krok jak w SPICE.
+- Krok pilnuje tego, co pamiętane: napięcie o ≤ 0,05 V, prąd o ≤ 1 mA na krok; stan wewnętrzny tylko pod
+  `Pre` (przerzutnik) skacze; sinus i fala prostokątna wyznaczają najdłuższy krok, zbocze w czasie skraca
+  następny.
+- Przerzutnik przy włączeniu: decyduje z tego, co było chwilę przed — przy pierwszym zboczu (t = 0)
+  wejścia jeszcze spoczywają, więc nie przełącza (stara biblioteka przełączała).
+- Dioda podręcznikowa (przypadki) jest tylko na kartkę: w czasie `NotSimulated`.
+- Sinus w czasie w analizie AC to jego wskaz; zadanie ze sinusami jednej częstotliwości liczy się na
+  kartce samo jej wskazami.

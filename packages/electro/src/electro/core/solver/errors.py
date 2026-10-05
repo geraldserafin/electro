@@ -44,7 +44,3 @@ class NotLinear(ValueError):
 
 class NotOnePort(ValueError):
     """A black box here is of a piece with one free end each side (1 → 1)."""
-
-
-class NoConvergence(ArithmeticError):
-    """A step in time Newton could not take (at ``t``)."""

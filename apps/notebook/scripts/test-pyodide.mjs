@@ -31,3 +31,22 @@ check("bode svg", out[0]?.type === "svg" && out[0].data.includes("<polyline"), o
 out = run("steps(sol)");
 check("steps", out[0]?.type === "solution" && JSON.stringify(out[0].data).includes("R_{2}"), out);
 check("symbol library", "resistor" in JSON.parse(kernel.symbols()).kinds, null);
+const led = {
+  version: 1,
+  elements: [
+    { id: "E_1", kind: "voltage_source", at: [0, 4], rotation: 270, value: "5" },
+    { id: "R_1", kind: "resistor", at: [0, 0], rotation: 0, value: "150" },
+    { id: "LED_1", kind: "led", at: [4, 0], rotation: 90, value: null, text: "red" },
+    { id: "GND1", kind: "ground", at: [0, 4], rotation: 0 },
+  ],
+  wires: [
+    {
+      points: [
+        [4, 4],
+        [0, 4],
+      ],
+    },
+  ],
+};
+const live = JSON.parse(kernel.live(JSON.stringify(led)));
+check("live", live.program?.kinds?.LED_1 === "led" && live.program.kernel.includes("limexp"), live);

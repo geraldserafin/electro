@@ -3,32 +3,8 @@
 ``circuit`` says what a circuit is, ``problem`` what is asked of it; ``solver`` and ``methods`` compute.
 """
 
-from .circuit.elements import (
-    CCCS,
-    CCVS,
-    NOT,
-    V_HIGH,
-    V_T,
-    VCCS,
-    VCVS,
-    Ammeter,
-    Capacitor,
-    Coupled,
-    CurrentSource,
-    DFlipFlop,
-    Diode,
-    DiodeDrop,
-    Hole,
-    Inductor,
-    Norator,
-    Nullator,
-    OpAmp,
-    Open,
-    Resistor,
-    Transformer,
-    VoltageSource,
-    Wire,
-)
+from .circuit.elements import *
+from .circuit.elements import __all__ as _elements
 from .circuit.kind import Case, Cases, Kind, Terminals, two_terminal
 from .circuit.netlist import ElementTwice, JoinsNodes, Netlist
 from .circuit.time import TIME, D, Pre, rising, square, when
@@ -44,12 +20,15 @@ from .methods.two_points import Thevenin, between, resistance, thevenin
 from .problem.data import problem_from_data, problem_to_data
 from .problem.problem import NoSuchParameter, NotClosed, Problem
 from .problem.quantities import Across, Current, I, P, Parameter, Potential, Power, U, V, Voltage
+from .simulation.errors import NoConvergence, NoSuchInput, NotSimulated, ValueNeeded
+from .simulation.program import Program, compile_program
+from .simulation.simulate import simulate
+from .simulation.trace import Trace
 from .solver.analysis import AC, DC, Step
 from .solver.errors import (
     Ambiguous,
     Contradiction,
     MissingData,
-    NoConvergence,
     NotLinear,
     NotOnePort,
     Undetermined,
@@ -57,60 +36,40 @@ from .solver.errors import (
 from .solver.laws import is_linear, is_source
 from .solver.port import blackbox, matches
 from .solver.relation import Equation, Origin, Relation, hide, join
-from .solver.simulate import Trace, simulate
 from .solver.solution import Solution, SolutionStep
 from .solver.solve import solve
 from .solver.system import relation
 
 __all__ = [
     "AC",
-    "CCCS",
-    "CCVS",
-    "DC",
-    "GND",
-    "TIME",
-    "V_HIGH",
-    "V_T",
-    "VCCS",
-    "VCVS",
     "Across",
     "Ambiguous",
-    "Ammeter",
-    "Capacitor",
     "Case",
     "Cases",
     "Circuit",
     "Contradiction",
-    "Coupled",
     "Current",
-    "CurrentSource",
     "D",
-    "DFlipFlop",
-    "Diode",
-    "DiodeDrop",
+    "DC",
     "Element",
     "ElementTwice",
     "Equation",
     "Filled",
-    "Hole",
+    "GND",
     "I",
-    "Inductor",
     "JoinsNodes",
     "Kind",
     "MissingData",
     "Net",
     "Netlist",
-    "Node",
     "NoConvergence",
+    "NoSuchInput",
     "NoSuchParameter",
-    "Norator",
-    "NOT",
+    "Node",
     "NotClosed",
     "NotLinear",
     "NotOnePort",
-    "Nullator",
-    "OpAmp",
-    "Open",
+    "NotSimulated",
     "Origin",
     "P",
     "Parameter",
@@ -118,9 +77,9 @@ __all__ = [
     "Power",
     "Pre",
     "Problem",
+    "Program",
     "Reduction",
     "Relation",
-    "Resistor",
     "Response",
     "Solution",
     "SolutionStep",
@@ -128,22 +87,22 @@ __all__ = [
     "Step",
     "Superposition",
     "Sweep",
+    "TIME",
     "Terminals",
     "Thevenin",
     "Trace",
-    "Transformer",
     "U",
     "Undetermined",
     "V",
+    "ValueNeeded",
     "Voltage",
-    "VoltageSource",
-    "Wire",
     "at",
     "beside",
     "between",
     "blackbox",
     "cap",
     "close",
+    "compile_program",
     "cup",
     "fill",
     "free",
@@ -175,4 +134,5 @@ __all__ = [
     "two_terminal",
     "when",
     "wire",
+    *_elements,
 ]

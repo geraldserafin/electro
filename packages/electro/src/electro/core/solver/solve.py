@@ -7,7 +7,7 @@ import sympy as sp
 
 from ..circuit.time import TIME, Pre
 from ..problem.problem import Problem
-from .analysis import AC, DC
+from .analysis import AC, DC, frequencies
 from .by_cases import solve_by_cases
 from .by_hand import solve_by_hand
 from .errors import Contradiction, NotLinear, Undetermined
@@ -19,7 +19,8 @@ from .system import SOURCES, System, equations, relation
 
 
 def solve(problem: Problem, analysis: DC | AC | None = None) -> Solution:
-    analysis = analysis or DC()
+    """``analysis``: by default DC, or with sines in time of one frequency, their phasors at it."""
+    analysis = analysis or _own_frequency(problem) or DC()
     if _has_memory(problem):
         raise Undetermined("it has memory — what it holds depends on what came before: simulate it")
     system = equations(problem, analysis)
@@ -32,6 +33,11 @@ def solve(problem: Problem, analysis: DC | AC | None = None) -> Solution:
     if isinstance(analysis, AC):
         raise NotLinear("a phasor of a non-linear circuit: around its working point (not yet)")
     return _by_newton(problem)
+
+
+def _own_frequency(problem: Problem) -> AC | None:
+    found = {w for eq in equations(problem, DC()).equations for w in frequencies(eq.expr)}
+    return AC(found.pop()) if len(found) == 1 else None
 
 
 def _has_memory(problem: Problem) -> bool:
