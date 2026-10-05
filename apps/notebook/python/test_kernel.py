@@ -116,26 +116,42 @@ def test_a_spice_netlist_in_the_code_view():
     assert {e["text"] for e in elements.values() if e["kind"] == "label"} == {"in", "out"}
 
 
-def test_frequency_of_a_drawing():
-    from electro import Capacitor, Resistor, VoltageSource, loop
-    from electro_schematic import layout
+def _loop(*elements) -> str:
+    """Elements in one loop from ground, as the page sends them: each ``(id, kind, value)``."""
+    nodes = ["GND", *(f"n{k}" for k in range(1, len(elements))), "GND"]
+    units = {"voltage_source": "V", "resistor": "Ω", "capacitor": "F"}
+    return json.dumps(
+        {
+            "elements": [
+                {"id": id, "kind": kind, "value": value, "unit": units[kind], "nodes": [a, b]}
+                for (id, kind, value), a, b in zip(elements, nodes, nodes[1:])
+            ]
+        }
+    )
 
-    out = json.loads(kernel.frequency(layout(loop(VoltageSource(1), Resistor(1000), Capacitor("1u"))).to_json()))
-    assert "<polyline" in out["svg"] and "U" in out["svg"]  # the capacitor's voltage, no node named
-    out = json.loads(kernel.frequency(layout(loop(VoltageSource(1), Resistor(1000))).to_json()))
-    assert "no output" in out["error"]["data"]  # nothing named, nothing reactive
+
+def test_frequency_of_a_drawing():
+    rc = _loop(("E_1", "voltage_source", "1"), ("R_1", "resistor", "1000"), ("C_1", "capacitor", "1u"))
+    bode = json.loads(kernel.frequency(rc))["bode"]
+    assert list(bode["outputs"]) == ["U_C_1"] and bode["input"] == "E_1"
+    assert abs(bode["cutoffs"][0] - 1 / (2 * 3.14159265 * 1e-3)) < 2
+    plain = json.loads(kernel.frequency(_loop(("E_1", "voltage_source", "1"), ("R_1", "resistor", "1000"))))
+    assert plain["error"]["issue"]["type"] == "NoOutput"
 
 
 def test_sweep_and_spread_of_a_drawing():
-    from electro import Resistor, VoltageSource, loop
-    from electro_schematic import layout
-
-    drawing = layout(loop(VoltageSource(12), Resistor("1k"), Resistor("2k"))).to_json()
-    out = json.loads(kernel.sweep_plot(drawing, "R_2"))  # no range: 200 Ω to 20 kΩ
-    assert "<polyline" in out["svg"] and "R<tspan" in out["svg"]
-    assert "<polyline" in json.loads(kernel.sweep_plot(drawing, "R_2", "1k", "5k"))["svg"]
-    assert "<rect" in json.loads(kernel.spread(drawing, 0.05))["svg"]
-    unknown = layout(loop(VoltageSource(12), Resistor("1k"), Resistor())).to_json()
+    divider = _loop(("E_1", "voltage_source", "12"), ("R_1", "resistor", "1k"), ("R_2", "resistor", "2k"))
+    trace = json.loads(kernel.sweep_plot(divider, "R_2"))["trace"]  # no range: 200 Ω to 20 kΩ
+    assert (
+        trace["x"] == {"name": "R_2", "unit": "Ω"}
+        and trace["t"][0] == 200
+        and set(trace["series"]) == {"U_R_2", "I_R_2"}
+    )
+    assert abs(trace["series"]["U_R_2"][0] - 12 * 200 / 1200) < 1e-9
+    assert len(json.loads(kernel.sweep_plot(divider, "R_2", "1k", "5k"))["trace"]["t"]) == 100
+    values = json.loads(kernel.spread(divider, 0.05))["histogram"]["values"]
+    assert set(values) == {"U_R_1", "U_R_2"} and len(values["U_R_2"]) == 500
+    unknown = _loop(("E_1", "voltage_source", "12"), ("R_1", "resistor", "1k"), ("R_2", "resistor", None))
     assert json.loads(kernel.sweep_plot(unknown, "R_2"))["error"]["issue"]["type"] == "NoSweepRange"
 
 

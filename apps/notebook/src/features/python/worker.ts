@@ -16,9 +16,9 @@ type Request =
   | { id: number; type: "fromCode"; source: string; name: string; old: string }
   | { id: number; type: "solve"; problem: string }
   | { id: number; type: "live"; problem: string }
-  | { id: number; type: "frequency"; schematic: string }
-  | { id: number; type: "sweep"; schematic: string; element: string; lo: string; hi: string }
-  | { id: number; type: "spread"; schematic: string; tol: number }
+  | { id: number; type: "frequency"; problem: string }
+  | { id: number; type: "sweep"; problem: string; element: string; lo: string; hi: string }
+  | { id: number; type: "spread"; problem: string; tol: number }
   | { id: number; type: "taskValues"; schematic: string; steps: string }
   | { id: number; type: "fromDrawing"; drawing: string; strict: boolean }
   | { id: number; type: "renderSvg"; schematic: string }
@@ -31,9 +31,9 @@ interface Kernel {
   from_code(source: string, name: string, old: string): string;
   solve(problem: string): string;
   live(problem: string): string;
-  frequency(schematic: string): string;
-  sweep_plot(schematic: string, element: string, lo: string, hi: string): string;
-  spread(schematic: string, tol: number): string;
+  frequency(problem: string): string;
+  sweep_plot(problem: string, element: string, lo: string, hi: string): string;
+  spread(problem: string, tol: number): string;
   task_values(schematic: string, steps: string): string;
   from_drawing(drawing: string, strict: boolean): string;
   render_svg(schematic: string): string;
@@ -100,11 +100,11 @@ self.onmessage = async (event: MessageEvent<Request>) => {
               : request.type === "live"
                 ? k.live(request.problem)
                 : request.type === "frequency"
-                  ? k.frequency(request.schematic)
+                  ? k.frequency(request.problem)
                   : request.type === "sweep"
-                    ? k.sweep_plot(request.schematic, request.element, request.lo, request.hi)
+                    ? k.sweep_plot(request.problem, request.element, request.lo, request.hi)
                     : request.type === "spread"
-                      ? k.spread(request.schematic, request.tol)
+                      ? k.spread(request.problem, request.tol)
                       : request.type === "taskValues"
                         ? k.task_values(request.schematic, request.steps)
                         : request.type === "fromDrawing"

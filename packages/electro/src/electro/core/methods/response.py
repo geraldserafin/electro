@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import cmath
 import math
+from collections.abc import Sequence
 from dataclasses import dataclass
 
 import sympy as sp
@@ -29,7 +30,12 @@ class Response:
 
     @property
     def phase_deg(self) -> tuple[float, ...]:
-        return tuple(math.degrees(cmath.phase(h)) for h in self.H)
+        """Unwrapped: no jump of 360° where the phase passes −180°."""
+        out: list[float] = []
+        for h in self.H:
+            p = math.degrees(cmath.phase(h))
+            out.append(p + 360 * round((out[-1] - p) / 360) if out else p)
+        return tuple(out)
 
     def cutoffs(self) -> list[float]:
         """Where the gain crosses 3 dB under its largest, straight in log f between two points."""
@@ -41,10 +47,21 @@ class Response:
 def respond(
     problem: Problem, q: Quantity, source: Element, f: tuple[float, float] = (10, 1e6), points: int = 200
 ) -> Response:
+    return responses(problem, [q], source, f, points)[q]
+
+
+def responses(
+    problem: Problem, qs: Sequence[Quantity], source: Element, f: tuple[float, float] = (10, 1e6), points: int = 200
+) -> dict[Quantity, Response]:
+    """Each of ``qs``, from one solution."""
     omega = sp.Symbol("omega", positive=True)
-    h = sp.lambdify(omega, solve(Problem(problem.circuit, {**problem.given, source: 1}), AC(omega))(q), "cmath")
+    solution = solve(Problem(problem.circuit, {**problem.given, source: 1}), AC(omega))
     fs = _logarithmic(f, points)
-    return Response(fs, tuple(complex(h(2 * math.pi * x)) for x in fs))
+    out = {}
+    for q in qs:
+        h = sp.lambdify(omega, solution(q), "cmath")
+        out[q] = Response(fs, tuple(complex(h(2 * math.pi * x)) for x in fs))
+    return out
 
 
 def _logarithmic(f: tuple[float, float], points: int) -> tuple[float, ...]:

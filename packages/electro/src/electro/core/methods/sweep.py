@@ -1,4 +1,5 @@
-"""What a quantity comes to as one datum takes each of several values."""
+"""What quantities come to as one datum takes each of several values: solved once with that datum a
+letter, then each value put in."""
 
 from __future__ import annotations
 
@@ -23,7 +24,13 @@ class Sweep:
 
 
 def sweep(problem: Problem, key: Key, values: Sequence[object], q: Quantity, analysis: DC | AC | None = None) -> Sweep:
-    results = tuple(
-        solve(Problem(problem.circuit, {**problem.given, key: v}, problem.find), analysis)(q) for v in values
-    )
-    return Sweep(tuple(cast(sp.Expr, parse(v)) for v in values), results)
+    return sweeps(problem, key, values, [q], analysis)[q]
+
+
+def sweeps(
+    problem: Problem, key: Key, values: Sequence[object], qs: Sequence[Quantity], analysis: DC | AC | None = None
+) -> dict[Quantity, Sweep]:
+    letter = sp.Symbol("swept")
+    solution = solve(Problem(problem.circuit, {**problem.given, key: letter}, problem.find), analysis)
+    numbers = tuple(cast(sp.Expr, parse(v)) for v in values)
+    return {q: Sweep(numbers, tuple(cast(sp.Expr, solution(q).subs(letter, v)) for v in numbers)) for q in qs}

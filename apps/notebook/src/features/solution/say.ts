@@ -161,6 +161,11 @@ export function sayer(t: TFunction<"solution">, lang: string) {
         return t("issue.BadDataEntry", { entry: i.entry });
       case "NoSuchSchematic":
         return t("issue.NoSuchSchematic", { name: code(i.name), available: names(i.available) });
+      case "NoSweepRange":
+        return t("issue.NoSweepRange", { element: code(i.element) });
+      case "NoInput":
+      case "NoOutput":
+        return t(`issue.${i.type}`);
       default:
         return code((i as { type: string }).type); // a kernel newer than the page
     }

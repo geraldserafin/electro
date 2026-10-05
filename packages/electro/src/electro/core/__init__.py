@@ -11,11 +11,11 @@ from .circuit.time import TIME, D, Pre, rising, square, when
 from .circuit.tree import GND, Circuit, Element, Net, Node, free, is_closed, netlist
 from .circuit.wiring import at, beside, cap, close, cup, loop, parallel, rebuild, series, wire
 from .methods.fill import Filled, fill
-from .methods.response import Response, respond
+from .methods.response import Response, respond, responses
 from .methods.simplify import Reduction, simplify
 from .methods.superposition import Superposition, superposition
-from .methods.sweep import Sweep, sweep
-from .methods.tolerance import Spread, tolerance
+from .methods.sweep import Sweep, sweep, sweeps
+from .methods.tolerance import Spread, spreads, tolerance
 from .methods.two_points import Thevenin, between, resistance, thevenin
 from .problem.data import problem_from_data, problem_to_data
 from .problem.problem import NoSuchParameter, NotClosed, Problem
@@ -121,6 +121,7 @@ __all__ = [
     "relation",
     "resistance",
     "respond",
+    "responses",
     "rising",
     "series",
     "simplify",
@@ -129,7 +130,9 @@ __all__ = [
     "square",
     "superposition",
     "sweep",
+    "sweeps",
     "thevenin",
+    "spreads",
     "tolerance",
     "two_terminal",
     "when",

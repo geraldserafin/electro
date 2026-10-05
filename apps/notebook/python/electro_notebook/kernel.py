@@ -24,7 +24,6 @@ from dataclasses import fields, is_dataclass
 
 import electro.core as core
 import sympy as sp
-from electro.analysis import bode, sweep, tolerance
 from electro.components import Law
 from electro.issues import Equals, Issue, IsZero, issue
 from electro.task import Task
@@ -280,45 +279,109 @@ def _resistance(sch: Schematic, a: str, b: str):
     return sp.simplify(sum(0 if n == GROUND else solution(f"V_{n}") * k for n, k in ((na, 1), (nb, -1))))
 
 
-def frequency(schematic_json: str) -> str:
-    """The frequency button of a schematic cell: ``bode()`` of the drawing (its named nodes, else its
-    capacitors' and inductors' voltages). Returns JSON ``{"svg": "..."}`` or ``{"error": {...}}``."""
+def frequency(problem_json: str) -> str:
+    """The frequency button of a schematic cell: its outputs (``_outputs``) against the frequency, per
+    its one source. Returns JSON ``{"bode": {"f", "input", "outputs": {name: {"gain", "phase"}},
+    "cutoffs"}}`` (decibels, degrees, hertz) or ``{"error": {...}}``."""
+    from electro.core import responses
+    from electro.core.problem.netlist import from_netlist
+
     try:
-        return json.dumps({"svg": bode(Schematic.from_json(schematic_json).to_circuit())._repr_svg_()})
+        net = from_netlist(json.loads(problem_json))
+        sources = [e for e in net.elements.values() if e.kind.name in ("voltage_source", "sine_source")]
+        if not sources:
+            raise NoInput()
+        outputs = _outputs(net)
+        if not outputs:
+            raise NoOutput()
+        found = responses(net.problem, list(outputs.values()), sources[0])
+        first = found[next(iter(outputs.values()))]
+        bode = {
+            "f": list(first.f),
+            "input": sources[0].name,
+            "outputs": {
+                n: {"gain": list(found[q].gain_db), "phase": list(found[q].phase_deg)} for n, q in outputs.items()
+            },
+            "cutoffs": first.cutoffs(),
+        }
+        return json.dumps({"bode": bode})
     except Exception as err:  # noqa: BLE001 — shown under the drawing
         return json.dumps({"error": _error(err)}, ensure_ascii=False)
 
 
-def sweep_plot(schematic_json: str, element: str, lo: str = "", hi: str = "") -> str:
+def sweep_plot(problem_json: str, element: str, lo: str = "", hi: str = "") -> str:
     """The sweep in an element's inspector: the outputs as its value goes from ``lo`` to ``hi`` (by
-    default a tenth of it to ten times it). Returns JSON ``{"svg": "..."}`` or ``{"error": {...}}``."""
-    from electro.solver import _sine_omega
+    default a tenth of it to ten times it), 100 steps; with sines, their amplitudes. Returns JSON
+    ``{"trace": {"x": {"name", "unit"}, "t", "series": {name: [...]}}}`` or ``{"error": {...}}``."""
+    from electro.core import I, U, sweeps
+    from electro.core.problem.netlist import from_netlist
+    from electro.values import parse
 
     try:
-        circuit = Schematic.from_json(schematic_json).to_circuit()
+        data = json.loads(problem_json)
+        net = from_netlist(data)
+        e = net.elements[element]
+        unit = next((x.get("unit", "") for x in data["elements"] if x["id"] == element), "")
         if not (lo.strip() and hi.strip()):
-            from electro.semantics import structure
-
-            value = structure(circuit).part(element).component.value
+            value = parse(next(x.get("value") for x in data["elements"] if x["id"] == element))
             if not isinstance(value, sp.Number):
                 raise NoSweepRange(element)
             lo, hi = lo.strip() or value / 10, hi.strip() or value * 10
-        svg = sweep(circuit, element, (lo, hi), omega=_sine_omega(circuit))._repr_svg_()
-        return json.dumps({"svg": svg})
+        a, b = float(parse(lo)), float(parse(hi))
+        values = [a + (b - a) * k / 99 for k in range(100)]
+        outputs = _outputs(net, named_only=True) or {f"U_{element}": U(e), f"I_{element}": I(e)}
+        found = sweeps(net.problem, e, values, list(outputs.values()))
+        series = {n: [_amplitude(v) for v in found[q].results] for n, q in outputs.items()}
+        return json.dumps({"trace": {"x": {"name": element, "unit": unit}, "t": values, "series": series}})
     except Exception as err:  # noqa: BLE001 — shown under the drawing
         return json.dumps({"error": _error(err)}, ensure_ascii=False)
 
 
-def spread(schematic_json: str, tol: float = 0.05) -> str:
-    """The tolerance button: the named nodes over many builds with every R, C and L within ``tol``.
-    Returns JSON ``{"svg": "..."}`` or ``{"error": {...}}``."""
-    from electro.solver import _sine_omega
+def spread(problem_json: str, tol: float = 0.05) -> str:
+    """The tolerance button: the outputs over many builds, every R, C and L within ``tol``. Returns JSON
+    ``{"histogram": {"values": {name: [...]}}}`` or ``{"error": {...}}``."""
+    from electro.core import U, spreads
+    from electro.core.problem.netlist import from_netlist
 
     try:
-        circuit = Schematic.from_json(schematic_json).to_circuit()
-        return json.dumps({"svg": tolerance(circuit, tol=tol, omega=_sine_omega(circuit))._repr_svg_()})
+        net = from_netlist(json.loads(problem_json))
+        outputs = _outputs(net, named_only=True)
+        if not outputs:
+            varied = [e for e in net.elements.values() if e.kind.positive and e in net.problem.given][:4]
+            outputs = {f"U_{e.name}": U(e) for e in varied}
+        found = spreads(net.problem, list(outputs.values()), tol)
+        return json.dumps({"histogram": {"values": {n: list(found[q].values) for n, q in outputs.items()}}})
     except Exception as err:  # noqa: BLE001 — shown under the drawing
         return json.dumps({"error": _error(err)}, ensure_ascii=False)
+
+
+def _outputs(net, named_only: bool = False) -> dict:
+    """What a plot shows: the potentials of the points the drawing names, else (``named_only`` not) the
+    capacitors' and inductors' voltages."""
+    from electro.core import U, V
+
+    named = {
+        f"V_{n}": V(p) for n, p in net.points.items() if n not in ("GND", "0") and not re.fullmatch(r"(.+_)?n\d+", n)
+    }
+    if named or named_only:
+        return named
+    return {f"U_{id}": U(e) for id, e in net.elements.items() if e.kind.name in ("capacitor", "inductor")}
+
+
+def _amplitude(v) -> float:
+    z = complex(v)
+    return abs(z) if abs(z.imag) > 1e-12 * max(1.0, abs(z)) else z.real
+
+
+@issue
+class NoOutput(Issue, ValueError):
+    """A plot needs something to show: no point is named, and nothing has a capacitor's or an inductor's
+    voltage."""
+
+
+@issue
+class NoInput(Issue, ValueError):
+    """A frequency response needs a source to be the input: the circuit has none."""
 
 
 def _task_values(circuit, steps: list[dict], given: list | None = None) -> dict[str, dict]:

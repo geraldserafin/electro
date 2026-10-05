@@ -1,6 +1,7 @@
 // The page's handle on the Python worker: every call is a message and a promise.
 
 import { type Progress, report } from "@/features/downloads/store";
+import { bodeSvg, histogramSvg, traceSvg } from "@/features/plots/svg";
 import { library } from "@/features/schematic/library";
 import { isComponent, key, pins } from "@/features/schematic/model";
 import { withParts } from "@/features/schematic/parts";
@@ -114,7 +115,8 @@ class Kernel {
 
   /** A schematic cell's frequency button: the Bode plot of the drawing (or the error in it). */
   async frequency(schematic: SchematicData): Promise<{ svg: string } | { error: Failure }> {
-    return JSON.parse((await this.call("frequency", { schematic: JSON.stringify(schematic) })) as string);
+    const reply = JSON.parse((await this.call("frequency", { problem: this.problem(schematic) })) as string);
+    return "error" in reply ? reply : { svg: bodeSvg(reply.bode) };
   }
 
   /** An element's sweep (its inspector): the outputs as its value goes from ``lo`` to ``hi``. */
@@ -124,12 +126,21 @@ class Kernel {
     lo: string,
     hi: string,
   ): Promise<{ svg: string } | { error: Failure }> {
-    return JSON.parse((await this.call("sweep", { schematic: JSON.stringify(schematic), element, lo, hi })) as string);
+    const reply = JSON.parse(
+      (await this.call("sweep", { problem: this.problem(schematic), element, lo, hi })) as string,
+    );
+    return "error" in reply ? reply : { svg: traceSvg(reply.trace) };
   }
 
   /** The tolerance button: the outputs over many builds, each R, C and L within ``tol``. */
   async spread(schematic: SchematicData, tol: number): Promise<{ svg: string } | { error: Failure }> {
-    return JSON.parse((await this.call("spread", { schematic: JSON.stringify(schematic), tol })) as string);
+    const reply = JSON.parse((await this.call("spread", { problem: this.problem(schematic), tol })) as string);
+    return "error" in reply ? reply : { svg: histogramSvg(reply.histogram) };
+  }
+
+  /** The drawing's elements as a problem, for the plots. */
+  private problem(schematic: SchematicData): string {
+    return JSON.stringify({ elements: elementsOf(schematic, library).elements });
   }
 
   /** Quantities of the drawing as it is (``steps``: each an id and its expression, ``I_R1``): each

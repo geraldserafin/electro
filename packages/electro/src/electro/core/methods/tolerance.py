@@ -5,7 +5,7 @@ from __future__ import annotations
 
 import math
 import random
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from typing import cast
 
@@ -33,16 +33,26 @@ def tolerance(
 ) -> Spread:
     """``tol``: the same for every part of a positive value (a resistor, a capacitor, an inductor), or by
     kind prefix (``{"C": 0.1}``)."""
+    return spreads(problem, [q], tol, runs, seed)[q]
+
+
+def spreads(
+    problem: Problem, qs: Sequence[Quantity], tol: float | Mapping[str, float] = 0.05, runs: int = 500, seed: int = 0
+) -> dict[Quantity, Spread]:
+    """Each of ``qs`` over the same builds (a phasor's: its amplitude)."""
     tolerances = _tolerances(problem, tol)
     nominal = {e: float(cast(sp.Expr, problem.given[e])) for e in tolerances}
     letters = {e: sp.Symbol(f"tol_{i}") for i, e in enumerate(nominal)}
-    at = sp.lambdify(list(letters.values()), solve(Problem(problem.circuit, {**problem.given, **letters}))(q), "math")
+    solution = solve(Problem(problem.circuit, {**problem.given, **letters}))
+    at = [sp.lambdify(list(letters.values()), solution(q), "cmath") for q in qs]
     rng = random.Random(seed)
+    builds = [[v * (1 + rng.uniform(-tolerances[e], tolerances[e])) for e, v in nominal.items()] for _ in range(runs)]
+    return {q: Spread(tuple(_number(f(*b)) for b in builds)) for q, f in zip(qs, at)}
 
-    def build() -> float:
-        return float(at(*(v * (1 + rng.uniform(-tolerances[e], tolerances[e])) for e, v in nominal.items())))
 
-    return Spread(tuple(build() for _ in range(runs)))
+def _number(v: complex | float) -> float:
+    v = complex(v)
+    return abs(v) if abs(v.imag) > 1e-12 * max(1.0, abs(v)) else v.real
 
 
 def _tolerances(problem: Problem, tol: float | Mapping[str, float]) -> dict[Element, float]:
