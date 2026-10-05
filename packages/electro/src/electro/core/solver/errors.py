@@ -6,6 +6,7 @@ from collections.abc import Mapping, Sequence
 
 import sympy as sp
 
+from ..problem.problem import Key
 from ..problem.quantities import Quantity
 
 
@@ -16,7 +17,7 @@ class Undetermined(ValueError):
 class Contradiction(Undetermined):
     """No circuit fits the data. ``data``: the given ones that clash, without any one of which it fits."""
 
-    def __init__(self, message: str, data: Sequence[object] = ()) -> None:
+    def __init__(self, message: str, data: Sequence[Key] = ()) -> None:
         super().__init__(message)
         self.data = tuple(data)
 
@@ -30,12 +31,19 @@ class Ambiguous(Undetermined):
 
 
 class MissingData(Undetermined):
-    """``needed`` data more. ``options``: quantities each of which, given, would do (when one is needed);
-    ``found``: what is sought and could be found."""
+    """``targets``: what is sought and could not be found; ``needed`` data more; ``options``: quantities
+    each of which, given, would do (when one is needed); ``found``: what is sought and could be found."""
 
-    def __init__(self, needed: int, options: Sequence[Quantity], found: Mapping[Quantity, sp.Expr]) -> None:
+    def __init__(
+        self,
+        needed: int,
+        options: Sequence[Quantity],
+        found: Mapping[Quantity, sp.Expr],
+        targets: Sequence[Quantity] = (),
+    ) -> None:
         super().__init__(f"{needed} more datum needed")
         self.needed, self.options, self.found = needed, tuple(options), dict(found)
+        self.targets = tuple(targets)
 
 
 class NotLinear(ValueError):

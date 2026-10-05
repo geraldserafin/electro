@@ -22,6 +22,7 @@ import traceback
 import warnings
 from dataclasses import fields, is_dataclass
 
+import electro.core as core
 import sympy as sp
 from electro.analysis import bode, sweep, tolerance
 from electro.components import Law
@@ -627,6 +628,167 @@ def netlist_of(schematic_json: str) -> str:
         return json.dumps({"elements": elements}, ensure_ascii=False)
     except Exception as err:  # noqa: BLE001 — the AI is told it could not be read
         return json.dumps({"error": _error(err)}, ensure_ascii=False)
+
+
+def solve(problem_json: str) -> str:
+    """The run button of a schematic cell: its problem (``schematic/problem.ts``: the elements, what its
+    marks give, ``marks`` — each mark's id, quantity and unit — and ``sought``, each key's quantity and
+    unit) solved on paper.
+
+    Returns JSON ``{"results": {id: {...}}, "problems": [...], "found": {key: value | null}}``: every
+    element's value, voltage, current and power, each mark's value, what each sought key came to, and
+    what could not be found or went wrong."""
+    from electro.core import Problem
+    from electro.core.problem.netlist import from_netlist, quantity
+
+    data = json.loads(problem_json)
+    units = {e["id"]: e.get("unit", "") for e in data["elements"]}
+    problems: list[dict] = []
+    problem = None
+    try:
+        net = from_netlist(data)
+        find = [quantity(q, net.elements, net.points) for _, q, _ in data.get("sought") or () if q[0] != "R"]
+        problem = Problem(net.problem.circuit, net.problem.given, find)
+        solution, filled = _solved(problem, net)
+    except Exception as err:  # noqa: BLE001 — every error is said on the board
+        return json.dumps(
+            {"results": {}, "problems": [_said("error", err, problem, units)], "found": {}}, ensure_ascii=False
+        )
+    try:
+        _ = solution.answers
+    except Exception as err:  # noqa: BLE001 — what was not found: a warning, the rest stands
+        problems.append(_said("warning", err, problem, units))
+    results = {id: _element_result(solution, e, units, filled.get(id)) for id, e in net.elements.items()}
+    for id, q, unit, given in data.get("marks") or ():
+        value = _number(solution, quantity(q, net.elements, net.points))
+        if value is not None:
+            results[id] = {
+                "value": _fmt(value, unit),
+                "solved": not given,
+                "U": None,
+                "I": None,
+                "P": None,
+                "reversed": False,
+            }
+    found = {key: _found(solution, net, q, unit) for key, q, unit in data.get("sought") or ()}
+    return json.dumps({"results": results, "problems": problems, "found": found}, ensure_ascii=False)
+
+
+def _solved(problem, net):
+    """Solved, a hole filled with the simplest element that fits (``{id: what it is}``)."""
+    from electro.core import fill, solve
+
+    holes = [(id, e) for id, e in net.elements.items() if e.kind.name == "hole"]
+    if len(holes) == 1:
+        id, hole = holes[0]
+        filled = fill(problem, hole)
+        return filled.solution, {id: filled.by}
+    return solve(problem), {}
+
+
+SOURCES = ("voltage_source", "current_source", "sine_source", "square_source")
+METERS = {"ammeter": core.I, "voltmeter": core.U}
+"""A meter's value is its reading: the current through it, the voltage across it."""
+"""Shown as a source is: its voltage the rise from its first end to its second, its power what it gives."""
+
+
+def _element_result(solution, e, units: dict, filled) -> dict:
+    from electro.core import Current, Parameter, Power, Voltage
+
+    id = e.name
+    two = len(e.kind.terminals) == 2
+    by = filled if filled is not None else e
+    value = _number(solution, Parameter(by)) if "" in by.kind.parameters else None
+    given = _given(solution.problem.given.get(e))
+    u = _number(solution, Voltage(by)) if two else None
+    i = _number(solution, Current(by)) if two else None
+    p = _number(solution, Power(by)) if two else None
+    if e.kind.name in SOURCES:
+        u, p = (-x if x is not None else None for x in (u, p))
+    sign = -1 if i is not None and i.is_real and i < 0 else 1
+    if e.kind.name in METERS:
+        reading = u if e.kind.name == "voltmeter" else i
+        shown = _fmt(reading, units.get(id, "")) if reading is not None else "?"
+        solved = not _given(solution.problem.given.get(METERS[e.kind.name](e)))
+        return {"value": shown, "solved": solved, "U": None, "I": None, "P": None, "reversed": False}
+    if filled is not None:
+        shown = _notation(filled, value)
+    elif "" in e.kind.parameters:
+        shown = _fmt(value, units.get(id, "")) if value is not None else "?"
+    else:
+        shown = ""
+    return {
+        "value": shown,
+        "solved": filled is not None or ("" in e.kind.parameters and not given and value is not None),
+        "U": _fmt(sign * u, "V") if u is not None else None,
+        "I": _fmt(sign * i, "A") if i is not None else None,
+        "P": _fmt(p, "W") if p is not None and not p.has(sp.I) else None,
+        "reversed": sign < 0,
+    }
+
+
+def _given(value) -> bool:
+    """A value given to an element: its main one (an element of several may be given others only)."""
+    from collections.abc import Mapping
+
+    from electro.values import UNKNOWN
+
+    if isinstance(value, Mapping):
+        return "" in value and value[""] is not UNKNOWN
+    return value is not None and value is not UNKNOWN
+
+
+def _notation(by, value) -> str:
+    """What a hole turned out to be, in values: ``R = 2 Ω``, ``E = 12 V``, ``R = ∞`` (a break), ``R = 0 Ω``."""
+    from electro.values import fmt
+
+    match by.kind.name:
+        case "wire":
+            return f"R = {fmt(0, 'Ω')}"
+        case "open":
+            return "R = ∞"
+        case "resistor":
+            return f"R = {fmt(value, 'Ω')}"
+        case "voltage_source":
+            return f"E = {fmt(value, 'V')}"
+    return f"J = {fmt(value, 'A')}"
+
+
+def _number(solution, q):
+    """``q`` found, or None."""
+    try:
+        v = solution(q)
+    except Exception:  # noqa: BLE001 — not found: none
+        return None
+    return v if v.is_number else None
+
+
+def _found(solution, net, q, unit: str) -> str | None:
+    from electro.core import between, thevenin
+
+    if q[0] == "R":
+        try:
+            t = thevenin(between(solution.problem, net.points[q[1]], net.points[q[2]], solution.analysis))
+        except Exception:  # noqa: BLE001 — not two points of it: none
+            return None
+        return _fmt(t.Z, unit) if t is not None and t.Z.is_number else None
+    from electro.core.problem.netlist import quantity
+
+    value = _number(solution, quantity(q, net.elements, net.points))
+    return None if value is None else _fmt(value, unit)
+
+
+def _fmt(value, unit: str) -> str:
+    from electro.values import fmt
+
+    return fmt(value, unit)
+
+
+def _said(kind: str, err, problem, units: dict) -> dict:
+    from electro.core.report.issues import issue
+
+    said = issue(err, problem, units)
+    return {"kind": kind, "issue": said} if said is not None else {"kind": kind, "text": str(err)}
 
 
 def live(problem_json: str) -> str:

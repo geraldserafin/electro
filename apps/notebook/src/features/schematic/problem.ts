@@ -4,7 +4,8 @@
 // quantities.
 import type { ElementData, SchematicData, SymbolLibrary } from "@/shared/model/types";
 import { kindInfo, wave } from "./model";
-import { type NetElement, netlist, type Quantity, quantities } from "./netlist";
+import { type NetElement, netlist, nodeAt, type Quantity, quantities } from "./netlist";
+import { sought, unitOf } from "./sought";
 
 export interface ProblemElement {
   id: string;
@@ -24,6 +25,8 @@ export interface ProblemData {
 
 const READINGS: Record<string, string> = { potentiometer: "position", photoresistor: "lux", thermistor: "temperature" };
 const PARTS = ["led", "diode", "npn", "pnp", "opamp"];
+/** A meter's value is its reading: the current through it, the voltage across it. */
+const READS: Record<string, "I" | "U"> = { ammeter: "I", voltmeter: "U" };
 
 /** What its text says, as its parameters. */
 function read(e: NetElement): Pick<ProblemElement, "params" | "part"> {
@@ -60,4 +63,40 @@ export function problemOf(sch: SchematicData, lib: SymbolLibrary): ProblemData &
   const marks = quantities(sch, lib, names);
   const given = marks.flatMap(([e, q]): [Quantity, string][] => (e.value?.trim() ? [[q, e.value.trim()]] : []));
   return { elements, given, find: [], marks };
+}
+
+/** A key of what is sought (``sought.ts``) as electro reads it: its quantity — or, for the resistance
+ *  between two points, ``["R", a, b]`` — and its unit. */
+type Sought = [string, Quantity | ["R", string, string], string];
+
+/** The drawing as the run button solves it: its problem, each mark's quantity (id, quantity, unit,
+ *  given) and what is sought. */
+export function solveData(sch: SchematicData, lib: SymbolLibrary) {
+  const { elements, given, marks } = problemOf(sch, lib);
+  const { names } = netlist(sch, lib);
+  const byId = new Map(sch.elements.map((e) => [e.id, e]));
+  const markOf = new Map(marks.map(([e, q]) => [e.id, q]));
+  const point = (id: string) => {
+    const e = byId.get(id);
+    return e ? nodeAt(sch, names, e.at) : null;
+  };
+  const wanted = sought(sch).flatMap((key): Sought[] => {
+    const [what, a, b] = key.split(":");
+    const e = byId.get(a);
+    if (what === "R") {
+      const [p, q] = [point(a), point(b)];
+      return p && q ? [[key, ["R", p, q], "Ω"]] : [];
+    }
+    if (!e) return [];
+    if (what === "mark") return markOf.has(a) ? [[key, markOf.get(a)!, unitOf(e)]] : [];
+    if (what === "value" && READS[e.kind]) return [[key, [READS[e.kind], a], kindInfo(e.kind)?.unit ?? ""]];
+    if (what === "value") return [[key, ["value", a], kindInfo(e.kind)?.unit ?? ""]];
+    return [[key, [what as "U" | "I" | "P", a], { U: "V", I: "A", P: "W" }[what] ?? ""]];
+  });
+  return {
+    elements,
+    given,
+    marks: marks.map(([e, q]) => [e.id, q, unitOf(e), Boolean(e.value?.trim())] as const),
+    sought: wanted,
+  };
 }

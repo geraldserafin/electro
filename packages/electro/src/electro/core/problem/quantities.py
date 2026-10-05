@@ -62,7 +62,14 @@ class Power(_Scalable):
     of: Element
 
 
-Quantity = Current | Voltage | Parameter | Potential | Across | Power
+@dataclass(frozen=True)
+class Sum(_Scalable):
+    """Quantities added, each times its number: a loop's current, the current along a wire (``Scaled``)."""
+
+    terms: tuple[Scaled, ...]
+
+
+Quantity = Current | Voltage | Parameter | Potential | Across | Power | Sum
 
 
 @dataclass(frozen=True)

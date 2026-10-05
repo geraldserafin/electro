@@ -1,7 +1,7 @@
 // A drawing as a problem is set: the drawing defines the circuit, its data (each element's value, each
 // mark's: an arrow's, a point's) are given apart from it, and what is sought is asked for — a quantity
 // of an element, a point's potential, the resistance between two points. Kept in the drawing as keys
-// (``find``), each the solver's (electro_notebook.kernel.simulate):
+// (``find``), each the solver's (electro_notebook.kernel.solve):
 //   "U:R_5", "I:R_5", "P:R_5"  its voltage, current, power   "value:R_5"  its value
 //   "mark:U1"                   what a mark (an arrow, a loop's current, a point's potential) is
 //   "R:A:B"                     the resistance between points A and B (terminals, labels), as seen from there

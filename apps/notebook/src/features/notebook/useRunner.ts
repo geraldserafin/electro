@@ -2,7 +2,6 @@
 // time per cell (``running``); "run all" goes through them in order.
 import { type RefObject, useRef, useState } from "react";
 import { kernel } from "@/features/python";
-import { sought } from "@/features/schematic";
 import type { Cell, Notebook, SchematicData } from "@/shared/model/types";
 
 export function useRunner(latest: RefObject<Notebook>, update: (id: string, patch: Partial<Cell>) => void) {
@@ -47,9 +46,7 @@ export function useRunner(latest: RefObject<Notebook>, update: (id: string, patc
     if (cell?.type !== "schematic") return Promise.resolve();
     return busy(id, async () => {
       try {
-        // (what is sought: asked for, and what has no value)
-        const drawing = schematic ?? cell.schematic;
-        const { results, problems, found } = await kernel.simulate({ ...drawing, find: sought(drawing) });
+        const { results, problems, found } = await kernel.solve(schematic ?? cell.schematic);
         update(id, { results, problems, found, stale: false });
       } catch (error) {
         update(id, { results: {}, problems: [{ kind: "error", text: String(error) }], stale: false });

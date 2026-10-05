@@ -1,0 +1,876 @@
+{
+ "arrows_of_elements": {
+  "elements": [
+   {
+    "id": "E",
+    "kind": "voltage_source",
+    "nodes": [
+     "GND",
+     "n1"
+    ],
+    "value": null,
+    "unit": "V",
+    "params": {}
+   },
+   {
+    "id": "R1",
+    "kind": "resistor",
+    "nodes": [
+     "n1",
+     "n2"
+    ],
+    "value": "3",
+    "unit": "Ω",
+    "params": {}
+   },
+   {
+    "id": "R2",
+    "kind": "resistor",
+    "nodes": [
+     "n2",
+     "GND"
+    ],
+    "value": "18",
+    "unit": "Ω",
+    "params": {}
+   },
+   {
+    "id": "R3",
+    "kind": "resistor",
+    "nodes": [
+     "n2",
+     "n3"
+    ],
+    "value": "3",
+    "unit": "Ω",
+    "params": {}
+   },
+   {
+    "id": "R4",
+    "kind": "resistor",
+    "nodes": [
+     "n3",
+     "GND"
+    ],
+    "value": "6",
+    "unit": "Ω",
+    "params": {}
+   }
+  ],
+  "given": [
+   [
+    [
+     "sum",
+     [
+      [
+       1,
+       [
+        "I",
+        "R2"
+       ]
+      ]
+     ]
+    ],
+    "2"
+   ]
+  ],
+  "marks": [
+   [
+    "i2",
+    [
+     "sum",
+     [
+      [
+       1,
+       [
+        "I",
+        "R2"
+       ]
+      ]
+     ]
+    ],
+    "A",
+    true
+   ],
+   [
+    "i4",
+    [
+     "sum",
+     [
+      [
+       -1,
+       [
+        "I",
+        "R4"
+       ]
+      ]
+     ]
+    ],
+    "A",
+    false
+   ],
+   [
+    "u",
+    [
+     "sum",
+     [
+      [
+       1,
+       [
+        "U",
+        "R1"
+       ]
+      ]
+     ]
+    ],
+    "V",
+    false
+   ]
+  ],
+  "sought": [
+   [
+    "mark:i4",
+    [
+     "sum",
+     [
+      [
+       -1,
+       [
+        "I",
+        "R4"
+       ]
+      ]
+     ]
+    ],
+    "A"
+   ],
+   [
+    "mark:u",
+    [
+     "sum",
+     [
+      [
+       1,
+       [
+        "U",
+        "R1"
+       ]
+      ]
+     ]
+    ],
+    "V"
+   ],
+   [
+    "value:E",
+    [
+     "value",
+     "E"
+    ],
+    "V"
+   ]
+  ]
+ },
+ "label_potential": {
+  "elements": [
+   {
+    "id": "E1",
+    "kind": "voltage_source",
+    "nodes": [
+     "GND",
+     "n1"
+    ],
+    "value": "12",
+    "unit": "V",
+    "params": {}
+   },
+   {
+    "id": "R1",
+    "kind": "resistor",
+    "nodes": [
+     "n1",
+     "A"
+    ],
+    "value": "10",
+    "unit": "Ω",
+    "params": {}
+   },
+   {
+    "id": "R2",
+    "kind": "resistor",
+    "nodes": [
+     "A",
+     "GND"
+    ],
+    "value": "20",
+    "unit": "Ω",
+    "params": {}
+   }
+  ],
+  "given": [
+   [
+    [
+     "V",
+     "A"
+    ],
+    "4"
+   ]
+  ],
+  "marks": [
+   [
+    "L1",
+    [
+     "V",
+     "A"
+    ],
+    "V",
+    true
+   ]
+  ],
+  "sought": []
+ },
+ "voltage_between": {
+  "elements": [
+   {
+    "id": "E1",
+    "kind": "voltage_source",
+    "nodes": [
+     "GND",
+     "n1"
+    ],
+    "value": null,
+    "unit": "V",
+    "params": {}
+   },
+   {
+    "id": "Rw",
+    "kind": "resistor",
+    "nodes": [
+     "n1",
+     "n2"
+    ],
+    "value": "2",
+    "unit": "Ω",
+    "params": {}
+   },
+   {
+    "id": "R1",
+    "kind": "resistor",
+    "nodes": [
+     "n2",
+     "GND"
+    ],
+    "value": "18",
+    "unit": "Ω",
+    "params": {}
+   }
+  ],
+  "given": [
+   [
+    [
+     "U_between",
+     "n2",
+     "GND"
+    ],
+    "90"
+   ]
+  ],
+  "marks": [
+   [
+    "U1",
+    [
+     "U_between",
+     "n2",
+     "GND"
+    ],
+    "V",
+    true
+   ]
+  ],
+  "sought": [
+   [
+    "U:R1",
+    [
+     "U",
+     "R1"
+    ],
+    "V"
+   ],
+   [
+    "I:Rw",
+    [
+     "I",
+     "Rw"
+    ],
+    "A"
+   ],
+   [
+    "R:U1:U1",
+    [
+     "R",
+     "GND",
+     "GND"
+    ],
+    "Ω"
+   ],
+   [
+    "value:E1",
+    [
+     "value",
+     "E1"
+    ],
+    "V"
+   ]
+  ]
+ },
+ "current_along": {
+  "elements": [
+   {
+    "id": "E1",
+    "kind": "voltage_source",
+    "nodes": [
+     "GND",
+     "n1"
+    ],
+    "value": "12",
+    "unit": "V",
+    "params": {}
+   },
+   {
+    "id": "R1",
+    "kind": "resistor",
+    "nodes": [
+     "n1",
+     "n2"
+    ],
+    "value": "10",
+    "unit": "Ω",
+    "params": {}
+   },
+   {
+    "id": "R2",
+    "kind": "resistor",
+    "nodes": [
+     "n2",
+     "GND"
+    ],
+    "value": "20",
+    "unit": "Ω",
+    "params": {}
+   }
+  ],
+  "given": [],
+  "marks": [
+   [
+    "I1",
+    [
+     "sum",
+     [
+      [
+       1,
+       [
+        "I",
+        "R2"
+       ]
+      ]
+     ]
+    ],
+    "A",
+    false
+   ]
+  ],
+  "sought": [
+   [
+    "mark:I1",
+    [
+     "sum",
+     [
+      [
+       1,
+       [
+        "I",
+        "R2"
+       ]
+      ]
+     ]
+    ],
+    "A"
+   ]
+  ]
+ },
+ "current_along_back": {
+  "elements": [
+   {
+    "id": "E1",
+    "kind": "voltage_source",
+    "nodes": [
+     "GND",
+     "n1"
+    ],
+    "value": "12",
+    "unit": "V",
+    "params": {}
+   },
+   {
+    "id": "R1",
+    "kind": "resistor",
+    "nodes": [
+     "n1",
+     "n2"
+    ],
+    "value": "10",
+    "unit": "Ω",
+    "params": {}
+   },
+   {
+    "id": "R2",
+    "kind": "resistor",
+    "nodes": [
+     "n2",
+     "GND"
+    ],
+    "value": "20",
+    "unit": "Ω",
+    "params": {}
+   }
+  ],
+  "given": [],
+  "marks": [
+   [
+    "I1",
+    [
+     "sum",
+     [
+      [
+       -1,
+       [
+        "I",
+        "R1"
+       ]
+      ]
+     ]
+    ],
+    "A",
+    false
+   ]
+  ],
+  "sought": [
+   [
+    "mark:I1",
+    [
+     "sum",
+     [
+      [
+       -1,
+       [
+        "I",
+        "R1"
+       ]
+      ]
+     ]
+    ],
+    "A"
+   ]
+  ]
+ },
+ "current_beyond_junction": {
+  "elements": [
+   {
+    "id": "E1",
+    "kind": "voltage_source",
+    "nodes": [
+     "GND",
+     "n1"
+    ],
+    "value": "12",
+    "unit": "V",
+    "params": {}
+   },
+   {
+    "id": "R1",
+    "kind": "resistor",
+    "nodes": [
+     "n1",
+     "n2"
+    ],
+    "value": "10",
+    "unit": "Ω",
+    "params": {}
+   },
+   {
+    "id": "R2",
+    "kind": "resistor",
+    "nodes": [
+     "n2",
+     "GND"
+    ],
+    "value": "20",
+    "unit": "Ω",
+    "params": {}
+   },
+   {
+    "id": "R3",
+    "kind": "resistor",
+    "nodes": [
+     "n2",
+     "GND"
+    ],
+    "value": "20",
+    "unit": "Ω",
+    "params": {}
+   },
+   {
+    "id": "R4",
+    "kind": "resistor",
+    "nodes": [
+     "n2",
+     "GND"
+    ],
+    "value": "20",
+    "unit": "Ω",
+    "params": {}
+   }
+  ],
+  "given": [],
+  "marks": [
+   [
+    "I1",
+    [
+     "sum",
+     [
+      [
+       1,
+       [
+        "I",
+        "R3"
+       ]
+      ],
+      [
+       1,
+       [
+        "I",
+        "R4"
+       ]
+      ]
+     ]
+    ],
+    "A",
+    false
+   ]
+  ],
+  "sought": [
+   [
+    "mark:I1",
+    [
+     "sum",
+     [
+      [
+       1,
+       [
+        "I",
+        "R3"
+       ]
+      ],
+      [
+       1,
+       [
+        "I",
+        "R4"
+       ]
+      ]
+     ]
+    ],
+    "A"
+   ]
+  ]
+ },
+ "terminal_on_corner": {
+  "elements": [
+   {
+    "id": "E1",
+    "kind": "voltage_source",
+    "nodes": [
+     "GND",
+     "n1"
+    ],
+    "value": "6",
+    "unit": "V",
+    "params": {}
+   },
+   {
+    "id": "R1",
+    "kind": "resistor",
+    "nodes": [
+     "n1",
+     "GND"
+    ],
+    "value": "12",
+    "unit": "Ω",
+    "params": {}
+   }
+  ],
+  "given": [],
+  "marks": [
+   [
+    "T1",
+    [
+     "V",
+     "GND"
+    ],
+    "V",
+    false
+   ]
+  ],
+  "sought": [
+   [
+    "U:R1",
+    [
+     "U",
+     "R1"
+    ],
+    "V"
+   ],
+   [
+    "value:E1",
+    [
+     "value",
+     "E1"
+    ],
+    "V"
+   ]
+  ]
+ },
+ "mesh": {
+  "elements": [
+   {
+    "id": "E1",
+    "kind": "voltage_source",
+    "nodes": [
+     "GND",
+     "n1"
+    ],
+    "value": "12",
+    "unit": "V",
+    "params": {}
+   },
+   {
+    "id": "R1",
+    "kind": "resistor",
+    "nodes": [
+     "n1",
+     "n2"
+    ],
+    "value": "10",
+    "unit": "Ω",
+    "params": {}
+   },
+   {
+    "id": "R2",
+    "kind": "resistor",
+    "nodes": [
+     "n2",
+     "GND"
+    ],
+    "value": "20",
+    "unit": "Ω",
+    "params": {}
+   },
+   {
+    "id": "R3",
+    "kind": "resistor",
+    "nodes": [
+     "n2",
+     "n3"
+    ],
+    "value": "10",
+    "unit": "Ω",
+    "params": {}
+   },
+   {
+    "id": "R4",
+    "kind": "resistor",
+    "nodes": [
+     "n3",
+     "GND"
+    ],
+    "value": "10",
+    "unit": "Ω",
+    "params": {}
+   }
+  ],
+  "given": [],
+  "marks": [
+   [
+    "M1",
+    [
+     "sum",
+     [
+      [
+       1,
+       [
+        "I",
+        "R1"
+       ]
+      ]
+     ]
+    ],
+    "A",
+    false
+   ],
+   [
+    "M2",
+    [
+     "sum",
+     [
+      [
+       -1,
+       [
+        "I",
+        "E1"
+       ]
+      ],
+      [
+       1,
+       [
+        "I",
+        "R2"
+       ]
+      ]
+     ]
+    ],
+    "A",
+    false
+   ]
+  ],
+  "sought": [
+   [
+    "mark:M1",
+    [
+     "sum",
+     [
+      [
+       1,
+       [
+        "I",
+        "R1"
+       ]
+      ]
+     ]
+    ],
+    "A"
+   ],
+   [
+    "mark:M2",
+    [
+     "sum",
+     [
+      [
+       -1,
+       [
+        "I",
+        "E1"
+       ]
+      ],
+      [
+       1,
+       [
+        "I",
+        "R2"
+       ]
+      ]
+     ]
+    ],
+    "A"
+   ]
+  ]
+ },
+ "bridge": {
+  "elements": [
+   {
+    "id": "E_1",
+    "kind": "voltage_source",
+    "nodes": [
+     "GND",
+     "n1"
+    ],
+    "value": "10",
+    "unit": "V",
+    "params": {}
+   },
+   {
+    "id": "R_1",
+    "kind": "resistor",
+    "nodes": [
+     "n1",
+     "n2"
+    ],
+    "value": "100",
+    "unit": "Ω",
+    "params": {}
+   },
+   {
+    "id": "R_2",
+    "kind": "resistor",
+    "nodes": [
+     "n2",
+     "GND"
+    ],
+    "value": null,
+    "unit": "Ω",
+    "params": {}
+   },
+   {
+    "id": "R_3",
+    "kind": "resistor",
+    "nodes": [
+     "n1",
+     "n3"
+    ],
+    "value": "50",
+    "unit": "Ω",
+    "params": {}
+   },
+   {
+    "id": "R_4",
+    "kind": "resistor",
+    "nodes": [
+     "n3",
+     "GND"
+    ],
+    "value": "100",
+    "unit": "Ω",
+    "params": {}
+   },
+   {
+    "id": "A_1",
+    "kind": "ammeter",
+    "nodes": [
+     "n2",
+     "n3"
+    ],
+    "value": null,
+    "unit": "A",
+    "params": {}
+   }
+  ],
+  "given": [],
+  "marks": [],
+  "sought": [
+   [
+    "value:R_2",
+    [
+     "value",
+     "R_2"
+    ],
+    "Ω"
+   ],
+   [
+    "value:A_1",
+    [
+     "I",
+     "A_1"
+    ],
+    "A"
+   ]
+  ]
+ }
+}

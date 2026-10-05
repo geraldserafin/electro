@@ -5,7 +5,9 @@
 ``nodes`` the points of its terminals in their order (``"GND"`` or ``"0"`` is ground; a terminal its
 kind does not draw, ``gnd``, may be left out: it is ground), ``value`` its main parameter (left out or
 ``"?"``: to be found), ``params`` the others by name, ``part`` a real part's name (``PARTS``) or an
-LED's colour. A meter's value is its reading.
+LED's colour. A meter's value is its reading. ``given``: ``[[quantity, value], ...]``, conditions on
+quantities; ``find``: quantities sought. A quantity is ``["I" | "U" | "P" | "value", element]``,
+``["V", point]``, ``["U_between", point, point]`` or ``["sum", [[number, quantity], ...]]``.
 """
 
 from __future__ import annotations
@@ -13,11 +15,13 @@ from __future__ import annotations
 from collections.abc import Mapping
 from dataclasses import dataclass
 
+import sympy as sp
+
 from ..circuit.elements import BJT_PARTS, BY_NAME, DIODE_PARTS, LED_COLORS, OPAMP_PARTS
 from ..circuit.tree import GND, Circuit, Element, Net, Node
 from ..circuit.wiring import at, beside
 from .problem import Key, Problem
-from .quantities import I, U
+from .quantities import Across, Current, I, Parameter, Potential, Power, Quantity, Scaled, Sum, U, Voltage
 
 READINGS = {"ammeter": I, "voltmeter": U}
 """Meters: what their value is a reading of."""
@@ -74,7 +78,29 @@ def from_netlist(data: Mapping) -> Netlist:
         names = _nodes(item, e)
         placed.append(at(e, *(points.setdefault(n, Node(n)) for n in names)))
         given |= _given(item, e)
-    return Netlist(Problem(beside(*placed), given), elements, points)
+    for q, value in data.get("given") or ():
+        given[quantity(q, elements, points)] = value
+    find = [quantity(q, elements, points) for q in data.get("find") or ()]
+    return Netlist(Problem(beside(*placed), given, find), elements, points)
+
+
+def quantity(data: list, elements: Mapping[str, Element], points: Mapping[str, Node | Net]) -> Quantity:
+    match data:
+        case ["I", str(id)]:
+            return Current(elements[id])
+        case ["U", str(id)]:
+            return Voltage(elements[id])
+        case ["P", str(id)]:
+            return Power(elements[id])
+        case ["value", str(id)]:
+            return Parameter(elements[id])
+        case ["V", str(n)]:
+            return Potential(points[n])
+        case ["U_between", str(a), str(b)]:
+            return Across(points[a], points[b])
+        case ["sum", list(terms)]:
+            return Sum(tuple(Scaled(sp.sympify(k), quantity(q, elements, points)) for k, q in terms))
+    raise ValueError(data)
 
 
 def _element(item: Mapping) -> Element:

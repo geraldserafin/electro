@@ -14,6 +14,7 @@ from .errors import MissingData, Undetermined
 from .expressions import subs, symbols_in
 from .relation import Origin
 from .symbols import Symbols
+from .system import parameter_values
 
 
 @dataclass(frozen=True)
@@ -54,19 +55,22 @@ class Solution:
         """What is sought, each found; or ``MissingData``: how many data more, and which would do."""
         found: dict[Quantity, sp.Expr] = {}
         lacking: list[sp.Expr] = []
+        targets: list[Quantity] = []
         for q in self.problem.find:
             try:
                 found[q] = self(q)
             except Undetermined:
                 lacking.append(self._expression(q))
+                targets.append(q)
         if not lacking:
             return found
         free = sorted({x for e in lacking for x in symbols_in(e)} & self.unknowns, key=str)
         options = self._pinning(free[0], lacking) if len(free) == 1 else []
-        raise MissingData(len(free), options, found)
+        raise MissingData(len(free), options, found, targets)
 
     def _expression(self, q: Quantity) -> sp.Expr:
-        return subs(self.symbols.of(q), self.values)
+        """``q`` with what was found and what was given in."""
+        return subs(subs(self.symbols.of(q), self.values), parameter_values(self.problem, self.symbols))
 
     def _average_power(self, q: Power) -> sp.Expr:
         """Of phasors: ½·Re(U·I*)."""

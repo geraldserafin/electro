@@ -6,7 +6,7 @@ from __future__ import annotations
 import sympy as sp
 
 from ..circuit.time import TIME, Pre
-from ..problem.problem import Problem
+from ..problem.problem import Key, Problem
 from .analysis import AC, DC, frequencies
 from .by_cases import solve_by_cases
 from .by_hand import solve_by_hand
@@ -64,12 +64,12 @@ def _by_algebra(problem: Problem, system: System, analysis: DC | AC) -> Solution
     return Solution(problem, values, unknown, system.symbols, steps, analysis)
 
 
-def _clashing(problem: Problem, analysis: DC | AC) -> list[object]:
+def _clashing(problem: Problem, analysis: DC | AC) -> list[Key]:
     """The given data that clash: those without which it fits."""
     return [key for key in problem.given if _fits_without(problem, key, analysis)]
 
 
-def _fits_without(problem: Problem, key: object, analysis: DC | AC) -> bool:
+def _fits_without(problem: Problem, key: Key, analysis: DC | AC) -> bool:
     rest = Problem(problem.circuit, {k: v for k, v in problem.given.items() if k is not key}, problem.find)
     try:
         solve_by_hand(equations(rest, analysis))

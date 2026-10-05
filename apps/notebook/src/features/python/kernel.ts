@@ -4,7 +4,7 @@ import { type Progress, report } from "@/features/downloads/store";
 import { library } from "@/features/schematic/library";
 import { isComponent, key, pins } from "@/features/schematic/model";
 import { withParts } from "@/features/schematic/parts";
-import { elementsOf } from "@/features/schematic/problem";
+import { elementsOf, solveData } from "@/features/schematic/problem";
 import type { LiveCircuit } from "@/features/simulation/engine";
 import type { Failure } from "@/shared/model/issues";
 import type { ElementResult, Output, Problem, SchematicData } from "@/shared/model/types";
@@ -80,13 +80,19 @@ class Kernel {
     return JSON.parse((await this.call("fromCode", { source, name, old: JSON.stringify(old) })) as string);
   }
 
-  /** A schematic cell's run button: every element's values, and what went wrong. */
-  async simulate(schematic: SchematicData): Promise<{
+  /** A schematic cell's run button: every element's values, each mark's, what is sought (``sought.ts``),
+   *  and what went wrong. */
+  async solve(schematic: SchematicData): Promise<{
     results: Record<string, ElementResult>;
     problems: Problem[];
-    found?: Record<string, string | null>; // what ``find`` asks for, what it came to
+    found?: Record<string, string | null>;
   }> {
-    return JSON.parse((await this.call("simulate", { schematic: JSON.stringify(schematic) })) as string);
+    try {
+      const problem = JSON.stringify(solveData(schematic, library));
+      return JSON.parse((await this.call("solve", { problem })) as string);
+    } catch (error) {
+      return { results: {}, problems: [{ kind: "error", text: String(error) }] };
+    }
   }
 
   /** A schematic cell's play button: the drawing compiled for the live simulation (or the error in it),

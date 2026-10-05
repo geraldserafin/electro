@@ -11,7 +11,7 @@ import sympy as sp
 from ..circuit.kind import Terminals
 from ..circuit.netlist import Netlist, pieces
 from ..circuit.tree import GND, Circuit, Element, Net, Node, netlist
-from ..problem.quantities import Across, Current, Parameter, Potential, Power, Quantity, Scaled, Voltage
+from ..problem.quantities import Across, Current, Parameter, Potential, Power, Quantity, Scaled, Sum, Voltage
 
 
 @dataclass(frozen=True)
@@ -68,6 +68,8 @@ class Symbols:
                 return self.of(Voltage(e)) * self.of(Current(e))
             case Scaled(k, x):
                 return k * self.of(x)
+            case Sum(terms):
+                return sp.Add(*(self.of(t) for t in terms))
         raise TypeError(q)
 
 

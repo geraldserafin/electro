@@ -14,7 +14,7 @@ type Request =
   | { id: number; type: "run"; code: string; schematics: string; standard: string }
   | { id: number; type: "code"; schematic: string; name: string }
   | { id: number; type: "fromCode"; source: string; name: string; old: string }
-  | { id: number; type: "simulate"; schematic: string }
+  | { id: number; type: "solve"; problem: string }
   | { id: number; type: "live"; problem: string }
   | { id: number; type: "frequency"; schematic: string }
   | { id: number; type: "sweep"; schematic: string; element: string; lo: string; hi: string }
@@ -29,7 +29,7 @@ interface Kernel {
   run(code: string, schematics: string, standard: string): string;
   code(schematic: string, name: string): string;
   from_code(source: string, name: string, old: string): string;
-  simulate(schematic: string): string;
+  solve(problem: string): string;
   live(problem: string): string;
   frequency(schematic: string): string;
   sweep_plot(schematic: string, element: string, lo: string, hi: string): string;
@@ -95,8 +95,8 @@ self.onmessage = async (event: MessageEvent<Request>) => {
           ? k.code(request.schematic, request.name)
           : request.type === "fromCode"
             ? k.from_code(request.source, request.name, request.old)
-            : request.type === "simulate"
-              ? k.simulate(request.schematic)
+            : request.type === "solve"
+              ? k.solve(request.problem)
               : request.type === "live"
                 ? k.live(request.problem)
                 : request.type === "frequency"
