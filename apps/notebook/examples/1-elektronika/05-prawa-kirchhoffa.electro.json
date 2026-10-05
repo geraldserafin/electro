@@ -20,7 +20,6 @@
       "source": "Oto obwód z **dwoma** źródłami: nie da się go uprościć do jednego opornika. Kliknij ▶ — solver ułoży\nrównania z praw Kirchhoffa i je rozwiąże."
     },
     {
-      "found": {},
       "id": "a02ca44a",
       "type": "schematic",
       "name": "dwa_zrodla",
@@ -189,7 +188,6 @@
           }
         ]
       },
-      "view": "schematic",
       "results": {
         "E_1": {
           "value": "12 V",
@@ -232,7 +230,9 @@
           "reversed": true
         }
       },
-      "problems": []
+      "problems": [],
+      "found": {},
+      "stale": false
     },
     {
       "id": "93c98f7a",

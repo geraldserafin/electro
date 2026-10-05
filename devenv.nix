@@ -46,7 +46,7 @@ in
   };
 
   enterShell = ''
-    export PYTHONPATH="${root}/packages/electro/src:${root}/packages/electro-schematic/src:${root}/packages/electro-render/src:${root}/packages/electro-notes/src:${root}/apps/notebook/python''${PYTHONPATH:+:$PYTHONPATH}"
+    export PYTHONPATH="${root}/packages/electro/src:${root}/packages/electro-schematic/src:${root}/packages/electro-render/src:${root}/apps/notebook/python''${PYTHONPATH:+:$PYTHONPATH}"
   '';
 
   services.postgres = {

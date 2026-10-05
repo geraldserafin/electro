@@ -20,7 +20,6 @@
       "source": "Poniżej dwie żarówki na 12 V: mocna (12 Ω) i słaba (48 Ω). Kliknij ▶ i porównaj moce $P$ w tabeli pod\nschematem. Która świeci jaśniej, gdy uruchomisz ⚡?"
     },
     {
-      "found": {},
       "id": "e9b059a0",
       "type": "schematic",
       "name": "dwie_zarowki",
@@ -143,7 +142,6 @@
           }
         ]
       },
-      "view": "schematic",
       "results": {
         "E_1": {
           "value": "12 V",
@@ -170,7 +168,9 @@
           "reversed": false
         }
       },
-      "problems": []
+      "problems": [],
+      "found": {},
+      "stale": false
     },
     {
       "id": "de08f928",

@@ -1,6 +1,6 @@
 /**
  * The notebook document on the wire: the *.electro.json file format, version 2 (described in
- * full by Python's electro_notes). Checked here only as far as the server needs — its identity,
+ * full in apps/notebook/README.md). Checked here only as far as the server needs — its identity,
  * title and the shape of its cells; everything else (outputs, results, keys of newer versions)
  * passes through untouched, so no side loses data it does not understand.
  */

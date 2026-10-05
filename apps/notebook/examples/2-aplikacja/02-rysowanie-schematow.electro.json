@@ -72,8 +72,7 @@
           }
         ],
         "wires": []
-      },
-      "view": "schematic"
+      }
     },
     {
       "id": "25b72db5",

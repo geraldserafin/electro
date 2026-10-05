@@ -1,4 +1,4 @@
-"""Builds apps/notebook/examples/3-biblioteka/03-niewiadome-i-dziury.electro.json (format: electro_notes) (run from the repo root with PYTHONPATH set, e.g. in devenv shell)."""
+"""Builds apps/notebook/examples/3-biblioteka/03-niewiadome-i-dziury.electro.json (run from the repo root with PYTHONPATH set, e.g. in devenv shell)."""
 
 import json
 import secrets
@@ -247,23 +247,22 @@ for cell in cells:
     if cell["type"] == "schematic" and cell.pop("simulate"):  # as if its run button was clicked
         cell.update(json.loads(kernel.simulate(json.dumps(cell["schematic"]))), stale=False)
 
-# through electro_notes: the file is checked, and in the current format; a fixed id and dates,
-# so regenerating it changes the file only where the content changed
-from electro_notes import FORMAT, VERSION, from_dict  # noqa: E402
-
-notebook = from_dict(
+# a fixed id and dates, so regenerating it changes the file only where the content changed
+notebook = json.dumps(
     {
-        "format": FORMAT,
-        "version": VERSION,
+        "format": "electro-notebook",
+        "version": 2,
         "id": "przyklad-nieznane-i-dziury",
         "title": "3. Niewiadome i dziury",
         "created": "2026-09-27T00:00:00Z",
         "modified": "2026-09-27T00:00:00Z",
         "settings": {"codeInPdf": True},
         "cells": cells,
-    }
+    },
+    ensure_ascii=False,
+    indent=2,
 )
 path = "apps/notebook/examples/3-biblioteka/03-niewiadome-i-dziury.electro.json"
 with open(path, "w", encoding="utf-8") as f:
-    f.write(notebook.dumps() + "\n")
-print(path, notebook)
+    f.write(notebook + "\n")
+print(path)

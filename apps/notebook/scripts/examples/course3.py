@@ -363,13 +363,6 @@ print([(e.id, e.kind, e.at) for e in rys.elements])
 rys.move("R_1", (6, -2))
 rys
 """)
-    L.md("""
-## Plik notatki w Pythonie
-
-Poza przeglądarką notatki czyta pakiet `electro_notes`: `load("notatka.electro.json")` zwraca notatkę
-z komórkami, a jej schematy są od razu obwodami. Tak można np. sprawdzić automatycznie rozwiązania
-z całej klasy albo wygenerować notatkę z kodu (tak powstały wszystkie lekcje tego kursu).
-""")
     L.save()
 
 

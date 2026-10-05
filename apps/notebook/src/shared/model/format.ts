@@ -1,7 +1,6 @@
-// The notebook file (*.electro.json): the same format as Python's electro_notes (format.py there
-// describes it in full). Reading migrates older versions and checks the shape — a broken file is a
-// FormatError with what and where (the types of electro_notes.issues); keys this version does not
-// know are kept.
+// The notebook file (*.electro.json), described in apps/notebook/README.md. Reading migrates older
+// versions and checks the shape — a broken file is a FormatError with what and where; keys this version
+// does not know are kept.
 import type { Cell, Notebook } from "./types";
 
 export const FORMAT = "electro-notebook";

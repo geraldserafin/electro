@@ -8,7 +8,6 @@ schematy, a docelowo notatnik webowy z eksportem sprawozdań do PDF.
 | [`packages/electro`](packages/electro) | rdzeń: obwody jako morfizmy kategorii, kombinatory `+`/`\|`, solver, `find`, `Hole` |
 | [`packages/electro-schematic`](packages/electro-schematic) | rysunek na siatce: model (JSON), rysunek → obwód, auto-layout kodu, edycja (`move`, `rotate`) |
 | [`packages/electro-render`](packages/electro-render) | wygląd: biblioteka symboli (też jako JSON dla edytora), schemat → SVG, ślad rozwiązania → Markdown + LaTeX |
-| [`packages/electro-notes`](packages/electro-notes) | plik notatnika `*.electro.json`: odczyt, zapis, migracja starszych wersji, walidacja, `python -m electro_notes check` |
 | [`packages/notes-api`](packages/notes-api) | kontrakt front ↔ backend notatek (TypeScript): schematy Effect Schema i `HttpApi` z błędami |
 | [`apps/auth-worker`](apps/auth-worker) | Cloudflare Worker: połączenie z GitHubem (code → token) i proxy gita do GitHuba (którego git nie ma CORS) |
 | [`apps/server`](apps/server) | dawny backend notatek (Effect, Postgres) — na razie nieużywany: notatki są w przeglądarce |
@@ -16,8 +15,7 @@ schematy, a docelowo notatnik webowy z eksportem sprawozdań do PDF.
 
 ```
 electro  ◀──  electro-schematic  ◀──  electro-render  ◀──  apps/notebook (Pyodide + edytor w TS)
-solver        gdzie co leży     ▲      jak to wygląda              │ ten sam format pliku
-                                └──  electro-notes  ◀──────────────┘
+solver        gdzie co leży            jak to wygląda
 ```
 
 ```python

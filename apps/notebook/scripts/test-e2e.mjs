@@ -629,20 +629,8 @@ try {
     check("add buttons show on the edge only", hiddenInside && (await pill.isVisible()));
   }
 
-  // the file: the note as the server keeps it, read by Python (electro_notes) — and an old (v1) file
-  // becomes a note, migrated
+  // an old (v1) file becomes a note, migrated
   {
-    const file = join(shots, "zapisany.electro.json");
-    writeFileSync(file, JSON.stringify((await noteOnServer()).document));
-    let python = "";
-    try {
-      python = execFileSync("python", ["-m", "electro_notes", "check", file], { encoding: "utf8" });
-    } catch (error) {
-      python = String(error.stdout ?? error);
-    }
-    check("a saved notebook is read by Python", python.includes("Notebook('Przykłady: niewiadome i dziury'"));
-    if (!python.includes("Notebook(")) console.log(python);
-
     const old = join(shots, "stary.electro.json");
     writeFileSync(
       old,

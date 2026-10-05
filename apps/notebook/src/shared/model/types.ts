@@ -128,7 +128,7 @@ export type Plot = { svg: string; stale?: boolean };
 /** A schematic cell, while it is edited: as the board, or as code. */
 export type SchematicView = "schematic" | "code";
 
-/** A notebook file (*.electro.json), version 2 — see format.ts / electro_notes. */
+/** A notebook file (*.electro.json), version 2 — see format.ts. */
 export interface Notebook {
   format: "electro-notebook";
   version: 2;

@@ -20,7 +20,6 @@
       "source": "## Obwód musi być zamknięty\n\nPrąd płynie tylko w **zamkniętej pętli**: z baterii, przez przewody i żarówkę, z powrotem do baterii.\nWystarczy jedna przerwa — i prąd nie płynie nigdzie. Tak działa każdy wyłącznik światła: rozcina pętlę.\n\nPoniżej jest latarka: bateria $E_1$ (6 V), łącznik $S_1$ i żarówka $H_1$. Kreska z trzema poziomymi\nliniami na dole to **masa** — umówiony punkt odniesienia, „zero” napięcia.\n\n**Spróbuj:** kliknij ⚡ (symulacja w czasie), a potem kliknij łącznik $S_1$. Żarówka\ngaśnie i zapala się, a kolor przewodów pokazuje napięcie: zielony to plus, szary to zero."
     },
     {
-      "found": {},
       "id": "015a0300",
       "type": "schematic",
       "name": "latarka",
@@ -119,7 +118,6 @@
           }
         ]
       },
-      "view": "schematic",
       "results": {
         "E_1": {
           "value": "6 V",
@@ -146,7 +144,9 @@
           "reversed": false
         }
       },
-      "problems": []
+      "problems": [],
+      "found": {},
+      "stale": false
     },
     {
       "id": "b3d5909a",

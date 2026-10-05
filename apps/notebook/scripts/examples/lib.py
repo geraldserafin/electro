@@ -70,7 +70,6 @@ class Lesson:
 
     def save(self, *, errors_ok: bool = False) -> Path:
         from electro_notebook import kernel
-        from electro_notes import FORMAT, VERSION, from_dict
 
         kernel.reset()
         schematics = {c["name"]: json.dumps(c["schematic"]) for c in self.cells if c["type"] == "schematic"}
@@ -83,20 +82,22 @@ class Lesson:
                 cell.update(json.loads(kernel.simulate(json.dumps(cell["schematic"]))), stale=False)
                 bad = [p for p in cell["problems"] if p["kind"] == "error"]
                 assert not bad, f"{self.name}: {cell['name']} → {bad}"
-        notebook = from_dict(
+        notebook = json.dumps(
             {
-                "format": FORMAT,
-                "version": VERSION,
+                "format": "electro-notebook",
+                "version": 2,
                 "id": _id(self.course, self.name)[:16],
                 "title": self.title,
                 "created": DATE,
                 "modified": DATE,
                 "settings": {"codeInPdf": True},
                 "cells": self.cells,
-            }
+            },
+            ensure_ascii=False,
+            indent=2,
         )
         path = EXAMPLES / self.course / f"{self.name}.electro.json"
-        path.write_text(notebook.dumps() + "\n", encoding="utf-8")
+        path.write_text(notebook + "\n", encoding="utf-8")
         print(path.relative_to(EXAMPLES.parent), len(self.cells), "cells")
         return path
 
