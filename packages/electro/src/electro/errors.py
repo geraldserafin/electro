@@ -10,18 +10,16 @@ from .circuit.quantities import Quantity
 
 
 class Undetermined(ValueError):
-    """What is sought does not follow from what is given. ``circuit``: whose (set where it is solved)."""
+    """What is sought does not follow from what is given. ``circuit``, ``values``, ``frame``: what was solved
+    (set where it is)."""
 
     circuit: object = None
+    values: Mapping = {}
+    frame: object = None
 
 
 class Contradiction(Undetermined):
-    """No circuit fits the data. ``data``: the given ones that clash (what to, by what), without any one of
-    which it fits."""
-
-    def __init__(self, message: str, data: Mapping[object, object] | None = None) -> None:
-        super().__init__(message)
-        self.data = dict(data or {})
+    """No circuit fits the data."""
 
 
 class Ambiguous(Undetermined):
@@ -33,19 +31,15 @@ class Ambiguous(Undetermined):
 
 
 class MissingData(Undetermined):
-    """``targets``: what is sought and could not be found; ``needed`` data more; ``options``: quantities
-    each of which, given, would do (when one is needed); ``found``: what is sought and could be found."""
+    """``targets``: what is sought and could not be found; ``needed`` data more; ``found``: what is sought and
+    could be found; ``solution``, ``lacking``: where, and what of the targets is still free."""
 
-    def __init__(
-        self,
-        needed: int,
-        options: Sequence[Quantity],
-        found: Mapping[Quantity, sp.Expr],
-        targets: Sequence[Quantity] = (),
-    ) -> None:
+    solution: object = None
+    lacking: tuple[sp.Expr, ...] = ()
+
+    def __init__(self, needed: int, found: Mapping[Quantity, sp.Expr], targets: Sequence[Quantity] = ()) -> None:
         super().__init__(f"{needed} more datum needed")
-        self.needed, self.options, self.found = needed, tuple(options), dict(found)
-        self.targets = tuple(targets)
+        self.needed, self.found, self.targets = needed, dict(found), tuple(targets)
 
 
 class NotLinear(ValueError):

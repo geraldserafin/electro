@@ -5,11 +5,10 @@ from __future__ import annotations
 import json
 
 import sympy as sp
-from electro.circuit.names import named
-from electro.values import expression
 
 from .drawing import from_drawing
 from .errors import error
+from .names import expression, named
 from .results import amplitude, shown, solved
 
 

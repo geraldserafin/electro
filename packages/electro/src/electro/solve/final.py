@@ -7,14 +7,15 @@ and checked); beyond algebra (an ``exp``) by Newton — and every quantity back 
 from __future__ import annotations
 
 import itertools
-from collections.abc import Mapping, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, field
+from typing import ClassVar
 
 import sympy as sp
 
 from ..circuit.algebra import Equation, Known, Laws, Origin, SolutionStep, Way, expr, subs, symbols_in
 from ..circuit.element import Element
-from ..circuit.quantities import Current, Parameter, Power, Quantity, Scaled, Voltage
+from ..circuit.quantities import Current, Power, Quantity, Scaled, Voltage
 from ..circuit.time import TIME
 from ..errors import Ambiguous, Contradiction, MissingData, NotLinear, Undetermined
 from ..frame.formula import Formula, Names, formula
@@ -42,21 +43,22 @@ class Solution:
     frame: Step = field(default_factory=DC)
     time: sp.Expr = sp.oo
 
-    def __call__(self, q: Quantity | Scaled | str) -> sp.Expr:
-        """``q``'s value; or by name, ``"I_R_1"``, an expression of names too (``"U_E_1 / I_E_1"``). What the
-        data do not pin down: ``MissingData`` — how many data more, and which would do."""
-        if isinstance(q, str):
-            from ..circuit.names import evaluated
+    by_name: ClassVar[Callable[[str, Solution], sp.Expr] | None] = None
+    """How a quantity written as text (``"U_R_1 / I_R_1"``) is read, when something reads it (the notebook)."""
 
-            return evaluated(q, self)
+    def __call__(self, q: Quantity | Scaled | str) -> sp.Expr:
+        """``q``'s value (by name too, when ``by_name`` reads names). What the data do not pin down:
+        ``MissingData``."""
+        if isinstance(q, str) and Solution.by_name is not None:
+            return Solution.by_name(q, self)
         return self.answers(q)[q]
 
     def answers(self, *qs: Quantity | Scaled) -> dict:
-        """Each of ``qs`` found; or ``MissingData``: how many data more all of them need, which one would do (when
-        one is), and those found."""
+        """Each of ``qs`` found; or ``MissingData``: how many data more all of them need (``lacking``: what of
+        them is still not pinned down), and those found."""
         found, lacking, targets = {}, [], []
         for q in qs:
-            value = sp.simplify(self._value(q))
+            value = sp.simplify(self.of(q))
             if value.free_symbols & self.unknowns:
                 lacking.append(value)
                 targets.append(q)
@@ -64,41 +66,20 @@ class Solution:
                 found[q] = value
         if not lacking:
             return found
-        free = sorted({x for e in lacking for x in e.free_symbols} & self.unknowns, key=str)
-        options = self._pinning(free[0], sp.Add(*lacking)) if len(free) == 1 else []
-        err = MissingData(len(free), options, found, [q for q in targets if isinstance(q, Quantity)])
-        err.circuit = self.circuit
+        free = {x for e in lacking for x in e.free_symbols} & self.unknowns
+        err = MissingData(len(free), found, [q for q in targets if isinstance(q, Quantity)])
+        err.circuit, err.solution, err.lacking = self.circuit, self, tuple(lacking)
         raise err
 
-    def _value(self, q: Quantity | Scaled) -> sp.Expr:
+    def of(self, q: Quantity | Scaled) -> sp.Expr:
+        """``q`` with what was found in: a value, or an expression of what was not."""
         if isinstance(q, Power):
-            return self.frame.product(self._value(Voltage(q.of)), self._value(Current(q.of)))
+            return self.frame.product(self.of(Voltage(q.of)), self.of(Current(q.of)))
         return self.evaluated(self.names.of(q))
 
     def evaluated(self, e: sp.Expr) -> sp.Expr:
         """``e``, of the circuit's named variables, with what was found and what was given in."""
         return e.xreplace(dict(self.values)).xreplace(dict(self.data))
-
-    def _pinning(self, x: sp.Symbol, lacking: sp.Expr) -> list[Quantity]:
-        """Quantities each of which, given, would pin ``x`` and with it what is lacking."""
-        out = []
-        for q in self._measurable():
-            e = self.evaluated(self.names.of(q))
-            if x not in e.free_symbols:
-                continue
-            roots = sp.solve(e - sp.Dummy("k"), x)
-            if len(roots) == 1 and not symbols_in(subs(lacking, {x: roots[0]})) & self.unknowns:
-                out.append(q)
-        return out
-
-    def _measurable(self) -> list[Quantity]:
-        """Each element's parameters, and of a two-terminal one its voltage and current."""
-        out: list[Quantity] = []
-        for e in self.circuit.members:
-            if len(e.terminals) == 2:
-                out += [Voltage(e), Current(e)]
-            out += [Parameter(e, w) for w in e.parameters]
-        return out
 
 
 def final(circuit: Element, values: Mapping, frame: Step | None = None) -> Solution:
@@ -118,7 +99,7 @@ def frame_after(circuit: Element, values: Mapping, frame: Step, before: Solution
     try:
         return _frame(circuit, values, frame, before)
     except Undetermined as err:
-        err.circuit = circuit
+        err.circuit, err.values, err.frame = circuit, values, frame
         raise
 
 
@@ -129,7 +110,7 @@ def _frame(circuit: Element, values: Mapping, frame: Step, before: Solution | No
     if left.laws.choices:
         found, steps = _by_cases(left)
     elif _is_algebraic(left):
-        found, steps = _by_algebra(circuit, values, frame, left)
+        found, steps = by_hand(left, left.laws)
     elif frame.dt == 0:
         raise NotLinear("a non-linear circuit in frames infinitely short: around its working point (not yet)")
     else:
@@ -192,27 +173,6 @@ def _is_algebraic(left: Formula) -> bool:
         return True
     except sp.PolynomialError:
         return False
-
-
-def _by_algebra(circuit: Element, values: Mapping, frame: Step, left: Formula):
-    try:
-        return by_hand(left, left.laws)
-    except Contradiction as err:
-        raise Contradiction(str(err), {k: values[k] for k in _clashing(circuit, values, frame)}) from None
-
-
-def _clashing(circuit: Element, values: Mapping, frame: Step) -> list:
-    """The data that clash: those without which it fits."""
-    out = []
-    for key in values:
-        rest = {k: v for k, v in values.items() if k is not key}
-        try:
-            f = formula(circuit, rest, frame)
-            by_hand(f, f.laws)
-        except Undetermined:
-            continue
-        out.append(key)
-    return out
 
 
 def _by_newton(left: Formula):

@@ -17,7 +17,6 @@ from collections.abc import Mapping
 
 import sympy as sp
 from electro import Element, Node, Solution, Trace
-from electro.circuit.names import named
 from electro.circuit.quantities import Current, Parameter, Power, Quantity, Voltage
 from electro.frame.formula import names
 
@@ -26,6 +25,7 @@ from . import task as tasks
 from .code_view import PRELUDE, variable
 from .drawing import Drawing, from_drawing, to_drawing
 from .errors import CELL, NoSuchSchematic, error, issue, warning
+from .names import named
 from .results import element_result
 from .steps import steps as steps_data
 

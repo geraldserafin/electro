@@ -5,7 +5,6 @@ frame of one worked out from its frame formula: ``circuit.final(values)`` where 
 
 from .circuit.algebra import Case, Cases, SolutionStep
 from .circuit.element import BadName, Element, ElementTwice, JoinsNodes, Terminals, WrongEnds
-from .circuit.names import NoSuchQuantity
 from .circuit.points import GND, Net, Node, Spider, Swap, cap, cup, swap, wire
 from .circuit.quantities import Across, Current, I, P, Parameter, Potential, Power, U, V, Voltage
 from .circuit.time import TIME, D, Pre, rising, square, when
@@ -46,7 +45,6 @@ __all__ = [
     "Net",
     "NoConvergence",
     "NoSuchInput",
-    "NoSuchQuantity",
     "Node",
     "NoSuchParameter",
     "NotClosed",

@@ -125,13 +125,6 @@ def test_contradiction():
         (~(e >> r)).final({e: 12, r: 10, I(r): 5})
 
 
-def test_contradiction_names_the_clashing_data():
-    e, r = (VoltageSource("E"), Resistor("R"))
-    with pytest.raises(Contradiction) as err:
-        (~(e >> r)).final({e: 12, r: 10, I(r): 5})
-    assert {e, r, I(r)} == set(err.value.data)
-
-
 def test_underdetermined_is_said_when_asked():
     e, r1, r2 = (VoltageSource("E"), Resistor("R_1"), Resistor("R_2"))
     s = (GND >> e >> r1 >> Node() >> r2 >> GND).final({e: 12, r1: 10})
@@ -208,8 +201,7 @@ def test_missing_data_says_what_would_help():
     s = circuit.final({**given, I(r1): 2, U(r2): 8})
     with pytest.raises(MissingData) as err:
         s.answers(Parameter(r1), Parameter(r3), Parameter(e2))
-    assert err.value.needed == 1 and U(r3) in err.value.options
-    assert err.value.found == {Parameter(r1): 2}
+    assert err.value.needed == 1 and err.value.found == {Parameter(r1): 2}
 
 
 def test_missing_data_counts_redundant_givens_once():

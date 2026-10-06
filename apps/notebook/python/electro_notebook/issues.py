@@ -7,13 +7,14 @@ from collections.abc import Mapping
 
 import sympy as sp
 from electro import Element
-from electro.circuit.names import NoSuchQuantity
 from electro.circuit.quantities import Quantity
 from electro.errors import Ambiguous, Contradiction, MissingData
 from electro.frame.formula import names
 from electro.values import parse
 
 from . import latex as tex
+from .hints import clashing, pinning
+from .names import NoSuchQuantity
 
 
 def issue(err: BaseException, units: Mapping[str, str] | None = None) -> dict | None:
@@ -28,7 +29,7 @@ def issue(err: BaseException, units: Mapping[str, str] | None = None) -> dict | 
                     "type": "MissingData",
                     "targets": [tex.quantity(q, n) for q in err.targets],
                     "needed": err.needed,
-                    "options": [[tex.quantity(q, n)] for q in err.options],
+                    "options": [[tex.quantity(q, n)] for q in pinning(err)],
                 }
             case Contradiction():
                 return _clash(err, n, units)
@@ -56,7 +57,7 @@ def _plain(v: object) -> bool:
 def _clash(err: Contradiction, n, units: Mapping[str, str]) -> dict:
     """The data that clash: conditions on quantities, and elements' values."""
     conditions, values = [], []
-    for key, given in err.data.items():
+    for key, given in clashing(err).items():
         given = parse(given) if isinstance(given, str | int | float) else given
         if isinstance(given, Mapping):
             continue
