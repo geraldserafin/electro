@@ -2,7 +2,7 @@
   "format": "electro-notebook",
   "version": 2,
   "id": "52aec6c08459beaa",
-  "title": "6. Thévenin, superpozycja i czarne skrzynki",
+  "title": "6. Komponenty i twierdzenia",
   "created": "2026-10-01T00:00:00Z",
   "modified": "2026-10-01T00:00:00Z",
   "settings": {
@@ -12,68 +12,48 @@
     {
       "id": "e1d409ea",
       "type": "markdown",
-      "source": "# Twierdzenia o obwodach\n\n**Twierdzenie Thévenina:** każdy liniowy obwód widziany z dwóch punktów zachowuje się jak jedno źródło\nnapięcia $E_{th}$ z jednym opornikiem $R_{th}$. To ogromne uproszczenie: zamiast liczyć cały obwód dla\nkażdego obciążenia, liczysz go raz. `between(zadanie, A, B)` patrzy na zadanie z punktów `A` i `B`,\na `thevenin(...)` daje $E_{th}$ i $R_{th}$:"
+      "source": "# Każdy obwód jest komponentem\n\nZłożenie dwóch kawałków to znowu kawałek: `R_1 >> R_2` ma dwa końce i jedno prawo między nimi. `>>` skleja\nkońce i **wyrzuca to, co jest w środku** — zostaje tylko związek napięcia $U$ z prądem $I$ na brzegu.\n`.component` go pokazuje. Opór szeregowy czy równoległy nie jest tu żadną regułą: wychodzi z praw elementów."
     },
     {
       "id": "0a4f8ee8",
       "type": "code",
-      "source": "E, R_1, R_2, A = VoltageSource(\"E\"), Resistor(\"R_1\"), Resistor(\"R_2\"), Node(\"A\")\ndzielnik = Problem(GND >> E >> R_1 >> A >> R_2 >> GND, {E: 12, R_1: 10, R_2: 10})\nthevenin(between(dzielnik, A, GND))",
+      "source": "R_1, R_2, R_3, E = Resistor(\"R_1\"), Resistor(\"R_2\"), Resistor(\"R_3\"), VoltageSource(\"E\")\nprint(\"szeregowo: \", (R_1 >> R_2).component)\nprint(\"równolegle:\", (R_1 | R_2).component)\nprint(\"z źródłem: \", (E >> R_1 >> (R_2 | R_3)).component)\nprint(\"z kondensatorem:\", (R_1 >> Capacitor(\"C\")).component)",
       "outputs": [
         {
-          "type": "text",
-          "data": "Thevenin(E=6, Z=5)"
+          "type": "stream",
+          "data": "szeregowo:  U = I*(R_1 + R_2)\nrównolegle: U = I*R_1*R_2/(R_1 + R_2)\nz źródłem:  U = -(E*R_2 + E*R_3 - I*R_1*R_2 - I*R_1*R_3 - I*R_2*R_3)/(R_2 + R_3)\nz kondensatorem: -C*D(-I*R_1 + U) + I = 0\n"
         }
       ]
     },
     {
       "id": "2d3085db",
       "type": "markdown",
-      "source": "Dzielnik 12 V z dwóch oporników 10 Ω to dla obciążenia po prostu 6 V przez 5 Ω.\n\n## Superpozycja\n\nW obwodzie liniowym każde źródło działa niezależnie: wynik to suma tego, co daje każde źródło samo\n(pozostałe wyłączone). `superposition` liczy te części:"
+      "source": "Dwa kawałki są równoważne dokładnie wtedy, gdy mają to samo prawo na końcach.\n\n## Thévenin\n\nKażdy liniowy obwód widziany z dwóch punktów to jedno źródło $E_{th}$ z jednym oporem $R_{th}$: $E_{th}$ to\nnapięcie, gdy nic nie jest podłączone, a $R_{th}$ — o ile napięcie spada na każdy amper pobrany.\n`resistance(zadanie, A, B)` liczy $R_{th}$ (wpuszcza prąd i patrzy, jak rośnie napięcie):"
     },
     {
       "id": "8dd5a0e1",
       "type": "code",
-      "source": "J = CurrentSource(\"J\")\ndwa_zrodla = Problem(((GND >> E >> R_1 >> A) @ (A >> R_2 >> GND) @ (GND >> J >> A)), {E: 12, R_1: 10, R_2: 10, J: 1})\ns = superposition(dwa_zrodla, U(R_2))\nfor zrodlo, czesc in s.parts:\n    print(f\"samo {zrodlo.name}: {czesc} V\")\nprint(\"razem:\", s.total, \"V\")",
+      "source": "A = Node(\"A\")\ndzielnik = Problem(GND >> E >> R_1 >> A >> R_2 >> GND, {E: 12, R_1: 10, R_2: 10})\nprint(\"E_th =\", solve(dzielnik)(V(A)), \"V,  R_th =\", resistance(dzielnik, A, GND), \"Ω\")",
       "outputs": [
         {
           "type": "stream",
-          "data": "samo E: 6 V\nsamo J: 5 V\nrazem: 11 V\n"
+          "data": "E_th = 6 V,  R_th = 5 Ω\n"
         }
       ]
     },
     {
       "id": "c2cc6adb",
       "type": "markdown",
-      "source": "## Czarna skrzynka\n\n`blackbox(kawałek)` eliminuje wszystko, co jest w środku, i zostawia tylko **relację na końcach**:\nrównanie wiążące napięcie i prąd na brzegach. Dwa kawałki są równoważne dokładnie wtedy, gdy mają tę samą\nczarną skrzynkę. `resistance` mówi, jakim jednym opornikiem jest kawałek — liczy to, a nie zna wzoru:"
+      "source": "Dzielnik 12 V z dwóch oporników 10 Ω to dla obciążenia po prostu 6 V przez 5 Ω.\n\n## Superpozycja\n\nW obwodzie liniowym każde źródło działa niezależnie: wynik to suma tego, co daje każde źródło samo\n(pozostałe wyłączone, czyli z wartością 0):"
     },
     {
       "id": "086ae0d8",
       "type": "code",
-      "source": "R_1, R_2 = Resistor(\"R_1\"), Resistor(\"R_2\")\nprint(\"szeregowo: \", resistance(blackbox(R_1 >> R_2)))\nprint(\"równolegle:\", resistance(blackbox(R_1 | R_2)))",
+      "source": "J = CurrentSource(\"J\")\nobwod = ((GND >> E >> R_1 >> A) @ (A >> R_2 >> GND) @ (GND >> J >> A))\ndane = {E: 12, R_1: 10, R_2: 10, J: 1}\nsamo_E = solve(Problem(obwod, {**dane, J: 0}))(U(R_2))\nsamo_J = solve(Problem(obwod, {**dane, E: 0}))(U(R_2))\nprint(\"samo E:\", samo_E, \"V,  samo J:\", samo_J, \"V,  razem:\", samo_E + samo_J, \"=\", solve(Problem(obwod, dane))(U(R_2)), \"V\")",
       "outputs": [
         {
           "type": "stream",
-          "data": "szeregowo:  R_1 + R_2\nrównolegle: R_1*R_2/(R_1 + R_2)\n"
-        }
-      ]
-    },
-    {
-      "id": "7688b5fc",
-      "type": "markdown",
-      "source": "## Upraszczanie jak w zeszycie\n\n`simplify` zastępuje dwa elementy jednym — szeregowo, równolegle, źródła szeregowo — dopóki się da,\ni zapisuje każdy krok:"
-    },
-    {
-      "id": "932b5d91",
-      "type": "code",
-      "source": "E, R_1, R_2, R_3 = VoltageSource(\"E\"), Resistor(\"R_1\"), Resistor(\"R_2\"), Resistor(\"R_3\")\nmniejszy, kroki = simplify(Problem(~(E >> R_1 >> (R_2 | R_3)), {E: 12, R_1: 4, R_2: 2, R_3: 3}, [I(R_1)]))\nfor k in kroki:\n    print(f\"{k.how}: {' i '.join(e.name for e in k.replaced)} → {k.by.name} = {k.amount} Ω\")\nmniejszy",
-      "outputs": [
-        {
-          "type": "stream",
-          "data": "parallel: R_2 i R_3 → R_23 = 6/5 Ω\n"
-        },
-        {
-          "type": "svg",
-          "data": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"-20 -20 560 220\" width=\"560\" height=\"220\"><style>\n.w{stroke:currentColor;stroke-width:1.6;fill:none;stroke-linecap:round;stroke-linejoin:round}\n.w .thick{stroke-width:3}.w .fill{fill:currentColor;stroke:none}.w .dashed{stroke-dasharray:4 3}\n.w .open{fill:none}.w .hole{fill:var(--board,#fff)}.dot{fill:currentColor}\ntext{font:13px ui-sans-serif,system-ui,sans-serif;fill:currentColor}.halo{fill:var(--paper,#fff)}\ntext .sub{font-size:10px}.solved{fill:#2563eb;font-weight:600}.result{fill:#059669}\n.node{font-style:italic}.letter{font-weight:600;text-anchor:middle;dominant-baseline:central}\n.w .when-closed,.closed .when-open{display:none}.closed .when-closed{display:inline}\n.w .seg{stroke-width:4;opacity:.12}.w .on{stroke-width:4;stroke:#ff3b30;fill:#ff3b30}.w .waves{stroke-width:1.4}\n.w .pins text{font-size:9px;stroke:none;fill:currentColor;opacity:.75}.w text.chip{font-size:13px;font-weight:600;stroke:none;fill:currentColor}\n</style><polyline class=\"w wire\" points=\"60,60 80,60\"></polyline><polyline class=\"w wire\" points=\"160,60 180,60\"></polyline><polyline class=\"w wire\" points=\"180,60 200,60\"></polyline><polyline class=\"w wire\" points=\"280,60 300,60\"></polyline><polyline class=\"w wire\" points=\"300,60 340,60\"></polyline><polyline class=\"w wire\" points=\"420,60 460,60\"></polyline><polyline class=\"w wire\" points=\"460,60 460,120\"></polyline><polyline class=\"w wire\" points=\"460,120 60,120\"></polyline><polyline class=\"w wire\" points=\"60,120 60,60\"></polyline><g class=\"element   \" data-id=\"E\" data-kind=\"voltage_source\"><rect class=\"hit\" x=\"76\" y=\"48\" width=\"88\" height=\"24\"></rect><g><g class=\"w\" transform=\"translate(80 60) rotate(0)\"><path d=\"M0 0H27M53 0H80\"/><g transform=\"translate(40 0)\"><circle r=\"13\"/><path d=\"M-13 0H13\"/><path class=\"fill\" d=\"M13 0l-7 -4v8z\"/></g></g></g><text x=\"120\" y=\"40\" text-anchor=\"middle\" class=\"label \">E</text></g><g class=\"element   \" data-id=\"R_1\" data-kind=\"resistor\"><rect class=\"hit\" x=\"196\" y=\"48\" width=\"88\" height=\"24\"></rect><g><g class=\"w\" transform=\"translate(200 60) rotate(0)\"><path d=\"M0 0H22M58 0H80\"/><g transform=\"translate(40 0)\"><rect x=\"-18\" y=\"-7\" width=\"36\" height=\"14\"/></g></g></g><text x=\"240\" y=\"40\" text-anchor=\"middle\" class=\"label \">R<tspan class=\"sub\" dy=\"4\">1</tspan><tspan dy=\"-4\"></tspan></text></g><g class=\"element   \" data-id=\"R_23\" data-kind=\"resistor\"><rect class=\"hit\" x=\"336\" y=\"48\" width=\"88\" height=\"24\"></rect><g><g class=\"w\" transform=\"translate(340 60) rotate(0)\"><path d=\"M0 0H22M58 0H80\"/><g transform=\"translate(40 0)\"><rect x=\"-18\" y=\"-7\" width=\"36\" height=\"14\"/></g></g></g><text x=\"380\" y=\"40\" text-anchor=\"middle\" class=\"label \">R<tspan class=\"sub\" dy=\"4\">23</tspan><tspan dy=\"-4\"></tspan></text></g></svg>"
+          "data": "samo E: 6 V,  samo J: 5 V,  razem: 11 = 11 V\n"
         }
       ]
     }

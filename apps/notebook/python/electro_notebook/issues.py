@@ -6,13 +6,14 @@ from __future__ import annotations
 from collections.abc import Mapping
 
 import sympy as sp
-from electro import latex as tex
 from electro.circuit.tree import Element
 from electro.problem.names import NoSuchQuantity
 from electro.problem.problem import Problem
 from electro.problem.quantities import Quantity
 from electro.solver.errors import Ambiguous, Contradiction, MissingData
 from electro.solver.symbols import symbols
+
+from . import latex as tex
 
 
 def issue(err: BaseException, problem: Problem | None = None, units: Mapping[str, str] | None = None) -> dict | None:

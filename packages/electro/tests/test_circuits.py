@@ -1,6 +1,5 @@
 """Circuits built of primitives, closed in any of the equivalent ways, and the problems set on them."""
 
-import json
 import math
 
 import pytest
@@ -8,7 +7,6 @@ import sympy as sp
 from electro import (
     AC,
     GND,
-    Ammeter,
     Capacitor,
     ElementTwice,
     I,
@@ -21,16 +19,13 @@ from electro import (
     Resistor,
     U,
     V,
-    Voltage,
     VoltageSource,
-    free,
-    from_netlist,
     is_closed,
     simulate,
     solve,
-    to_netlist,
     two_terminal,
 )
+from electro.circuit.tree import free
 
 
 def test_a_loop_closed_by_one_node_its_two_ends_on_it():
@@ -119,20 +114,3 @@ def test_a_new_element_is_one_law_and_nothing_else():
     e, g = VoltageSource("E"), Conductance("G")
     p = Problem(GND >> e >> g >> GND, {e: 10, g: "0.5"})
     assert solve(p)(I(g)) == 5 and solve(p, AC(sp.Integer(1)))(I(g)) == 5
-
-
-def test_written_down_and_read_back_it_solves_the_same():
-    e, r1, r2 = VoltageSource("E"), Resistor("R_1"), Resistor("R_2")
-    b = Node("B")
-    p = Problem((GND >> e >> r1 >> b) @ (b >> r2 >> GND), {e: 12, r1: 10, r2: 20}, [I(r1), V(b)])
-    data = json.loads(json.dumps(to_netlist(p)))
-    again = from_netlist(data).problem
-    assert list(solve(again).answers.values()) == list(solve(p).answers.values()) == [sp.Rational(2, 5), 8]
-
-
-def test_a_meters_reading_is_written_down_as_its_value():
-    e, r, a = VoltageSource("E"), Resistor("R"), Ammeter("A_1")
-    data = to_netlist(Problem(~(e >> r >> a), {r: 3, I(a): 2}))
-    assert [x.get("value") for x in data["elements"]] == [None, "3", "2"] and data["given"] == []
-    again = from_netlist(data)
-    assert solve(again.problem)(Voltage(again.elements["R"])) == 6

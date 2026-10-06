@@ -68,11 +68,6 @@ class Solution:
             object.__setattr__(self, "worked", self.worked())
         return cast(tuple[SolutionStep, ...], self.worked)
 
-    def _repr_latex_(self) -> str:
-        from ..latex import solution
-
-        return f"${solution(self)}$"
-
     @property
     def answers(self) -> dict[Quantity, sp.Expr]:
         """What is sought, each found; or ``MissingData``: how many data more, and which would do."""

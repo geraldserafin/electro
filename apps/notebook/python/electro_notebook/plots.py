@@ -6,10 +6,12 @@ from __future__ import annotations
 import re
 from collections.abc import Mapping
 
-from electro import Element, Net, Node, Problem, U, V, responses, spreads, stores
+from electro import Element, Net, Node, Problem, U, V
 from electro.problem.quantities import Quantity
+from electro.solver.laws import stores
 
 from .errors import NoInput, NoOutput
+from .methods import responses, spreads
 
 AUTO = re.compile(r"(.+_)?n\d+")
 """The names given to points no one named."""
@@ -52,4 +54,4 @@ def input_of(elements: Mapping[str, Element]) -> tuple[str, Element]:
 
 def histogram(problem: Problem, shown: Mapping[str, Quantity], tol: float) -> dict:
     found = spreads(problem, list(shown.values()), tol)
-    return {"histogram": {"values": {n: list(found[q].values) for n, q in shown.items()}}}
+    return {"histogram": {"values": {n: list(found[q]) for n, q in shown.items()}}}

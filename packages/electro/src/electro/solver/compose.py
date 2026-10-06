@@ -68,6 +68,29 @@ class Component:
     taps: tuple[tuple[Node | Net, sp.Expr], ...] = ()
     definitions: tuple[Definition, ...] = ()
 
+    def __str__(self) -> str:
+        """A piece of one end each side as a book writes it: its voltage ``U`` (the first end against the second)
+        by its current ``I`` (in at the first) — ``U = I·(R_1 + R_2)``; else its laws."""
+        if len(self.left) == len(self.right) == 1 and not self.choices:
+            U, I = sp.symbols("U I")
+            (a,), (b,) = self.left, self.right
+            eqs = [eq.expr for eq in self.laws] + [U - (a.v - b.v), I - a.i]
+            inside = sorted({x for e in eqs for x in symbols_in(e) if isinstance(x, sp.Dummy)}, key=str)
+            for x in (U, I):
+                try:
+                    found = sp.solve(eqs, [*inside, x], dict=True)
+                except NotImplementedError:  # under a time word: said as it is, below
+                    continue
+                if len(found) == 1 and x in found[0]:
+                    return f"{x} = {sp.factor(found[0][x])}"
+            plain = [e for e in eqs if not e.atoms(sp.Function)]
+            by = sp.solve(plain, [x for x in inside if any(e.has(x) for e in plain)], dict=True)
+            if len(by) == 1:
+                left = {sp.factor(sp.expand(subs(e, by[0]))) for e in eqs} - {0}
+                if not {x for e in left for x in symbols_in(e) if isinstance(x, sp.Dummy)}:
+                    return "; ".join(f"{e} = 0" for e in left)
+        return "; ".join(f"{eq.expr} = 0" for eq in self.laws)
+
 
 @dataclass(frozen=True)
 class Own:
@@ -375,6 +398,7 @@ def framed(
     eqs = _once(Equation(_normal(eq.expr), eq.origin) for eq in left.laws)
     unknowns = {x for eq in eqs for x in symbols_in(eq.expr)} & variables
     unknowns |= {x for c in left.choices for w in c for eq in w.equations for x in symbols_in(eq.expr)} & variables
+    unknowns |= params
     positive = {s.param(e, w) for e, _ in s.net.parts for w in e.kind.positive} & unknowns
     system = System(
         eqs, tuple(sorted(unknowns, key=str)), s, left.choices, frozenset(positive), frozenset(params & unknowns)

@@ -311,16 +311,16 @@
     {
       "id": "6cb41a70",
       "type": "markdown",
-      "source": "## Opór zastępczy w kodzie\n\nW kodzie `>>` łączy szeregowo, a `|` równolegle. `blackbox()` patrzy na kawałek obwodu od jego\nkońców, a `resistance()` mówi, jakim jednym opornikiem jest — najpierw wzorem, potem liczbą:"
+      "source": "## Opór zastępczy w kodzie\n\nW kodzie `>>` łączy szeregowo, a `|` równolegle. Każdy kawałek obwodu to **komponent**: `.component`\npokazuje, jak jego napięcie $U$ zależy od prądu $I$ — opór zastępczy wychodzi sam, nikt nie podaje wzoru:"
     },
     {
       "id": "dca255f9",
       "type": "code",
-      "source": "R_1, R_2, R_3 = Resistor(\"R_1\"), Resistor(\"R_2\"), Resistor(\"R_3\")\nwartosci = {\"R_1\": 100, \"R_2\": 300, \"R_3\": 600}\nfor nazwa, kawalek in [(\"szeregowo\", R_1 >> R_2), (\"równolegle\", R_2 | R_3), (\"mieszane\", R_1 >> (R_2 | R_3))]:\n    wzor = resistance(blackbox(kawalek))\n    print(f\"{nazwa}: {wzor} = {wzor.subs(wartosci)} Ω\")",
+      "source": "R_1, R_2, R_3 = Resistor(\"R_1\"), Resistor(\"R_2\"), Resistor(\"R_3\")\nfor nazwa, kawalek in [(\"szeregowo\", R_1 >> R_2), (\"równolegle\", R_2 | R_3), (\"mieszane\", R_1 >> (R_2 | R_3))]:\n    print(f\"{nazwa}: {kawalek.component}\")",
       "outputs": [
         {
           "type": "stream",
-          "data": "szeregowo: R_1 + R_2 = 400 Ω\nrównolegle: R_2*R_3/(R_2 + R_3) = 200 Ω\nmieszane: (R_1*R_2 + R_1*R_3 + R_2*R_3)/(R_2 + R_3) = 300 Ω\n"
+          "data": "szeregowo: U = I*(R_1 + R_2)\nrównolegle: U = I*R_2*R_3/(R_2 + R_3)\nmieszane: U = I*(R_1*R_2 + R_1*R_3 + R_2*R_3)/(R_2 + R_3)\n"
         }
       ]
     },

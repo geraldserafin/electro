@@ -44,16 +44,16 @@
     {
       "id": "41569d40",
       "type": "markdown",
-      "source": "## Netlista\n\nKażdy obwód ma swoją **netlistę**: elementy i punkty, do których dochodzą ich zaciski. `to_netlist`\nzapisuje zadanie jako dane (tak schemat w notatce rozmawia z biblioteką), `from_netlist` czyta je z\npowrotem:"
+      "source": "## Netlista\n\nKażdy obwód ma swoją **netlistę**: elementy i punkty (numerowane), do których dochodzą ich zaciski:"
     },
     {
       "id": "9a0d4285",
       "type": "code",
-      "source": "to_netlist(mostek)",
+      "source": "for element, punkty in netlist(mostek.circuit).parts:\n    print(element.name, punkty)",
       "outputs": [
         {
-          "type": "text",
-          "data": "{'elements': [{'id': 'E', 'kind': 'voltage_source', 'nodes': ['GND', 'A'], 'value': '10'}, {'id': 'R_1', 'kind': 'resistor', 'nodes': ['A', 'B'], 'value': '100'}, {'id': 'R_2', 'kind': 'resistor', 'nodes': ['B', 'GND'], 'value': '200'}, {'id': 'R_3', 'kind': 'resistor', 'nodes': ['A', 'C'], 'value': '150'}, {'id': 'R_4', 'kind': 'resistor', 'nodes': ['C', 'GND'], 'value': '150'}, {'id': 'R_5', 'kind': 'resistor', 'nodes': ['B', 'C'], 'value': '50'}], 'given': [], 'find': []}"
+          "type": "stream",
+          "data": "E (0, 1)\nR_1 (1, 2)\nR_2 (2, 0)\nR_3 (1, 3)\nR_4 (3, 0)\nR_5 (2, 3)\n"
         }
       ]
     }

@@ -15,12 +15,12 @@ from electro import (
     Problem,
     Solution,
     Voltage,
-    fill,
-    is_source,
-    reading,
     solve,
 )
+from electro.solver.laws import is_source, reading
 from electro.values import UNKNOWN, fmt
+
+from .methods import fill
 
 
 def solved(problem: Problem, elements: Mapping[str, Element]) -> tuple[Solution, dict[str, Element]]:

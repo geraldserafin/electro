@@ -88,7 +88,40 @@
       "id": "3f76ee23",
       "type": "code",
       "source": "E, R_1, R_2 = VoltageSource(\"E\"), Resistor(\"R_1\"), Resistor(\"R_2\")\ntry:\n    solve(Problem(~(E >> R_1 >> R_2), {E: 12, R_1: 100}, [Parameter(R_2)])).answers\nexcept MissingData as e:\n    display(e)",
-      "outputs": []
+      "outputs": [
+        {
+          "type": "issue",
+          "kind": "error",
+          "data": "MissingData: 1 more datum needed",
+          "issue": {
+            "type": "MissingData",
+            "targets": [
+              "R_{2}"
+            ],
+            "needed": 1,
+            "options": [
+              [
+                "I_{E}"
+              ],
+              [
+                "U_{R_{1}}"
+              ],
+              [
+                "I_{R_{1}}"
+              ],
+              [
+                "U_{R_{2}}"
+              ],
+              [
+                "I_{R_{2}}"
+              ],
+              [
+                "R_{2}"
+              ]
+            ]
+          }
+        }
+      ]
     },
     {
       "id": "c4ab101d",

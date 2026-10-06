@@ -163,3 +163,19 @@ def labels(net: Netlist) -> tuple[str, ...]:
 
 def _loose(name: str) -> str:
     return name.replace("_", "")
+
+
+def point_names(net: Netlist) -> list[str]:
+    """Each point's name: its ``Node``'s or ``Net``'s, else ``n1``, ``n2``…"""
+    named = {n: getattr(p, "name", getattr(p, "label", None)) for n, p in net.named}
+    taken = {x for x in named.values() if x}
+    out, k = [], 0
+    for n in range(net.size):
+        if named.get(n):
+            out.append(named[n])
+            continue
+        k += 1
+        while f"n{k}" in taken:
+            k += 1
+        out.append(f"n{k}")
+    return out

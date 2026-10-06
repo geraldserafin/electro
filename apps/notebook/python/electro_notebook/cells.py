@@ -15,7 +15,7 @@ import json
 import warnings
 
 import sympy as sp
-from electro import Circuit, Problem, Solution, Trace, from_netlist, to_netlist
+from electro import Circuit, Problem, Solution, Trace
 from electro.problem.names import name_of, named, naming
 from electro.problem.quantities import Quantity
 
@@ -23,6 +23,7 @@ from . import plots
 from . import task as tasks
 from .code_view import PRELUDE, variable
 from .errors import CELL, NoSuchSchematic, error, issue, warning
+from .netlist import from_netlist, to_netlist
 from .results import element_result
 from .steps import steps as steps_data
 

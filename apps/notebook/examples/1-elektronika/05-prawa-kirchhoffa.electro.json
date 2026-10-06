@@ -273,23 +273,52 @@
                 }
               },
               {
-                "type": "SystemStep",
-                "equations": [
-                  "V_{n1} - 4 \\cdot I_{R_{1}} - V_{n2} = 0",
-                  "V_{n2} - 6 \\cdot I_{R_{2}} = 0",
-                  "V_{n2} - 3 \\cdot I_{R_{3}} - V_{n3} = 0",
-                  "I_{R_{1}} - I_{E_{1}} = 0",
-                  "I_{R_{2}} + I_{R_{3}} - I_{R_{1}} = 0",
-                  "- I_{E_{2}} - I_{R_{3}} = 0"
-                ],
-                "results": [
-                  "I_{E_{1}} = 1.333\\,\\mathrm{A}",
-                  "I_{E_{2}} = -222.2\\,\\mathrm{mA}",
-                  "I_{R_{1}} = 1.333\\,\\mathrm{A}",
-                  "I_{R_{2}} = 1.111\\,\\mathrm{A}",
-                  "I_{R_{3}} = 222.2\\,\\mathrm{mA}",
-                  "V_{n2} = 6.667\\,\\mathrm{V}"
-                ]
+                "type": "FormulaStep",
+                "chain": "V_{n2} = \\frac{20}{3} = 6.667\\,\\mathrm{V}",
+                "reason": {
+                  "type": "KirchhoffCurrent",
+                  "node": "n2"
+                }
+              },
+              {
+                "type": "FormulaStep",
+                "chain": "I_{R_{1}} = \\frac{V_{n1}}{4} - \\frac{V_{n2}}{4} = \\frac{12}{4} - \\frac{6.66667}{4} = 1.333\\,\\mathrm{A}",
+                "reason": {
+                  "type": "OhmsLaw",
+                  "label": "R_{1}"
+                }
+              },
+              {
+                "type": "FormulaStep",
+                "chain": "I_{R_{2}} = \\frac{V_{n2}}{6} = \\frac{6.66667}{6} = 1.111\\,\\mathrm{A}",
+                "reason": {
+                  "type": "OhmsLaw",
+                  "label": "R_{2}"
+                }
+              },
+              {
+                "type": "FormulaStep",
+                "chain": "I_{R_{3}} = \\frac{V_{n2}}{3} - \\frac{V_{n3}}{3} = \\frac{6.66667}{3} - \\frac{6}{3} = 222.2\\,\\mathrm{mA}",
+                "reason": {
+                  "type": "OhmsLaw",
+                  "label": "R_{3}"
+                }
+              },
+              {
+                "type": "FormulaStep",
+                "chain": "I_{E_{1}} = \\frac{4}{3} = 1.333\\,\\mathrm{A}",
+                "reason": {
+                  "type": "KirchhoffCurrent",
+                  "node": "n1"
+                }
+              },
+              {
+                "type": "FormulaStep",
+                "chain": "I_{E_{2}} = - \\frac{2}{9} = -222.2\\,\\mathrm{mA}",
+                "reason": {
+                  "type": "KirchhoffCurrent",
+                  "node": "n3"
+                }
               }
             ],
             "answer": null,

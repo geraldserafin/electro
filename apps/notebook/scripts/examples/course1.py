@@ -233,15 +233,13 @@ bez względu na to, ile urządzeń już działa.
     L.md("""
 ## Opór zastępczy w kodzie
 
-W kodzie `>>` łączy szeregowo, a `|` równolegle. `blackbox()` patrzy na kawałek obwodu od jego
-końców, a `resistance()` mówi, jakim jednym opornikiem jest — najpierw wzorem, potem liczbą:
+W kodzie `>>` łączy szeregowo, a `|` równolegle. Każdy kawałek obwodu to **komponent**: `.component`
+pokazuje, jak jego napięcie $U$ zależy od prądu $I$ — opór zastępczy wychodzi sam, nikt nie podaje wzoru:
 """)
     L.code("""
 R_1, R_2, R_3 = Resistor("R_1"), Resistor("R_2"), Resistor("R_3")
-wartosci = {"R_1": 100, "R_2": 300, "R_3": 600}
 for nazwa, kawalek in [("szeregowo", R_1 >> R_2), ("równolegle", R_2 | R_3), ("mieszane", R_1 >> (R_2 | R_3))]:
-    wzor = resistance(blackbox(kawalek))
-    print(f"{nazwa}: {wzor} = {wzor.subs(wartosci)} Ω")
+    print(f"{nazwa}: {kawalek.component}")
 """)
     L.md("""
 ## Spróbuj sam

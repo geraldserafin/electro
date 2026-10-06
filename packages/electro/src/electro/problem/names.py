@@ -10,9 +10,8 @@ import sympy as sp
 
 from electro.values import expression
 
-from ..circuit.netlist import labels
+from ..circuit.netlist import labels, point_names
 from ..circuit.tree import GND, Circuit, Element, Net, Node, netlist
-from .netlist import point_names
 from .quantities import Current, Parameter, Potential, Power, Quantity, Voltage
 
 OF_ELEMENTS = {"I": Current, "U": Voltage, "P": Power}

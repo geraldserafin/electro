@@ -305,12 +305,11 @@ print("U_wy =", solve(wzmacniacz)(V(wy)), "V")
     L.md("""
 ## Netlista
 
-Każdy obwód ma swoją **netlistę**: elementy i punkty, do których dochodzą ich zaciski. `to_netlist`
-zapisuje zadanie jako dane (tak schemat w notatce rozmawia z biblioteką), `from_netlist` czyta je z
-powrotem:
+Każdy obwód ma swoją **netlistę**: elementy i punkty (numerowane), do których dochodzą ich zaciski:
 """)
     L.code("""
-to_netlist(mostek)
+for element, punkty in netlist(mostek.circuit).parts:
+    print(element.name, punkty)
 """)
     L.save()
 
@@ -369,19 +368,34 @@ for f in [0.5 * f0, 0.9 * f0, f0, 1.1 * f0, 2 * f0]:
 
 
 def lesson06():
-    L = Lesson(C, "06-twierdzenia", "6. Thévenin, superpozycja i czarne skrzynki")
+    L = Lesson(C, "06-twierdzenia", "6. Komponenty i twierdzenia")
     L.md("""
-# Twierdzenia o obwodach
+# Każdy obwód jest komponentem
 
-**Twierdzenie Thévenina:** każdy liniowy obwód widziany z dwóch punktów zachowuje się jak jedno źródło
-napięcia $E_{th}$ z jednym opornikiem $R_{th}$. To ogromne uproszczenie: zamiast liczyć cały obwód dla
-każdego obciążenia, liczysz go raz. `between(zadanie, A, B)` patrzy na zadanie z punktów `A` i `B`,
-a `thevenin(...)` daje $E_{th}$ i $R_{th}$:
+Złożenie dwóch kawałków to znowu kawałek: `R_1 >> R_2` ma dwa końce i jedno prawo między nimi. `>>` skleja
+końce i **wyrzuca to, co jest w środku** — zostaje tylko związek napięcia $U$ z prądem $I$ na brzegu.
+`.component` go pokazuje. Opór szeregowy czy równoległy nie jest tu żadną regułą: wychodzi z praw elementów.
 """)
     L.code("""
-E, R_1, R_2, A = VoltageSource("E"), Resistor("R_1"), Resistor("R_2"), Node("A")
+R_1, R_2, R_3, E = Resistor("R_1"), Resistor("R_2"), Resistor("R_3"), VoltageSource("E")
+print("szeregowo: ", (R_1 >> R_2).component)
+print("równolegle:", (R_1 | R_2).component)
+print("z źródłem: ", (E >> R_1 >> (R_2 | R_3)).component)
+print("z kondensatorem:", (R_1 >> Capacitor("C")).component)
+""")
+    L.md("""
+Dwa kawałki są równoważne dokładnie wtedy, gdy mają to samo prawo na końcach.
+
+## Thévenin
+
+Każdy liniowy obwód widziany z dwóch punktów to jedno źródło $E_{th}$ z jednym oporem $R_{th}$: $E_{th}$ to
+napięcie, gdy nic nie jest podłączone, a $R_{th}$ — o ile napięcie spada na każdy amper pobrany.
+`resistance(zadanie, A, B)` liczy $R_{th}$ (wpuszcza prąd i patrzy, jak rośnie napięcie):
+""")
+    L.code("""
+A = Node("A")
 dzielnik = Problem(GND >> E >> R_1 >> A >> R_2 >> GND, {E: 12, R_1: 10, R_2: 10})
-thevenin(between(dzielnik, A, GND))
+print("E_th =", solve(dzielnik)(V(A)), "V,  R_th =", resistance(dzielnik, A, GND), "Ω")
 """)
     L.md("""
 Dzielnik 12 V z dwóch oporników 10 Ω to dla obciążenia po prostu 6 V przez 5 Ω.
@@ -389,40 +403,15 @@ Dzielnik 12 V z dwóch oporników 10 Ω to dla obciążenia po prostu 6 V przez 
 ## Superpozycja
 
 W obwodzie liniowym każde źródło działa niezależnie: wynik to suma tego, co daje każde źródło samo
-(pozostałe wyłączone). `superposition` liczy te części:
+(pozostałe wyłączone, czyli z wartością 0):
 """)
     L.code("""
 J = CurrentSource("J")
-dwa_zrodla = Problem(((GND >> E >> R_1 >> A) @ (A >> R_2 >> GND) @ (GND >> J >> A)), {E: 12, R_1: 10, R_2: 10, J: 1})
-s = superposition(dwa_zrodla, U(R_2))
-for zrodlo, czesc in s.parts:
-    print(f"samo {zrodlo.name}: {czesc} V")
-print("razem:", s.total, "V")
-""")
-    L.md("""
-## Czarna skrzynka
-
-`blackbox(kawałek)` eliminuje wszystko, co jest w środku, i zostawia tylko **relację na końcach**:
-równanie wiążące napięcie i prąd na brzegach. Dwa kawałki są równoważne dokładnie wtedy, gdy mają tę samą
-czarną skrzynkę. `resistance` mówi, jakim jednym opornikiem jest kawałek — liczy to, a nie zna wzoru:
-""")
-    L.code("""
-R_1, R_2 = Resistor("R_1"), Resistor("R_2")
-print("szeregowo: ", resistance(blackbox(R_1 >> R_2)))
-print("równolegle:", resistance(blackbox(R_1 | R_2)))
-""")
-    L.md("""
-## Upraszczanie jak w zeszycie
-
-`simplify` zastępuje dwa elementy jednym — szeregowo, równolegle, źródła szeregowo — dopóki się da,
-i zapisuje każdy krok:
-""")
-    L.code("""
-E, R_1, R_2, R_3 = VoltageSource("E"), Resistor("R_1"), Resistor("R_2"), Resistor("R_3")
-mniejszy, kroki = simplify(Problem(~(E >> R_1 >> (R_2 | R_3)), {E: 12, R_1: 4, R_2: 2, R_3: 3}, [I(R_1)]))
-for k in kroki:
-    print(f"{k.how}: {' i '.join(e.name for e in k.replaced)} → {k.by.name} = {k.amount} Ω")
-mniejszy
+obwod = ((GND >> E >> R_1 >> A) @ (A >> R_2 >> GND) @ (GND >> J >> A))
+dane = {E: 12, R_1: 10, R_2: 10, J: 1}
+samo_E = solve(Problem(obwod, {**dane, J: 0}))(U(R_2))
+samo_J = solve(Problem(obwod, {**dane, E: 0}))(U(R_2))
+print("samo E:", samo_E, "V,  samo J:", samo_J, "V,  razem:", samo_E + samo_J, "=", solve(Problem(obwod, dane))(U(R_2)), "V")
 """)
     L.save()
 
@@ -546,8 +535,8 @@ print(netlist(~(R_1 >> R_2)).parts)
 ## Semantyka
 
 Każdy element to **relacja** między potencjałami i prądami na końcach (opornik: $U = RI$), a obwód złożony
-z elementów — relacja złożona z relacji. `blackbox` eliminuje zmienne wewnętrzne i zostawia relację na
-brzegu: dwa obwody są równoważne, gdy mają tę samą czarną skrzynkę. Złożenie w kategorii obwodów przechodzi
+z elementów — relacja złożona z relacji. `>>` eliminuje zmienne wewnętrzne i zostawia relację na brzegu
+(`.component`): dwa obwody są równoważne, gdy mają tę samą. Złożenie w kategorii obwodów przechodzi
 na złożenie relacji — dlatego solver może pracować na dowolnie złożonych kawałkach i zawsze dostanie ten
 sam wynik, jakby liczył całość.
 
@@ -588,13 +577,13 @@ filtr_rc = Problem(GND >> E_1 >> R_1 >> Node("wy") >> C_1 >> GND, {E_1: 1, R_1: 
     L.md("""
 ## Zmiana wartości elementu
 
-`sweep(zadanie, element, wartości, wielkość)` pokazuje, jak wynik zależy od wartości jednego elementu:
+`swept(zadanie, element, wartości, [wielkości])` pokazuje, jak wynik zależy od wartości jednego elementu:
 """)
     L.code("""
 E, R_1, R_2, A = VoltageSource("E"), Resistor("R_1"), Resistor("R_2"), Node("A")
 dzielnik = Problem(GND >> E >> R_1 >> A >> R_2 >> GND, {E: 12, R_1: "1k", R_2: "1k"})
-s = sweep(dzielnik, R_2, [100, 1000, 10000], V(A))
-for r, u in zip(s.values, s.results):
+wartosci = [100, 1000, 10000]
+for r, u in zip(wartosci, swept(dzielnik, R_2, wartosci, [V(A)])[V(A)]):
     print(f"R_2 = {int(r):>5} Ω: V_A = {float(u):.2f} V")
 """)
     L.md("""

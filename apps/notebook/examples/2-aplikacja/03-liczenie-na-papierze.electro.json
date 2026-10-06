@@ -492,6 +492,14 @@
             "steps": [
               {
                 "type": "FormulaStep",
+                "chain": "R_{x} = 200\\,\\mathrm{\\Omega}",
+                "reason": {
+                  "type": "KirchhoffCurrent",
+                  "node": "n2"
+                }
+              },
+              {
+                "type": "FormulaStep",
                 "chain": "V_{n1} = 10\\,\\mathrm{V}",
                 "reason": {
                   "type": "SourceVoltage",
@@ -499,27 +507,60 @@
                 }
               },
               {
-                "type": "SystemStep",
-                "equations": [
-                  "V_{n1} - 100 \\cdot I_{R_{1}} - V_{n2} = 0",
-                  "V_{n2} - I_{R_{x}} \\cdot R_{x} = 0",
-                  "V_{n1} - 50 \\cdot I_{R_{3}} - V_{n3} = 0",
-                  "V_{n3} - 100 \\cdot I_{R_{4}} = 0",
-                  "V_{n2} - V_{n3} = 0",
-                  "I_{R_{1}} + I_{R_{3}} - I_{E_{1}} = 0",
-                  "I_{A_{1}} + I_{R_{x}} - I_{R_{1}} = 0",
-                  "I_{R_{4}} - I_{A_{1}} - I_{R_{3}} = 0"
-                ],
-                "results": [
-                  "I_{E_{1}} = 100\\,\\mathrm{mA}",
-                  "I_{R_{1}} = 33.33\\,\\mathrm{mA}",
-                  "I_{R_{3}} = 66.67\\,\\mathrm{mA}",
-                  "I_{R_{4}} = 66.67\\,\\mathrm{mA}",
-                  "I_{R_{x}} = 33.33\\,\\mathrm{mA}",
-                  "R_{x} = 200\\,\\mathrm{\\Omega}",
-                  "V_{n2} = 6.667\\,\\mathrm{V}",
-                  "V_{n3} = 6.667\\,\\mathrm{V}"
-                ]
+                "type": "FormulaStep",
+                "chain": "V_{n3} = \\frac{20}{3} = 6.667\\,\\mathrm{V}",
+                "reason": {
+                  "type": "KirchhoffCurrent",
+                  "node": "n3"
+                }
+              },
+              {
+                "type": "FormulaStep",
+                "chain": "I_{R_{3}} = \\frac{V_{n1}}{50} - \\frac{V_{n3}}{50} = \\frac{10}{50} - \\frac{6.66667}{50} = 66.67\\,\\mathrm{mA}",
+                "reason": {
+                  "type": "OhmsLaw",
+                  "label": "R_{3}"
+                }
+              },
+              {
+                "type": "FormulaStep",
+                "chain": "I_{R_{4}} = \\frac{V_{n3}}{100} = \\frac{6.66667}{100} = 66.67\\,\\mathrm{mA}",
+                "reason": {
+                  "type": "OhmsLaw",
+                  "label": "R_{4}"
+                }
+              },
+              {
+                "type": "FormulaStep",
+                "chain": "V_{n2} = \\frac{20}{3} = 6.667\\,\\mathrm{V}",
+                "reason": {
+                  "type": "IdealAmmeter",
+                  "label": "A_{1}"
+                }
+              },
+              {
+                "type": "FormulaStep",
+                "chain": "I_{R_{1}} = \\frac{V_{n1}}{100} - \\frac{V_{n2}}{100} = \\frac{10}{100} - \\frac{6.66667}{100} = 33.33\\,\\mathrm{mA}",
+                "reason": {
+                  "type": "OhmsLaw",
+                  "label": "R_{1}"
+                }
+              },
+              {
+                "type": "FormulaStep",
+                "chain": "I_{R_{x}} = \\frac{V_{n2}}{R_{x}} = \\frac{6.66667}{200} = 33.33\\,\\mathrm{mA}",
+                "reason": {
+                  "type": "OhmsLaw",
+                  "label": "R_{x}"
+                }
+              },
+              {
+                "type": "FormulaStep",
+                "chain": "I_{E_{1}} = \\frac{1}{10} = 100\\,\\mathrm{mA}",
+                "reason": {
+                  "type": "KirchhoffCurrent",
+                  "node": "n1"
+                }
               }
             ],
             "answer": null,

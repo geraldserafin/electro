@@ -14,10 +14,10 @@ from dataclasses import dataclass
 
 import sympy as sp
 from electro import Problem, solve
-from electro.latex import name
 from electro.problem.names import name_of, named, naming
 from electro.problem.quantities import Quantity
 
+from .latex import name
 from .results import shown
 
 LETTERS = {"I": "A", "U": "V", "V": "V", "P": "W"}

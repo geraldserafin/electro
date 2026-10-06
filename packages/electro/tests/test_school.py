@@ -19,13 +19,10 @@ from electro import (
     Contradiction,
     Coupled,
     CurrentSource,
-    Hole,
     I,
-    Inductor,
     MissingData,
     Node,
     OpAmp,
-    Open,
     P,
     Parameter,
     Problem,
@@ -35,19 +32,8 @@ from electro import (
     Undetermined,
     V,
     VoltageSource,
-    Wire,
-    between,
-    blackbox,
-    fill,
-    resistance,
-    respond,
     solve,
-    superposition,
-    sweep,
-    thevenin,
-    tolerance,
 )
-from electro import Capacitor as C
 from electro.values import parse
 
 
@@ -63,15 +49,6 @@ def test_givens_in_many_forms():
         assert solve(Problem(GND >> e >> r1 >> Node() >> r2 >> GND, {e: 12, r1: 10, I(r1): given}))(Parameter(r2)) == 14
     e, r1, r2 = VoltageSource("E"), Resistor("R_1"), Resistor("R_2")
     assert solve(Problem(GND >> e >> r1 >> Node() >> r2 >> GND, {e: 12, r1: 10, U(r1): 5}))(Parameter(r2)) == 14
-
-
-def test_series_parallel_resistance():
-    assert (
-        resistance(blackbox(Resistor("a") >> (Resistor("b") | Resistor("c")))).subs({"a": 10, "b": 20, "c": 30}) == 22
-    )
-    r = resistance(blackbox(Resistor("a") | Resistor("b") | Resistor("c")))
-    assert r.subs({"a": 6, "b": 3, "c": 2}) == 1
-    assert parse("4k7") + parse("300") == 5000
 
 
 def test_loop():
@@ -92,14 +69,6 @@ def test_shunt_and_named_node():
     out = Node("out")
     s = solve(Problem((GND >> e >> r1 >> out) @ (out >> r2 >> GND), {e: 10, r1: 1000, r2: 4000}))
     assert s(V(out)) == 8
-
-
-def test_thevenin_of_divider():
-    e, r1, r2 = VoltageSource("E"), Resistor("R_1"), Resistor("R_2")
-    out = Node("out")
-    p = Problem((GND >> e >> r1 >> out) @ (out >> r2 >> GND), {e: 12, r1: 10, r2: 10})
-    th = thevenin(between(p, out, GND))
-    assert th is not None and (th.E, th.Z) == (6, 5)
 
 
 def test_symbolic_answer():
@@ -140,68 +109,10 @@ def test_inverting_amplifier():
     assert solve(Problem(circuit, {e: 1, r1: 1000, r2: 10000}))(V(out)) == -10
 
 
-def test_ac_impedance():
-    assert (
-        resistance(blackbox(Resistor("R") >> C("C"), AC(sp.Integer(1))), AC(sp.Integer(1))).subs({"R": 1, "C": 1})
-        == 1 - sp.I
-    )
-    assert (
-        resistance(blackbox(Resistor("R") >> Inductor("L"), AC(sp.Integer(2))), AC(sp.Integer(2))).subs(
-            {"R": 1, "L": 1}
-        )
-        == 1 + 2 * sp.I
-    )
-
-
 def test_ac_power_is_average():
     e, r, c = VoltageSource("E"), Resistor("R"), Capacitor("C")
     s = solve(Problem(GND >> e >> r >> Node() >> c >> GND, {e: 1, r: 1000, c: "1u"}), AC(sp.Integer(1000)))
     assert s(P(r)) == sp.Rational(1, 4000) and s(P(c)) == 0
-
-
-def _rc(c_value="1u"):
-    e, r, c = VoltageSource("E"), Resistor("R"), Capacitor("C")
-    a = Node("A")
-    return Problem((GND >> e >> r >> a) @ (a >> c >> GND), {e: 12, r: "1k", c: c_value}), e, r, c, a
-
-
-def test_bode_rc_low_pass():
-    p, e, _, _, a = _rc()
-    resp = respond(p, V(a), e)
-
-    def at(f):
-        return min(range(len(resp.f)), key=lambda k: abs(resp.f[k] - f))
-
-    fc = 1 / (2 * 3.14159265 * 1e-3)
-    assert resp.gain_db[0] == pytest.approx(0, abs=0.05)
-    assert resp.gain_db[at(fc)] == pytest.approx(-3, abs=0.1) and resp.phase_deg[at(fc)] == pytest.approx(-45, abs=1)
-    assert resp.gain_db[at(1e5)] - resp.gain_db[at(1e4)] == pytest.approx(-20, abs=0.5)
-    [corner] = resp.cutoffs()
-    assert corner == pytest.approx(fc, rel=0.01)
-
-
-def test_sweep_a_divider():
-    e, r1, r2 = VoltageSource("E"), Resistor("R_1"), Resistor("R_2")
-    a = Node("A")
-    p = Problem((GND >> e >> r1 >> a) @ (a >> r2 >> GND), {e: 12, r1: "1k"})
-    out = sweep(p, r2, (100, 5050, 10000), V(a))
-    assert out.values == (100, 5050, 10000) and out.results[0] == sp.Rational(12 * 100, 1100)
-
-
-def test_sweep_at_a_frequency_gives_amplitudes():
-    p, e, _, c, _ = _rc()
-    out = sweep(Problem(p.circuit, {**p.given, e: 1}), c, ("1u", "1n"), U(c), AC(sp.Integer(1000)))
-    assert [abs(complex(x)) for x in out.results] == pytest.approx([1 / abs(1 + 1j), 1 / abs(1 + 1e-3j)])
-
-
-def test_tolerance_of_a_divider():
-    e, r1, r2 = VoltageSource("E"), Resistor("R_1"), Resistor("R_2")
-    a = Node("A")
-    p = Problem((GND >> e >> r1 >> a) @ (a >> r2 >> GND), {e: 12, r1: "10k", r2: "10k"})
-    s = tolerance(p, V(a), tol=0.05, runs=400).stats()
-    assert s["mean"] == pytest.approx(6, abs=0.03) and 5.7 <= s["min"] and s["max"] <= 6.3
-    assert tolerance(p, V(a), tol=0.05, runs=400) == tolerance(p, V(a), tol=0.05, runs=400)
-    assert tolerance(p, V(a), tol={"C": 0.1}, runs=5).stats()["std"] == 0
 
 
 def test_dc_capacitor_blocks():
@@ -264,7 +175,7 @@ def test_three_sources_as_parallel_branches():
     )
     p = Problem(circuit, {e1: 12, e2: 6, j: 1, r1: 2, r2: 4, r3: 6})
     total = solve(p)(I(r2))
-    assert total == sp.Rational(-18, 11) and superposition(p, I(r2)).total == total
+    assert total == sp.Rational(-18, 11)
 
 
 def _three_unknowns():
@@ -309,32 +220,6 @@ def test_missing_data_counts_redundant_givens_once():
     with pytest.raises(MissingData) as err:
         _ = s.answers
     assert err.value.needed == 2
-
-
-def _with_hole(given_current):
-    e, r, x = VoltageSource("E"), Resistor("R_1"), Hole("X")
-    return Problem(GND >> e >> r >> Node() >> x >> GND, {e: 12, r: 10, I(r): given_current}), x
-
-
-def test_hole_becomes_the_simplest_element():
-    filled = fill(*_with_hole("0.5"))
-    assert filled.by.kind is Resistor and filled.solution(Parameter(filled.by)) == 14
-    assert solve(filled.problem)(I(filled.by)) == sp.Rational(1, 2)
-
-
-def test_hole_needs_a_source_when_current_flows_backwards():
-    filled = fill(*_with_hole("-0.5"))
-    assert filled.by.kind is VoltageSource and filled.solution(Parameter(filled.by)) == -17
-
-
-def test_hole_can_be_a_plain_wire():
-    assert fill(*_with_hole("1,2")).by.kind is Wire
-
-
-def test_hole_with_no_current_is_a_break():
-    e, r, x = VoltageSource("E"), Resistor("R_1"), Hole("X")
-    filled = fill(Problem(~(e >> r >> x), {e: 12, r: 10, I(r): 0}), x)
-    assert filled.by.kind is Open and filled.solution(U(filled.by)) == 12
 
 
 def test_unknown_resistor_cannot_be_negative():

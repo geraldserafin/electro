@@ -7,16 +7,14 @@ from collections.abc import Mapping
 from typing import TYPE_CHECKING
 
 import sympy as sp
+from electro.problem.quantities import Current, Parameter, Potential, Power, Quantity, Scaled, Voltage
+from electro.solver.errors import Undetermined
+from electro.solver.symbols import Symbols
+from electro.values import fmt
 from sympy.printing.latex import LatexPrinter
 
-from electro.values import fmt
-
-from .problem.quantities import Current, Parameter, Potential, Power, Quantity, Scaled, Voltage
-from .solver.errors import Undetermined
-from .solver.symbols import Symbols
-
 if TYPE_CHECKING:
-    from .solver.solution import Solution, SolutionStep
+    from electro.solver.solution import Solution, SolutionStep
 
 UNITS = {Current: "A", Voltage: "V", Potential: "V", Power: "W"}
 

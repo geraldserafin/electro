@@ -9,13 +9,14 @@ from collections.abc import Callable
 from typing import cast
 
 import sympy as sp
-from electro import I, Problem, U, between, step_function, sweeps, thevenin
-from electro.problem.netlist import Netlist, from_netlist, quantity
+from electro import I, Problem, U, step_function
 from electro.values import fmt, parse
 
 from . import plots
 from .errors import NoSweepRange, error
 from .issues import issue
+from .methods import resistance, swept
+from .netlist import Netlist, from_netlist, quantity
 from .results import amplitude, element_result, number, solved
 
 
@@ -69,10 +70,10 @@ def _found(solution, net: Netlist, q: list, unit: str) -> str | None:
     """A sought key's value: a quantity's, or ``["R", a, b]`` the resistance between two points."""
     if q[0] == "R":
         try:
-            t = thevenin(between(solution.problem, net.points[q[1]], net.points[q[2]], solution.analysis))
+            z = resistance(solution.problem, net.points[q[1]], net.points[q[2]], solution.analysis)
         except Exception:  # noqa: BLE001 — not two points of it: none
             return None
-        return fmt(t.Z, unit) if t is not None and t.Z.is_number else None
+        return fmt(z, unit) if z is not None and z.is_number else None
     value = number(solution, quantity(q, net.elements, net.points))
     return None if value is None else fmt(value, unit)
 
@@ -114,8 +115,8 @@ def sweep_plot(problem_json: str, element: str, lo: str = "", hi: str = "") -> s
         a, b = _range(element, item.get("value"), lo, hi)
         values = [a + (b - a) * k / 99 for k in range(100)]
         shown = plots.outputs(net.elements, net.points, named_only=True) or {f"U_{element}": U(e), f"I_{element}": I(e)}
-        found = sweeps(net.problem, e, values, list(shown.values()))
-        series = {n: [amplitude(v) for v in found[q].results] for n, q in shown.items()}
+        found = swept(net.problem, e, values, list(shown.values()))
+        series = {n: [amplitude(v) for v in found[q]] for n, q in shown.items()}
         return plots.trace({"name": element, "unit": item.get("unit", "")}, values, series)
 
     return _answer(work)

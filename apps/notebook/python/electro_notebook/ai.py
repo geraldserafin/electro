@@ -6,9 +6,9 @@ import json
 
 import sympy as sp
 from electro.problem.names import evaluated
-from electro.problem.netlist import from_netlist
 
 from .errors import error
+from .netlist import from_netlist
 from .results import amplitude, shown, solved
 
 

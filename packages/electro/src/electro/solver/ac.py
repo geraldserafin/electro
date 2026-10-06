@@ -12,10 +12,10 @@ import sympy as sp
 
 from ..circuit.time import TIME
 from ..problem.problem import Problem
-from ..solver import solve as solver
-from ..solver.analysis import DC, DT, Step
-from ..solver.solution import Solution
-from ..solver.system import equations
+from . import solve as solver
+from .analysis import DC, DT, Step
+from .solution import Solution
+from .system import equations
 
 
 @dataclass(frozen=True, init=False)

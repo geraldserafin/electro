@@ -6,11 +6,12 @@ from __future__ import annotations
 import json
 import re
 
-from electro import Circuit, Problem, to_netlist
+from electro import Circuit, Problem
 
 from .errors import CELL, NoCircuitInCode, error
+from .netlist import to_netlist
 
-PRELUDE = "from electro import *"
+PRELUDE = "from electro import *\nfrom electro_notebook.methods import fill, resistance, swept"
 
 
 def variable(name: str) -> str:

@@ -18,17 +18,15 @@ from functools import reduce
 from operator import matmul
 
 import sympy as sp
-
+from electro.circuit.elements import BY_NAME
+from electro.circuit.elements.parts import Part
+from electro.circuit.netlist import labels, point_names
+from electro.circuit.tree import GND, Circuit, Element, Net, Node, netlist
+from electro.circuit.wiring import placed
+from electro.problem.problem import Key, Problem
+from electro.problem.quantities import Across, Current, Parameter, Potential, Power, Quantity, Scaled, Sum, Voltage
+from electro.solver.laws import reading
 from electro.values import UNKNOWN, to_text
-
-from ..circuit.elements import BY_NAME
-from ..circuit.elements.parts import Part
-from ..circuit.netlist import labels
-from ..circuit.tree import GND, Circuit, Element, Net, Node, netlist
-from ..circuit.wiring import placed
-from ..solver.laws import reading
-from .problem import Key, Problem
-from .quantities import Across, Current, Parameter, Potential, Power, Quantity, Scaled, Sum, Voltage
 
 GROUND_NAMES = ("GND", "0")
 
@@ -171,22 +169,6 @@ def quantity_data(q, elements: Mapping[Element, str], points: Mapping[Node | Net
         case Sum(terms):
             return ["sum", [[float(t.factor), quantity_data(t.of, elements, points)] for t in terms]]
     raise TypeError(q)
-
-
-def point_names(net) -> list[str]:
-    """Each point's name: its ``Node``'s or ``Net``'s, else ``n1``, ``n2``…"""
-    named = {n: p.name if isinstance(p, Net) else p.label for n, p in net.named}
-    taken = {x for x in named.values() if x}
-    out, k = [], 0
-    for n in range(net.size):
-        if named.get(n):
-            out.append(named[n])
-            continue
-        k += 1
-        while f"n{k}" in taken:
-            k += 1
-        out.append(f"n{k}")
-    return out
 
 
 def _value(given: object) -> dict:

@@ -3,7 +3,7 @@ from notes other people send (a link, a course), so nothing in them may reach ev
 
 import pytest
 import sympy as sp
-from electro import GND, BadName, I, Node, Problem, Resistor, VoltageSource, from_netlist, solve
+from electro import GND, BadName, I, Node, Problem, Resistor, VoltageSource, solve
 from electro.values import BadExpression, expression
 
 RUN = "__import__('os').system('echo pwned')"
@@ -17,12 +17,6 @@ def test_a_name_that_is_not_a_name_is_refused(name):
     if not name[0].isdigit():  # a point may be called "3", as SPICE calls them
         with pytest.raises(BadName):
             Node(name)
-    loop_ = {"elements": [{"id": name, "kind": "resistor", "nodes": ["GND", "A"]}]}
-    with pytest.raises(BadName):
-        from_netlist(loop_)
-    if not name[0].isdigit():
-        with pytest.raises(BadName):
-            from_netlist({"elements": [{"id": "R_1", "kind": "resistor", "nodes": ["GND", name]}]})
 
 
 def test_names_as_people_write_them_still_work():
