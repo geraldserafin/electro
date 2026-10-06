@@ -12,8 +12,7 @@ from ..problem.quantities import Quantity
 from ..solver.analysis import Analysis
 from ..solver.errors import NotLinear
 from ..solver.laws import is_linear, is_source
-from ..solver.solve import solve
-from .ac import settled
+from .ac import solve
 
 
 @dataclass(frozen=True)
@@ -39,4 +38,4 @@ def _alone(
     problem: Problem, source: Element, sources: list[Element], q: Quantity, analysis: Analysis | None
 ) -> sp.Expr:
     others_off = {o: 0 for o in sources if o is not source}
-    return solve(Problem(problem.circuit, {**problem.given, **others_off}), analysis or settled(problem))(q)
+    return solve(Problem(problem.circuit, {**problem.given, **others_off}), analysis)(q)

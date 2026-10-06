@@ -320,14 +320,13 @@ Przy napięciu sinusoidalnym kondensator i cewka zachowują się jak „opory”
 $$Z_C = \\frac{1}{j\\omega C} \\qquad Z_L = j\\omega L \\qquad \\omega = 2\\pi f$$
 
 Zadanie ze źródłem sinusoidalnym (`SineSource`: amplituda, częstotliwość `f` i faza `phase` w stopniach)
-liczy się metodą **wskazów** — liczb zespolonych: moduł to amplituda, a argument to przesunięcie fazy.
-`settled(zadanie)` mówi, jak układ się ustala: przy sinusach jednej częstotliwości to `AC` przy niej.
+liczy się samo metodą **wskazów** — liczb zespolonych: moduł to amplituda, a argument to przesunięcie fazy.
 """)
     L.code("""
 import cmath, math
 S, R, C, wy = SineSource("S"), Resistor("R"), Capacitor("C"), Node("wy")
 rc = Problem(GND >> S >> R >> wy >> C >> GND, {S: {"": 10, "f": 50}, R: 1000, C: "3.3u"})
-u = complex(solve(rc, settled(rc))(V(wy)))
+u = complex(solve(rc)(V(wy)))
 print(f"amplituda {abs(u):.2f} V, faza {math.degrees(cmath.phase(u)):.1f}°")
 """)
     L.md("""

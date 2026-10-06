@@ -12,12 +12,12 @@
     {
       "id": "76a95afc",
       "type": "markdown",
-      "source": "# Prąd zmienny: wskazy\n\nPrzy napięciu sinusoidalnym kondensator i cewka zachowują się jak „opory” zależne od częstotliwości —\n**impedancje**:\n\n$$Z_C = \\frac{1}{j\\omega C} \\qquad Z_L = j\\omega L \\qquad \\omega = 2\\pi f$$\n\nZadanie ze źródłem sinusoidalnym (`SineSource`: amplituda, częstotliwość `f` i faza `phase` w stopniach)\nliczy się metodą **wskazów** — liczb zespolonych: moduł to amplituda, a argument to przesunięcie fazy.\n`settled(zadanie)` mówi, jak układ się ustala: przy sinusach jednej częstotliwości to `AC` przy niej."
+      "source": "# Prąd zmienny: wskazy\n\nPrzy napięciu sinusoidalnym kondensator i cewka zachowują się jak „opory” zależne od częstotliwości —\n**impedancje**:\n\n$$Z_C = \\frac{1}{j\\omega C} \\qquad Z_L = j\\omega L \\qquad \\omega = 2\\pi f$$\n\nZadanie ze źródłem sinusoidalnym (`SineSource`: amplituda, częstotliwość `f` i faza `phase` w stopniach)\nliczy się samo metodą **wskazów** — liczb zespolonych: moduł to amplituda, a argument to przesunięcie fazy."
     },
     {
       "id": "d4ebe54b",
       "type": "code",
-      "source": "import cmath, math\nS, R, C, wy = SineSource(\"S\"), Resistor(\"R\"), Capacitor(\"C\"), Node(\"wy\")\nrc = Problem(GND >> S >> R >> wy >> C >> GND, {S: {\"\": 10, \"f\": 50}, R: 1000, C: \"3.3u\"})\nu = complex(solve(rc, settled(rc))(V(wy)))\nprint(f\"amplituda {abs(u):.2f} V, faza {math.degrees(cmath.phase(u)):.1f}°\")",
+      "source": "import cmath, math\nS, R, C, wy = SineSource(\"S\"), Resistor(\"R\"), Capacitor(\"C\"), Node(\"wy\")\nrc = Problem(GND >> S >> R >> wy >> C >> GND, {S: {\"\": 10, \"f\": 50}, R: 1000, C: \"3.3u\"})\nu = complex(solve(rc)(V(wy)))\nprint(f\"amplituda {abs(u):.2f} V, faza {math.degrees(cmath.phase(u)):.1f}°\")",
       "outputs": [
         {
           "type": "stream",

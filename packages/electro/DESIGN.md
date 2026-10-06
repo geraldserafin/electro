@@ -1018,7 +1018,7 @@ robi z rysunku kernel. Wszystkie testy symulacji starej biblioteki działają na
 - Sinus w czasie w analizie AC to jego wskaz. AC to klatka jak każda (`methods/ac.py`): każda klatka to
   poprzednia obrócona o ω·dt, dt → 0, więc jω wychodzi z granicy w solverze, nie jest mu podane. Solver nie
   zna AC ani żadnego elementu: co strona czyta z elementu (`Kind.shows`) i tryby pinów płytki
-  (`Kind.modes`) mówi sam rodzaj; `settled(zadanie)` wybiera AC, gdy sinusy mają jedną częstotliwość.
+  (`Kind.modes`) mówi sam rodzaj; domyślną klatkę wybiera publiczne `solve` (`methods/ac.py`): tę po klatkach bez końca, `settled` — DC albo AC.
 
 **Etapy C–F — co wyszło.** Rdzeń jest pakietem `electro` (stare moduły, `electro-schematic`, `electro-render`
 i `electro-notes` usunięte). Strona robi z rysunku netlistę i zadanie jako dane (`schematic/netlist.ts`,

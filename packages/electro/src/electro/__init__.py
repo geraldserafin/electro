@@ -11,7 +11,7 @@ from .circuit.netlist import ElementTwice, JoinsNodes, Netlist
 from .circuit.time import TIME, D, Pre, rising, square, when
 from .circuit.tree import GND, BadName, Circuit, Element, Net, Node, free, is_closed, netlist
 from .circuit.wiring import at, beside, cap, close, cup, flip, loop, parallel, rebuild, series, wire
-from .methods.ac import AC, settled
+from .methods.ac import AC, settled, solve
 from .methods.fill import Filled, fill
 from .methods.response import Response, respond, responses
 from .methods.simplify import Reduction, simplify
@@ -41,7 +41,6 @@ from .solver.laws import is_linear, is_source, reading, stores
 from .solver.port import blackbox, matches
 from .solver.relation import Equation, Origin, Relation, hide, join
 from .solver.solution import Solution, SolutionStep
-from .solver.solve import solve
 from .solver.step import Frame, StepFunction, step_function
 from .solver.system import relation
 

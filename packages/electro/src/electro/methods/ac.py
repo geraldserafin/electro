@@ -12,7 +12,9 @@ import sympy as sp
 
 from ..circuit.time import TIME
 from ..problem.problem import Problem
+from ..solver import solve as solver
 from ..solver.analysis import DC, DT, Step
+from ..solver.solution import Solution
 from ..solver.system import equations
 
 
@@ -61,3 +63,9 @@ def settled(problem: Problem) -> Step:
 def frequencies(law: sp.Expr) -> set[sp.Expr]:
     """The angular frequencies of the sines in time in ``law``."""
     return {sp.diff(e.args[0], TIME) for e in law.atoms(sp.sin, sp.cos) if TIME in e.free_symbols}
+
+
+def solve(problem: Problem, analysis: Step | None = None, before: Solution | None = None) -> Solution:
+    """The solver's frame, by default the one the circuit comes to after frames without end (``settled``):
+    DC, or with sines of one frequency AC at it."""
+    return solver.solve(problem, analysis or settled(problem), before)

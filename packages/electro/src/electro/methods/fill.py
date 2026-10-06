@@ -13,8 +13,7 @@ from ..problem.quantities import Parameter
 from ..solver.analysis import Analysis
 from ..solver.errors import Undetermined
 from ..solver.solution import Solution
-from ..solver.solve import solve
-from .ac import settled
+from .ac import solve
 
 SIMPLEST_FIRST = (Wire, Open, Resistor, VoltageSource, CurrentSource)
 
@@ -31,7 +30,7 @@ def fill(problem: Problem, hole: Element, analysis: Analysis | None = None) -> F
     for kind in SIMPLEST_FIRST:
         filled, by = _filled_with(problem, hole, kind)
         try:
-            solution = solve(filled, analysis or settled(filled))
+            solution = solve(filled, analysis)
         except Undetermined:
             continue
         if _pinned(solution, by):
