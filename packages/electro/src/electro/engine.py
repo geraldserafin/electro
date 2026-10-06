@@ -2,11 +2,13 @@
 JavaScript printed from this very file (``scripts/engine_js.py``, by pscript). ``Machine`` is a circuit in
 time, one function with memory: frame after frame from rest, each step as long as what is remembered
 allows, Newton's method on a frame's equations (compiled from its formula: ``code``), a p-n junction
-approached along its exponential as SPICE does, a linear system solved by elimination.
+approached along its exponential as SPICE does.
 
-A kernel is ``kernel(x, p, F, J)``: it fills ``F`` with the equations' values at the unknowns ``x`` and the
-parameters ``p``, ``J`` (zeroed first) with their derivatives, n × n row by row. An update is
-``update(x, p, out)``: what is remembered after a step into ``out``.
+A frame's equations are a ``System``: their Jacobian sparse, eliminated in an order ``code`` chose once
+(``sparse``). Its entries that the unknowns do not change (a resistor's, a capacitor's C/dt) are worked out
+once a frame and eliminated first, and that is kept while they stay the same: Newton then eliminates only
+what the unknowns move (what a diode's exponential touches); a circuit with none is solved in one go. An
+update is ``update(x, p, out)``: what is remembered after a step into ``out``.
 
 Written for the printing: no imports but ``math``; printed as JavaScript's own operators, so ``+`` and ``*``
 on numbers only, and nothing empty tested as false.
@@ -36,8 +38,8 @@ class Machine:
     it jumps), ``inputs`` (name → parameter), ``junctions`` (unknown, scale, bend) and the unknowns' count
     ``n``. Its memory: the time ``t``, the unknowns ``x``, the parameters ``p``, the next step's length."""
 
-    def __init__(self, program, kernel, update):
-        self.kernel = kernel
+    def __init__(self, program, system, update):
+        self.system = system
         self.update = update
         self.n = program["n"]
         self.states = program["states"]
@@ -83,7 +85,7 @@ class Machine:
         if self.changed:
             x0 = self.guesses.get(self.key(), self.x)
         self.changed = False
-        return newton(self.kernel, x0, self.p, self.junctions)
+        return newton(self.system, x0, self.p, self.junctions)
 
     def advance(self, dt, jump):
         """Try one step of ``dt``: [taken, how much of its allowed move a remembered value used]; ``jump``:
@@ -146,39 +148,158 @@ class Machine:
         self.advance_to(until, dt_max, schedule, on_frame)
 
 
-def newton(kernel, x0, p, junctions):
-    """A root near ``x0``, or None; ``junctions``: each one's unknown, the scale it moves on, where it bends."""
-    n = len(x0)
-    x = [v for v in x0]
-    F = [0.0 for _ in range(n)]
-    J = [0.0 for _ in range(n * n)]
-    for iteration in range(1, MAX_NEWTON + 1):
+class System:
+    """Equations F(x) = 0 over ``n`` unknowns and their Jacobian, sparse. ``jconst(p, A)`` fills the
+    entries the unknowns do not change, ``jdyn(x, p, F, A)`` the residuals and the rest; ``shape`` (from
+    ``sparse.shape``) says where each entry is and how to eliminate them: the pivots in order, the first
+    ``k1`` of them on entries that never change."""
+
+    def __init__(self, shape, jconst, jdyn):
+        self.jconst = jconst
+        self.jdyn = jdyn
+        self.n = shape["n"]
+        self.m = shape["m"]
+        self.rows = shape["rows"]
+        self.cols = shape["cols"]
+        self.constant = shape["constant"]
+        self.linear = shape["linear"]
+        self.pivots = shape["pivots"]
+        self.prow = shape["prow"]
+        self.pcol = shape["pcol"]
+        self.k1 = shape["k1"]
+        self.low = shape["low"]
+        self.low_row = shape["low_row"]
+        self.low_at = shape["low_at"]
+        self.upd = shape["upd"]
+        self.upd_at = shape["upd_at"]
+        self.up = shape["up"]
+        self.up_col = shape["up_col"]
+        self.up_at = shape["up_at"]
+        self.head = shape["head"]
+        self.trail = shape["trail"]
+        self.A = [0.0 for _ in range(self.m)]
+        self.W = [0.0 for _ in range(self.m)]
+        self.D = [0.0 for _ in range(self.m)]
+        self.kept = [0.0 for _ in self.constant]
+        self.fresh = False
+        self.F = [0.0 for _ in range(self.n)]
+        self.dx = [0.0 for _ in range(self.n)]
+        self.dense = [0.0 for _ in range(self.n * self.n)]
+
+    def begin(self, p):
+        """A frame's parameters in: its unchanging entries; what was eliminated of them kept while they are
+        the same."""
+        self.jconst(p, self.A)
+        for k in range(len(self.constant)):
+            v = self.A[self.constant[k]]
+            if v != self.kept[k]:
+                self.kept[k] = v
+                self.fresh = False
+
+    def step(self, x, p):
+        """Newton's step from ``x`` into ``dx``; False: no step (the Jacobian singular)."""
+        self.jdyn(x, p, self.F, self.A)
+        for i in range(self.n):
+            self.F[i] = -self.F[i]
+        if self.factor():
+            self.solve()
+            return True
+        self.fresh = False
+        return self.solve_dense()
+
+    def factor(self):
+        A, W, D = self.A, self.W, self.D
+        if not self.fresh:
+            for pos in self.head:
+                W[pos] = A[pos]
+            for pos in self.trail:
+                D[pos] = 0.0
+            for k in range(self.k1):
+                if not self.pivot(k, True):
+                    return False
+            self.fresh = True
+        for pos in self.trail:
+            W[pos] = A[pos] + D[pos]
+        for k in range(self.k1, self.n):
+            if not self.pivot(k, False):
+                return False
+        return True
+
+    def pivot(self, k, first):
+        """The ``k``-th pivot's column eliminated below it; in the first part, what falls on entries that
+        change kept apart (``D``), to be added to them anew."""
+        W = self.W
+        at = self.pivots[k]
+        top = abs(W[at])
+        big = top
+        for q in range(self.low_at[k], self.low_at[k + 1]):
+            big = max(big, abs(W[self.low[q]]))
+        if top == 0 or top < 1e-13 * big:
+            return False
+        inv = 1.0 / W[at]
+        for q in range(self.low_at[k], self.low_at[k + 1]):
+            W[self.low[q]] *= inv
+        upd = self.upd
+        for q in range(self.upd_at[k], self.upd_at[k + 1], 4):
+            if first and upd[q + 3] == 1:
+                self.D[upd[q]] -= W[upd[q + 1]] * W[upd[q + 2]]
+            else:
+                W[upd[q]] -= W[upd[q + 1]] * W[upd[q + 2]]
+        return True
+
+    def solve(self):
+        W, b, x = self.W, self.F, self.dx
+        for k in range(self.n):
+            v = b[self.prow[k]]
+            for q in range(self.low_at[k], self.low_at[k + 1]):
+                b[self.low_row[q]] -= W[self.low[q]] * v
+        for k in range(self.n - 1, -1, -1):
+            s = b[self.prow[k]]
+            for q in range(self.up_at[k], self.up_at[k + 1]):
+                s -= W[self.up[q]] * x[self.up_col[q]]
+            x[self.pcol[k]] = s / W[self.pivots[k]]
+
+    def solve_dense(self):
+        """When a pivot the order chose is nothing here (a switch open): elimination with partial pivoting."""
+        n, J = self.n, self.dense
         for k in range(n * n):
             J[k] = 0.0
+        for q in range(len(self.rows)):
+            J[self.rows[q] * n + self.cols[q]] += self.A[q]
+        if not solve_linear(J, self.F, n):
+            return False
+        for i in range(n):
+            self.dx[i] = self.F[i]
+        return True
+
+
+def newton(system, x0, p, junctions):
+    """A root near ``x0``, or None; ``junctions``: each one's unknown, the scale it moves on, where it bends.
+    A linear system in one step."""
+    n = len(x0)
+    x = [v for v in x0]
+    system.begin(p)
+    for iteration in range(1, MAX_NEWTON + 1):
         try:
-            kernel(x, p, F, J)
+            if not system.step(x, p):
+                return None
         except OverflowError:
             return None
-        for k in range(n):
-            F[k] = -F[k]
-        if not solve_linear(J, F, n):
-            return None
+        dx = system.dx
         done = True
         for k in range(n):
-            moved = x[k] + F[k]
+            moved = x[k] + dx[k]
             if math.isnan(moved):
                 return None
-            F[k] = moved
+            dx[k] = moved
         for junction in junctions:
             i = junction[0]
-            F[i] = junction_step(F[i], x[i], junction[1], junction[2])
+            dx[i] = junction_step(dx[i], x[i], junction[1], junction[2])
         for k in range(n):
-            if abs(F[k] - x[k]) > RELTOL * max(abs(F[k]), abs(x[k])) + VNTOL:
+            if abs(dx[k] - x[k]) > RELTOL * max(abs(dx[k]), abs(x[k])) + VNTOL:
                 done = False
-        was = x
-        x = F
-        F = was
-        if done and iteration > 1:
+            x[k] = dx[k]
+        if system.linear or (done and iteration > 1):
             return x
     return None
 

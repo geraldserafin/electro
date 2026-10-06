@@ -71,7 +71,8 @@ przypadkami, a `exp` (dioda Shockleya, tranzystor) Newtonem.
 ## Silnik
 
 `engine.py` to cały silnik liczący klatki — zwykły Python, bez importów poza `math`: Newton z
-ograniczaniem złącza jak w SPICE, eliminacja Gaussa, długość kroku. Strona dostaje go jako JavaScript
+ograniczaniem złącza jak w SPICE, rzadka eliminacja w kolejności wybranej przy kompilacji (`sparse.py`;
+część stała liczona raz, Newton tylko na tym, czego dotyka `exp`), długość kroku. Strona dostaje go jako JavaScript
 wydrukowany z tego samego pliku przez pscript (`apps/notebook/scripts/engine_js.py`), więc obie strony
 liczą tak samo. Węzły zostają niewiadomymi Newtona, a to, co się odczytuje (napięcia i prądy elementów),
 liczy się po klatce prostym kodem.
@@ -86,7 +87,7 @@ liczy się po klatce prostym kodem.
 | `formula.py` | wzór klatki obwodu zamkniętego: nazwy, dane, co zostało do rozwiązania |
 | `frame.py`, `time.py` | klatki (`Step`, `DC`, `AC`) i słowa czasu (`D`, `Pre`) |
 | `solve.py`, `by_hand.py` | `final`: klatka rozwiązana algebrą, przypadkami albo Newtonem; `Solution` |
-| `simulate.py`, `code.py`, `engine.py` | Φ skompilowane, przebieg, ślad |
+| `simulate.py`, `code.py`, `sparse.py`, `engine.py` | Φ skompilowane, kolejność eliminacji, przebieg, ślad |
 | `laws.py` | co wynika z praw elementu: źródło, miernik, pamięć |
 | `quantities.py`, `names.py`, `values.py` | wielkości, nazwy, wartości z jednostkami |
 | `parts.py` | części z katalogów |

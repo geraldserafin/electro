@@ -31,4 +31,4 @@ const led = {
   ],
 };
 const live = JSON.parse(kernel.live(JSON.stringify(led)));
-check("live", live.program?.kinds?.LED_1 === "led" && live.program.kernel.includes("limexp"), live);
+check("live", live.program?.kinds?.LED_1 === "led" && live.program.moving.includes("limexp"), live);

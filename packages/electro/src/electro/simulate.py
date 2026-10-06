@@ -33,6 +33,8 @@ from .time import TIME
 G_NODE = 1e-12
 STEP_VOLTS, STEP_AMPS = 0.05, 1e-3
 """How far a remembered voltage (or anything else) may move in one step; a remembered current."""
+SAMPLE_DT = 1e-5
+"""A step's length in the sample frame whose numbers choose the pivots (``sparse``)."""
 SINE_STEPS, EDGE_STEPS = 40, 100
 """Steps at least in a period of a sine, of a square wave."""
 
@@ -106,7 +108,7 @@ class StepFunction:
         """Φ with memory: from rest, frame after frame."""
         program = {"n": len(self.unknowns), "states": self.states, "inputs": self.inputs}
         program |= {"junctions": self.equations.junctions, "initial": self.initial}
-        return Machine(program, self.equations.kernel, self.functions()[0])
+        return Machine(program, self.equations.system, self.functions()[0])
 
     @property
     def rest(self) -> Frame:
@@ -140,7 +142,9 @@ class StepFunction:
                 "states": self.states,
                 "inputs": self.inputs,
                 "junctions": self.equations.junctions,
-                "kernel": self.equations.kernel_body["js"],
+                "constant": self.equations.constant["js"],
+                "moving": self.equations.moving["js"],
+                "shape": self.equations.shape,
                 "update": self.update_body["js"],
                 "seen": list(self.seen),
                 "see": self.see_body["js"],
@@ -193,14 +197,17 @@ def step_function(circuit: Element, values: Mapping) -> StepFunction:
     seen = {name: left.resolve(expr(value)) for name, value in seen.items()}
     _check_square([*exprs, *seen.values()], unknowns, params, len(exprs))
     potentials = [v for v in left.names.to.values() if str(v).startswith("V_")]
-    compiled = compile_equations(exprs, unknowns, params, potentials, currents=[v for _, v, _ in left.definitions])
+    initial = [0.0, 0.0, *(st.initial for st in states), *(value for _, _, value in inputs)]
+    sample = [SAMPLE_DT, 0.0, *initial[2:]]
+    currents = [v for _, v, _ in left.definitions]
+    compiled = compile_equations(exprs, unknowns, params, potentials, currents=currents, sample=sample)
     unknowns = compiled.unknowns
     place = {name: k for k, name in enumerate(seen)}
     return StepFunction(
         circuit=circuit,
         left=left,
         equations=compiled,
-        initial=[0.0, 0.0, *(st.initial for st in states), *(value for _, _, value in inputs)],
+        initial=initial,
         states=[(2 + k, st.most) for k, st in enumerate(states)],
         inputs={letter.name: 2 + len(states) + k for k, (_, letter, _) in enumerate(inputs)},
         update_body=statements([(f"out[{k}]", st.update) for k, st in enumerate(states)], unknowns, params),

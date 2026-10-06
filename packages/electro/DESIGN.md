@@ -85,17 +85,28 @@ liczb wstawiona. W symulacji **nazwane punkty zostają niewiadomymi** (eliminowa
 w drabince wielomian w 1/dt jej długości — liczby, których float nie utrzyma), a to, co się odczytuje
 (napięcia, prądy elementów), liczy się po klatce prostym kodem, nie w Newtonie.
 
-`engine.py` (Newton, Gauss, długość kroku, pamięć wejść) to zwykły Python bez importów poza `math`;
-strona dostaje go jako JavaScript drukowany z tego samego pliku przez pscript (bez przeciążania
+`engine.py` (Newton, rzadka eliminacja, długość kroku, pamięć wejść) to zwykły Python bez importów poza
+`math`; strona dostaje go jako JavaScript drukowany z tego samego pliku przez pscript (bez przeciążania
 operatorów: `PSCRIPT_OVERLOAD = False` w każdej funkcji). Jedno źródło prawdy, bez ręcznego portu.
 
-Pomiar (Node, ten sam wynik; październik 2026), klatek na sekundę:
+Jacobian jest rzadki (drabinka: każdy węzeł ma dwóch sąsiadów). Kolejność eliminacji wybiera raz
+kompilacja (`sparse.py`): Markowitz jak w SPICE (najmniej nowych niezer), pivot nie mniejszy niż 0,1
+największego w kolumnie na liczbach próbnej klatki, a najpierw wiersze i kolumny, których niewiadome nie
+zmieniają (oporniki, C/dt). Silnik (`engine.System`) chodzi tylko po niezerach:
 
-| obwód | stary silnik JS | nowy (Python → JS) | ngspice |
+- część stała jest eliminowana raz i trzymana, dopóki jej liczby te same (`dt` i wejścia bez zmian) —
+  Newton eliminuje tylko to, czego dotyka `exp` (dopełnienie Schura bez wypisywania go);
+- obwód bez `exp` to jeden krok na klatkę, bez drugiego sprawdzającego;
+- pivot, który w tej klatce wyszedł zerem (otwarty przełącznik), cofa do zwykłej eliminacji z wyborem.
+
+Pomiar (Node, ten sam wynik w każdym; październik 2026), klatek na sekundę:
+
+| obwód | pełna eliminacja | rzadka | ngspice |
 |---|---|---|---|
-| dioda + RC | 343 000 | 1 025 000 | 231 000 |
-| drabinka RC × 10 | 23 000 | 368 000 | 252 000 |
-| 555 | 110 000 | 611 000 | — |
+| dioda + RC | 1 249 000 | 2 163 000 | 305 000 |
+| drabinka RC × 10 | 440 000 | 2 560 000 | 390 000 |
+| drabinka RC × 40 | 28 000 | 759 000 | 151 000 |
+| 555 | 548 000 | 1 759 000 | — |
 
 ## 5. Zasady kodu
 

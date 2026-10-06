@@ -1,5 +1,6 @@
-"""A frame's equations as code: what fills their residuals and their Jacobian, printed once — Python here,
-JavaScript for the page — for the engine (``engine``) to run on numbers. Two things help Newton, both read
+"""A frame's equations as code: what fills their residuals and their Jacobian's nonzero entries — those the
+unknowns do not change apart, once a frame — printed once, Python here, JavaScript for the page, and how
+to eliminate them (``sparse``), for the engine (``engine.System``) to run on numbers. Two things help Newton, both read
 off the shape of the laws, never any element's: every exponential grows along its tangent far out, and one
 that is tiny at zero but steep (as a p-n junction's, whatever has one) is approached along it, as SPICE does.
 """
@@ -7,7 +8,7 @@ that is tiny at zero but steep (as a p-n junction's, whatever has one) is approa
 from __future__ import annotations
 
 import math
-from collections.abc import Callable, Sequence
+from collections.abc import Sequence
 from dataclasses import dataclass, field
 from typing import cast
 
@@ -16,12 +17,12 @@ from sympy.printing.jscode import JavascriptCodePrinter
 from sympy.printing.pycode import PythonCodePrinter
 
 from .algebra import expr, subs, symbols_in
-from .engine import limited_exp, limited_exp_slope, newton
+from .engine import System, limited_exp, limited_exp_slope, newton
+from .sparse import shape
 
 Code = dict[str, str]
 """``"py"`` and ``"js"``: the same statements in each."""
 
-Kernel = Callable[[list[float], list[float], list[float], list[float]], None]
 
 JUNCTION = 1e-6
 """An exponential less than this at zero is approached along it."""
@@ -29,23 +30,27 @@ JUNCTION = 1e-6
 
 @dataclass
 class Compiled:
-    """Equations as code over ``unknowns`` and ``params``. ``junctions``: each junction's unknown, the scale
-    it moves on and where it bends."""
+    """Equations as code over ``unknowns`` and ``params``: ``constant`` fills the Jacobian's entries the
+    unknowns do not change, ``moving`` the residuals and the rest; ``shape`` how they are eliminated.
+    ``junctions``: each junction's unknown, the scale it moves on and where it bends."""
 
     unknowns: list[sp.Symbol]
     params: list[sp.Symbol]
-    kernel_body: Code
+    constant: Code
+    moving: Code
+    shape: dict
     junctions: list[tuple[int, float, float]]
-    _kernel: Kernel | None = field(default=None, repr=False)
+    _system: System | None = field(default=None, repr=False)
 
     @property
-    def kernel(self) -> Kernel:
-        if self._kernel is None:
-            self._kernel = cast(Kernel, python(f"def kernel(x, p, F, J):\n{self.kernel_body['py']}\n")["kernel"])
-        return self._kernel
+    def system(self) -> System:
+        if self._system is None:
+            scope = python(f"def jconst(p, A):\n{self.constant['py']}\n\ndef jdyn(x, p, F, A):\n{self.moving['py']}\n")
+            self._system = System(self.shape, scope["jconst"], scope["jdyn"])
+        return self._system
 
     def newton(self, x0: Sequence[float], p: Sequence[float]) -> list[float] | None:
-        return newton(self.kernel, x0, p, self.junctions)
+        return newton(self.system, x0, p, self.junctions)
 
 
 def compile_equations(
@@ -55,18 +60,47 @@ def compile_equations(
     potentials: Sequence[sp.Expr],
     limited: bool = True,
     currents: Sequence[sp.Expr] = (),
+    sample: Sequence[float] | None = None,
 ) -> Compiled:
     """``exprs`` = 0 as code; ``potentials``: the points', to tell a junction's scale; ``currents``: what
     the laws say flows (a junction's own current, before any equation was scaled). ``limited``: every
-    exponential continued by its tangent far out (a model that runs); else exactly the law."""
+    exponential continued by its tangent far out (a model that runs); else exactly the law. ``sample``: the
+    parameters of a frame like those it will run (by default all 1), whose numbers choose the pivots."""
     exprs, unknowns = list(exprs), list(unknowns)
     junctions = _junctions(exprs, unknowns, potentials, limexp if limited else sp.exp, currents)
-    n = len(unknowns)
-    F = sp.Matrix(exprs)
-    J = F.jacobian(unknowns) if n else sp.zeros(0, 0)
-    targets = [(f"F[{i}]", expr(F[i])) for i in range(n)]
-    targets += [(f"J[{i * n + j}]", expr(J[i, j])) for i in range(n) for j in range(n) if J[i, j] != 0]
-    return Compiled(unknowns, list(params), statements(targets, unknowns, params), junctions)
+    place = {u: j for j, u in enumerate(unknowns)}
+    entries, values = [], []
+    for i, e in enumerate(exprs):
+        for u in sorted(symbols_in(e) & set(place), key=lambda u: place[u]):
+            d = expr(sp.diff(e, u))
+            if d != 0:
+                entries.append((i, place[u]))
+                values.append(d)
+    dynamic = [bool(symbols_in(d) & set(place)) for d in values]
+    constant = statements([(f"A[{k}]", d) for k, (d, m) in enumerate(zip(values, dynamic)) if not m], unknowns, params)
+    moving = statements(
+        [(f"F[{i}]", e) for i, e in enumerate(exprs)]
+        + [(f"A[{k}]", d) for k, (d, m) in enumerate(zip(values, dynamic)) if m],
+        unknowns,
+        params,
+    )
+    scope = python(f"def jconst(p, A):\n{constant['py']}\n\ndef jdyn(x, p, F, A):\n{moving['py']}\n")
+    A = [0.0] * len(entries)
+    p = list(sample) if sample is not None else [1.0] * len(params)
+    with _quiet():
+        scope["jconst"](p, A)
+        scope["jdyn"]([0.0] * len(unknowns), p, [0.0] * len(exprs), A)
+    return Compiled(unknowns, list(params), constant, moving, shape(len(unknowns), entries, A, dynamic), junctions)
+
+
+class _quiet:
+    """A sample frame's numbers as they come: what overflows or divides by zero is very large."""
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, kind, err, tb):
+        return kind in (OverflowError, ZeroDivisionError)
 
 
 def python(source: str) -> dict:

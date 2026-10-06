@@ -26,6 +26,6 @@ header = (
     "Exception.prototype = Object.create(Error.prototype);\n"
     "Exception.prototype.__init__ = function (message) { this.message = message; };\n"
 )
-names = ["Machine", "NoConvergence", "newton", "solve_linear", "limited_exp", "limited_exp_slope"]
+names = ["Machine", "System", "NoConvergence", "newton", "solve_linear", "limited_exp", "limited_exp_slope"]
 out.write_text(header + body + f"\nexport {{ {', '.join(names)} }};\n")
 print(f"engine: {out.relative_to(repo)}", file=sys.stderr)

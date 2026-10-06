@@ -3,7 +3,7 @@
 // compiled (sympy wrote its residuals, Jacobian and readings as JavaScript). Here only what the page
 // reads of it: `x` is what is seen of the circuit now (each point's potential, each element's voltage
 // and currents), where `program.nodes`, `parts` and `flows` point.
-import { limited_exp, limited_exp_slope, Machine } from "./engine.gen.js";
+import { limited_exp, limited_exp_slope, Machine, System } from "./engine.gen.js";
 
 /** electro.simulate.StepFunction.to_json() */
 export interface ProgramData {
@@ -13,7 +13,9 @@ export interface ProgramData {
   states: [number, number | null][]; // param index, the most it may change in a step (null: it jumps)
   inputs: Record<string, number>; // name -> param index
   junctions: [number, number, number][]; // unknown index, n·V_T, V_crit
-  kernel: string;
+  constant: string; // fills A with the Jacobian's entries the unknowns do not change
+  moving: string; // fills F with the residuals, A with the rest
+  shape: object; // how they are eliminated (electro/sparse.py)
   update: string;
   seen: string[]; // what is read of a frame, by name ("V_A", "U_R_1", "R_1.a")
   see: string; // fills out with them
@@ -67,7 +69,7 @@ export class Simulation {
     this.n = program.unknowns.length;
     this.machine = new Machine(
       { ...program, n: this.n },
-      compiled(program.kernel, "x, p, F, J"),
+      new System(program.shape, compiled(program.constant, "p, A"), compiled(program.moving, "x, p, F, A")),
       compiled(program.update, "x, p, out"),
     ) as Engine;
     this.see = compiled(program.see, "x, p, out");
