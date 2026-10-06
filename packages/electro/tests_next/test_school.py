@@ -1,0 +1,341 @@
+"""The library's school problems (test_school.py), each again on the prototype (electro), with the
+same numbers."""
+
+from functools import reduce
+from operator import matmul
+
+import pytest
+import sympy as sp
+from electro_next import (
+    AC,
+    CCCS,
+    CCVS,
+    GND,
+    VCCS,
+    VCVS,
+    Ambiguous,
+    Ammeter,
+    Capacitor,
+    Contradiction,
+    Coupled,
+    CurrentSource,
+    I,
+    MissingData,
+    Node,
+    OpAmp,
+    P,
+    Parameter,
+    Resistor,
+    Transformer,
+    U,
+    Undetermined,
+    V,
+    VoltageSource,
+)
+from electro_next.values import parse
+
+
+def test_divider_with_unknown_resistor():
+    e, r1, r2 = (VoltageSource("E"), Resistor("R_1"), Resistor("R_2"))
+    s = (GND >> e >> r1 >> Node() >> r2 >> GND).final({e: 12, r1: 10, I(r1): "0.5"})
+    assert (s(Parameter(r2)), s(U(r2)), -s(P(e))) == (14, 7, 6)
+
+
+def test_givens_in_many_forms():
+    for given in ("500m", "0,5 A"):
+        e, r1, r2 = (VoltageSource("E"), Resistor("R_1"), Resistor("R_2"))
+        assert (GND >> e >> r1 >> Node() >> r2 >> GND).final({e: 12, r1: 10, I(r1): given})(Parameter(r2)) == 14
+    e, r1, r2 = (VoltageSource("E"), Resistor("R_1"), Resistor("R_2"))
+    assert (GND >> e >> r1 >> Node() >> r2 >> GND).final({e: 12, r1: 10, U(r1): 5})(Parameter(r2)) == 14
+
+
+def test_loop():
+    e, r1, r2 = (VoltageSource("E"), Resistor("R_1"), Resistor("R_2"))
+    s = (~(e >> r1 >> r2)).final({e: 12, r1: 4, r2: 2})
+    assert (s(I(r1)), s(U(r2))) == (2, 4)
+
+
+def test_parallel_branch_currents():
+    e, r1, r2 = (VoltageSource("E"), Resistor("R_1"), Resistor("R_2"))
+    a = Node()
+    s = ((GND >> e >> a) @ (a >> r1 >> GND) @ (a >> r2 >> GND)).final({e: 12, r1: 6, r2: 3})
+    assert (s(I(r1)), s(I(r2)), s(I(e))) == (2, 4, 6)
+
+
+def test_shunt_and_named_node():
+    e, r1, r2 = (VoltageSource("E"), Resistor("R_1"), Resistor("R_2"))
+    out = Node("out")
+    s = ((GND >> e >> r1 >> out) @ (out >> r2 >> GND)).final({e: 10, r1: 1000, r2: 4000})
+    assert s(V(out)) == 8
+
+
+def test_symbolic_answer():
+    e, r1, r2 = (VoltageSource("E"), Resistor("R_1"), Resistor("R_2"))
+    s = (GND >> e >> r1 >> Node() >> r2 >> GND).final({e: "E", r1: "R", r2: "R"})
+    assert sp.simplify(s(U(r2)) - sp.Symbol("E") / 2) == 0
+
+
+def _bridge(r2_value):
+    e, r1, r2, r3, r4, a1 = (
+        VoltageSource("E"),
+        Resistor("R_1"),
+        Resistor("R_2"),
+        Resistor("R_3"),
+        Resistor("R_4"),
+        Ammeter(),
+    )
+    a, b, c = (Node("A"), Node("B"), Node("C"))
+    circuit = (GND >> e >> a) @ (a >> r1 >> b) @ (b >> r2 >> GND) @ (a >> r3 >> c) @ (c >> r4 >> GND) @ (b >> a1 >> c)
+    given = {e: 10, r1: 100, r3: 50, r4: 100} | ({r2: r2_value} if r2_value is not None else {I(a1): 0})
+    return (circuit, given, r2, a1)
+
+
+def test_wheatstone_bridge_balanced():
+    circuit, given, _, a1 = _bridge(200)
+    assert circuit.final(given)(I(a1)) == 0
+
+
+def test_wheatstone_bridge_unknown_resistor():
+    circuit, given, r2, _ = _bridge(None)
+    assert circuit.final(given)(Parameter(r2)) == 200
+
+
+def test_inverting_amplifier():
+    e, r1, r2, amp = (VoltageSource("E"), Resistor("R_1"), Resistor("R_2"), OpAmp())
+    x, out = (Node("x"), Node("out"))
+    circuit = (GND >> e >> Node() >> r1 >> x) @ (x >> r2 >> out) @ (amp >> GND @ x @ out)
+    assert circuit.final({e: 1, r1: 1000, r2: 10000})(V(out)) == -10
+
+
+def test_ac_power_is_average():
+    e, r, c = (VoltageSource("E"), Resistor("R"), Capacitor("C"))
+    s = (GND >> e >> r >> Node() >> c >> GND).final({e: 1, r: 1000, c: "1u"}, AC(sp.Integer(1000)))
+    assert s(P(r)) == sp.Rational(1, 4000) and s(P(c)) == 0
+
+
+def test_dc_capacitor_blocks():
+    e, r, c = (VoltageSource("E"), Resistor("R"), Capacitor("C"))
+    s = (GND >> e >> r >> Node() >> c >> GND).final({e: 5, r: 100, c: "1u"})
+    assert (s(I(r)), s(U(c))) == (0, 5)
+
+
+def test_contradiction():
+    e, r = (VoltageSource("E"), Resistor("R"))
+    with pytest.raises(Undetermined, match="contradict"):
+        (~(e >> r)).final({e: 12, r: 10, I(r): 5})
+
+
+def test_contradiction_names_the_clashing_data():
+    e, r = (VoltageSource("E"), Resistor("R"))
+    with pytest.raises(Contradiction) as err:
+        (~(e >> r)).final({e: 12, r: 10, I(r): 5})
+    assert {e, r, I(r)} == set(err.value.data)
+
+
+def test_underdetermined_is_said_when_asked():
+    e, r1, r2 = (VoltageSource("E"), Resistor("R_1"), Resistor("R_2"))
+    s = (GND >> e >> r1 >> Node() >> r2 >> GND).final({e: 12, r1: 10})
+    with pytest.raises(Undetermined):
+        s(Parameter(r2))
+
+
+def test_two_solutions_from_power():
+    e, r1, r2 = (VoltageSource("E"), Resistor("R_1"), Resistor("R_2"))
+    with pytest.raises(Undetermined, match="2 solutions"):
+        (~(e >> r1 >> r2)).final({e: 12, r2: 4, P(r1): 8})
+
+
+def test_two_solutions_are_named():
+    e, r1, r2 = (VoltageSource("E"), Resistor("R_1"), Resistor("R_2"))
+    with pytest.raises(Ambiguous) as err:
+        (~(e >> r1 >> r2)).final({e: 12, r2: 4, P(r1): 8})
+    assert sorted(o[sp.Symbol("R_1")] for o in err.value.options) == [2, 8]
+    e, r1, r2 = (VoltageSource("E"), Resistor("R_1"), Resistor("R_2"))
+    assert (~(e >> r1 >> r2)).final({e: 12, r2: 4, P(r1): 8, U(r1): 2 * U(r2)})(Parameter(r1)) == 8
+
+
+def test_three_sources_as_parallel_branches():
+    e1, e2, j, r1, r2, r3 = (
+        VoltageSource("E_1"),
+        VoltageSource("E_2"),
+        CurrentSource("J"),
+        Resistor("R_1"),
+        Resistor("R_2"),
+        Resistor("R_3"),
+    )
+    top, mid = (Node("TOP"), Node("MID"))
+    circuit = (
+        (GND >> e1 >> Node() >> r1 >> top)
+        @ (GND >> r2 >> top)
+        @ (GND >> r3 >> mid)
+        @ (GND >> j >> mid)
+        @ (top >> e2 >> mid)
+    )
+    values = {e1: 12, e2: 6, j: 1, r1: 2, r2: 4, r3: 6}
+    total = circuit.final(values)(I(r2))
+    assert total == sp.Rational(-18, 11)
+
+
+def _three_unknowns():
+    e1, e2, j, r1, r2, r3 = (
+        VoltageSource("E_1"),
+        VoltageSource("E_2"),
+        CurrentSource("J"),
+        Resistor("R_1"),
+        Resistor("R_2"),
+        Resistor("R_3"),
+    )
+    top, mid = (Node("TOP"), Node("MID"))
+    circuit = (
+        (GND >> e1 >> Node() >> r1 >> top)
+        @ (top >> r2 >> GND)
+        @ (mid >> r3 >> GND)
+        @ (GND >> j >> mid)
+        @ (top >> e2 >> mid)
+    )
+    return (circuit, {e1: 12, r2: 4, j: 1}, (r1, r2, r3, e2))
+
+
+def test_find_several_unknowns():
+    circuit, given, (r1, r2, r3, e2) = _three_unknowns()
+    find = [Parameter(r1), Parameter(r3), Parameter(e2)]
+    answers = circuit.final({**given, I(r1): 2, U(r2): 8, U(r3): 5}).answers(*find)
+    assert list(answers.values()) == [2, 5, -3]
+
+
+def test_missing_data_says_what_would_help():
+    circuit, given, (r1, r2, r3, e2) = _three_unknowns()
+    s = circuit.final({**given, I(r1): 2, U(r2): 8})
+    with pytest.raises(MissingData) as err:
+        s.answers(Parameter(r1), Parameter(r3), Parameter(e2))
+    assert err.value.needed == 1 and U(r3) in err.value.options
+    assert err.value.found == {Parameter(r1): 2}
+
+
+def test_missing_data_counts_redundant_givens_once():
+    circuit, given, (r1, r2, r3, e2) = _three_unknowns()
+    s = circuit.final({**given, U(r2): 8, I(r2): 2})
+    with pytest.raises(MissingData) as err:
+        s.answers(Parameter(r1), Parameter(r3), Parameter(e2))
+    assert err.value.needed == 2
+
+
+def test_unknown_resistor_cannot_be_negative():
+    e, r1, r2 = (VoltageSource("E"), Resistor("R_1"), Resistor("R_2"))
+    with pytest.raises(Contradiction):
+        (GND >> e >> r1 >> Node() >> r2 >> GND).final({e: 12, r1: 10, I(r1): "-0.5"})
+
+
+def test_unknown_source_can_come_out_positive():
+    e, r = (VoltageSource("E"), Resistor("R"))
+    assert (~(e >> r)).final({r: 10, I(r): 5})(Parameter(e)) == 50
+
+
+def test_ammeter_reading_is_a_datum():
+    e, r1, r2, r3, r4, a2 = (VoltageSource("E"), *(Resistor(f"R_{k}") for k in range(1, 5)), Ammeter())
+    a, b, c = (Node("A"), Node("B"), Node("C"))
+    circuit = (GND >> e >> a) @ (a >> r1 >> b) @ (b >> r2 >> c) @ (c >> a2 >> GND) @ (b >> r3 >> Node() >> r4 >> GND)
+    s = circuit.final({r1: 3, r2: 18, r3: 3, r4: 6, I(a2): 2})
+    assert s(Parameter(e)) == 54
+
+
+def test_meter_without_reading_reads_the_result():
+    e, r1, r2, a1 = (VoltageSource("E"), Resistor("R_1"), Resistor("R_2"), Ammeter())
+    s = (~(e >> r1 >> a1 >> r2)).final({e: 12, r1: 4, r2: 2})
+    assert s(I(a1)) == 2
+
+
+def test_vcvs_amplifies_the_voltage_it_senses():
+    e, rin, rout, amp = (VoltageSource("E"), Resistor("R_1"), Resistor("R_2"), VCVS("mu"))
+    inn, out = (Node("in"), Node("out"))
+    s = ((GND >> e >> inn) @ (inn >> rin >> GND) @ (amp >> inn @ GND @ GND @ out) @ (out >> rout >> GND)).final(
+        {e: 2, rin: 1000, rout: 50, "mu": 10}
+    )
+    assert (s(V(out)), s(I(rout)), s(I(e))) == (20, sp.Rational(2, 5), sp.Rational(2, 1000))
+
+
+def test_vccs_is_a_transconductance():
+    e, g, r = (VoltageSource("E"), VCCS("g"), Resistor("R"))
+    inn, out = (Node("in"), Node("out"))
+    s = ((GND >> e >> inn) @ (g >> inn @ GND @ GND @ out) @ (out >> r >> GND)).final({e: 2, "g": "0.5", r: 10})
+    assert s(U(r)) == 10
+
+
+def test_ccvs_and_cccs_sense_the_current_in_series():
+    for kind, gain, want in ((CCVS, 3, 6), (CCCS, 10, 20)):
+        e, r1, src, r2 = (VoltageSource("E"), Resistor("R_1"), kind("k"), Resistor("R_2"))
+        a, b, out = (Node("a"), Node("b"), Node("out"))
+        circuit = (GND >> e >> a) @ (a >> r1 >> b) @ (src >> b @ GND @ GND @ out) @ (out >> r2 >> GND)
+        s = circuit.final({e: 10, r1: 5, "k": gain, r2: 1})
+        assert s(I(e)) == 2 and (s(V(out)) if kind is CCVS else s(I(r2))) == want
+
+
+def test_the_gain_is_found_from_the_data():
+    e, rbe, beta, rc = (VoltageSource("E"), Resistor("R_1"), CCCS("beta"), Resistor("R_2"))
+    inn, b, c = (Node("in"), Node("b"), Node("c"))
+    circuit = (GND >> e >> inn) @ (inn >> rbe >> b) @ (beta >> b @ GND @ GND @ c) @ (c >> rc >> GND)
+    s = circuit.final({e: "10m", rbe: 1000, rc: 2000, U(rc): 2})
+    assert s(Parameter(beta)) == 100
+
+
+def test_ideal_transformer_steps_down():
+    e, tr, r = (VoltageSource("E"), Transformer("n"), Resistor("R"))
+    a, b = (Node("A"), Node("B"))
+    s = ((GND >> e >> a) @ (tr >> a @ GND @ GND @ b) @ (b >> r >> GND)).final(
+        {e: 10, "n": 2, r: 10}, AC(sp.Integer(100))
+    )
+    assert (s(U(r)), s(I(r))) == (5, sp.Rational(1, 2))
+    assert complex(s(I(tr, "p1"))) == pytest.approx(0.25, abs=1e-06)
+    e, r1, tr = (VoltageSource("E"), Resistor("R"), Transformer("n"))
+    s_, a = (Node("S"), Node("A"))
+    assert ((GND >> e >> s_) @ (s_ >> r1 >> a) @ (tr >> a @ GND @ Node() @ GND)).final({e: 10, r1: 5, "n": 2})(
+        I(r1)
+    ) == 2
+
+
+def test_coupled_inductors():
+    e, r, m, rl = (VoltageSource("E"), Resistor("R"), Coupled("M"), Resistor("R_L"))
+    a, b, c = (Node("A"), Node("B"), Node("C"))
+    circuit = (GND >> e >> a) @ (a >> r >> b) @ (m >> b @ GND @ GND @ c) @ (c >> rl >> GND)
+    s = circuit.final({e: 1, r: 1, m: {"": "1m", "L1": "2m", "L2": "3m"}, rl: "1G"}, AC(sp.Integer(1000)))
+    i1 = complex(s(I(m, "p1")))
+    assert i1 == pytest.approx(1 / (1 + 2j), rel=1e-06) and complex(s(V(c))) == pytest.approx(1j * i1, rel=1e-06)
+
+
+def _three_phase(loads):
+    """Three sources from a neutral, 120° apart — nothing of its own: three elements composed (F13)."""
+    sources = [VoltageSource(f"E_{k}") for k in (1, 2, 3)]
+    lines = [Node(f"L{k}") for k in (1, 2, 3)]
+    given = {e: f"230∠{a}" for e, a in zip(sources, (0, -120, 120), strict=True)}
+    return (reduce(matmul, (GND >> e >> line for e, line in zip(sources, lines, strict=True))), lines, sources, given)
+
+
+def test_three_phase_star_and_delta():
+    r = [Resistor(f"R_{k}") for k in (1, 2, 3)]
+    supply, lines, sources, given = _three_phase(r)
+    star = Node("S")
+    s = (
+        supply
+        @ reduce(matmul, (line >> x >> star for line, x in zip(lines, r, strict=True)))
+        @ (star >> Resistor("R_n") >> GND)
+    ).final({**given, **dict.fromkeys(r, 10), "R_n": 1}, AC(sp.Integer(314)))
+    assert sp.simplify(s(V(star))) == 0
+    r = [Resistor(f"R_{k}") for k in (1, 2, 3)]
+    supply, lines, sources, given = _three_phase(r)
+    star = Node("S")
+    s = (supply @ reduce(matmul, (line >> x >> star for line, x in zip(lines, r, strict=True)))).final(
+        {**given, **dict(zip(r, (10, 20, 30), strict=True))}, AC(sp.Integer(314))
+    )
+    assert abs(complex(s(V(star)))) > 1
+    r = [Resistor(f"R_{k}") for k in (1, 2, 3)]
+    supply, (l1, l2, l3), sources, given = _three_phase(r)
+    delta = (l1 >> r[0] >> l2) @ (l2 >> r[1] >> l3) @ (l3 >> r[2] >> l1)
+    s = (supply @ delta).final({**given, **dict.fromkeys(r, 10)}, AC(sp.Integer(314)))
+    assert sp.simplify(sp.expand(s(U(r[0])) - 230 * sp.sqrt(3) * sp.exp(sp.I * sp.pi / 6), complex=True)) == 0
+
+
+def test_phasor_strings():
+    assert parse("230∠-120") == -115 - 115 * sp.sqrt(3) * sp.I
+    e, r = (VoltageSource("E"), Resistor("R"))
+    s = (~(e >> r)).final({e: "10∠90", r: 1}, AC(sp.Integer(1)))
+    assert s(I(r)) == 10 * sp.I

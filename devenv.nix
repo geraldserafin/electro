@@ -33,6 +33,7 @@ in
     package = pkgs.python3.withPackages (p: [
       p.sympy
       p.pytest
+      p.pscript # the simulation's engine, written in Python, printed as JavaScript for the page
     ]);
   };
 
