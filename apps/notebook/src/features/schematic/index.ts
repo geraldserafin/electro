@@ -1,5 +1,6 @@
 export { Adjusters, isAdjustable } from "./Adjusters";
 export { BoardButton, BoardIsland, board, islandButton } from "./Board";
+export { codeOf, shapeOf, variable, writeCode } from "./code";
 export type { ProbeTarget } from "./Editor";
 export { SchematicEditor } from "./Editor";
 export { useKinds } from "./kinds";

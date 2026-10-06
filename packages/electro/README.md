@@ -85,7 +85,6 @@ AC(ω))` przy danej częstotliwości. W czasie: `simulate(zadanie, until=…, dt
 | `methods/` | metody nad solverem, bez nowych praw |
 | `simulation/` | program kroku w czasie, przebieg, wejścia |
 | `report/` | kroki i problemy jako dane, LaTeX |
-| `code/` | zadanie jako kod (`>>` i `\|`, gdzie się da) i jego struktura |
 | `values.py` | liczby z jednostkami i przedrostkami, wyrażenia bez `eval` |
 
 Projekt i decyzje: [`DESIGN.md`](DESIGN.md). Testy: `devenv shell`, potem `pytest` w katalogu głównym repo.

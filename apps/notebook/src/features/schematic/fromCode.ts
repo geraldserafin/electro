@@ -1,15 +1,15 @@
-// The code view edited back into a drawing: what the kernel made of the code (its problem as data, and
-// the series and parallel it is made of) laid out — or, when only values changed, the drawing as it was
-// with the new values (its own layout kept).
+// The code view edited back into a drawing: what the kernel made of the code (its problem as data) laid
+// out by the series and parallel it is made of — or, when only values changed, the drawing as it was with
+// the new values (its own layout kept).
 import type { Failure } from "@/shared/model/issues";
 import type { SchematicData, SymbolLibrary } from "@/shared/model/types";
-import { CannotLayOut, layout, type Shape } from "./layout";
+import { shapeOf } from "./code";
+import { CannotLayOut, layout } from "./layout";
 import { waveText } from "./model";
 import { elementsOf, type NetlistElement } from "./problem";
 
 export interface FromCode {
   netlist: { elements: NetlistElement[] };
-  shape: Shape | null;
 }
 
 const READINGS: Record<string, string> = { potentiometer: "position", photoresistor: "lux", thermistor: "temperature" };
@@ -59,9 +59,10 @@ export function drawingFromCode(
     return { schematic: { ...old, elements } };
   }
   const cause = { type: "CannotLayOut" as const, circuit: "" };
-  if (!back.shape) return { error: { data: "OnlyValuesInCode", issue: { type: "OnlyValuesInCode", cause } } };
+  const shape = shapeOf(fresh);
+  if (!shape) return { error: { data: "OnlyValuesInCode", issue: { type: "OnlyValuesInCode", cause } } };
   try {
-    return { schematic: layout(back.shape, fresh, textOf) };
+    return { schematic: layout(shape, fresh, textOf) };
   } catch (error) {
     if (error instanceof CannotLayOut)
       return { error: { data: "OnlyValuesInCode", issue: { type: "OnlyValuesInCode", cause } } };

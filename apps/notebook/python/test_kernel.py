@@ -25,7 +25,7 @@ def test_rich_outputs():
     kernel.reset()
     run(LOOP)
     [drawn] = run("schematic(c, sol)")
-    assert drawn["type"] == "schematic" and drawn["shape"]["loop"][0] == {"element": "E", "flip": False}
+    assert drawn["type"] == "schematic" and drawn["netlist"]["elements"][0]["id"] == "E"
     assert drawn["results"]["R_2"]["value"] == "14 Ω" and drawn["results"]["R_2"]["solved"]
     [shown] = run("steps(sol)")
     assert shown["type"] == "solution" and shown["data"]["answer"] == [r"R_{2} = 14\,\mathrm{\Omega}"]
@@ -62,16 +62,6 @@ def test_schematic_cells_are_available_by_name():
         "name": "inny",
         "available": ["petla"],
     }
-
-
-def test_code_of_a_drawing():
-    drawing = _loop(("E_1", "voltage_source", "12"), ("R_1", "resistor", "4"))
-    assert kernel.code(drawing, "petla").splitlines() == [
-        'E_1 = VoltageSource("E_1")',
-        'R_1 = Resistor("R_1")',
-        "petla = Problem(loop(E_1, R_1), {E_1: 12, R_1: 4})",
-    ]
-    assert "\nnienazwa = " in kernel.code(drawing, "nie nazwa")
 
 
 def test_a_spice_netlist_in_the_code_view():
@@ -120,12 +110,11 @@ def test_sweep_and_spread_of_a_drawing():
     assert json.loads(kernel.sweep_plot(unknown, "R_2"))["error"]["issue"]["type"] == "NoSweepRange"
 
 
-def test_code_view_round_trip():
-    drawing = _loop(("E_1", "voltage_source", "12"), ("R_1", "resistor", "4"), ("C_1", "capacitor", "1u"))
-    source = kernel.code(drawing, "uklad").replace("R_1: 4", "R_1: 6")
-    back = json.loads(kernel.from_code(source, "uklad"))
-    assert kernel.code(json.dumps(back["netlist"]), "uklad") == source
-    assert [p["element"] for p in back["shape"]["loop"]] == ["E_1", "R_1", "C_1"]
+def test_code_view_read_back():
+    # as the page writes it (schematic/code.ts), a value edited
+    source = 'E_1 = VoltageSource("E_1")\nR_1 = Resistor("R_1")\nuklad = Problem(loop(E_1, R_1), {E_1: 12, R_1: 6})'
+    elements = json.loads(kernel.from_code(source, "uklad"))["netlist"]["elements"]
+    assert [(e["id"], e["value"]) for e in elements] == [("E_1", "12"), ("R_1", "6")]
     # no variable called like the schematic: the last circuit the code defines
     assert "netlist" in json.loads(kernel.from_code('a = Resistor("R")\nb = loop(VoltageSource("E"), a)', "x"))
 
@@ -153,7 +142,6 @@ def test_a_schematic_is_a_variable_named_after_it():
     )
     assert out == [{"type": "markdown", "data": "$\\displaystyle 6$"}]
     assert run("układ1", **{"Układ 1": drawing})[0]["type"] == "schematic"
-    assert "\nukład1 = " in kernel.code(_loop(("E_1", "voltage_source", "12")), "Układ 1")
 
 
 def test_the_ais_solve_tool_on_a_drawing():

@@ -18,7 +18,7 @@ sol = solve(c)
 sol(Parameter(R_2))`);
 check("solver", out[0]?.data === "$\\displaystyle 14$", out);
 out = run("schematic(c, sol)");
-check("schematic", out[0]?.type === "schematic" && out[0].shape?.loop?.length === 3, out);
+check("schematic", out[0]?.type === "schematic" && out[0].netlist?.elements?.length === 3, out);
 out = run('bode(Problem(GND >> E >> R_1 >> Node("A") >> (C := Capacitor("C")) >> GND, {E: 1, R_1: 1000, C: 1e-6}))');
 check("bode", out[0]?.type === "plot" && out[0].bode?.cutoffs?.length === 1, out);
 out = run("steps(sol)");

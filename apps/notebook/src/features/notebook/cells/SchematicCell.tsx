@@ -18,6 +18,8 @@ import {
   PdfDrawing,
   SchematicEditor,
   updateElement,
+  variable,
+  writeCode,
 } from "@/features/schematic";
 import {
   carriesFiles,
@@ -53,7 +55,7 @@ import {
   type Side,
   split,
 } from "./layout";
-import { variableName } from "./NameBox";
+
 import { DataTab, FoundTab } from "./Problem";
 import { Problems } from "./Problems";
 
@@ -143,7 +145,7 @@ function Tab({
           }}
         />
         <small className="pr-1.5 text-[11px] text-faint">
-          {t("schematic.inCode")} <code className="font-mono text-fg">{variableName(draft)}</code>
+          {t("schematic.inCode")} <code className="font-mono text-fg">{variable(draft)}</code>
         </small>
       </span>
     );
@@ -296,7 +298,7 @@ export function SchematicCell({
 
   const files = ["board", "circuit", ...arduinos.map((e) => e.id)];
   const labelOf = (id: string) =>
-    id === "board" ? cell.name : id === "circuit" ? `${variableName(cell.name)}.py` : `${id}.ino`;
+    id === "board" ? cell.name : id === "circuit" ? `${variable(cell.name)}.py` : `${id}.ino`;
   const iconOf = (id: string) => (id === "board" ? <SchematicIcon /> : <CodeIcon />);
   // the layout is this browser's, kept per cell (a reload keeps it); the file keeps what shows first
   const kept = `electro.layout.${cell.id}`;
@@ -405,9 +407,9 @@ export function SchematicCell({
 
   // ------------------------------------------------------------------ the circuit's code
 
-  const load = async () => {
+  const load = () => {
     if (source !== null && writtenFor.current === cell.schematic) return;
-    const code = await kernel.code(cell.schematic, cell.name);
+    const code = writeCode(cell.schematic, library, cell.name);
     writtenFor.current = cell.schematic;
     setSource(code);
     setGenerated(code);
@@ -433,7 +435,11 @@ export function SchematicCell({
   // nothing typed is waiting; what is typed goes to the drawing a moment after the typing stops
   useEffect(() => {
     if (circuitShown && (source === null || source === generated))
-      kernel.ready.then(load).catch((e) => setError({ data: String(e) }));
+      try {
+        load();
+      } catch (e) {
+        setError({ data: String(e) });
+      }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [circuitShown, cell.schematic]);
   useEffect(() => {
@@ -894,7 +900,7 @@ export function SchematicCell({
                         }
                         title={
                           id === "board" && g.active === id
-                            ? t("schematic.nameTitle", { variable: variableName(cell.name) })
+                            ? t("schematic.nameTitle", { variable: variable(cell.name) })
                             : undefined
                         }
                         name={id === "board" ? cell.name : undefined}

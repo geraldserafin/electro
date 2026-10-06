@@ -16,7 +16,6 @@ import warnings
 
 import sympy as sp
 from electro import Circuit, Problem, Solution, Trace, from_netlist, to_netlist
-from electro.code.structure import shape, to_data
 from electro.problem.names import name_of, named, naming
 from electro.problem.quantities import Quantity
 from electro.report.steps import steps as steps_data
@@ -56,8 +55,7 @@ def steps(solution: Solution) -> Shown:
 def schematic(what: Problem | Circuit, solution: Solution | None = None) -> Shown:
     """A circuit as a drawing (laid out by the page); with ``solution``, each element's values on it."""
     problem = what if isinstance(what, Problem) else Problem(what)
-    laid = shape(problem)
-    out: dict = {"type": "schematic", "netlist": to_netlist(problem), "shape": to_data(laid) if laid else None}
+    out: dict = {"type": "schematic", "netlist": to_netlist(problem)}
     if solution is not None:
         elements, _ = naming(problem.circuit)
         by_unit = _units_of(problem)

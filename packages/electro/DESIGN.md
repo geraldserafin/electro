@@ -1020,7 +1020,7 @@ robi z rysunku kernel. Wszystkie testy symulacji starej biblioteki działają na
 
 **Etapy C–F — co wyszło.** Rdzeń jest pakietem `electro` (stare moduły, `electro-schematic`, `electro-render`
 i `electro-notes` usunięte). Strona robi z rysunku netlistę i zadanie jako dane (`schematic/netlist.ts`,
-`problem.ts`), układa obwód z kodu (`layout.ts` ze struktury `code/structure.py`), rysuje schematy
+`problem.ts`), układa obwód z kodu (`layout.ts` ze struktury z `code.ts`), pisze kod rysunku (`code.ts`), rysuje schematy
 (`Drawing`, `picture.tsx`) i wykresy z serii liczb (`plots/svg.ts`), czyta obwód z danych i obrazka AI
 (`fromDrawing.ts`). Kernel notatnika jest cienki (`electro_notebook`: komórki, przyciski schematu, widok
 kodu, narzędzie AI, zadania) i oddaje tylko dane. Kursy pisze Python jako dane, a uruchamia i sprawdza je

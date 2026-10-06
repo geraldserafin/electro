@@ -12,7 +12,6 @@ const PYODIDE = "https://cdn.jsdelivr.net/pyodide/v314.0.7/full/";
 type Request =
   | { id: number; type: "init"; bundleUrl: string }
   | { id: number; type: "run"; code: string; problems: string; units: string }
-  | { id: number; type: "code"; problem: string; name: string }
   | { id: number; type: "fromCode"; source: string; name: string }
   | { id: number; type: "solve"; problem: string }
   | { id: number; type: "live"; problem: string }
@@ -24,7 +23,6 @@ type Request =
 
 interface Kernel {
   run(code: string, problems: string, units: string): string;
-  code(problem: string, name: string): string;
   from_code(source: string, name: string): string;
   solve(problem: string): string;
   live(problem: string): string;
@@ -85,23 +83,21 @@ self.onmessage = async (event: MessageEvent<Request>) => {
     const result =
       request.type === "run"
         ? k.run(request.code, request.problems, request.units)
-        : request.type === "code"
-          ? k.code(request.problem, request.name)
-          : request.type === "fromCode"
-            ? k.from_code(request.source, request.name)
-            : request.type === "solve"
-              ? k.solve(request.problem)
-              : request.type === "live"
-                ? k.live(request.problem)
-                : request.type === "frequency"
-                  ? k.frequency(request.problem)
-                  : request.type === "sweep"
-                    ? k.sweep_plot(request.problem, request.element, request.lo, request.hi)
-                    : request.type === "spread"
-                      ? k.spread(request.problem, request.tol)
-                      : request.type === "taskValues"
-                        ? k.task_values(request.problem, request.steps)
-                        : (k.reset(), null);
+        : request.type === "fromCode"
+          ? k.from_code(request.source, request.name)
+          : request.type === "solve"
+            ? k.solve(request.problem)
+            : request.type === "live"
+              ? k.live(request.problem)
+              : request.type === "frequency"
+                ? k.frequency(request.problem)
+                : request.type === "sweep"
+                  ? k.sweep_plot(request.problem, request.element, request.lo, request.hi)
+                  : request.type === "spread"
+                    ? k.spread(request.problem, request.tol)
+                    : request.type === "taskValues"
+                      ? k.task_values(request.problem, request.steps)
+                      : (k.reset(), null);
     self.postMessage({ id: request.id, ok: true, result });
   } catch (error) {
     self.postMessage({ id: request.id, ok: false, error: String(error) });

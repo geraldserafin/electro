@@ -54,11 +54,6 @@ class Kernel {
     return shown(JSON.parse(text), libraryFor(standard));
   }
 
-  /** The drawing as electro code (`>>`/`|` where it is made of them, else each element at its points). */
-  async code(schematic: SchematicData, name: string): Promise<string> {
-    return (await this.call("code", { problem: this.problem(schematic), name })) as string;
-  }
-
   /** Code edited in a schematic's code view, laid out back into a drawing (or the error in it). */
   async fromCode(
     source: string,

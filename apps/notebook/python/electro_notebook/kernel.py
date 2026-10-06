@@ -5,10 +5,9 @@ language by the page."""
 from .ai import task_values
 from .board import frequency, live, solve, spread, sweep_plot
 from .cells import reset, run
-from .code_view import code, from_code, variable
+from .code_view import from_code, variable
 
 __all__ = [
-    "code",
     "frequency",
     "from_code",
     "live",

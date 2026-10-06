@@ -9,8 +9,9 @@ import {
   type TraceData,
   traceSvg,
 } from "@/features/plots/svg";
+import { shapeOf } from "@/features/schematic/code";
 import { textOf } from "@/features/schematic/fromCode";
-import { CannotLayOut, layout, type Shape } from "@/features/schematic/layout";
+import { CannotLayOut, layout } from "@/features/schematic/layout";
 import { KINDS, type KindInfo } from "@/features/schematic/model";
 import { pictureOf } from "@/features/schematic/picture";
 import { type NetlistElement, problemOf } from "@/features/schematic/problem";
@@ -22,7 +23,6 @@ export type Shown =
   | {
       type: "schematic";
       netlist: { elements: NetlistElement[] };
-      shape: Shape | null;
       results?: Record<string, ElementResult>;
     }
   | { type: "plot"; trace?: TraceData; bode?: BodeData; histogram?: HistogramData };
@@ -53,8 +53,9 @@ async function one(o: Shown, lib: SymbolLibrary): Promise<Output> {
   }
   if (o.type !== "schematic") return o;
   const elements = o.netlist.elements;
+  const shape = shapeOf(elements);
   try {
-    if (o.shape) return { type: "svg", data: await pictureOf(layout(o.shape, elements, textOf), lib, o.results) };
+    if (shape) return { type: "svg", data: await pictureOf(layout(shape, elements, textOf), lib, o.results) };
   } catch (error) {
     if (!(error instanceof CannotLayOut)) throw error;
   }

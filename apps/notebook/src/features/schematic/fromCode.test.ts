@@ -2,9 +2,10 @@
 // it was when only values changed. The `FromCode`s are what the kernel's ``from_code`` returns for them.
 import { expect, it } from "vitest";
 import type { SchematicData } from "@/shared/model/types";
+import { shapeOf } from "./code";
 import golden from "./fixtures/netlists.json";
 import { drawingFromCode, type FromCode, textOf } from "./fromCode";
-import { layout } from "./layout";
+import { layout, type Shape } from "./layout";
 import { library } from "./library";
 import { elementsOf } from "./problem";
 
@@ -17,19 +18,21 @@ const rc: FromCode = {
       { id: "C_1", kind: "capacitor", nodes: ["A", "n2"], value: "1µ" },
     ],
   },
-  shape: {
-    loop: [
-      { element: "E_1", flip: false },
-      { element: "R_1", flip: false },
-      { node: "A" },
-      {
-        parallel: [
-          { element: "R_2", flip: false },
-          { element: "C_1", flip: false },
-        ],
-      },
-    ],
-  },
+};
+
+/** The series and parallel ``rc`` is made of: a loop from its source, R_2 and C_1 side by side. */
+const shape: Shape = {
+  loop: [
+    { element: "E_1", flip: false },
+    { element: "R_1", flip: false },
+    { node: "A" },
+    {
+      parallel: [
+        { element: "R_2", flip: false },
+        { element: "C_1", flip: false },
+      ],
+    },
+  ],
 };
 
 const cases = golden as unknown as Record<string, { schematic: SchematicData }>;
@@ -43,8 +46,12 @@ function circuit(elements: { id: string; kind: string; nodes: string[] }[]): str
     .map((e) => `${e.id} ${e.kind} ${e.nodes.map(point).join(" ")}`);
 }
 
+it("finds the series and parallel a circuit is made of", () => {
+  expect(shapeOf(rc.netlist.elements)).toEqual(shape);
+});
+
 it("lays out a circuit read from code: the same elements on the same points", () => {
-  const drawn = layout(rc.shape!, rc.netlist.elements, textOf);
+  const drawn = layout(shape, rc.netlist.elements, textOf);
   const read = elementsOf(drawn, library).elements;
   expect(circuit(read)).toEqual(circuit(rc.netlist.elements));
   expect(read.find((e) => e.id === "C_1")?.value).toBe("1µ");
@@ -53,7 +60,7 @@ it("lays out a circuit read from code: the same elements on the same points", ()
 it("keeps the drawing when only values change", () => {
   const old = cases.bridge.schematic;
   const elements = elementsOf(old, library).elements.map((e) => (e.id === "R_1" ? { ...e, value: "150" } : e));
-  const back = drawingFromCode({ netlist: { elements }, shape: null }, old, library);
+  const back = drawingFromCode({ netlist: { elements } }, old, library);
   if (!("schematic" in back)) throw new Error(JSON.stringify(back));
   expect(back.schematic.elements.map((e) => e.at)).toEqual(old.elements.map((e) => e.at));
   expect(back.schematic.elements.find((e) => e.id === "R_1")?.value).toBe("150");
@@ -62,7 +69,7 @@ it("keeps the drawing when only values change", () => {
 it("a new element with no layout: only values can change in code", () => {
   const old = cases.bridge.schematic;
   const grown = [...elementsOf(old, library).elements, { id: "R9", kind: "resistor", nodes: ["GND", "GND"] }];
-  const back = drawingFromCode({ netlist: { elements: grown }, shape: null }, old, library);
+  const back = drawingFromCode({ netlist: { elements: grown } }, old, library);
   expect("error" in back && back.error.issue?.type).toBe("OnlyValuesInCode");
 });
 
