@@ -3,7 +3,7 @@ from notes other people send (a link, a course), so nothing in them may reach ev
 
 import pytest
 import sympy as sp
-from electro import GND, BadName, I, Node, Problem, Resistor, VoltageSource, from_netlist, from_spice, solve
+from electro import GND, BadName, I, Node, Problem, Resistor, VoltageSource, from_netlist, solve
 from electro.values import BadExpression, expression
 
 RUN = "__import__('os').system('echo pwned')"
@@ -23,11 +23,6 @@ def test_a_name_that_is_not_a_name_is_refused(name):
     if not name[0].isdigit():
         with pytest.raises(BadName):
             from_netlist({"elements": [{"id": "R_1", "kind": "resistor", "nodes": ["GND", name]}]})
-
-
-def test_a_spice_netlist_names_nothing_but_names():
-    with pytest.raises(BadName):
-        from_spice(f"* x\nR1+{RUN} a 0 1k\n")
 
 
 def test_names_as_people_write_them_still_work():

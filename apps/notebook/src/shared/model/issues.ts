@@ -56,7 +56,6 @@ export type Issue =
   | { type: "WrongNodeCount"; part: string; terminals: number; nodes: string[] }
   | { type: "UnknownKind"; kind: string; available: string[] }
   | { type: "UnknownPart"; part: string }
-  | { type: "NoSpice"; element: string }
   // in time (electro.simulation)
   | { type: "NotSimulated" | "ValueNeeded"; label: Tex }
   | { type: "NoConvergence"; time: number }

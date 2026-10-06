@@ -58,7 +58,6 @@ export const pl = {
     NoConvergence:
       "Symulacja utknęła w chwili t = {{time}} s: nawet w bardzo małych krokach nie da się znaleźć stanu obwodu.",
     NoSuchInput: "Nic w obwodzie nie nazywa się {{name}}. Można ustawiać: {{available}}.",
-    NoSpice: "{{element}} nie ma odpowiednika w SPICE (albo nie ma liczbowej wartości).",
     CannotLayOut:
       "Nie umiem jeszcze ułożyć {{circuit}}. Obsługiwane są: elementy dwuzaciskowe, +, |, shunt, transpose, ~ (zamknięcie), node, ground, wire. Resztę narysuj na siatce.",
     UnknownKind: "Nieznany rodzaj elementu {{kind}}. Dostępne: {{available}}.",
@@ -135,7 +134,6 @@ export const en: typeof pl = {
     NoConvergence:
       "The simulation got stuck at t = {{time}} s: even in tiny steps the circuit's state cannot be found.",
     NoSuchInput: "Nothing in the circuit is called {{name}}. What can be set: {{available}}.",
-    NoSpice: "{{element}} has no SPICE counterpart (or no number for its value).",
     CannotLayOut:
       "{{circuit}} cannot be laid out yet. Supported: two-terminal elements, +, |, shunt, transpose, ~ (closing), node, ground, wire. Draw the rest on the grid.",
     UnknownKind: "Unknown element kind {{kind}}. Available: {{available}}.",

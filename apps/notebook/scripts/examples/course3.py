@@ -513,8 +513,7 @@ schematic(zadanie, solve(zadanie))
 ## Widok kodu
 
 Karta **Kod** w komórce schematu pokazuje rysunek jako kod — taki jak w tych lekcjach — a po zmianie kodu
-rysuje go z powrotem. Gdy zmieniasz tylko wartości, rysunek zostaje, jaki był. Działa też netlista SPICE:
-wklej `uklad = from_spice(\"\"\"...\"\"\")` (z LTspice: *View → SPICE Netlist*).
+rysuje go z powrotem. Gdy zmieniasz tylko wartości, rysunek zostaje, jaki był.
 """)
     L.save()
 
@@ -606,15 +605,6 @@ w tych granicach i pokazuje, jak bardzo rozrzuca się wynik:
 """)
     L.code("""
 spread(dzielnik, "V_A", tol=0.05)
-""")
-    L.md("""
-## SPICE
-
-`to_spice()` zapisuje zadanie jako netlistę dla ngspice albo LTspice, a `from_spice()` wczytuje netlistę
-(w LTspice: *View → SPICE Netlist*).
-""")
-    L.code("""
-print(to_spice(filtr))
 """)
     L.md("""
 ## Zadania do sprawdzenia

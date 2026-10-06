@@ -22,7 +22,6 @@ from .methods.two_points import Thevenin, between, resistance, thevenin
 from .problem.netlist import from_netlist, to_netlist
 from .problem.problem import NoSuchParameter, NotClosed, Problem
 from .problem.quantities import Across, Current, I, P, Parameter, Potential, Power, U, V, Voltage
-from .problem.spice import NoSpice, from_spice, to_spice
 from .simulation.errors import NoConvergence, NoSuchInput
 from .simulation.simulate import simulate
 from .simulation.trace import Trace
@@ -137,9 +136,6 @@ __all__ = [
     "thevenin",
     "spreads",
     "to_netlist",
-    "from_spice",
-    "to_spice",
-    "NoSpice",
     "tolerance",
     "two_terminal",
     "when",

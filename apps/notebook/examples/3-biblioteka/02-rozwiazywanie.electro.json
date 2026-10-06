@@ -61,36 +61,57 @@
             "steps": [
               {
                 "type": "FormulaStep",
-                "chain": "I_{R_{2}} = I_{A_{1}} = 2\\,\\mathrm{A}",
+                "chain": "E = 54\\,\\mathrm{V}",
                 "reason": {
-                  "type": "KirchhoffCurrent",
-                  "node": "n2"
+                  "type": "OhmsLaw",
+                  "label": "R_{1}"
                 }
               },
               {
-                "type": "SystemStep",
-                "equations": [
-                  "E + V_{4} = 0",
-                  "- 3 \\cdot I_{R_{1}} - V_{2} = 0",
-                  "V_{2} - 18 \\cdot I_{R_{2}} - V_{1} = 0",
-                  "V_{1} - V_{4} = 0",
-                  "V_{2} - 3 \\cdot I_{R_{3}} - V_{3} = 0",
-                  "V_{3} - 6 \\cdot I_{R_{4}} - V_{4} = 0",
-                  "I_{R_{2}} + I_{R_{3}} - I_{R_{1}} = 0",
-                  "I_{R_{4}} - I_{R_{3}} = 0",
-                  "I_{E} - I_{A_{1}} - I_{R_{4}} = 0"
-                ],
-                "results": [
-                  "E = 54\\,\\mathrm{V}",
-                  "I_{E} = 6\\,\\mathrm{A}",
-                  "I_{R_{1}} = 6\\,\\mathrm{A}",
-                  "I_{R_{3}} = 4\\,\\mathrm{A}",
-                  "I_{R_{4}} = 4\\,\\mathrm{A}",
-                  "V_{1} = -54\\,\\mathrm{V}",
-                  "V_{2} = -18\\,\\mathrm{V}",
-                  "V_{3} = -30\\,\\mathrm{V}",
-                  "V_{4} = -54\\,\\mathrm{V}"
-                ]
+                "type": "FormulaStep",
+                "chain": "I_{R_{4}} = \\frac{v}{9} - \\frac{v}{9} = 4\\,\\mathrm{A}",
+                "reason": {
+                  "type": "OhmsLaw",
+                  "label": "R_{4}"
+                }
+              },
+              {
+                "type": "FormulaStep",
+                "chain": "I_{A_{1}} = i - I_{R_{4}} = i - 4 = 2\\,\\mathrm{A}",
+                "reason": {
+                  "type": "Given"
+                }
+              },
+              {
+                "type": "FormulaStep",
+                "chain": "I_{E} = i = 6\\,\\mathrm{A}",
+                "reason": {
+                  "type": "Given"
+                }
+              },
+              {
+                "type": "FormulaStep",
+                "chain": "V_{4} = - E = - 54 = -54\\,\\mathrm{V}",
+                "reason": {
+                  "type": "SourceVoltage",
+                  "label": "E"
+                }
+              },
+              {
+                "type": "FormulaStep",
+                "chain": "V_{1} = - E = - 54 = -54\\,\\mathrm{V}",
+                "reason": {
+                  "type": "IdealAmmeter",
+                  "label": "A_{1}"
+                }
+              },
+              {
+                "type": "FormulaStep",
+                "chain": "V_{3} = - \\frac{E}{3} - 12 = - \\frac{54}{3} - 12 = -30\\,\\mathrm{V}",
+                "reason": {
+                  "type": "OhmsLaw",
+                  "label": "R_{3}"
+                }
               }
             ],
             "answer": [

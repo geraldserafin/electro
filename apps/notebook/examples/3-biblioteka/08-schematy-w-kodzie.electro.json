@@ -28,7 +28,7 @@
     {
       "id": "c396574e",
       "type": "markdown",
-      "source": "## Widok kodu\n\nKarta **Kod** w komórce schematu pokazuje rysunek jako kod — taki jak w tych lekcjach — a po zmianie kodu\nrysuje go z powrotem. Gdy zmieniasz tylko wartości, rysunek zostaje, jaki był. Działa też netlista SPICE:\nwklej `uklad = from_spice(\"\"\"...\"\"\")` (z LTspice: *View → SPICE Netlist*)."
+      "source": "## Widok kodu\n\nKarta **Kod** w komórce schematu pokazuje rysunek jako kod — taki jak w tych lekcjach — a po zmianie kodu\nrysuje go z powrotem. Gdy zmieniasz tylko wartości, rysunek zostaje, jaki był."
     }
   ]
 }

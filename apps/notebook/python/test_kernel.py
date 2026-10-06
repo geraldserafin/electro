@@ -66,13 +66,6 @@ def test_schematic_cells_are_available_by_name():
     }
 
 
-def test_a_spice_netlist_in_the_code_view():
-    source = 'uklad = from_spice("""* rc\nV1 in 0 SIN(0 1 1k)\nR1 in out 1k\nC1 out 0 100n\nD1 out 0 1N4148\n""")'
-    elements = {e["id"]: e for e in json.loads(kernel.from_code(source, "uklad"))["netlist"]["elements"]}
-    assert elements["C1"]["value"] == "100n" and elements["D1"]["part"] == "1N4148"
-    assert elements["R1"]["nodes"] == ["in", "out"]
-
-
 def _loop(*elements) -> str:
     """Elements in one loop from ground, as the page sends them: each ``(id, kind, value)``."""
     nodes = ["GND", *(f"n{k}" for k in range(1, len(elements))), "GND"]

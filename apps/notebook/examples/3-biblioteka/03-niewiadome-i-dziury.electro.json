@@ -32,15 +32,7 @@
             "steps": [
               {
                 "type": "FormulaStep",
-                "chain": "V_{2} = -12\\,\\mathrm{V}",
-                "reason": {
-                  "type": "SourceVoltage",
-                  "label": "E"
-                }
-              },
-              {
-                "type": "FormulaStep",
-                "chain": "I_{R_{1}} = - \\frac{V_{1}}{100} = - \\frac{\\left(-8\\right)}{100} = 80\\,\\mathrm{mA}",
+                "chain": "R_{2} = 50\\,\\mathrm{\\Omega}",
                 "reason": {
                   "type": "OhmsLaw",
                   "label": "R_{1}"
@@ -48,15 +40,7 @@
               },
               {
                 "type": "FormulaStep",
-                "chain": "I_{R_{2}} = I_{R_{1}} = 80\\,\\mathrm{mA}",
-                "reason": {
-                  "type": "KirchhoffCurrent",
-                  "node": "n2"
-                }
-              },
-              {
-                "type": "FormulaStep",
-                "chain": "R_{2} = \\frac{V_{1} - V_{2}}{I_{R_{2}}} = \\frac{\\left(-8\\right) - \\left(-12\\right)}{0.08} = 50\\,\\mathrm{\\Omega}",
+                "chain": "I_{R_{2}} = \\frac{12}{R_{2} + 100} = \\frac{12}{50 + 100} = 80\\,\\mathrm{mA}",
                 "reason": {
                   "type": "OhmsLaw",
                   "label": "R_{2}"
@@ -64,10 +48,10 @@
               },
               {
                 "type": "FormulaStep",
-                "chain": "I_{E} = I_{R_{2}} = 80\\,\\mathrm{mA}",
+                "chain": "V_{2} = -12\\,\\mathrm{V}",
                 "reason": {
-                  "type": "KirchhoffCurrent",
-                  "node": "n3"
+                  "type": "SourceVoltage",
+                  "label": "E"
                 }
               }
             ],
@@ -104,40 +88,7 @@
       "id": "3f76ee23",
       "type": "code",
       "source": "E, R_1, R_2 = VoltageSource(\"E\"), Resistor(\"R_1\"), Resistor(\"R_2\")\ntry:\n    solve(Problem(~(E >> R_1 >> R_2), {E: 12, R_1: 100}, [Parameter(R_2)])).answers\nexcept MissingData as e:\n    display(e)",
-      "outputs": [
-        {
-          "type": "issue",
-          "kind": "error",
-          "data": "MissingData: 1 more datum needed",
-          "issue": {
-            "type": "MissingData",
-            "targets": [
-              "R_{2}"
-            ],
-            "needed": 1,
-            "options": [
-              [
-                "I_{E}"
-              ],
-              [
-                "U_{R_{1}}"
-              ],
-              [
-                "I_{R_{1}}"
-              ],
-              [
-                "U_{R_{2}}"
-              ],
-              [
-                "I_{R_{2}}"
-              ],
-              [
-                "R_{2}"
-              ]
-            ]
-          }
-        }
-      ]
+      "outputs": []
     },
     {
       "id": "c4ab101d",
@@ -152,7 +103,7 @@
         {
           "type": "issue",
           "kind": "error",
-          "data": "Contradiction: no solution: the data contradict each other (kcl)",
+          "data": "Contradiction: no solution: the data contradict each other (given)",
           "issue": {
             "type": "ConflictingData",
             "conditions": [
@@ -184,10 +135,10 @@
             "type": "Ambiguous",
             "options": [
               [
-                "R_{1} = 8"
+                "R_{1} = 2"
               ],
               [
-                "R_{1} = 2"
+                "R_{1} = 8"
               ]
             ]
           }

@@ -81,7 +81,6 @@ obwodu liniowego `phi.formula(V(A))` to krok jako wzór (`V_A⁻` — krok wcze�
 | `simplify(zadanie)` | upraszczanie jak w zeszycie, krok po kroku |
 | `fill(zadanie, dziura)` | najprostszy element w miejsce `Hole` |
 | `respond`/`responses`, `sweep`/`sweeps`, `tolerance`/`spreads` | charakterystyka częstotliwościowa, przemiatanie wartości, rozrzut z tolerancji — każde rozwiązane raz, z literą |
-| `to_spice`, `from_spice` | netlisty SPICE w obie strony (porównane z ngspice w testach) |
 | `to_netlist`, `from_netlist` | zadanie jako dane (tak rozmawia z nim notatnik) |
 | `step_function` | `solve` jednej klatki skompilowane (Φ); `to_json()` dla silnika na stronie |
 
@@ -90,7 +89,7 @@ obwodu liniowego `phi.formula(V(A))` to krok jako wzór (`V_A⁻` — krok wcze�
 | | |
 |---|---|
 | `circuit/` | budowa: drzewo, netlista (kospan), rodzaje elementów i ich prawa, części z katalogów |
-| `problem/` | zadanie: wielkości, dane, nazwy, netlista jako dane, SPICE |
+| `problem/` | zadanie: wielkości, dane, nazwy, netlista jako dane |
 | `solver/` | obwód jako komponent (`compose.py`: `>>` skleja końce i wyrzuca środek), klatka z niego; co zostało — ręcznie, przypadkami albo Newtonem |
 | `methods/` | metody nad solverem, bez nowych praw |
 | `simulation/` | Φ (`solver/step.py`) powtarzane: jak długi krok, przebieg, wejścia |

@@ -21,7 +21,7 @@ let
   };
 in
 {
-  packages = [ pkgs.uv pkgs.arduino-cli pkgs.git-lfs pkgs.ruff pkgs.ngspice ]; # git-lfs: the in-page Arduino compiler (public/arduino/*.wasm, pico.tar); ngspice: packages/electro/tests/test_spice.py
+  packages = [ pkgs.uv pkgs.arduino-cli pkgs.git-lfs pkgs.ruff pkgs.ngspice ]; # git-lfs: the in-page Arduino compiler (public/arduino/*.wasm, pico.tar); ngspice: packages/electro/tests/test_ngspice.py
 
   env = pkgs.lib.optionalAttrs (pkgs.stdenv.isDarwin && pkgs.stdenv.isAarch64) {
     ARDUINO_COMPILER_PATH = "${avrToolchain}/bin/";
