@@ -18,13 +18,13 @@ import sympy as sp
 from electro import Circuit, Problem, Solution, Trace, from_netlist, to_netlist
 from electro.problem.names import name_of, named, naming
 from electro.problem.quantities import Quantity
-from electro.report.steps import steps as steps_data
 
 from . import plots
 from . import task as tasks
 from .code_view import PRELUDE, variable
 from .errors import CELL, NoSuchSchematic, error, issue, warning
 from .results import element_result
+from .steps import steps as steps_data
 
 namespace: dict = {}
 units: dict[str, str] = {}

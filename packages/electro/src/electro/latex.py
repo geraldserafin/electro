@@ -1,16 +1,22 @@
-"""Quantities, expressions and values in LaTeX: ``I_R_1`` is ``I_{R_{1}}``, 0.5 A is ``500\\,\\mathrm{mA}``."""
+"""A solution, its quantities, expressions and values pretty-printed in LaTeX: ``I_R_1`` is ``I_{R_{1}}``,
+0.5 A is ``500\\,\\mathrm{mA}``."""
 
 from __future__ import annotations
 
 from collections.abc import Mapping
+from typing import TYPE_CHECKING
 
 import sympy as sp
 from sympy.printing.latex import LatexPrinter
 
 from electro.values import fmt
 
-from ..problem.quantities import Current, Parameter, Potential, Power, Quantity, Scaled, Voltage
-from ..solver.symbols import Symbols
+from .problem.quantities import Current, Parameter, Potential, Power, Quantity, Scaled, Voltage
+from .solver.errors import Undetermined
+from .solver.symbols import Symbols
+
+if TYPE_CHECKING:
+    from .solver.solution import Solution, SolutionStep
 
 UNITS = {Current: "A", Voltage: "V", Potential: "V", Power: "W"}
 
@@ -67,6 +73,26 @@ def unit(q: Quantity | Scaled, units: Mapping[str, str], s: Symbols) -> str:
         case Scaled(_, x):
             return unit(x, units, s)
     return UNITS.get(type(q), "A" if "I_" in str(s.of(q)) else "V")
+
+
+def solution(s: Solution) -> str:
+    """Each step's values, one line each, then what is sought."""
+    try:
+        answers = s.answers
+    except Undetermined:
+        answers = {}
+    lines = [step(st) for st in s.steps if st.found]
+    lines += [f"{quantity(q, s.symbols)} = {value(v, UNITS.get(type(q), ''))}" for q, v in answers.items()]
+    return r"\begin{aligned}" + r" \\ ".join(f"&{line}" for line in lines) + r"\end{aligned}"
+
+
+def step(st: SolutionStep) -> str:
+    """What it found: ``U_{R_{1}} = 5\\,\\mathrm{V}``, a current in amperes, a potential in volts."""
+    return ", ".join(f"{name(x.name)} = {value(v, LETTERS.get(x.name[0], ''))}" for x, v in zip(st.found, st.values))
+
+
+LETTERS = {"I": "A", "V": "V", "U": "V"}
+"""A variable's unit by its letter."""
 
 
 def _unit(text: str) -> str:

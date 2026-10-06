@@ -11,11 +11,11 @@ from typing import cast
 import sympy as sp
 from electro import I, Problem, U, between, compile_program, sweeps, thevenin
 from electro.problem.netlist import Netlist, from_netlist, quantity
-from electro.report.issues import issue
 from electro.values import fmt, parse
 
 from . import plots
 from .errors import NoSweepRange, error
+from .issues import issue
 from .results import amplitude, element_result, number, solved
 
 

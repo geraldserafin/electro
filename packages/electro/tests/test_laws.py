@@ -90,3 +90,9 @@ def test_an_inner_quantity_an_inductor_written_by_its_flux_is_the_inductor():
         p = Problem(GND >> e >> r >> Node() >> coil >> GND, {e: 10, r: 10, coil: 1})
         currents.append(simulate(p, until=0.3, dt=1e-3).at(I(coil), 0.1))
     assert currents == pytest.approx([1 - math.exp(-1)] * 2, abs=0.01)
+
+
+def test_a_solution_pretty_printed():
+    e, r = VoltageSource("E"), Resistor("R")
+    s = solve(Problem(GND >> e >> r >> GND, {e: 12, r: 4}, [I(r)]))
+    assert r"I_{R} = 3\,\mathrm{A}" in s._repr_latex_()

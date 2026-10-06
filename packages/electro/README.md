@@ -19,8 +19,10 @@ sol.steps             # co wyliczono, z którego równania i dlaczego
 Obwód to sama budowa, bez liczb; liczby i pytania dochodzą w **zadaniu** (`Problem`). Ten sam obwód
 rozwiązuje się z różnymi danymi, a analizy (prąd stały, wskazy, czas) tylko inaczej czytają te same prawa.
 
-Biblioteka nie mówi nic słowami: powód kroku i to, co poszło nie tak, to dane (`report.steps`,
-`report.issues`, wzory w LaTeX). Słowami mówi ten, kto pokazuje wynik — notatnik po polsku albo po angielsku.
+Biblioteka nie mówi nic słowami: `solve` daje `Solution` — wartości i kroki (`SolutionStep`: co
+znaleziono, z jakiego równania, skąd to równanie), a to, co poszło nie tak, to wyjątki z polami
+(`MissingData`, `Contradiction`…). `latex` drukuje je ładnie (`Solution` też sam, w Jupyterze). Słowami
+mówi ten, kto pokazuje wynik — notatnik po polsku albo po angielsku.
 
 ## Klocki
 
@@ -81,10 +83,10 @@ AC(ω))` przy danej częstotliwości. W czasie: `simulate(zadanie, until=…, dt
 |---|---|
 | `circuit/` | budowa: drzewo, netlista (kospan), rodzaje elementów i ich prawa, części z katalogów |
 | `problem/` | zadanie: wielkości, dane, nazwy, netlista jako dane, SPICE |
-| `solver/` | równania z praw, rozwiązanie krok po kroku, przypadki, Newton |
+| `solver/` | równania z praw, rozwiązanie krok po kroku, przypadki; liczbami: równania jako kod i Newton |
 | `methods/` | metody nad solverem, bez nowych praw |
-| `simulation/` | program kroku w czasie, przebieg, wejścia |
-| `report/` | kroki i problemy jako dane, LaTeX |
+| `simulation/` | krok w czasie (te same równania i Newton co `solve`): co pamiętane, jak długi krok, przebieg, wejścia |
+| `latex.py` | rozwiązanie, wielkości i wartości w LaTeX |
 | `values.py` | liczby z jednostkami i przedrostkami, wyrażenia bez `eval` |
 
 Projekt i decyzje: [`DESIGN.md`](DESIGN.md). Testy: `devenv shell`, potem `pytest` w katalogu głównym repo.

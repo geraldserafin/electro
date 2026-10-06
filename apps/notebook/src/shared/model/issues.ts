@@ -1,5 +1,5 @@
-// What the kernel says without words (python/electro_notebook): what went wrong (electro.report.issues,
-// the kernel's errors), why a step of a solution holds and a worked solution (electro.report.steps). Each
+// What the kernel says without words (python/electro_notebook): what went wrong (electro_notebook/issues.py,
+// the kernel's errors), why a step of a solution holds and a worked solution (electro_notebook/steps.py). Each
 // is its type's name and its fields; features/solution says them in the reader's language. Tex: LaTeX
 // without the $ (a quantity, a value, an equation).
 
@@ -45,7 +45,7 @@ export interface Steps {
 }
 
 export type Issue =
-  // solving (electro.report.issues)
+  // solving (electro_notebook/issues.py)
   | { type: "ConflictingData"; conditions: Tex[]; values: Tex[] }
   | { type: "Ambiguous"; options: Tex[][] }
   | ({ type: "MissingData" | "Underdetermined" } & Diagnosis)

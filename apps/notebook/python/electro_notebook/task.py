@@ -14,9 +14,9 @@ from dataclasses import dataclass
 
 import sympy as sp
 from electro import Problem, solve
+from electro.latex import name
 from electro.problem.names import name_of, named, naming
 from electro.problem.quantities import Quantity
-from electro.report.tex import name
 
 from .results import shown
 

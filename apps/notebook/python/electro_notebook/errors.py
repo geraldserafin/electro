@@ -1,4 +1,4 @@
-"""What goes wrong, as data: electro's errors by ``electro.report.issues``, the notebook's own by their
+"""What goes wrong, as data: electro's errors by ``issues``, the notebook's own by their
 type and fields, both said in the reader's language by the page (``shared/model/issues.ts``); anything else
 (Python's NameError, …) as Python says it."""
 
@@ -42,7 +42,7 @@ class NoInput(NotebookError):
 def issue(err: BaseException, units: dict[str, str] | None = None) -> dict | None:
     if isinstance(err, NotebookError):
         return {"type": type(err).__name__, **err.fields}
-    from electro.report.issues import issue as core_issue
+    from .issues import issue as core_issue
 
     return core_issue(err, units=units)
 
