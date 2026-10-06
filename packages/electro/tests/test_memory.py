@@ -47,10 +47,10 @@ def test_a_flip_flop_and_a_not_gate_in_a_loop_halve_the_clock():
     assert [round(q_at(t)) for t in (0.0003, 0.0008, 0.0018, 0.0028, 0.0038, 0.0048)] == [0, 5, 0, 5, 0, 5]
 
 
-def test_on_paper_a_circuit_with_memory_is_said_to_need_its_past():
+def test_on_paper_a_circuit_with_memory_is_one_frame_from_rest():
     clk_src, _, load, _, d, q, circuit = _clocked()
-    with pytest.raises(Undetermined, match="memory"):
-        solve(Problem(circuit @ (GND >> VoltageSource("E_d") >> d), {clk_src: 5, "E_d": 5, load: 1000}))
+    s = solve(Problem(circuit @ (GND >> VoltageSource("E_d") >> d), {clk_src: 5, "E_d": 5, load: 1000}))
+    assert s(V(q)) == 0 and s.time == sp.oo
     e, r = VoltageSource("E"), Resistor("R")
     with pytest.raises(Undetermined, match="time"):
         solve(Problem(GND >> e >> r >> GND, {e: square(5, 1), r: 1}))

@@ -35,7 +35,7 @@ class SolutionStep:
 
 @dataclass(frozen=True)
 class Solution:
-    """``unknowns``: what is left not found."""
+    """One frame of a circuit: ``unknowns``, what is left not found; ``time``, when (DC: ∞, all settled)."""
 
     problem: Problem
     values: Mapping[sp.Symbol, sp.Expr]
@@ -43,6 +43,7 @@ class Solution:
     symbols: Symbols
     steps: tuple[SolutionStep, ...] = ()
     analysis: Analysis = field(default_factory=DC)
+    time: sp.Expr = sp.oo
 
     def __call__(self, q: Quantity | str) -> sp.Expr:
         """``q``'s value; or by name, ``"I_R_1"``, an expression of names too, ``"U_E_1 / I_E_1"``
@@ -85,7 +86,11 @@ class Solution:
 
     def _expression(self, q: Quantity) -> sp.Expr:
         """``q`` with what was found and what was given in."""
-        return subs(subs(self.symbols.of(q), self.values), parameter_values(self.problem, self.symbols))
+        return self.evaluated(self.symbols.of(q))
+
+    def evaluated(self, e: sp.Expr) -> sp.Expr:
+        """``e``, of the circuit's variables, with what was found and what was given in."""
+        return subs(subs(e, self.values), parameter_values(self.problem, self.symbols))
 
     def _average_power(self, q: Power) -> sp.Expr:
         """Of phasors: ½·Re(U·I*)."""

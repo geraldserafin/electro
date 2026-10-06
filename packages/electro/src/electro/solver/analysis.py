@@ -1,5 +1,6 @@
-"""The analyses. Each reads a law's time words its own way: ``D`` is 0 in DC, jω in AC, the difference
-back over a step in time; ``Pre`` is the value itself in DC and AC, the value a step ago in time."""
+"""The analyses: how a law's time words are read. In a step of time ``D`` is the difference back over it and
+``Pre`` the value a step ago; DC is one step, infinitely long — everything settled, so ``D`` is 0. In AC
+``D`` is jω (phasors) and ``Pre`` the value itself."""
 
 from __future__ import annotations
 
@@ -11,10 +12,6 @@ import sympy as sp
 
 from ..circuit.time import TIME, D, Pre
 from .expressions import replace
-
-
-@dataclass(frozen=True)
-class DC: ...
 
 
 @dataclass(frozen=True)
@@ -37,6 +34,13 @@ class Step:
     dt: sp.Expr = DT
 
 
+@dataclass(frozen=True)
+class DC(Step):
+    """One frame, infinitely long: whatever changes has stopped changing."""
+
+    dt: sp.Expr = sp.oo
+
+
 Analysis = DC | AC | Step
 
 
@@ -51,8 +55,6 @@ def is_before(x: sp.Symbol) -> bool:
 
 def interpret(law: sp.Expr, analysis: Analysis) -> sp.Expr:
     match analysis:
-        case DC():
-            return _reading(law, lambda x: sp.Integer(0), lambda x: x)
         case AC(omega):
             return _reading(law, lambda x: sp.I * omega * x, lambda x: x)
         case Step(dt):

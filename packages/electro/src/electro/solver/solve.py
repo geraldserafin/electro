@@ -1,56 +1,64 @@
-"""Where a circuit settles (DC), its phasors (AC), or its step in time (``Step``: Φ, every frame from the one
-before). Linear: by algebra, step by step; elements of several ways: by cases; beyond algebra (a diode's
-exp): by Newton."""
+"""A frame of a circuit: where it settles (DC, one frame infinitely long), where it is a step after another
+(``Step``), or its phasors (AC). Linear: by algebra, step by step; elements of several ways: by cases;
+beyond algebra (a diode's exp): by Newton."""
 
 from __future__ import annotations
 
-from typing import overload
+from dataclasses import replace
 
 import sympy as sp
 
-from ..circuit.time import TIME, Pre
+from ..circuit.time import TIME, D, Pre
 from ..problem.problem import Key, Problem
 from .analysis import AC, DC, Step, frequencies
+from .analysis import before as before_of
 from .by_cases import solve_by_cases
 from .by_hand import solve_by_hand
 from .errors import Contradiction, NotLinear, Undetermined
-from .expressions import symbols_in
+from .expressions import expr, symbols_in
 from .numeric import compile_equations, homotopy
 from .relation import all_equations
 from .solution import Solution, SolutionStep
-from .step import StepFunction, step_function
 from .system import SOURCES, System, equations, relation
 
 
-@overload
-def solve(problem: Problem, analysis: DC | AC | None = None) -> Solution: ...
-@overload
-def solve(problem: Problem, analysis: Step) -> StepFunction: ...
-def solve(problem: Problem, analysis: DC | AC | Step | None = None) -> Solution | StepFunction:
-    """``analysis``: by default DC, or with sines in time of one frequency, their phasors at it. At
-    ``Step()``: Φ, the step function (``solver.step``)."""
+def solve(problem: Problem, analysis: DC | AC | Step | None = None, before: Solution | None = None) -> Solution:
+    """One frame of the circuit: ``analysis`` long, after ``before`` (by default from rest — every capacitor
+    empty, every inductor still). By default DC, one frame infinitely long: all settled; with sines in time of
+    one frequency, their phasors at it. A simulation is nothing but frames, each solved after the one before
+    (``simulate`` runs it compiled: ``solver.step``)."""
+    analysis = analysis or _own_frequency(problem) or DC()
     try:
-        if isinstance(analysis, Step):
-            return step_function(problem)
-        return _solve(problem, analysis or _own_frequency(problem) or DC())
+        return _solve(problem, analysis, _frame(problem, analysis, before))
     except Undetermined as err:
         err.problem = problem
         raise
 
 
-def _solve(problem: Problem, analysis: DC | AC) -> Solution:
-    if _has_memory(problem):
-        raise Undetermined("it has memory — what it holds depends on what came before: simulate it")
-    system = equations(problem, analysis)
+def _frame(problem: Problem, analysis: DC | AC | Step, before: Solution | None) -> dict[sp.Symbol, sp.Expr]:
+    """What a frame starts from: what each remembered quantity was (``before``'s, or nothing at rest), and the
+    time at its end."""
+    if not isinstance(analysis, Step):
+        return {}
+    remembered = {expr(a.args[0]) for eq in all_equations(relation(problem.circuit)) for a in eq.expr.atoms(D, Pre)}
+    was = {before_of(x): before.evaluated(x) if before is not None else sp.Integer(0) for x in remembered}
+    start = before.time if before is not None else sp.Integer(0)
+    return was | ({TIME: start + analysis.dt} if analysis.dt != sp.oo else {})
+
+
+def _solve(problem: Problem, analysis: DC | AC | Step, frame: dict[sp.Symbol, sp.Expr]) -> Solution:
+    system = equations(problem, analysis, letters=frame)
     if any(eq.expr.has(TIME) for eq in system.equations):
         raise Undetermined("its data change in time: simulate it")
     if system.choices:
-        return solve_by_cases(problem, system, analysis)
-    if _is_algebraic(system):
-        return _by_algebra(problem, system, analysis)
-    if isinstance(analysis, AC):
+        solution = solve_by_cases(problem, system, analysis)
+    elif _is_algebraic(system):
+        solution = _by_algebra(problem, system, analysis)
+    elif isinstance(analysis, AC):
         raise NotLinear("a phasor of a non-linear circuit: around its working point (not yet)")
-    return _by_newton(problem)
+    else:
+        solution = _by_newton(problem, analysis, frame)
+    return replace(solution, time=frame.get(TIME, sp.oo))
 
 
 def solve_step(problem: Problem) -> Solution:
@@ -64,11 +72,6 @@ def solve_step(problem: Problem) -> Solution:
 def _own_frequency(problem: Problem) -> AC | None:
     found = {w for eq in equations(problem, DC()).equations for w in frequencies(eq.expr)}
     return AC(found.pop()) if len(found) == 1 else None
-
-
-def _has_memory(problem: Problem) -> bool:
-    """A law speaks of what came before (a flip-flop holds what it was last given)."""
-    return any(eq.expr.has(Pre) for eq in all_equations(relation(problem.circuit)))
 
 
 def _is_algebraic(system: System) -> bool:
@@ -104,9 +107,9 @@ def _fits_without(problem: Problem, key: Key, analysis: DC | AC | Step) -> bool:
     return True
 
 
-def _by_newton(problem: Problem) -> Solution:
+def _by_newton(problem: Problem, analysis: Step, frame: dict[sp.Symbol, sp.Expr]) -> Solution:
     """Every value is needed; the sources are raised from nothing."""
-    raised = equations(problem, DC(), sources=SOURCES)
+    raised = equations(problem, analysis, sources=SOURCES, letters=frame)
     exprs = [eq.expr for eq in raised.equations]
     unknowns = list(raised.unknowns)
     if any(x not in {*unknowns, SOURCES} for e in exprs for x in symbols_in(e)):
@@ -119,4 +122,4 @@ def _by_newton(problem: Problem) -> Solution:
     step = SolutionStep(
         tuple(values), tuple(values.values()), tuple(eq.origin for eq in raised.equations), "numerically"
     )
-    return Solution(problem, values, frozenset(), raised.symbols, (step,))
+    return Solution(problem, values, frozenset(), raised.symbols, (step,), analysis)

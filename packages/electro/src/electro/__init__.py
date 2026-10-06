@@ -41,7 +41,7 @@ from .solver.port import blackbox, matches
 from .solver.relation import Equation, Origin, Relation, hide, join
 from .solver.solution import Solution, SolutionStep
 from .solver.solve import solve
-from .solver.step import Frame, StepFunction
+from .solver.step import Frame, StepFunction, step_function
 from .solver.system import relation
 
 __all__ = [
@@ -135,6 +135,7 @@ __all__ = [
     "simplify",
     "simulate",
     "solve",
+    "step_function",
     "square",
     "stores",
     "superposition",

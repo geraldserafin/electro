@@ -613,7 +613,7 @@ class Solution:
 
 
 def simulate(problem: Problem, until: Duration) -> Trace:
-    phi = solve(problem, Step())                     # Φ: zadanie rozwiązane dla jednego kroku
+    phi = step_function(problem)                     # Φ: solve jednej klatki, skompilowane
     states = unfold(phi, phi.rest, until)            # każda klatka to Φ poprzedniej
     return Trace(problem, tuple(states))
 
@@ -952,7 +952,7 @@ warstw. Kierunek zależności jest jeden: `circuit` ← `problem` ← `solver` �
   (`by_hand.py`), przez przypadki (`by_cases.py`), liczbami — równania jako kod i Newton (`numeric.py`),
   wybór drogi (`solve.py`), czarna skrzynka (`port.py`).
 - **`simulation/`**: krok w czasie to te same równania (`Step(dt)`) i ten sam Newton co w `solve`; własne
-  ma tylko długość kroku (`run.py`). Krok to `solve(zadanie, Step())` = Φ (`solver/step.py`): klatka po klatce
+  ma tylko długość kroku (`run.py`). `solve` to jedna klatka (DC: `dt = ∞`), a krok to ta sama klatka skompilowana: Φ (`solver/step.py`), klatka po klatce
   `Φ(klatka, dt)`, a parametry Φ to `dt`, czas, to, co pamiętane, i to, co ustawia świat. Liniowy obwód ma Φ
   jako wzór z literami (`Φ.formula`), nieliniowy — jako pierwiastek równań kroku, liczony Newtonem.
 - **`methods/`**: metody podręcznikowe, po pliku na metodę.

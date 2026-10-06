@@ -61,9 +61,11 @@ Czego nie da się wyznaczyć — `MissingData` (ile danych brakuje i które by w
 
 Prąd zmienny: zadanie z sinusami jednej częstotliwości liczy się samo ich wskazami; `solve(zadanie,
 AC(ω))` przy danej częstotliwości. W czasie: `simulate(zadanie, until=…, dt=…, inputs={…})` zwraca ślad:
-`slad(q)`, `slad.at(q, t)`, `slad.spectrum(q)`. Symulacja to tylko krok rozwiązany raz i powtarzany:
-`phi = solve(zadanie, Step())` to funkcja kroku Φ — `phi(klatka, dt)` daje następną klatkę, od
-`phi.rest`; dla obwodu liniowego `phi.formula(V(A))` to ten krok jako wzór (`V_A⁻` — krok wcześniej).
+`slad(q)`, `slad.at(q, t)`, `slad.spectrum(q)`. `solve` to jedna klatka: DC to klatka nieskończenie długa (`DC()` = `Step(∞)`, wszystko ustalone),
+`solve(zadanie, Step(dt), before=poprzednia)` — klatka `dt` po poprzedniej (domyślnie od spoczynku).
+Symulacja to nic więcej niż klatki jedna po drugiej; `simulate` liczy je skompilowane raz: `phi =
+step_function(zadanie)`, `phi(klatka, dt)` daje następną od `phi.rest`, `phi(phi.rest, ∞)` to DC, a dla
+obwodu liniowego `phi.formula(V(A))` to krok jako wzór (`V_A⁻` — krok wcześniej).
 
 ## Metody
 
@@ -77,7 +79,7 @@ AC(ω))` przy danej częstotliwości. W czasie: `simulate(zadanie, until=…, dt
 | `respond`/`responses`, `sweep`/`sweeps`, `tolerance`/`spreads` | charakterystyka częstotliwościowa, przemiatanie wartości, rozrzut z tolerancji — każde rozwiązane raz, z literą |
 | `to_spice`, `from_spice` | netlisty SPICE w obie strony (porównane z ngspice w testach) |
 | `to_netlist`, `from_netlist` | zadanie jako dane (tak rozmawia z nim notatnik) |
-| `solve(…, Step())` | funkcja kroku Φ; `to_json()` dla silnika na stronie |
+| `step_function` | `solve` jednej klatki skompilowane (Φ); `to_json()` dla silnika na stronie |
 
 ## Pakiet
 

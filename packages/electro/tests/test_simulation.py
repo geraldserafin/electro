@@ -62,6 +62,7 @@ from electro import (
     beside,
     simulate,
     solve,
+    step_function,
 )
 
 
@@ -188,12 +189,12 @@ def test_on_paper_a_switch_is_a_datum_and_a_simulation_needs_every_value():
     assert solve(Problem(circuit, {e: 5, r1: 100, r2: 100, s: {"closed": 1}}))(I(r1)) == sp.Rational(1, 40)
     assert solve(Problem(circuit, {e: 5, r1: 100, r2: 100}))(I(r1)) == 0
     with pytest.raises(ValueNeeded):
-        solve(Problem(circuit, {e: 5, r1: 100}), Step())
+        step_function(Problem(circuit, {e: 5, r1: 100}))
 
 
 def test_the_program_in_javascript_is_the_same_program():
     red, _ = _led_circuit()
-    data = json.loads(solve(red, Step()).to_json())
+    data = json.loads(step_function(red).to_json())
     assert "limexp(" in data["kernel"] and "F[" in data["kernel"] and "J[" in data["kernel"]
     assert data["junctions"] and data["kinds"] == {"E_1": "voltage_source", "R_1": "resistor", "LED_1": "led"}
     assert set(data["parts"]["LED_1"]) == {"U", "I"}
@@ -511,7 +512,7 @@ def test_the_textbook_diode_is_for_paper():
     e, r, d = VoltageSource(), Resistor(), DiodeDrop()
     circuit, _ = net((e, "GND", "a"), (r, "a", "b"), (d, "b", "GND"))
     with pytest.raises(NotSimulated):
-        solve(Problem(circuit, {e: 5, r: 1000}), Step())
+        step_function(Problem(circuit, {e: 5, r: 1000}))
 
 
 def test_power_of_a_lamp_in_time():
@@ -532,15 +533,33 @@ def test_a_simulation_is_its_step_function_again_and_again():
     e, r, c = VoltageSource("E"), Resistor("R"), Capacitor("C")
     a = Node("A")
     rc = Problem(GND >> e >> r >> a >> c >> GND, {e: 10, r: 1000, c: "1u"})
-    phi = solve(rc, Step())
+    phi = step_function(rc)
     after = reduce(lambda frame, _: phi(frame, 1e-5), range(500), phi.rest)
     assert after.t == pytest.approx(5e-3)
     assert after.x[phi.unknowns.index("V_A")] == pytest.approx(10 * (1 - math.exp(-5)), rel=1e-2)
     before, dt = sp.Symbol("V_A⁻"), sp.Symbol("dt", positive=True)
     assert sp.simplify(phi.formula(V(a)) - (before + 10000 * dt) / (1000 * dt + 1)) == 0
     d = Diode("D")
-    with_diode = solve(
-        Problem(GND >> VoltageSource("E") >> Resistor("R") >> a >> d >> GND, {"E": 5, "R": 1000}), Step()
+    with_diode = step_function(
+        Problem(GND >> VoltageSource("E") >> Resistor("R") >> a >> d >> GND, {"E": 5, "R": 1000})
     )
     settled = reduce(lambda frame, _: with_diode(frame, 1e-3), range(3), with_diode.rest)
     assert 0.5 < settled.x[with_diode.unknowns.index("V_A")] < 0.8
+
+
+def test_solve_is_a_simulation_of_one_frame():
+    from functools import reduce
+
+    from electro import Capacitor, Resistor, VoltageSource
+
+    e, r, c = VoltageSource("E"), Resistor("R"), Capacitor("C")
+    a = Node("A")
+    rc = Problem(GND >> e >> r >> a >> c >> GND, {e: 10, r: 1000, c: "1u"})
+    phi = step_function(rc)
+    frames = reduce(
+        lambda done, _: [*done, solve(rc, Step(sp.Rational(1, 10**4)), done[-1] if done else None)], range(3), []
+    )
+    stepped = reduce(lambda done, _: [*done, phi(done[-1], 1e-4)], range(3), [phi.rest])[1:]
+    assert [float(f(V(a))) for f in frames] == pytest.approx([f.x[phi.unknowns.index("V_A")] for f in stepped])
+    assert frames[-1].time == sp.Rational(3, 10**4)
+    assert solve(rc)(V(a)) == 10 == pytest.approx(phi(phi.rest, math.inf).x[phi.unknowns.index("V_A")])

@@ -71,10 +71,11 @@ def equations(
     problem: Problem,
     analysis: Analysis,
     sources: sp.Expr | int = 1,
-    letters: Mapping[sp.Symbol, sp.Symbol] | None = None,
+    letters: Mapping[sp.Symbol, sp.Expr] | None = None,
 ) -> System:
     """The problem's equations read by ``analysis``, its data in; every independent source scaled by
-    ``sources``; the parameters in ``letters`` left as those letters (what is set while it runs)."""
+    ``sources``; ``letters``: symbols standing for something else — a parameter left as a letter (what is
+    set while it runs), what was a step before, the time."""
     s = symbols(problem.circuit)
     values = {**parameter_values(problem, s), **(letters or {})}
     if sources != 1:

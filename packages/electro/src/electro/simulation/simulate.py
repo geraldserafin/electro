@@ -1,5 +1,6 @@
-"""A problem in time, from rest: Φ, its step function (``solve(problem, Step())``), again and again — in the
-notebook by the page's engine (the same loop, JIT-compiled), elsewhere here."""
+"""A problem in time, from rest: frame after frame, each ``solve``d after the one before — compiled once
+(Φ, ``solver.step``) and run by the page's engine in the notebook (the same loop, JIT-compiled), elsewhere
+here."""
 
 from __future__ import annotations
 
@@ -9,9 +10,7 @@ from array import array
 from collections.abc import Mapping
 
 from ..problem.problem import Problem
-from ..solver.analysis import Step
-from ..solver.solve import solve
-from ..solver.step import Frame, StepFunction
+from ..solver.step import Frame, StepFunction, step_function
 from ..solver.symbols import symbols
 from .errors import NoConvergence
 from .inputs import Key, schedule
@@ -25,7 +24,7 @@ def simulate(
     """``until`` seconds from rest (every capacitor empty, every inductor still). ``dt``: the longest step
     (by default ``until``/500; steps shrink by themselves where things move fast). ``inputs``: what the world
     sets (``inputs.Key``), each a value or a function of time."""
-    phi = solve(problem, Step())
+    phi = step_function(problem)
     when = schedule(phi, symbols(problem.circuit), inputs)
     dt_max = dt or until / 500
     engine = _engine()

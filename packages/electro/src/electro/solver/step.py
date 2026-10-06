@@ -1,6 +1,7 @@
-"""A problem solved at ``Step(dt)``: Φ, the step function. Every frame of a circuit in time is Φ of the frame
-before — ``frame(n + 1) = Φ(frame(n), dt)``, from rest — with ``dt``, the time, what is remembered and what
-the world sets (a switch, a pin) its parameters. Linear, Φ is a formula (``formula``); otherwise it is the
+"""Φ, the step function: ``solve(problem, Step(dt), before)`` compiled once, for a simulation's thousands of
+frames. Every frame of a circuit in time is Φ of the frame before — ``frame(n + 1) = Φ(frame(n), dt)``,
+from rest — with ``dt``, the time, what is remembered and what the world sets (a switch, a pin) its
+parameters; ``Φ(rest, ∞)`` is DC. Linear, Φ is a formula (``formula``); otherwise it is the
 root of the step's equations, found by Newton. Either way it is compiled once (``solver.numeric``): Python
 here, JavaScript for the page's engine (``to_json``).
 

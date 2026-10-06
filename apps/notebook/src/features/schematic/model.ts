@@ -216,7 +216,7 @@ export const hasValue = (kind: string) => kindInfo(kind)?.unit !== undefined;
 /** A drawing with a non-linear element (a diode, a transistor, a 555, an Arduino): it can only run in time. */
 export const inTimeOnly = (sch: SchematicData) => sch.elements.some((e) => kindInfo(e.kind)?.live);
 /**
- * Can it run in time? (as electro.solve(problem, Step()) asks) No hole in it, and every value known — a
+ * Can it run in time? (as electro.step_function asks) No hole in it, and every value known — a
  * meter's reading apart, the simulation measures that.
  */
 export const canRunInTime = (sch: SchematicData) =>
