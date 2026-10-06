@@ -23,6 +23,7 @@ import sympy as sp
 from .algebra import expr, subs, symbols_in
 from .code import Code, Compiled, compile_equations, python, statements
 from .element import Element
+from .engine import Machine, NoConvergence
 from .formula import Formula, NotClosed, formula, parameter_values
 from .frame import DT, Step, before
 from .quantities import Quantity, Scaled
@@ -60,14 +61,6 @@ class NoSuchInput(KeyError):
         self.name, self.available = name, available
 
 
-class NoConvergence(ArithmeticError):
-    """The circuit's state at ``time`` (seconds) could not be found, even in tiny steps."""
-
-    def __init__(self, time: float) -> None:
-        super().__init__(time)
-        self.time = time
-
-
 @dataclass
 class Frame:
     """The circuit at time ``t``: its unknowns ``x``, and the step's parameters ``p`` — ``dt``, ``t``, what
@@ -82,8 +75,10 @@ class Frame:
 class StepFunction:
     """Φ. ``equations``: a step's, over its unknowns; its parameters ``dt``, the time at the step's end, what
     is remembered and what the world sets. ``states``: each remembered value's parameter and the most it may
-    move in a step (None: it jumps). ``update`` fills what is remembered after a step, ``flow`` each
-    terminal's current; ``nodes`` and ``parts`` say where the page reads a point and an element."""
+    move in a step (None: it jumps). ``update`` fills what is remembered after a step. ``seen``: what is read
+    of a frame, by name — each point's potential, each element's voltage, currents and what its kind shows —
+    worked out straight from the unknowns by ``see``; ``nodes``, ``parts`` and ``flows`` (each terminal's
+    current, into its element) say where in it the page finds a point and an element."""
 
     circuit: Element
     left: Formula
@@ -92,10 +87,11 @@ class StepFunction:
     states: list[tuple[int, float | None]]
     inputs: dict[str, int]
     update_body: Code
-    nodes: dict[str, int | None]
+    seen: dict[str, sp.Expr]
+    see_body: Code
+    nodes: dict[str, int]
     parts: dict[str, dict[str, int]]
     kinds: dict[str, str]
-    flow_body: Code
     flows: dict[str, list[int]]
     _compiled: tuple | None = field(default=None, repr=False)
 
@@ -108,13 +104,25 @@ class StepFunction:
         return [p.name for p in self.equations.params]
 
     def functions(self):
-        """The update and the flow as Python functions."""
+        """The update and what is seen as Python functions."""
         if self._compiled is None:
             scope = python(
-                f"def update(x, p, out):\n{self.update_body['py']}\n\ndef flow(x, p, out):\n{self.flow_body['py']}\n"
+                f"def update(x, p, out):\n{self.update_body['py']}\n\ndef see(x, p, out):\n{self.see_body['py']}\n"
             )
-            self._compiled = (scope["update"], scope["flow"])
+            self._compiled = (scope["update"], scope["see"])
         return self._compiled
+
+    def read(self, frame: Frame) -> dict[str, float]:
+        """What is seen of ``frame``, by name."""
+        out = [0.0] * len(self.seen)
+        self.functions()[1](frame.x, frame.p, out)
+        return dict(zip(self.seen, out))
+
+    def machine(self) -> Machine:
+        """Φ with memory: from rest, frame after frame."""
+        program = {"n": len(self.unknowns), "states": self.states, "inputs": self.inputs}
+        program |= {"junctions": self.equations.junctions, "initial": self.initial}
+        return Machine(program, self.equations.kernel, self.functions()[0])
 
     @property
     def rest(self) -> Frame:
@@ -150,10 +158,11 @@ class StepFunction:
                 "junctions": self.equations.junctions,
                 "kernel": self.equations.kernel_body["js"],
                 "update": self.update_body["js"],
+                "seen": list(self.seen),
+                "see": self.see_body["js"],
                 "nodes": self.nodes,
                 "parts": self.parts,
                 "kinds": self.kinds,
-                "flow": self.flow_body["js"],
                 "flows": self.flows,
             }
         )
@@ -190,17 +199,19 @@ def step_function(circuit: Element, values: Mapping) -> StepFunction:
     exprs = [q.expr for q in left.system.equations]
     unknowns = list(left.system.unknowns)
     memory = _memory(left, {**given, **letters})
-    parts = _observed(circuit, left, exprs, unknowns)
-    nodes = {str(v)[2:]: _shown(v, left, exprs, unknowns) for v in left.names.points.values()}
     clocks = _clocks([*exprs, *(v for _, v, _ in left.definitions)])
     states = memory + clocks
     params = [DT, TIME, *(st.symbol for st in states), *(letter for _, letter, _ in inputs)]
-    _check_square(exprs, unknowns, params)
+    parts = _observed(circuit, left)
+    flowing = {f"{labels[e]}.{t}": c.xreplace(left.names.to) for e in circuit.members for t, c in e.I.items()}
+    seen = {str(v): v for v in left.names.points.values()}
+    seen |= {called: value for named in parts.values() for called, value in named.values()} | flowing
+    seen = {name: left.resolve(expr(value)) for name, value in seen.items()}
+    _check_square([*exprs, *seen.values()], unknowns, params, len(exprs))
     potentials = [v for v in left.names.to.values() if str(v).startswith("V_")]
     compiled = compile_equations(exprs, unknowns, params, potentials, currents=[v for _, v, _ in left.definitions])
     unknowns = compiled.unknowns
-    index = {u: k for k, u in enumerate(unknowns)}
-    flowing = [left.resolve(c.xreplace(left.names.to)) for e in circuit.members for c in e.I.values()]
+    place = {name: k for k, name in enumerate(seen)}
     return StepFunction(
         circuit=circuit,
         left=left,
@@ -209,11 +220,12 @@ def step_function(circuit: Element, values: Mapping) -> StepFunction:
         states=[(2 + k, st.most) for k, st in enumerate(states)],
         inputs={letter.name: 2 + len(states) + k for k, (_, letter, _) in enumerate(inputs)},
         update_body=statements([(f"out[{k}]", st.update) for k, st in enumerate(states)], unknowns, params),
-        nodes={name: index.get(u) if u is not None else None for name, u in nodes.items()},
-        parts={label: {name: index[u] for name, u in named.items()} for label, named in parts.items()},
+        seen=seen,
+        see_body=statements([(f"out[{k}]", v) for k, v in enumerate(seen.values())], unknowns, params),
+        nodes={str(v)[2:]: place[str(v)] for v in left.names.points.values()},
+        parts={label: {name: place[called] for name, (called, _) in named.items()} for label, named in parts.items()},
         kinds={labels[e]: e.kind for e in circuit.members},
-        flow_body=statements([(f"out[{k}]", c) for k, c in enumerate(flowing)], unknowns, params),
-        flows=_flow_places(circuit, labels),
+        flows={labels[e]: [place[f"{labels[e]}.{t}"] for t in e.terminals] for e in circuit.members},
     )
 
 
@@ -239,12 +251,11 @@ def _most(x: sp.Expr) -> float:
     return STEP_VOLTS
 
 
-def _observed(circuit: Element, left: Formula, exprs: list, unknowns: list) -> dict[str, dict[str, sp.Symbol]]:
-    """What the page reads of each element, by name: ``U``, ``I`` of two terminals, ``I_<terminal>`` of more,
-    its inner quantities, and what its kind ``shows`` — each an unknown (one made, with its equation, where
-    joining eliminated it)."""
+def _observed(circuit: Element, left: Formula) -> dict[str, dict[str, tuple[str, sp.Expr]]]:
+    """What the page reads of each element, by name, and what it is called: ``U``, ``I`` of two terminals,
+    ``I_<terminal>`` of more, its inner quantities, and what its kind ``shows``."""
     to, labels = left.names.to, left.names.labels
-    out: dict[str, dict[str, sp.Symbol]] = {}
+    out = {}
     for e in circuit.members:
         label = labels[e]
 
@@ -263,23 +274,8 @@ def _observed(circuit: Element, left: Formula, exprs: list, unknowns: list) -> d
         for name, what in e.shows:
             value = e.I[what].xreplace(to) if isinstance(what, str) else across(*what)
             named[name] = (f"{name[0]}_{label}{name[1:]}", value)
-        out[label] = {name: _shown(value, left, exprs, unknowns, called) for name, (called, value) in named.items()}
+        out[label] = named
     return out
-
-
-def _shown(value: sp.Expr, left: Formula, exprs: list, unknowns: list, called: str = "") -> sp.Symbol | None:
-    """``value`` as an unknown the page reads: one already, or one made, its equation added; None: always 0."""
-    v = left.resolve(expr(value))
-    if v in unknowns:
-        return v
-    if v == 0 and not called:
-        return None
-    u = sp.Symbol(called or f"V_{len(unknowns)}")
-    while u in unknowns:
-        u = sp.Symbol(f"{u.name}_")
-    unknowns.append(u)
-    exprs.append(u - v)
-    return u
 
 
 def _clocks(exprs: list[sp.Expr]) -> list[_State]:
@@ -301,21 +297,14 @@ def _clocks(exprs: list[sp.Expr]) -> list[_State]:
     return states
 
 
-def _check_square(exprs: list[sp.Expr], unknowns: list[sp.Symbol], params: list[sp.Symbol]) -> None:
+def _check_square(exprs: list[sp.Expr], unknowns: list[sp.Symbol], params: list[sp.Symbol], laws: int) -> None:
+    """Every symbol a value or found, and as many ``laws`` (the first of ``exprs``) as unknowns."""
     allowed = set(unknowns) | set(params)
     stray = sorted({x for e in exprs for x in symbols_in(e)} - allowed, key=str)
     if stray:
         raise ValueNeeded(stray[0].name)
-    if len(exprs) != len(unknowns):
-        raise NotSimulated(f"{len(exprs)} laws, {len(unknowns)} unknowns")
-
-
-def _flow_places(circuit: Element, labels) -> dict[str, list[int]]:
-    out, k = {}, 0
-    for e in circuit.members:
-        out[labels[e]] = list(range(k, k + len(e.terminals)))
-        k += len(e.terminals)
-    return out
+    if laws != len(unknowns):
+        raise NotSimulated(f"{laws} laws, {len(unknowns)} unknowns")
 
 
 # Frame after frame
@@ -324,55 +313,11 @@ Schedule = Callable[[float], list[tuple[int, float]]]
 """What the world sets at a time: ``[(param index, value)]``."""
 
 
-def run(phi: StepFunction, until: float, dt_max: float, schedule: Schedule | None = None, on_frame=None) -> Frame:
-    """From rest to ``until``; ``on_frame`` gets every frame, at t = 0 too, after a first tiny step (the
-    circuit the instant it starts)."""
-    frame, step = _walk(phi, _set(phi.rest, schedule), min(1e-9, until), dt_max, schedule, 0.0)
-    frame = Frame(0.0, frame.x, frame.p)
-    if on_frame is not None:
-        on_frame(frame)
-    return _walk(phi, frame, until, dt_max, schedule, step, on_frame)[0]
-
-
-def _walk(phi: StepFunction, frame: Frame, target: float, dt_max: float, schedule, step: float, on_frame=None):
-    """Steps up to ``target``, at most ``dt_max``: shorter while what is remembered moves fast, after something
-    jumped, or when Newton did not get there; in the shortest step a value may jump for real (a capacitor put
-    across an ideal source). Returns the last frame and the step it would take next."""
-    dt_min = dt_max * 1e-9
-    step = min(step or min(dt_max, 1e-6), dt_max)
-    while frame.t < target - 1e-15:
-        h = min(step, target - frame.t)
-        frame = _set(frame, schedule)
-        after = phi(frame, h)
-        change = math.inf if after is None else _change(phi, frame, after)
-        if after is None or (change > 1 and h > dt_min):
-            if h <= dt_min:
-                raise NoConvergence(frame.t)
-            step = h / 4 if change == math.inf else h / 2
-            continue
-        switched = any(most is None and after.p[i] != frame.p[i] for i, most in phi.states)
-        frame = after
-        if on_frame is not None:
-            on_frame(frame)
-        if switched:
-            step = max(dt_min, h / 8)
-        elif change < 0.25 and h >= step * 0.999:
-            step = min(dt_max, h * 2)
-    return frame, step
-
-
-def _change(phi: StepFunction, before: Frame, after: Frame) -> float:
-    """How much of its allowed move a remembered value used."""
-    return max((abs(after.p[i] - before.p[i]) / most for i, most in phi.states if most is not None), default=0.0)
-
-
-def _set(frame: Frame, schedule: Schedule | None) -> Frame:
-    if schedule is None:
-        return frame
-    p = list(frame.p)
-    for i, value in schedule(frame.t):
-        p[i] = value
-    return Frame(frame.t, frame.x, p)
+def run(phi: StepFunction, until: float, dt_max: float, schedule: Schedule | None = None, on_frame=None) -> Machine:
+    """From rest to ``until`` (``Machine.run``); ``on_frame`` gets the machine at every frame."""
+    machine = phi.machine()
+    machine.run(until, dt_max, schedule, on_frame)
+    return machine
 
 
 # What the world sets
@@ -452,10 +397,10 @@ def simulate(
         return Trace(phi, times, rows, None)
     params = array("d")
 
-    def record(frame: Frame) -> None:
-        times.append(frame.t)
-        rows.extend(frame.x)
-        params.extend(frame.p)
+    def record(machine: Machine) -> None:
+        times.append(machine.t)
+        rows.extend(machine.x)
+        params.extend(machine.p)
 
     run(phi, until, dt_max, when, record)
     return Trace(phi, times, rows, params)
@@ -499,7 +444,9 @@ class Trace:
         """``q`` at each frame: a quantity, or an unknown's or a point's name (``"I_R_1"``, ``"V_A"``)."""
         if isinstance(q, str):
             return self._column(q)
-        e = self.phi.at(q)
+        return self._of(self.phi.at(q))
+
+    def _of(self, e: sp.Expr) -> list[float]:
         names = sorted({s.name for s in e.free_symbols if isinstance(s, sp.Symbol)})
         f = sp.lambdify([sp.Symbol(n) for n in names], e, "math")
         columns = [self._column(n) for n in names]
@@ -530,11 +477,8 @@ class Trace:
             return self.data[phi.unknowns.index(name) :: len(phi.unknowns)].tolist()
         if name in phi.params and self.params is not None:
             return self.params[phi.params.index(name) :: len(phi.params)].tolist()
-        node = phi.nodes.get(name[2:]) if name.startswith("V_") else None
-        if node is not None:
-            return self._column(phi.unknowns[node])
-        if name.startswith("V_") and name[2:] in phi.nodes:
-            return [0.0] * len(self.t)
+        if name in phi.seen:
+            return self._of(phi.seen[name])
         raise KeyError(name)
 
 

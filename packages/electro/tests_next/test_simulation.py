@@ -542,13 +542,13 @@ def test_a_simulation_is_its_step_function_again_and_again():
     phi = step_function(circuit, values)
     after = reduce(lambda frame, _: phi(frame, 1e-05), range(500), phi.rest)
     assert after.t == pytest.approx(0.005)
-    assert after.x[phi.nodes["A"]] == pytest.approx(10 * (1 - math.exp(-5)), rel=0.01)
-    first = phi(phi.rest, 1e-05).x[phi.nodes["A"]]
+    assert phi.read(after)["V_A"] == pytest.approx(10 * (1 - math.exp(-5)), rel=0.01)
+    first = phi.read(phi(phi.rest, 1e-05))["V_A"]
     assert first == pytest.approx(10000 * 1e-05 / (1000 * 1e-05 + 1), rel=1e-06)
     d = Diode("D")
     with_diode = step_function(GND >> VoltageSource("E") >> Resistor("R") >> a >> d >> GND, {"E": 5, "R": 1000})
     settled = reduce(lambda frame, _: with_diode(frame, 0.001), range(3), with_diode.rest)
-    assert 0.5 < settled.x[with_diode.nodes["A"]] < 0.8
+    assert 0.5 < with_diode.read(settled)["V_A"] < 0.8
 
 
 def test_solve_is_a_simulation_of_one_frame():
@@ -566,9 +566,9 @@ def test_solve_is_a_simulation_of_one_frame():
         [],
     )
     stepped = reduce(lambda done, _: [*done, phi(done[-1], 0.0001)], range(3), [phi.rest])[1:]
-    assert [float(f(V(a))) for f in frames] == pytest.approx([f.x[phi.nodes["A"]] for f in stepped])
+    assert [float(f(V(a))) for f in frames] == pytest.approx([phi.read(f)["V_A"] for f in stepped])
     assert frames[-1].time == sp.Rational(3, 10**4)
-    assert circuit.final(values)(V(a)) == 10 == pytest.approx(phi(phi.rest, math.inf).x[phi.nodes["A"]])
+    assert circuit.final(values)(V(a)) == 10 == pytest.approx(phi.read(phi(phi.rest, math.inf))["V_A"])
 
 
 def test_ac_is_the_frames_forever_under_a_sine():

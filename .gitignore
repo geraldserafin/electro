@@ -18,3 +18,4 @@ dist/
 # the auth worker's secrets in development
 .dev.vars
 .wrangler/
+apps/notebook/src/features/simulation/engine.gen.js

@@ -148,7 +148,9 @@ def formula(
     """The closed ``circuit`` read in ``frame`` after the frame ``after`` (a solution; by default from rest),
     ``values`` in (its elements' values, and data on quantities: ``{R: "1k", I(R): 2}``) and ``letters``
     (every independent source scaled by ``sources``). ``kept``: what was a frame before and the time stay
-    letters — the frame as a function of them. ``leak``: a whisper of a conductance from each named point to
+    letters — the frame as a function of them, its named points' potentials kept among what is found (each
+    gone, the next is worked out from it: a ladder of them is a polynomial in 1/dt of its length, numbers
+    no float holds). ``leak``: a whisper of a conductance from each named point to
     ground."""
     if circuit.free != (0, 0):
         raise NotClosed(*circuit.free)
@@ -206,9 +208,10 @@ def formula(
     appearing |= {x for c in choices for w in c for q in w.equations for x in symbols_in(q.expr)}
     variables = {x for x in appearing - known if not is_before(x)}
     params = {p.xreplace(to) for e in circuit.members for p in e.P.values()} - set(given)
+    staying = {v for v in points.values() if isinstance(v, sp.Symbol)} if kept else set()
     left = reduced(
         Relation(laws=tuple(laws), choices=choices, definitions=tuple(definitions)),
-        variables - params,
+        variables - params - staying,
         variables,
         _steady,
     )
