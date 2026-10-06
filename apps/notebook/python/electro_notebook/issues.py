@@ -7,9 +7,9 @@ from collections.abc import Mapping
 
 import sympy as sp
 from electro import Element
+from electro.circuit.names import names
 from electro.circuit.quantities import Quantity
 from electro.errors import Ambiguous, Contradiction, MissingData
-from electro.frame.formula import names
 from electro.values import parse
 
 from . import latex as tex

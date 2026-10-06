@@ -10,7 +10,7 @@ from typing import cast
 
 import sympy as sp
 from electro import Element, I, U, step_function
-from electro.frame.formula import names
+from electro.circuit.names import names
 from electro.values import parse
 
 from . import plots

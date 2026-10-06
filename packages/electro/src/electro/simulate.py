@@ -20,10 +20,11 @@ import sympy as sp
 
 from .circuit.algebra import expr, subs, symbols_in
 from .circuit.element import Element
+from .circuit.names import names
 from .circuit.quantities import Quantity, Scaled
 from .circuit.time import THETA, TIME, D
 from .errors import NotSimulated, ValueNeeded
-from .frame.formula import Formula, NotClosed, formula, names, parameter_values
+from .frame.formula import Formula, NotClosed, formula, parameter_values
 from .frame.reading import DT, Step, before, interpret, slope
 from .numeric.code import Code, Compiled, compile_equations, python, statements
 from .numeric.engine import Machine

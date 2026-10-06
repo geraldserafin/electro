@@ -12,7 +12,6 @@ uklad = GND >> E >> R_1 >> A >> R_2 >> GND
 sol = uklad.final({E: 12, R_1: 10, I(R_1): "500m"})
 sol(Parameter(R_2))   # 14
 sol(V(A))             # 7
-sol("U_R_1 / I_R_1")  # 10 — po nazwach też, wyrażenia bez eval
 sol.steps             # co wyliczono, z którego równania i dlaczego
 
 uklad.simulate({E: 12, R_1: 10, R_2: 14}, until=1)   # klatka po klatce
@@ -106,7 +105,7 @@ simulate.py klatka za klatką (na frame/ i numeric/)
 |---|---|---|---|
 | `__init__.py` | to, co daje `from electro import *` | prawie wszystkiego | jedno miejsce dla użytkownika |
 | `errors.py` | wyjątki z polami: `MissingData`, `Contradiction`… | `circuit/quantities` | błąd mówi, której wielkości dotyczy |
-| `values.py` | `"4k7"`, `"0,5 A"`, `"230∠-120"` na liczby; wyrażenia nazw bez `eval` | — | wartości wpisuje człowiek |
+| `values.py` | `"4k7"`, `"0,5 A"`, `"230∠-120"` na liczby | — | wartości wpisuje człowiek |
 | `parts.py` | części z katalogu (`part("1N4148")`) | — | parametry prawdziwych części |
 | **`circuit/`** | | | |
 | `algebra.py` | `Laws`: równania z pochodzeniem, wybory „albo-albo”, log; `eliminate` — jedyna operacja | `time` | jedna abstrakcja na składanie i rozwiązywanie |
@@ -114,18 +113,18 @@ simulate.py klatka za klatką (na frame/ i numeric/)
 | `element.py` | `Rel` (końce, `Laws`, prądy w punkty: `>>` = utożsamij + `eliminate`, `@` = `&`) i `Element` (rodzaj: końcówki i prawa) | `algebra`, `time` | serce: wszystko jest elementem |
 | `points.py` | punkty: `Node`, `GND`, pająki `wire`, `cap`, `cup`, `swap` | `element`, `algebra` | punkt to też element (Kirchhoff) |
 | `quantities.py` | `I(e)`, `U(e)`, `P(e)`, `V(punkt)`, `Parameter(e)` | `element`, `points` | czym są dane i szukane |
-| `names.py` | `"I_R_1"`, `"U_R_1 / I_R_1"` na wielkości, bez `eval` | `quantities`, `values` | nazwy pisane przez człowieka, bezpiecznie |
+| `names.py` | nazwy jak w książce: etykiety (`R_1`), zmienne (`I_R_1`, `V_A`) — przemianowanie (`Names.rename`) | `element`, `points`, `quantities` | kroki i wyniki mówią nazwami ucznia |
 | **`elements/`** | rodzaje: jeden na plik, rodziny w folderach; `physics.py` — złącze p-n, poziom logiczny | `circuit/element`, `circuit/time` | nowy element = nowy plik, nic więcej |
 | **`frame/`** | | | |
-| `reading.py` | `Step`, `DC`, `AC`: jak `D` i `Pre` stają się równaniem jednej klatki (trapezy, Euler) | `circuit/algebra`, `circuit/time` | jedno miejsce wie, jak się liczy czas |
-| `formula.py` | wzór klatki obwodu zamkniętego: nazwy jak w książce, `Laws.map` przez klatkę, dane wstawione, Kirchhoff w punktach, `eliminate`; `is_source` | `circuit/*`, `reading`, `values` | od tego miejsca nikt nie zna rodzajów elementów |
+| `reading.py` | `Step`, `DC`, `AC`: jak `D` i `Pre` stają się równaniem jednej klatki (trapezy, Euler); `reading(dane)` to funktor dla `Laws.map` | `circuit/algebra`, `circuit/time` | jedno miejsce wie, jak się liczy czas |
+| `formula.py` | wzór klatki: `rel.map(nazwy)`, potem `(prawa & kirchhoff).map(klatka z wartościami)`, dane, masa, `eliminate`; `is_source` | `circuit/*`, `reading`, `values` | od tego miejsca nikt nie zna rodzajów elementów |
 | **`numeric/`** | | | |
 | `code.py` | równania klatki jako kod (reszty i niezerowe miejsca Jakobianu), Python tu, JavaScript na stronę | `circuit/algebra`, `engine`, `sparse` | sympy raz przy kompilacji, potem same liczby |
 | `sparse.py` | kolejność eliminacji (Markowitz), wybrana raz; część stała osobno | — | szybkość: nie dotyka zer, nie liczy stałego dwa razy |
 | `engine.py` | `Machine` (pętla klatek, krok z błędu), `System`, `newton`, `homotopy` | tylko `math` | zwykły Python, pscript drukuje go jako JS dla strony — obie liczą tak samo |
 | **`solve/`** | | | |
 | `final.py` | `final`: klatka DC/AC na kartce (`eliminate`, kroki z logu), przypadkami albo Newtonem; `Solution` | `frame/*`, `numeric/code`, `numeric/engine` | odpowiedź i kroki |
-| **`simulate.py`** | `step_function` (Φ skompilowane raz), `simulate`, `Trace` (ślad); `RUNNER` — strona podstawia swój silnik | `frame/*`, `numeric/*`, `circuit/*` | obwód w czasie, w Pythonie i na stronie |
+| **`simulate.py`** | `step_function` (Φ skompilowane raz; co odczytać — po nazwach), `simulate`, `Trace` (ślad); `RUNNER` — strona podstawia swój silnik | `frame/*`, `numeric/*`, `circuit/*` | obwód w czasie, w Pythonie i na stronie |
 
 Droga `obwód.final(dane)`: `element.py` → `solve/final.py` → `frame/formula.py` (wzór klatki, przez
 `reading.py`, potem `eliminate`) → na kartce w `final.py` (znowu `eliminate`) albo `numeric/code.py` +
@@ -134,5 +133,10 @@ Droga `obwód.final(dane)`: `element.py` → `solve/final.py` → `frame/formula
 Droga `obwód.simulate(dane)`: `simulate.py` → `frame/formula.py` przy `Step(dt)` → `numeric/code.py`
 (kod + `sparse.py`) → `numeric/engine.py` `Machine` klatka za klatką → `Trace`. Strona bierze ten sam kod
 (`to_json`) i ten sam silnik, wydrukowany jako JavaScript (`apps/notebook/scripts/engine_js.py`).
+
+W notatniku (`apps/notebook/python/electro_notebook`), nie w bibliotece: wielkości pisane napisem
+(`sol("U_R_1 / I_R_1")` — przez zaczep `Solution.by_name`, wyrażenia bez `eval`), „która dana by pomogła”
+i „które dane się kłócą” (`hints.py`), liczby jako tekst (`text.py`), co czyta miernik i co pamięta
+(`kinds.py`), gdzie strona znajduje punkty i prądy (`board.program`), silnik strony (`page.py`).
 
 Projekt i decyzje: [`DESIGN.md`](DESIGN.md). Testy: `devenv shell`, potem `pytest` w `packages/electro`.

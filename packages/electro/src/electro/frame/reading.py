@@ -8,6 +8,7 @@ before turned by ω·dt, infinitely short — ``D`` comes out jω, found as the 
 
 from __future__ import annotations
 
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass, fields
 from typing import cast
 
@@ -36,6 +37,10 @@ class Step:
     def product(self, a: sp.Expr, b: sp.Expr) -> sp.Expr:
         """Two quantities multiplied (a power: a voltage and a current), as this frame reads it."""
         return a * b
+
+    def reading(self, given: Mapping[sp.Symbol, sp.Expr]) -> Callable[[sp.Expr], sp.Expr]:
+        """A law as this frame reads it, ``given`` in: what ``Laws.map`` takes."""
+        return lambda e: self.timed((interpret(e, self) if e.has(D, Pre) else e).xreplace(given))
 
     def letters(self) -> set[sp.Symbol]:
         """The letters the frame itself brings (its length, …): never to be found."""

@@ -6,8 +6,8 @@ from __future__ import annotations
 from collections.abc import Mapping
 
 import sympy as sp
+from electro.circuit.names import Names
 from electro.circuit.quantities import Current, Parameter, Potential, Power, Quantity, Scaled, Voltage
-from electro.frame.formula import Names
 from sympy.printing.latex import LatexPrinter
 
 from .text import fmt

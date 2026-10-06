@@ -20,9 +20,9 @@ from operator import matmul
 
 import sympy as sp
 from electro import GND, Element, Net, Node, Part
+from electro.circuit.names import names
 from electro.circuit.quantities import Across, Current, Parameter, Potential, Power, Quantity, Scaled, Sum, Voltage
 from electro.elements import BY_KIND
-from electro.frame.formula import names
 from electro.values import UNKNOWN
 
 from .kinds import reading

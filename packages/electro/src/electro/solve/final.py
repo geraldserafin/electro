@@ -15,10 +15,11 @@ import sympy as sp
 
 from ..circuit.algebra import Equation, Known, Laws, Origin, SolutionStep, Way, expr, subs, symbols_in
 from ..circuit.element import Element
+from ..circuit.names import Names
 from ..circuit.quantities import Current, Power, Quantity, Scaled, Voltage
 from ..circuit.time import TIME
 from ..errors import Ambiguous, Contradiction, MissingData, NotLinear, Undetermined
-from ..frame.formula import Formula, Names, formula
+from ..frame.formula import Formula, formula
 from ..frame.reading import AC, DC, Step, frequencies
 from ..numeric.code import compile_equations
 from ..numeric.engine import homotopy

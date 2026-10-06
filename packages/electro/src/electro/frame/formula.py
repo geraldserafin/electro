@@ -10,7 +10,6 @@ there — they hold whatever is added to all — so the choice is free.
 
 from __future__ import annotations
 
-from collections import Counter
 from collections.abc import Mapping
 from dataclasses import dataclass, field
 from typing import cast
@@ -18,9 +17,9 @@ from typing import cast
 import sympy as sp
 
 from ..circuit.algebra import Equation, Known, Laws, Origin, expr, linear, normal, symbols_in
-from ..circuit.element import NAMED, POTENTIALS, Element
-from ..circuit.points import Node
-from ..circuit.quantities import Across, Current, Parameter, Potential, Power, Quantity, Scaled, Sum, Voltage
+from ..circuit.element import NAMED, POTENTIALS, Element, Rel
+from ..circuit.names import Names, names
+from ..circuit.quantities import Potential, Quantity, Scaled
 from ..circuit.time import TIME, D, Pre
 from ..values import UNKNOWN, parse
 from .reading import DT, Step, before, interpret, is_before
@@ -36,63 +35,6 @@ class NotClosed(ValueError):
 
 class NoSuchParameter(ValueError):
     """A value given for a name no element has."""
-
-
-@dataclass(frozen=True)
-class Names:
-    """A closed circuit's elements by their labels (``R_1``) and its variables by the names a book gives
-    them."""
-
-    labels: Mapping[Element, str]
-    to: Mapping[sp.Symbol, sp.Expr]
-    points: Mapping[Node, sp.Expr]
-
-    def of(self, q: Quantity | Scaled) -> sp.Expr:
-        """A quantity in the named variables."""
-        match q:
-            case Current(e, at):
-                return e.I[at or e.terminals[0]].xreplace(self.to)
-            case Voltage(e):
-                a, b = e.terminals[:2]
-                return (e.V[a] - e.V[b]).xreplace(self.to)
-            case Parameter(e, which):
-                return e.P[which].xreplace(self.to)
-            case Potential(p):
-                return self.points.get(p, p.potential)
-            case Across(a, b):
-                return self.of(Potential(a)) - self.of(Potential(b))
-            case Power(e):
-                return self.of(Voltage(e)) * self.of(Current(e))
-            case Scaled(k, x):
-                return k * self.of(x)
-            case Sum(terms):
-                return sp.Add(*(self.of(t) for t in terms))
-        raise TypeError(q)
-
-
-def names(circuit: Element) -> Names:
-    labels = _labels(circuit.members)
-    to: dict[sp.Symbol, sp.Expr] = {}
-    for e in circuit.members:
-        label = labels[e]
-        for t, v in e.V.items():
-            if isinstance(v, sp.Symbol):
-                to[v] = sp.Symbol(f"V_{label}_{t}")
-        two = len(e.terminals) == 2
-        to |= {
-            x: sp.Symbol(f"I_{label}" if two else f"I_{label}_{t}") for t, x in e.I.items() if isinstance(x, sp.Symbol)
-        }
-        base = e.name or label
-        to |= {x: sp.Symbol(f"{w}_{base}" if w else base) for w, x in e.P.items() if isinstance(x, sp.Dummy)}
-        to |= {x: sp.Symbol(f"{name}_{label}") for name, x in e.inner.items()}
-    points = {}
-    every = _points(circuit)
-    alike = Counter(p.label for p in every)
-    for k, p in enumerate(every, 1):
-        if isinstance(p.potential, sp.Dummy):
-            points[p] = sp.Symbol(f"V_{p.label}" if p.label and alike[p.label] == 1 else f"V_n{k}")
-            to[p.potential] = points[p]
-    return Names(labels, to, points)
 
 
 @dataclass(frozen=True)
@@ -131,13 +73,11 @@ def formula(
     if circuit.free != (0, 0):
         raise NotClosed(*circuit.free)
     n = names(circuit)
-    rel = circuit.rel.map(lambda e: e.xreplace(n.to))
+    rel = circuit.rel.map(n.rename)
     given = {**parameter_values(circuit, values, n), **(letters or {})}
     if sources != 1:
         given = _scaled(given, circuit, n, sources)
-    said = rel.laws.expressions()
-    under_d = frozenset(expr(a.args[0]) for e in said for a in e.atoms(D))
-    under_pre = frozenset(expr(a.args[0]) for e in said for a in e.atoms(Pre))
+    under_d, under_pre = remembered(rel.laws)
     time = sp.oo
     if not kept:
         given |= {before(x): after.evaluated(x) if after is not None else sp.Integer(0) for x in under_d | under_pre}
@@ -145,24 +85,15 @@ def formula(
             time = (after.time if after is not None else sp.Integer(0)) + frame.dt
             given[TIME] = time
 
-    def read(e: sp.Expr) -> sp.Expr:
-        return frame.timed((interpret(e, frame) if e.has(D, Pre) else e).xreplace(given))
-
-    points = {p: n.of(Potential(p)) for p in _points(circuit)}
-    kcl = [
-        Equation(sp.Add(*(i for q, i in rel.taps if q == p)) + leak * v, Origin("kcl", p))
-        for p, v in points.items()
-        if v != 0
-    ]
-    kcl += [Equation(end.i, Origin("kcl", None)) for end in (*rel.left, *rel.right)]
-    laws = (rel.laws & Laws(tuple(kcl))).map(read)
+    read = frame.reading(given)
+    laws = (rel.laws & kirchhoff(rel, n, leak)).map(read)
     laws &= Laws(tuple(Equation(laws.resolve(read(q.expr)), q.origin) for q in conditions(values, n)))
     laws &= Laws(_references(laws, {n.to.get(v, v) for v in POTENTIALS | NAMED}))
     known = {x for v in given.values() for x in symbols_in(v)} | frame.letters() | {TIME}
     appearing = {x for q in _said(laws) for x in symbols_in(q.expr)}
     variables = {x for x in appearing - known if not is_before(x)}
     params = {p.xreplace(n.to) for e in circuit.members for p in e.P.values()} - set(given)
-    staying = {v for v in points.values() if isinstance(v, sp.Symbol)} if kept else set()
+    staying = {v for p, _ in rel.taps if isinstance(v := n.of(Potential(p)), sp.Symbol)} if kept else set()
     left = laws.eliminate(variables - params - staying, linear(variables, _steady))
     left = Laws(_once(Equation(normal(q.expr), q.origin) for q in left.equations), left.choices, left.log)
     unknowns = ({x for q in _said(left) for x in symbols_in(q.expr)} & variables) | params
@@ -177,6 +108,24 @@ def formula(
         (under_d, under_pre),
         time,
     )
+
+
+def remembered(laws: Laws) -> tuple[frozenset[sp.Expr], frozenset[sp.Expr]]:
+    """What the laws keep under ``D``, and under ``Pre``."""
+    said = laws.expressions()
+    return tuple(frozenset(expr(a.args[0]) for e in said for a in e.atoms(w)) for w in (D, Pre))  # type: ignore[return-value]
+
+
+def kirchhoff(rel: Rel, n: Names, leak: float = 0.0) -> Laws:
+    """What comes into each named point is 0 (``leak``: a whisper of a conductance from each to ground);
+    nothing comes in at a closed circuit's ends."""
+    points = {p: n.of(Potential(p)) for p in dict.fromkeys(q for q, _ in rel.taps)}
+    kcl = [
+        Equation(sp.Add(*(i for q, i in rel.taps if q == p)) + leak * v, Origin("kcl", p))
+        for p, v in points.items()
+        if v != 0
+    ]
+    return Laws((*kcl, *(Equation(end.i, Origin("kcl", None)) for end in (*rel.left, *rel.right))))
 
 
 def _said(laws: Laws) -> list[Equation]:
@@ -295,34 +244,3 @@ def _once(eqs) -> tuple[Equation, ...]:
         seen.add(q.expr)
         out.append(q)
     return tuple(out)
-
-
-def _labels(members: tuple[Element, ...]) -> dict[Element, str]:
-    """An element's name when no other has it; the others numbered by their prefix in order (``R_1``,
-    ``R_2``), past the names taken (``R1`` takes ``R_1`` too)."""
-    named = [e.name for e in members]
-    unique = {x for x in named if x and named.count(x) == 1}
-    taken = {x.replace("_", "") for x in unique}
-    counters: Counter[str] = Counter()
-    out = {}
-    for e in members:
-        if e.name in unique:
-            out[e] = e.name
-            continue
-        while True:
-            counters[e.prefix] += 1
-            label = f"{e.prefix}_{counters[e.prefix]}"
-            if label.replace("_", "") not in taken:
-                taken.add(label.replace("_", ""))
-                out[e] = label
-                break
-    return out
-
-
-def _points(circuit: Element) -> list[Node]:
-    """Its named points, in the order they are first met."""
-    out: list[Node] = []
-    for p, _ in circuit.rel.taps:
-        if p not in out:
-            out.append(p)
-    return out
