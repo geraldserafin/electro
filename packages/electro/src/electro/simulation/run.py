@@ -32,16 +32,13 @@ class Simulation:
 
     def __init__(self, program: Program):
         self.program = program
-        self.kernel, self.update, self.flow = program.functions()
+        self.kernel, self.update, _ = program.functions()
         self.n = len(program.unknowns)
         self.x = [0.0] * self.n
         self.p = list(program.initial)
         self.t = 0.0
         self.switched = False
         self.step = 0.0
-
-    def set_input(self, name: str, value: float) -> None:
-        self.p[self.program.inputs[name]] = float(value)
 
     def newton(self, dt: float) -> list[float] | None:
         n, p = self.n, self.p
