@@ -1,8 +1,13 @@
 """The engine every frame runs on: numbers only, no algebra — plain Python, so that the page gets it as
 JavaScript printed from this very file (``scripts/engine_js.py``, by pscript). ``Machine`` is a circuit in
-time, one function with memory: frame after frame from rest, each step as long as what is remembered
-allows, Newton's method on a frame's equations (compiled from its formula: ``code``), a p-n junction
-approached along its exponential as SPICE does.
+time, one function with memory: frame after frame from rest, Newton's method on a frame's equations
+(compiled from its formula: ``code``), a p-n junction approached along its exponential as SPICE does.
+
+How long a step is follows from one rule: the error it makes. A change is read by trapezoids, whose error
+over a step is dt³/12 times the third derivative; after a jump, back over the step, dt²/2 times the second.
+Both are read off what is remembered at the last few frames (divided differences, as SPICE does) — never off
+the slopes, which a stiff junction makes ring, step after step, while what it remembers stands still. A step
+whose error is over the tolerance is taken again shorter; the next is as long as keeps it under.
 
 A frame's equations are a ``System``: their Jacobian sparse, eliminated in an order ``code`` chose once
 (``sparse``). Its entries that the unknowns do not change (a resistor's, a capacitor's C/dt) are worked out
@@ -24,6 +29,8 @@ ROUGH = 2
 """Steps back over the step (θ = 1) after a jump, before trapezoids."""
 GUESSES = 64
 """Input combinations whose circuit is remembered as Newton's first guess (the most recent)."""
+TRTOL, TRABS = 1e-3, 1e-6
+"""The error a step may make in what it remembers: this part of it, and this much more."""
 
 
 class NoConvergence(Exception):
@@ -36,21 +43,32 @@ class NoConvergence(Exception):
 
 class Machine:
     """A circuit in time. ``program``: ``initial`` (the parameters at rest: dt, t, how a change is read —
-    θ: 1 back over the step, ½ trapezoids —, what is remembered, what the world sets), ``states`` (each remembered value's parameter and the most it may move in a step, None:
-    it jumps), ``inputs`` (name → parameter), ``junctions`` (unknown, scale, bend) and the unknowns' count
-    ``n``. Its memory: the time ``t``, the unknowns ``x``, the parameters ``p``, the next step's length."""
+    θ: 1 back over the step, ½ trapezoids —, what is remembered, what the world sets), ``states`` (each
+    remembered value's parameter, in the order ``update`` gives them), ``changing`` (the places in ``states``
+    of what changes, under ``D``: what a step's error is read from), ``jumps`` (those that jump: a
+    flip-flop's state, a switch in time), ``longest`` (the longest a step may be, or None), ``inputs`` (name → parameter), ``junctions`` (unknown, scale,
+    bend) and the unknowns' count ``n``. Its memory: the time ``t``, the unknowns ``x``, the parameters
+    ``p``, the next step's length."""
 
     def __init__(self, program, system, update):
         self.system = system
         self.update = update
         self.n = program["n"]
         self.states = program["states"]
+        self.changing = program["changing"]
+        self.jumps = program["jumps"]
+        self.longest = program["longest"]
         self.junctions = program["junctions"]
         self.inputs = program["inputs"]
         self.places = sorted([self.inputs[k] for k in self.inputs])
         self.x = [0.0 for _ in range(self.n)]
         self.p = [v for v in program["initial"]]
         self.after = [0.0 for _ in self.states]
+        # what changes at the frames before this one, and how long the steps between them were: since the last
+        # jump only (a slope is no slope across one)
+        self.back = [[0.0, 0.0] for _ in self.changing]
+        self.steps = [0.0, 0.0]
+        self.known = 0
         self.t = 0.0
         self.step = 0.0
         self.switched = False
@@ -95,36 +113,62 @@ class Machine:
         self.changed = False
         return newton(self.system, x0, self.p, self.junctions)
 
+    def error(self, dt):
+        """How far over the tolerance the step's error is (1: at it); 0 when too few frames since the last
+        jump tell."""
+        if self.rough == ROUGH:
+            self.known = 0
+        if self.known < 1:
+            return 0.0
+        h1, h2 = self.steps[0], self.steps[1]
+        worst = 0.0
+        for k in range(len(self.changing)):
+            v = self.changing[k]
+            x1, x0, xa, xb = self.after[v], self.p[self.states[v]], self.back[k][0], self.back[k][1]
+            d1 = (x1 - x0) / dt
+            second = (d1 - (x0 - xa) / h1) / (dt + h1)
+            if self.p[2] == 1.0 or self.known < 2:
+                err = dt * dt * abs(second)
+            else:
+                third = (second - ((x0 - xa) / h1 - (xa - xb) / h2) / (h1 + h2)) / (dt + h1 + h2)
+                err = dt * dt * dt * abs(third) / 2
+            worst = max(worst, err / (TRTOL * max(abs(x0), abs(x1)) + TRABS))
+        return worst
+
     def advance(self, dt, jump):
-        """Try one step of ``dt``: [taken, how much of its allowed move a remembered value used]; ``jump``:
-        taken whatever the move, as long as Newton got there."""
+        """Try one step of ``dt``: [taken, its error against the tolerance]; ``jump``: taken whatever the
+        error, as long as Newton got there."""
         x = self.frame(dt)
         if x is None:
             return [False, math.inf]
         self.update(x, self.p, self.after)
-        change = 0.0
-        for k in range(len(self.states)):
-            i, most = self.states[k]
-            if most is not None:
-                change = max(change, abs(self.after[k] - self.p[i]) / most)
-        if change > 1 and not jump:
-            return [False, change]
+        err = self.error(dt)
+        if err > 1 and not jump:
+            return [False, err]
+        for k in range(len(self.changing)):
+            self.back[k][1] = self.back[k][0]
+            self.back[k][0] = self.p[self.states[self.changing[k]]]
+        self.steps[1] = self.steps[0]
+        self.steps[0] = dt
+        self.known += 1
         self.x = x
         self.t += dt
         self.switched = False
         self.rough = max(0, self.rough - 1)
-        for k in range(len(self.states)):
-            i, most = self.states[k]
-            if most is None and self.after[k] != self.p[i]:
+        for k in self.jumps:
+            if self.after[k] != self.p[self.states[k]]:
                 self.switched = True
                 self.rough = ROUGH
-            self.p[i] = self.after[k]
-        return [True, change]
+        for k in range(len(self.states)):
+            self.p[self.states[k]] = self.after[k]
+        return [True, err]
 
     def advance_to(self, target, dt_max, schedule=None, on_frame=None):
-        """Steps up to ``target``, at most ``dt_max``: shorter while what is remembered moves fast, after
+        """Steps up to ``target``, at most ``dt_max``, each as long as its error allows; shorter after
         something jumped, or when Newton did not get there; in the shortest step a value may jump for real (a
         capacitor put across an ideal source)."""
+        if self.longest is not None:
+            dt_max = min(dt_max, self.longest)
         dt_min = dt_max * 1e-9
         self.step = min(self.step if self.step > 0 else min(dt_max, 1e-6), dt_max)
         while self.t < target - 1e-15:
@@ -134,18 +178,19 @@ class Machine:
                     if self.p[pair[0]] != pair[1]:
                         self.p[pair[0]] = pair[1]
                         self.rough = ROUGH
-            taken, change = self.advance(h, h <= dt_min)
+            taken, err = self.advance(h, h <= dt_min)
             if not taken:
                 if h <= dt_min:
                     raise NoConvergence(self.t)
-                self.step = h / 4 if change == math.inf else h / 2
+                self.step = h / 4 if err == math.inf else h * max(0.1, 0.9 * math.exp(-math.log(err) / 3))
                 continue
             if on_frame is not None:
                 on_frame(self)
             if self.switched:
                 self.step = max(dt_min, h / 8)
-            elif change < 0.25 and h >= self.step * 0.999:
-                self.step = min(dt_max, h * 2)
+            elif h >= self.step * 0.999:
+                grow = 2.0 if err < 0.1 else 0.9 * math.exp(-math.log(err) / 3)
+                self.step = min(dt_max, h * min(2.0, grow))
 
     def run(self, until, dt_max, schedule=None, on_frame=None):
         """From rest to ``until``; ``on_frame`` gets every frame, at t = 0 too, after a first tiny step (the

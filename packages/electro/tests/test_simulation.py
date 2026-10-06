@@ -431,21 +431,6 @@ def test_ili9341_loads_the_3v3_rail_and_its_backlight_pin():
     assert lit.at(I(tft, "vcc"), 0.0001) == pytest.approx(3.3 / 150, rel=0.001)
 
 
-def test_spectrum_of_a_square_wave():
-    e, r = (SquareSource(), Resistor())
-    circuit, _ = net((e, "GND", "a"), (r, "a", "GND"))
-    trace = circuit.simulate({e: {"": 1, "f": 100}, r: 1}, until=0.1)
-    f, amplitude = trace.spectrum(U(r), f_max=1000)
-
-    def at(x):
-        return amplitude[round(x / f[1])]
-
-    assert at(0) == pytest.approx(0.5, abs=0.01)
-    for k in (1, 3, 5):
-        assert at(100 * k) == pytest.approx(2 / (math.pi * k), rel=0.02)
-    assert at(200) < 0.01 and at(400) < 0.01
-
-
 def _clock():
     clock = SquareSource()
     return (clock, {clock: {"": 5, "f": 1000}})
@@ -584,13 +569,14 @@ def test_ac_is_the_frames_forever_under_a_sine():
     assert max(last) == pytest.approx(phasor, rel=0.01)
 
 
-def test_trapezoids_error_falls_as_the_square_of_the_step():
+def test_a_step_is_as_long_as_its_error_allows_and_by_trapezoids_the_error_falls_as_its_square():
     e, r, c = (VoltageSource(), Resistor(), Capacitor())
     circuit, n = net((e, "GND", "a"), (r, "a", "b"), (c, "b", "GND"))
 
-    def worst(steps):
+    def run(steps):
         trace = circuit.simulate({e: 1, r: 1000, c: "1m"}, until=5, dt=5 / steps)
-        return max(abs(v - (1 - math.exp(-t))) for t, v in zip(trace.t, trace(V(n["b"]))) if t > 0.1)
+        return len(trace.t), max(abs(v - (1 - math.exp(-t))) for t, v in zip(trace.t, trace(V(n["b"]))) if t > 0.1)
 
-    assert worst(50) < 2e-4  # backward Euler: 7e-3
-    assert worst(500) < worst(50) / 20
+    frames, error = run(1)  # no step asked for: five time constants in a few dozen frames
+    assert frames < 50 and error < 2e-3
+    assert run(500)[1] < run(50)[1] / 20

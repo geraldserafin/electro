@@ -8,7 +8,7 @@ conductance to ground: a floating one is never a singular matrix.
 
 from __future__ import annotations
 
-import cmath
+import bisect
 import importlib
 import json
 import math
@@ -31,14 +31,10 @@ from .numeric.code import Code, Compiled, compile_equations, python, statements
 from .numeric.engine import Machine, NoConvergence
 
 G_NODE = 1e-12
-STEP_VOLTS, STEP_AMPS = 0.05, 1e-3
-"""How far a remembered voltage (or anything else) may move in one step; a remembered current."""
-ANY = 1e300
-"""How far a value may move in one step when it may move any way (a slope)."""
 SAMPLE_DT = 1e-5
 """A step's length in the sample frame whose numbers choose the pivots (``sparse``)."""
-SINE_STEPS, EDGE_STEPS = 40, 100
-"""Steps at least in a period of a sine, of a square wave."""
+PERIOD_STEPS = 40
+"""Steps at least in a period of anything in time in the data (a sine, a square wave)."""
 
 
 class NoSuchInput(KeyError):
@@ -62,8 +58,9 @@ class Frame:
 @dataclass
 class StepFunction:
     """Φ. ``equations``: a step's, over its unknowns; its parameters ``dt``, the time at the step's end, what
-    is remembered and what the world sets. ``states``: each remembered value's parameter and the most it may
-    move in a step (None: it jumps). ``update`` fills what is remembered after a step. ``seen``: what is read
+    is remembered and what the world sets. ``states``: each remembered value's parameter, ``changing`` the
+    places in ``states`` of what changes (under ``D``), ``jumps`` those that jump, ``longest`` the longest a
+    step may be; ``update`` fills what is remembered after a step. ``seen``: what is read
     of a frame, by name — each point's potential, each element's voltage, currents and what its kind shows —
     worked out straight from the unknowns by ``see``; ``nodes``, ``parts`` and ``flows`` (each terminal's
     current, into its element) say where in it the page finds a point and an element."""
@@ -72,7 +69,10 @@ class StepFunction:
     left: Formula
     equations: Compiled
     initial: list[float]
-    states: list[tuple[int, float | None]]
+    states: list[int]
+    changing: list[int]
+    jumps: list[int]
+    longest: float | None
     inputs: dict[str, int]
     update_body: Code
     seen: dict[str, sp.Expr]
@@ -108,9 +108,20 @@ class StepFunction:
 
     def machine(self) -> Machine:
         """Φ with memory: from rest, frame after frame."""
-        program = {"n": len(self.unknowns), "states": self.states, "inputs": self.inputs}
-        program |= {"junctions": self.equations.junctions, "initial": self.initial}
-        return Machine(program, self.equations.system, self.functions()[0])
+        return Machine(self.program(), self.equations.system, self.functions()[0])
+
+    def program(self) -> dict:
+        """What the engine's ``Machine`` runs, but its code."""
+        return {
+            "n": len(self.unknowns),
+            "initial": self.initial,
+            "states": self.states,
+            "changing": self.changing,
+            "jumps": self.jumps,
+            "longest": self.longest,
+            "inputs": self.inputs,
+            "junctions": self.equations.junctions,
+        }
 
     @property
     def rest(self) -> Frame:
@@ -126,7 +137,7 @@ class StepFunction:
             return None
         after = [0.0] * len(self.states)
         self.functions()[0](x, p, after)
-        for (i, _), v in zip(self.states, after):
+        for i, v in zip(self.states, after):
             p[i] = v
         return Frame(frame.t + dt, x, p)
 
@@ -138,12 +149,9 @@ class StepFunction:
         """For the page's engine (``simulation/engine.ts``)."""
         return json.dumps(
             {
+                **self.program(),
                 "unknowns": self.unknowns,
                 "params": self.params,
-                "initial": self.initial,
-                "states": self.states,
-                "inputs": self.inputs,
-                "junctions": self.equations.junctions,
                 "constant": self.equations.constant["js"],
                 "moving": self.equations.moving["js"],
                 "shape": self.equations.shape,
@@ -162,8 +170,8 @@ class StepFunction:
 class _State:
     symbol: sp.Symbol
     update: sp.Expr
-    initial: float
-    most: float | None
+    initial: float = 0.0
+    jumps: bool = False
 
 
 def step_function(circuit: Element, values: Mapping) -> StepFunction:
@@ -188,9 +196,11 @@ def step_function(circuit: Element, values: Mapping) -> StepFunction:
         raise ValueNeeded(min(p.name for p in left.params))
     exprs = [q.expr for q in left.laws.equations]
     unknowns = list(left.unknowns)
-    memory = _memory(left, {**given, **letters})
-    clocks = _clocks(left.laws.expressions())
-    states = memory + clocks
+    memory, changing = _memory(left, {**given, **letters})
+    edges = sorted(
+        {p for e in left.laws.expressions() for p in e.atoms(sp.Piecewise) if symbols_in(p) == {TIME}}, key=str
+    )
+    states = memory + [_State(sp.Symbol(f"edge{k}"), p, float(p.subs(TIME, 0)), True) for k, p in enumerate(edges)]
     params = [DT, TIME, THETA, *(st.symbol for st in states), *(letter for _, letter, _ in inputs)]
     parts = _observed(circuit, left)
     flowing = {f"{labels[e]}.{t}": c.xreplace(left.names.to) for e in circuit.members for t, c in e.I.items()}
@@ -210,7 +220,10 @@ def step_function(circuit: Element, values: Mapping) -> StepFunction:
         left=left,
         equations=compiled,
         initial=initial,
-        states=[(3 + k, st.most) for k, st in enumerate(states)],
+        states=[3 + k for k in range(len(states))],
+        changing=changing,
+        jumps=[k for k, st in enumerate(states) if st.jumps],
+        longest=_longest(left.laws.expressions()),
         inputs={letter.name: 3 + len(states) + k for k, (_, letter, _) in enumerate(inputs)},
         update_body=statements([(f"out[{k}]", st.update) for k, st in enumerate(states)], unknowns, params),
         seen=seen,
@@ -222,32 +235,20 @@ def step_function(circuit: Element, values: Mapping) -> StepFunction:
     )
 
 
-def _memory(left: Formula, values) -> list[_State]:
+def _memory(left: Formula, values) -> tuple[list[_State], list[int]]:
     """What is remembered, from rest: each quantity under ``D`` or ``Pre``, after a step as what is found then
-    has it. An inner one only under ``Pre`` is a state that jumps (a flip-flop's); the rest move at most so far
-    a step. Of each under ``D``, how fast it changed at the end of the step too, for the next to go by
-    trapezoids."""
+    has it (one only under ``Pre`` and worked out through a ``when`` jumps: a flip-flop's state); of each under
+    ``D``, how fast it changed at the end of the step too, for the next to go by trapezoids. And the places
+    of those under ``D``: what a step's error is read off."""
     under_d, under_pre = left.remembered
-    kept = [
-        _State(before(x), left.laws.resolve(subs(x, values)), 0.0, None if x not in under_d and _inner(x) else _most(x))
-        for x in sorted(under_d | under_pre, key=str)
+    kept = sorted(under_d | under_pre, key=str)
+    states = [
+        _State(before(x), u := left.laws.resolve(subs(x, values)), 0.0, x not in under_d and u.has(sp.Piecewise))
+        for x in kept
     ]
-    slopes = [
-        _State(slope(x), left.laws.resolve(subs(interpret(D(x), Step(DT, THETA)), values)), 0.0, ANY)
-        for x in sorted(under_d, key=str)
-    ]
-    return kept + slopes
-
-
-def _inner(x: sp.Expr) -> bool:
-    return not any(s.name.startswith(("V_", "I_")) for s in symbols_in(x))
-
-
-def _most(x: sp.Expr) -> float:
-    names = [s.name for s in symbols_in(x)]
-    if not any(n.startswith("V_") for n in names) and any(n.startswith("I_") for n in names):
-        return STEP_AMPS
-    return STEP_VOLTS
+    changing = sorted(under_d, key=str)
+    states += [_State(slope(x), left.laws.resolve(subs(interpret(D(x), Step(DT, THETA)), values))) for x in changing]
+    return states, [kept.index(x) for x in changing]
 
 
 def _observed(circuit: Element, left: Formula) -> dict[str, dict[str, tuple[str, sp.Expr]]]:
@@ -277,23 +278,16 @@ def _observed(circuit: Element, left: Formula) -> dict[str, dict[str, tuple[str,
     return out
 
 
-def _clocks(exprs: list[sp.Expr]) -> list[_State]:
-    """What time does in the data: steps short enough for each sine (``SINE_STEPS`` a period) and square wave
-    (``EDGE_STEPS``), and each switch in time remembered, so a step after it starts short again."""
-    limits: list[float] = []
-    edges: list[sp.Expr] = []
-    for e in exprs:
-        for a in e.atoms(sp.sin, sp.cos):
-            if TIME in a.free_symbols:
-                limits.append(2 * math.pi / abs(float(sp.diff(a.args[0], TIME))) / SINE_STEPS)
-        for a in e.atoms(sp.Mod):
-            if TIME in a.free_symbols:
-                limits.append(abs(float(a.args[1] / sp.diff(a.args[0], TIME))) / EDGE_STEPS)
-        edges += [p for p in e.atoms(sp.Piecewise) if symbols_in(p) == {TIME} and p not in edges]
-    states = [_State(sp.Symbol(f"edge{k}"), p, float(p.subs(TIME, 0)), None) for k, p in enumerate(edges)]
-    if limits:
-        states.append(_State(sp.Symbol("clock"), TIME, 0.0, min(limits)))
-    return states
+def _longest(exprs: list[sp.Expr]) -> float | None:
+    """The longest a step may be: ``PERIOD_STEPS`` in a period of each sine and square wave in time."""
+    timed = [a for e in exprs for a in e.atoms(sp.sin, sp.cos, sp.Mod) if TIME in a.free_symbols]
+    periods = [
+        abs(float(a.args[1] / sp.diff(a.args[0], TIME)))
+        if isinstance(a, sp.Mod)
+        else 2 * math.pi / abs(float(sp.diff(a.args[0], TIME)))
+        for a in timed
+    ]
+    return min(periods) / PERIOD_STEPS if periods else None
 
 
 def _check_square(exprs: list[sp.Expr], unknowns: list[sp.Symbol], params: list[sp.Symbol], laws: int) -> None:
@@ -452,23 +446,13 @@ class Trace:
         return [float(f(*row)) for row in zip(*columns)] if names else [float(e)] * len(self.t)
 
     def at(self, q: Quantity | Scaled | str, t: float) -> float:
-        """``q`` at the last frame not after ``t``."""
-        k = max((i for i, s in enumerate(self.t) if s <= t + 1e-15), default=0)
-        return self(q)[k]
-
-    def spectrum(self, q: Quantity | Scaled | str, points: int = 4096, f_max: float | None = None):
-        """``q``'s amplitude at each frequency (the trace resampled evenly, a Hann window): a sine of 5 V at 50 Hz
-        is a peak of 5 at 50. Up to ``f_max`` Hz (by default a quarter of the sampling rate)."""
-        t0, t1 = self.t[0], self.t[-1]
-        n = 1 << max(3, (points - 1).bit_length())
-        dt = (t1 - t0) / n
-        window = [0.5 - 0.5 * math.cos(2 * math.pi * k / n) for k in range(n)]
-        keep = n // 4 if f_max is None else min(n // 2, int(f_max * dt * n) + 1)
-        samples = _resample(self.t, self(q), [t0 + k * dt for k in range(n)])
-        mean = sum(samples) / n
-        spectrum = _fft([(v - mean) * w for v, w in zip(samples, window)])
-        gain = 2 / sum(window)
-        return [k / (dt * n) for k in range(keep)], [abs(mean)] + [abs(x) * gain for x in spectrum[1:keep]]
+        """``q`` at ``t``: between two frames, on the line between them."""
+        k = bisect.bisect_right(self.t, t) - 1
+        ys = self(q)
+        if k < 0 or k + 1 >= len(self.t) or self.t[k] == t:
+            return ys[min(max(k, 0), len(ys) - 1)]
+        f = (t - self.t[k]) / (self.t[k + 1] - self.t[k])
+        return ys[k] + f * (ys[k + 1] - ys[k])
 
     def _column(self, name: str) -> list[float]:
         phi = self.phi
@@ -479,40 +463,3 @@ class Trace:
         if name in phi.seen:
             return self._of(phi.seen[name])
         raise KeyError(name)
-
-
-def _resample(t: list[float], y: list[float], at: list[float]) -> list[float]:
-    out, i = [], 0
-    for s in at:
-        while i + 1 < len(t) - 1 and t[i + 1] <= s:
-            i += 1
-        j = min(i + 1, len(t) - 1)
-        f = 0.0 if t[j] == t[i] else min(max((s - t[i]) / (t[j] - t[i]), 0.0), 1.0)
-        out.append(y[i] + f * (y[j] - y[i]))
-    return out
-
-
-def _fft(x: list[float]) -> list[complex]:
-    """Radix-2 (``len(x)`` a power of two), iterative: no numpy in the notebook."""
-    n = len(x)
-    a = [complex(v) for v in x]
-    j = 0
-    for i in range(1, n):
-        bit = n >> 1
-        while j & bit:
-            j ^= bit
-            bit >>= 1
-        j |= bit
-        if i < j:
-            a[i], a[j] = a[j], a[i]
-    size = 2
-    while size <= n:
-        w = cmath.exp(-2j * math.pi / size)
-        for start in range(0, n, size):
-            wk = 1
-            for k in range(size // 2):
-                u, v = a[start + k], a[start + k + size // 2] * wk
-                a[start + k], a[start + k + size // 2] = u + v, u - v
-                wk *= w
-        size <<= 1
-    return a

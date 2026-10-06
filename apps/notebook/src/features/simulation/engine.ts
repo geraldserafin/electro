@@ -10,7 +10,10 @@ export interface ProgramData {
   unknowns: string[];
   params: string[];
   initial: number[];
-  states: [number, number | null][]; // param index, the most it may change in a step (null: it jumps)
+  states: number[]; // each remembered value's param index, in the order update gives them
+  changing: number[]; // places in states of what changes (under D): what a step's error is read off
+  jumps: number[]; // places in states of what jumps (a flip-flop's state, a switch in time)
+  longest: number | null; // the longest a step may be
   inputs: Record<string, number>; // name -> param index
   junctions: [number, number, number][]; // unknown index, n·V_T, V_crit
   constant: string; // fills A with the Jacobian's entries the unknowns do not change
