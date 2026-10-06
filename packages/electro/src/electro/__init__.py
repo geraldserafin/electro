@@ -35,7 +35,7 @@ from .solver.errors import (
     NotOnePort,
     Undetermined,
 )
-from .solver.laws import is_linear, is_source
+from .solver.laws import is_linear, is_source, reading, stores
 from .solver.port import blackbox, matches
 from .solver.relation import Equation, Origin, Relation, hide, join
 from .solver.solution import Solution, SolutionStep
@@ -122,6 +122,7 @@ __all__ = [
     "netlist",
     "parallel",
     "part",
+    "reading",
     "rebuild",
     "relation",
     "resistance",
@@ -133,6 +134,7 @@ __all__ = [
     "simulate",
     "solve",
     "square",
+    "stores",
     "superposition",
     "sweep",
     "sweeps",

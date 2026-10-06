@@ -45,9 +45,9 @@ def _led(t: Terminals, p: Params) -> list[sp.Expr]:
 
 def _zener(t: Terminals, p: Params) -> list[sp.Expr]:
     """Forward a diode; backwards it breaks down: I_ZT flows at U = −U_Z, and every V_T further multiplies
-    it by e."""
+    it by e. Like any element that is no source, nothing flows with nothing across it."""
     u = t.across("a", "b")
-    breakdown = ZENER_I_ZT * sp.exp((-u - p[""]) / V_T)
+    breakdown = ZENER_I_ZT * (sp.exp((-u - p[""]) / V_T) - sp.exp(-p[""] / V_T))
     return [t.I["a"] - (junction(u, ZENER_I_S) - breakdown)]
 
 

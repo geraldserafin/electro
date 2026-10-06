@@ -24,11 +24,9 @@ from ..circuit.elements.parts import Part
 from ..circuit.netlist import labels
 from ..circuit.tree import GND, Circuit, Element, Net, Node, netlist
 from ..circuit.wiring import at, beside
+from ..solver.laws import reading
 from .problem import Key, Problem
-from .quantities import Across, Current, I, Parameter, Potential, Power, Quantity, Scaled, Sum, U, Voltage
-
-READINGS = {"ammeter": I, "voltmeter": U}
-"""Meters: what their value is a reading of."""
+from .quantities import Across, Current, Parameter, Potential, Power, Quantity, Scaled, Sum, Voltage
 
 GROUND_NAMES = ("GND", "0")
 
@@ -113,8 +111,8 @@ def _given(item: Mapping, e: Element) -> dict[Key, object]:
     out: dict[Key, object] = {}
     value = item.get("value")
     if value not in (None, "", "?"):
-        reading = READINGS.get(e.kind.name)
-        out[reading(e) if reading else e] = value
+        reads = reading(e.kind)
+        out[reads(e) if reads else e] = value
     params = item.get("params") or {}
     part = item.get("part")
     if part and not params and e not in out:
@@ -135,7 +133,7 @@ def to_netlist(problem: Problem) -> dict:
     def q(x) -> list:
         return quantity_data(x, by, {p: names[n] for n, p in net.named})
 
-    readings = {r(e): e for e, _ in net.parts if (r := READINGS.get(e.kind.name))}
+    readings = {r(e): e for e, _ in net.parts if (r := reading(e.kind))}
     elements = [
         {"id": id, "kind": e.kind.name, "nodes": [names[n] for n in ns], **_value(_given_of(problem, e))}
         for id, (e, ns) in zip(ids, net.parts)
@@ -146,8 +144,8 @@ def to_netlist(problem: Problem) -> dict:
 
 def _given_of(problem: Problem, e: Element) -> object:
     """What is given of an element: its value, or a meter's reading."""
-    reading = READINGS.get(e.kind.name)
-    return problem.given.get(reading(e)) if reading else problem.given.get(e)
+    reads = reading(e.kind)
+    return problem.given.get(reads(e)) if reads else problem.given.get(e)
 
 
 def quantity_data(q, elements: Mapping[Element, str], points: Mapping[Node | Net, str]) -> list:

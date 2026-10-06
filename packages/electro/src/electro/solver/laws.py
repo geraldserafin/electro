@@ -1,4 +1,5 @@
-"""What an element's laws say of themselves: its ways, whether it is linear, whether it is a source."""
+"""What an element's laws say of themselves: its ways, whether it is linear, whether it is a source, what a
+meter reads, whether it stores energy."""
 
 from __future__ import annotations
 
@@ -7,9 +8,11 @@ from collections.abc import Sequence
 import sympy as sp
 
 from ..circuit.kind import Case, Cases, Kind, Terminals
+from ..circuit.time import D
 from ..circuit.tree import Element
+from ..problem.quantities import Current, Voltage
 from .analysis import DC, Analysis, interpret
-from .expressions import expr, subs
+from .expressions import expr, subs, symbols_in
 
 
 def ways(laws: Sequence[sp.Expr] | Cases) -> tuple[Case, ...]:
@@ -43,6 +46,22 @@ def is_source(e: Element) -> bool:
     laws, quantities = own
     zero = dict.fromkeys(quantities, sp.Integer(0))
     return any(sp.simplify(subs(interpret(law, DC()), zero)) != 0 for law in laws)
+
+
+def reading(kind: Kind) -> type[Current] | type[Voltage] | None:
+    """What a meter reads: of two terminals and no parameter, one law fixing its voltage or its current at
+    zero leaves the other free, and that is its value. An ammeter is a wire, a voltmeter a break."""
+    cases, quantities, _ = _read(kind)
+    if len(kind.terminals) != 2 or kind.parameters or len(cases) != 1 or len(cases[0].laws) != 1:
+        return None
+    v_a, v_b, i_a, _ = quantities
+    fixed = symbols_in(cases[0].laws[0])
+    return Current if fixed == {v_a, v_b} else Voltage if fixed == {i_a} else None
+
+
+def stores(kind: Kind) -> bool:
+    """A law of how something changes (a capacitor's charge, an inductor's flux): it stores energy."""
+    return any(law.has(D) for case in _read(kind)[0] for law in case.laws)
 
 
 def inner_names(kind: Kind) -> tuple[str, ...]:

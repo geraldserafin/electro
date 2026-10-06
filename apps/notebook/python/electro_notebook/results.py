@@ -7,14 +7,8 @@ from __future__ import annotations
 from collections.abc import Callable, Mapping
 
 import sympy as sp
-from electro import Current, Element, I, Parameter, Power, Problem, Solution, U, Voltage, fill, solve
+from electro import Current, Element, Parameter, Power, Problem, Solution, Voltage, fill, is_source, reading, solve
 from electro.values import UNKNOWN, fmt
-
-SOURCES = ("voltage_source", "current_source", "sine_source", "square_source")
-"""Shown as a source is: its voltage the rise from its first end to its second, its power what it gives."""
-
-METERS = {"ammeter": I, "voltmeter": U}
-"""A meter's value is its reading: the current through it, the voltage across it."""
 
 
 def solved(problem: Problem, elements: Mapping[str, Element]) -> tuple[Solution, dict[str, Element]]:
@@ -28,9 +22,10 @@ def solved(problem: Problem, elements: Mapping[str, Element]) -> tuple[Solution,
 
 
 def shown(solution: Solution, q) -> sp.Expr:
-    """``q`` as the board shows it."""
+    """``q`` as the board shows it: a source's voltage the rise from its first end to its second, its power
+    what it gives."""
     v = solution(q)
-    return -v if isinstance(q, Voltage | Power) and q.of.kind.name in SOURCES else v
+    return -v if isinstance(q, Voltage | Power) and is_source(q.of) else v
 
 
 def number(read: Callable, q) -> sp.Expr | None:
@@ -53,10 +48,11 @@ def element_result(solution: Solution, e: Element, unit: str, filled: Element | 
     u = number(read, Voltage(by)) if two else None
     i = number(read, Current(by)) if two else None
     p = number(read, Power(by)) if two else None
-    if e.kind.name in METERS:
-        reading = u if e.kind.name == "voltmeter" else i
-        text = fmt(reading, unit) if reading is not None else "?"
-        solved = not given(solution.problem.given.get(METERS[e.kind.name](e)))
+    reads = reading(e.kind)
+    if reads is not None:
+        shows = u if reads is Voltage else i
+        text = fmt(shows, unit) if shows is not None else "?"
+        solved = not given(solution.problem.given.get(reads(e)))
         return {"value": text, "solved": solved, "U": None, "I": None, "P": None, "reversed": False}
     if filled is not None:
         text = notation(filled, value)

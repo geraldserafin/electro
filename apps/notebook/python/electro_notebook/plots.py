@@ -6,7 +6,7 @@ from __future__ import annotations
 import re
 from collections.abc import Mapping
 
-from electro import Element, Net, Node, Problem, U, V, responses, spreads
+from electro import Element, Net, Node, Problem, U, V, responses, spreads, stores
 from electro.problem.quantities import Quantity
 
 from .errors import NoInput, NoOutput
@@ -18,14 +18,14 @@ AUTO = re.compile(r"(.+_)?n\d+")
 def outputs(
     elements: Mapping[str, Element], points: Mapping[str, Node | Net], named_only: bool = False
 ) -> dict[str, Quantity]:
-    """What a plot shows: the potentials of the points named, else (``named_only`` not) the capacitors'
-    and inductors' voltages."""
+    """What a plot shows: the potentials of the points named, else (``named_only`` not) the voltages of
+    what stores energy (a capacitor, an inductor)."""
     named: dict[str, Quantity] = {
         f"V_{n}": V(p) for n, p in points.items() if n not in ("GND", "0") and not AUTO.fullmatch(n)
     }
     if named or named_only:
         return named
-    return {f"U_{id}": U(e) for id, e in elements.items() if e.kind.name in ("capacitor", "inductor")}
+    return {f"U_{id}": U(e) for id, e in elements.items() if len(e.kind.terminals) == 2 and stores(e.kind)}
 
 
 def trace(x: Mapping[str, str], t: list[float], series: Mapping[str, list[float]]) -> dict:
