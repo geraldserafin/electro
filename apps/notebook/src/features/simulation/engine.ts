@@ -22,7 +22,7 @@ export interface ProgramData {
   update: string;
   seen: string[]; // what is read of a frame, by name ("V_A", "U_R_1", "R_1.a")
   see: string; // fills out with them
-  nodes: Record<string, number>; // node -> index in seen
+  nodes: Record<string, number>; // node -> index in seen (these four: electro_notebook.board.program)
   parts: Record<string, Record<string, number>>; // element -> "U", "I", ... -> index in seen
   kinds: Record<string, string>; // element -> its kind
   flows: Record<string, number[]>; // element -> per terminal, in its order: index in seen of its current in

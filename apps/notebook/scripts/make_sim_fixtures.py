@@ -7,7 +7,8 @@ a circuit in time.
 import json
 from pathlib import Path
 
-from electro import Arduino, Pico, step_function
+from electro import Arduino, Pico
+from electro_notebook.board import program as compiled
 from electro_notebook.drawing import from_drawing
 
 here = Path(__file__).parent.parent / "src/features/simulation/fixtures"
@@ -21,7 +22,7 @@ def element(id: str, kind: str, *nodes: str, value=None, **params) -> dict:
 
 def write(name: str, elements: list[dict], pins: dict | None = None) -> None:
     drawing = from_drawing({"elements": elements})
-    program = json.loads(step_function(drawing.circuit, drawing.values).to_json())
+    program = compiled(drawing.circuit, drawing.values)
     data = program if pins is None else {"program": program, "wires": [], "pins": pins}
     (here / name).write_text(json.dumps(data) + "\n")
     print(here / name)

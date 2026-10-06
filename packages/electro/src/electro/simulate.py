@@ -60,8 +60,8 @@ class StepFunction:
     places in ``states`` of what changes (under ``D``), ``jumps`` those that jump, ``longest`` the longest a
     step may be; ``update`` fills what is remembered after a step. ``seen``: what is read
     of a frame, by name — each point's potential, each element's voltage, currents and what its kind shows —
-    worked out straight from the unknowns by ``see``; ``nodes``, ``parts`` and ``flows`` (each terminal's
-    current, into its element) say where in it the page finds a point and an element."""
+    worked out straight from the unknowns by ``see``; ``observed``: what of each element is read, by what
+    name."""
 
     circuit: Element
     left: Formula
@@ -75,10 +75,7 @@ class StepFunction:
     update_body: Code
     seen: dict[str, sp.Expr]
     see_body: Code
-    nodes: dict[str, int]
-    parts: dict[str, dict[str, int]]
-    kinds: dict[str, str]
-    flows: dict[str, list[int]]
+    observed: dict[str, dict[str, str]]
     _compiled: tuple | None = field(default=None, repr=False)
 
     @property
@@ -156,10 +153,6 @@ class StepFunction:
                 "update": self.update_body["js"],
                 "seen": list(self.seen),
                 "see": self.see_body["js"],
-                "nodes": self.nodes,
-                "parts": self.parts,
-                "kinds": self.kinds,
-                "flows": self.flows,
             }
         )
 
@@ -172,9 +165,9 @@ class _State:
     jumps: bool = False
 
 
-def step_function(circuit: Element, values: Mapping) -> StepFunction:
+def step_function(circuit: Element, values: Mapping, reads: Mapping[str, sp.Expr] | None = None) -> StepFunction:
     """The circuit's frame formula at a step of ``dt``, what was a step before, the time and what the world
-    sets letters, compiled."""
+    sets letters, compiled; ``reads``: more to read of a frame, by name, in its elements' own variables."""
     if circuit.free != (0, 0):
         raise NotClosed(*circuit.free)
     for e in circuit.members:
@@ -201,9 +194,9 @@ def step_function(circuit: Element, values: Mapping) -> StepFunction:
     states = memory + [_State(sp.Symbol(f"edge{k}"), p, float(p.subs(TIME, 0)), True) for k, p in enumerate(edges)]
     params = [DT, TIME, THETA, *(st.symbol for st in states), *(letter for _, letter, _ in inputs)]
     parts = _observed(circuit, left)
-    flowing = {f"{labels[e]}.{t}": c.xreplace(left.names.to) for e in circuit.members for t, c in e.I.items()}
     seen = {str(v): v for v in left.names.points.values()}
-    seen |= {called: value for named in parts.values() for called, value in named.values()} | flowing
+    seen |= {called: value for named in parts.values() for called, value in named.values()}
+    seen |= {name: e.xreplace(left.names.to) for name, e in (reads or {}).items()}
     seen = {name: left.laws.resolve(expr(value)) for name, value in seen.items()}
     _check_square([*exprs, *seen.values()], unknowns, params, len(exprs))
     potentials = [v for v in left.names.to.values() if str(v).startswith("V_")]
@@ -212,7 +205,6 @@ def step_function(circuit: Element, values: Mapping) -> StepFunction:
     currents = [v for s in left.laws.log for v in s.values]
     compiled = compile_equations(exprs, unknowns, params, potentials, currents=currents, sample=sample)
     unknowns = compiled.unknowns
-    place = {name: k for k, name in enumerate(seen)}
     return StepFunction(
         circuit=circuit,
         left=left,
@@ -226,10 +218,7 @@ def step_function(circuit: Element, values: Mapping) -> StepFunction:
         update_body=statements([(f"out[{k}]", st.update) for k, st in enumerate(states)], unknowns, params),
         seen=seen,
         see_body=statements([(f"out[{k}]", v) for k, v in enumerate(seen.values())], unknowns, params),
-        nodes={str(v)[2:]: place[str(v)] for v in left.names.points.values()},
-        parts={label: {name: place[called] for name, (called, _) in named.items()} for label, named in parts.items()},
-        kinds={labels[e]: e.kind for e in circuit.members},
-        flows={labels[e]: [place[f"{labels[e]}.{t}"] for t in e.terminals] for e in circuit.members},
+        observed={label: {name: called for name, (called, _) in named.items()} for label, named in parts.items()},
     )
 
 

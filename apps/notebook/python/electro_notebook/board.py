@@ -5,11 +5,12 @@ Each returns JSON: what it found, or ``{"error": …}``."""
 from __future__ import annotations
 
 import json
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from typing import cast
 
 import sympy as sp
-from electro import I, U, step_function
+from electro import Element, I, U, step_function
+from electro.frame.formula import names
 from electro.values import parse
 
 from . import plots
@@ -89,9 +90,28 @@ def live(problem_json: str) -> str:
 
     def work() -> dict:
         net = from_drawing(json.loads(problem_json))
-        return {"program": json.loads(step_function(net.circuit, net.values).to_json())}
+        return {"program": program(net.circuit, net.values)}
 
     return _answer(work)
+
+
+def program(circuit: Element, values: Mapping) -> dict:
+    """Φ as the page's engine runs it, and where in what it reads the page finds each point (``nodes``), each
+    element's quantities (``parts``), its kind (``kinds``) and the current into each of its terminals
+    (``flows``)."""
+    n = names(circuit)
+    flowing = {f"{n.labels[e]}.{t}": c for e in circuit.members for t, c in e.I.items()}
+    phi = step_function(circuit, values, flowing)
+    place = {name: k for k, name in enumerate(phi.seen)}
+    return {
+        **json.loads(phi.to_json()),
+        "nodes": {str(v)[2:]: place[str(v)] for v in n.points.values()},
+        "parts": {
+            label: {name: place[called] for name, called in named.items()} for label, named in phi.observed.items()
+        },
+        "kinds": {n.labels[e]: e.kind for e in circuit.members},
+        "flows": {n.labels[e]: [place[f"{n.labels[e]}.{t}"] for t in e.terminals] for e in circuit.members},
+    }
 
 
 def frequency(problem_json: str) -> str:

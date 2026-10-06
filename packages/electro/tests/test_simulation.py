@@ -197,11 +197,11 @@ def test_on_paper_a_switch_is_a_datum_and_a_simulation_needs_every_value():
 
 def test_the_program_in_javascript_is_the_same_program():
     red, given, _ = _led_circuit()
-    data = json.loads(step_function(red, given).to_json())
+    phi = step_function(red, given)
+    data = json.loads(phi.to_json())
     assert "limexp(" in data["moving"] and "F[" in data["moving"] and "A[" in data["moving"]
     assert not data["shape"]["linear"] and data["shape"]["n"] == len(data["unknowns"])
-    assert data["junctions"] and data["kinds"] == {"E_1": "voltage_source", "R_1": "resistor", "LED_1": "led"}
-    assert set(data["parts"]["LED_1"]) == {"U", "I"}
+    assert data["junctions"] and phi.observed["LED_1"] == {"U": "U_LED_1", "I": "I_LED_1"}
 
 
 def _sine_rc(f):
