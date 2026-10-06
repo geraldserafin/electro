@@ -1,30 +1,31 @@
 """Element: anything with ends and laws between them. A resistor is one; so is ``E >> R``, and every circuit.
 
-An element is a relation of its ends — at each a potential and a current (in at a left end, out at a right
-one) — and its laws say what holds between them, in the words of time (``D``, ``Pre``) where it remembers.
-A kind of element (``Resistor``) is a subclass that says its terminals and its laws; nothing else.
+An element is a relation of its ends (``Rel``) — at each a potential and a current (in at a left end, out at
+a right one) — and its laws (``Laws``) say what holds between them, in the words of time (``D``, ``Pre``)
+where it remembers. A kind of element (``Resistor``) is a subclass that says its terminals and its laws;
+nothing else.
 
-Elements are joined by:
+Relations are the morphisms of a hypergraph category, and every way of joining is one of its operations:
 
-- ``f >> g``: ``f``'s right ends are ``g``'s left ends — and what is then inside goes (∃: composing relations
-  hides what two pieces share), its definition kept, still there to be asked (``I(R)``). ``R_1 >> R_2`` so
-  comes to one law of its ends, ``U = (R_1 + R_2)·I``, with nothing told of series;
-- ``f @ g``: side by side; ``f | g``: both between the same two points; ``~f``: a 1 → 1 element's two ends
-  joined (a loop); ``-f``: a 1 → 1 element the other way round.
+- ``f @ g``: side by side — the ends side by side, both laws hold (``&``);
+- ``f >> g``: ``f``'s right ends are ``g``'s left ends — each pair of variables made one (a pushout: one
+  goes, logged as a wire's), then what is inside hidden (∃: ``Laws.eliminate``). ``R_1 >> R_2`` so comes to
+  one law of its ends, ``U = (R_1 + R_2)·I``, with nothing told of series;
+- ``f | g``, ``~f``, ``-f``: ``>>`` and ``@`` with points (``points``).
 
-A variable goes by an equation of degree one in it whose factor holds no variable, is never zero as the
-circuit runs, and is not under a function (``exp``, a time word): what is tangled so stays, for Newton. Nothing
-here knows any kind of element.
+A variable inside goes by an equation of degree one in it whose factor holds no variable, is never zero as
+the circuit runs, and is not under a function (``exp``, a time word): what is tangled stays, for Newton.
+Nothing here knows any kind of element.
 """
 
 from __future__ import annotations
 
 from collections.abc import Callable, Mapping, Sequence
-from dataclasses import dataclass, replace
+from dataclasses import dataclass
 
 import sympy as sp
 
-from .algebra import Cases, Equation, Origin, Way, normal, symbols_in, ways
+from .algebra import JOINING, Cases, Equation, Laws, Origin, SolutionStep, Way, linear, symbols_in, ways
 from .time import TIME, D, Pre
 
 
@@ -52,10 +53,92 @@ class WrongEnds(ValueError):
         self.left, self.right = left, right
 
 
+POTENTIALS: set[sp.Symbol] = set()
+"""Every terminal's and named point's potential: what a reference (``formula``) is chosen among."""
+
+NAMED: set[sp.Symbol] = set()
+"""A named point's potential: one variable wherever the point is, never gone inside an element."""
+
+PARAMETERS: set[sp.Symbol] = set()
+"""An unnamed element's parameters: given, never gone by joining."""
+
+
 @dataclass(frozen=True)
 class End:
     v: sp.Expr
     i: sp.Expr
+
+
+@dataclass(frozen=True)
+class Rel:
+    """A relation of ends: its ``left`` and ``right`` ends, its ``laws``, and the current into each named
+    point from it (``taps``: Kirchhoff there waits for the circuit to be whole)."""
+
+    left: tuple[End, ...] = ()
+    right: tuple[End, ...] = ()
+    laws: Laws = Laws()
+    taps: tuple[tuple[object, sp.Expr], ...] = ()
+
+    def map(self, f: Callable[[sp.Expr], sp.Expr]) -> Rel:
+        def end(e: End) -> End:
+            return End(f(e.v), f(e.i))
+
+        return Rel(
+            tuple(map(end, self.left)),
+            tuple(map(end, self.right)),
+            self.laws.map(f),
+            tuple((p, f(i)) for p, i in self.taps),
+        )
+
+    def __matmul__(self, other: Rel) -> Rel:
+        return Rel(self.left + other.left, self.right + other.right, self.laws & other.laws, self.taps + other.taps)
+
+    def __rshift__(self, other: Rel) -> Rel:
+        if len(self.right) != len(other.left):
+            raise WrongEnds(len(self.right), len(other.left))
+        r = Rel(self.left, other.right, self.laws & other.laws, self.taps + other.taps)
+        for x, y in zip(self.right, other.left):
+            for a, b in ((x.v, y.v), (x.i, y.i)):
+                r = r.glued(a, b)
+        return r.hidden()
+
+    def glued(self, a: sp.Expr, b: sp.Expr) -> Rel:
+        """``a`` and ``b`` one: a variable that may go goes (what only joins first, else ``b``), logged as a
+        wire's; two that may not, a wire's equation."""
+        a, b = self.laws.resolve(a), self.laws.resolve(b)
+        if sp.expand(a - b) == 0:
+            return self
+        if _named(a) and _named(b):
+            raise JoinsNodes(a, b)
+        goes = [x for x in (b, a) if isinstance(x, sp.Symbol) and not _named(x)]
+        wire = Origin("wire", None)
+        if not goes:
+            return Rel(self.left, self.right, self.laws & Laws((Equation(a - b, wire),)), self.taps)
+        x = min(goes, key=lambda x: x not in JOINING)
+        value = a if x == b else b
+        r = self.map(lambda e: e.xreplace({x: value}) if e.has(x) else e)
+        return Rel(
+            r.left, r.right, r.laws & Laws(log=(SolutionStep((x,), (value,), (wire,), equations=(x - value,)),)), r.taps
+        )
+
+    def hidden(self) -> Rel:
+        """What is inside gone where it can: every variable but those on its ends, the named points', and the
+        parameters."""
+        ends = {x for e in (*self.left, *self.right) for x in (*symbols_in(e.v), *symbols_in(e.i))}
+        inside = {
+            x
+            for q in (*self.laws.equations, *(q for c in self.laws.choices for w in c for q in w.equations))
+            for x in symbols_in(q.expr)
+            if isinstance(x, sp.Dummy) and x not in NAMED and x not in PARAMETERS
+        }
+        laws = self.laws.eliminate(inside - ends, linear(inside | NAMED, _steady), keep=ends)
+        new = Laws(log=laws.log[len(self.laws.log) :])
+        return Rel(self.left, self.right, laws, tuple((p, new.resolve(i)) for p, i in self.taps))
+
+    @property
+    def wires(self) -> tuple[tuple[sp.Symbol, sp.Expr], ...]:
+        """Which variables joining made one: what a drawing of it needs (which terminals are one point)."""
+        return tuple((s.found[0], s.values[0]) for s in self.laws.log if s.because[0].what == "wire" and s.found)
 
 
 @dataclass(frozen=True)
@@ -74,33 +157,6 @@ class Terminals:
 
 Params = Mapping[str, sp.Expr]
 """An element's parameters by name; ``""`` is its main one (R, C, E)."""
-
-
-@dataclass(frozen=True)
-class Relation:
-    """What an element is, seen from outside: its ends, its laws, its elements of several ways, the current
-    into each named point from it, what it eliminated (``x = value`` by ``eq``, in order), which of its
-    variables only join (a spider's, a crossing's: fresh wherever the piece is used again), and which ends'
-    potentials ``>>`` glued (where each terminal is: what a drawing of it needs)."""
-
-    left: tuple[End, ...] = ()
-    right: tuple[End, ...] = ()
-    laws: tuple[Equation, ...] = ()
-    choices: tuple[tuple[Way, ...], ...] = ()
-    taps: tuple[tuple[object, sp.Expr], ...] = ()
-    definitions: tuple[tuple[sp.Symbol, sp.Expr, Equation], ...] = ()
-    joining: frozenset[sp.Symbol] = frozenset()
-    glued: tuple[tuple[sp.Expr, sp.Expr], ...] = ()
-
-
-POTENTIALS: set[sp.Symbol] = set()
-"""Every terminal's and named point's potential: what a reference (``formula``) is chosen among."""
-
-NAMED: set[sp.Symbol] = set()
-"""A named point's potential: one variable wherever the point is, never gone inside an element."""
-
-PARAMETERS: set[sp.Symbol] = set()
-"""An unnamed element's parameters: given, never gone by joining."""
 
 
 class Element:
@@ -123,7 +179,7 @@ class Element:
     ground = False
 
     name: str | None
-    relation: Relation
+    rel: Rel
     members: tuple[Element, ...]
     """The kinds' elements it is made of, in order."""
 
@@ -146,16 +202,16 @@ class Element:
         def equations(case) -> tuple[Equation, ...]:
             return tuple(Equation(law, Origin("law", self, i, case.name)) for i, law in enumerate(case.laws))
 
-        laws, choices = (
-            (equations(cases[0]), ())
+        laws = (
+            Laws(equations(cases[0]))
             if len(cases) == 1
-            else ((), (tuple(Way(self, c.name, equations(c), c.holds) for c in cases),))
+            else Laws(choices=(tuple(Way(self, c.name, equations(c), c.holds) for c in cases),))
         )
         if len(ts) == 2:
             ends = ((End(self.V[ts[0]], self.I[ts[0]]),), (End(self.V[ts[1]], -self.I[ts[1]]),))
         else:
             ends = ((), tuple(End(self.V[t], -self.I[t]) for t in (ts[:-1] if self.ground else ts)))
-        self.relation = Relation(*ends, laws, choices)
+        self.rel = Rel(*ends, laws)
         self.members = (self,)
 
     def _inner(self, name: str) -> sp.Symbol:
@@ -166,35 +222,22 @@ class Element:
 
     # Joining
 
-    def piece(self) -> Relation:
-        """Its relation where it is used: what only joins, fresh (an element itself is one object)."""
-        r = self.relation
-        if not r.joining:
+    def piece(self) -> Rel:
+        """Its relation where it is used: an element is one object, in one place; what only joins (points,
+        crossings and what is made of them) is fresh wherever it is used."""
+        r = self.rel
+        if self.members:
             return r
-        fresh = {x: sp.Dummy(x.name) for x in r.joining}
+        fresh = {x: sp.Dummy(x.name) for x in _variables(r) if x not in NAMED}
+        JOINING.update(fresh.values())
         POTENTIALS.update(y for x, y in fresh.items() if x in POTENTIALS)
-        return _renamed(r, fresh, frozenset(fresh.values()))
+        return r.map(lambda e: e.xreplace(fresh))
 
     def __rshift__(self, other: Element) -> Element:
-        a, b = self.piece(), other.piece()
-        if len(a.right) != len(b.left):
-            raise WrongEnds(len(a.right), len(b.left))
-        for x, y in zip(a.right, b.left):
-            if _named(x.v) and _named(y.v) and x.v != y.v:
-                raise JoinsNodes(x.v, y.v)
-        wires = [
-            Equation(one - two, Origin("wire", None))
-            for x, y in zip(a.right, b.left)
-            for one, two in ((x.v, y.v), (x.i, y.i))
-            if sp.expand(one - two) != 0
-        ]
-        both = _beside(a, b)
-        pairs = (*both.glued, *((x.v, y.v) for x, y in zip(a.right, b.left)))
-        glued = replace(both, left=a.left, right=b.right, laws=(*both.laws, *wires), glued=pairs)
-        return composite(reduced(glued), _members(self, other))
+        return composite(self.piece() >> other.piece(), _members(self, other))
 
     def __matmul__(self, other: Element) -> Element:
-        return composite(_beside(self.piece(), other.piece()), _members(self, other))
+        return composite(self.piece() @ other.piece(), _members(self, other))
 
     def __or__(self, other: Element) -> Element:
         from .points import Spider
@@ -217,15 +260,14 @@ class Element:
     @property
     def free(self) -> tuple[int, int]:
         """How many of its ends, left and right, are not on a named point: still to be joined."""
-        on = lambda e: e.v == 0 or e.v in NAMED  # noqa: E731
-        return sum(not on(e) for e in self.relation.left), sum(not on(e) for e in self.relation.right)
+        return sum(not _named(e.v) for e in self.rel.left), sum(not _named(e.v) for e in self.rel.right)
 
     def __str__(self) -> str:
         """A 1 → 1 element as a book writes it: its voltage ``U`` (the first end against the second) by its
         current ``I`` (in at the first) — ``U = I·(R_1 + R_2)``; else its laws."""
-        return said(self.relation)
+        return said(self.rel)
 
-    # Its frames (``formula``): where it ends, and in time
+    # Its frames: where it ends, and in time
 
     def final(self, values: Mapping | None = None, frame=None):
         """Where the circuit comes to: one frame infinitely long — or, with sines of one frequency, turning at
@@ -245,10 +287,16 @@ def _named(v: sp.Expr) -> bool:
     return v == 0 or v in NAMED
 
 
-def composite(relation: Relation, members: tuple[Element, ...]) -> Element:
+def _variables(r: Rel) -> set[sp.Symbol]:
+    out: set[sp.Symbol] = set()
+    r.map(lambda e: out.update(x for x in symbols_in(e) if isinstance(x, sp.Dummy)) or e)
+    return out
+
+
+def composite(rel: Rel, members: tuple[Element, ...]) -> Element:
     """An element made of others: no kind of its own, its relation what joining them left."""
     e = object.__new__(Element)
-    e.name, e.relation, e.members = None, relation, members
+    e.name, e.rel, e.members = None, rel, members
     return e
 
 
@@ -268,125 +316,19 @@ def _members(a: Element, b: Element) -> tuple[Element, ...]:
     return both
 
 
-def _beside(a: Relation, b: Relation) -> Relation:
-    return Relation(
-        a.left + b.left,
-        a.right + b.right,
-        a.laws + b.laws,
-        a.choices + b.choices,
-        a.taps + b.taps,
-        a.definitions + b.definitions,
-        a.joining | b.joining,
-        a.glued + b.glued,
-    )
-
-
-def _renamed(r: Relation, to: Mapping[sp.Symbol, sp.Expr], joining: frozenset) -> Relation:
-    def ren(e: sp.Expr) -> sp.Expr:
-        return e.xreplace(to)
-
-    return Relation(
-        tuple(End(ren(e.v), ren(e.i)) for e in r.left),
-        tuple(End(ren(e.v), ren(e.i)) for e in r.right),
-        tuple(Equation(ren(q.expr), q.origin) for q in r.laws),
-        tuple(tuple(_way(w, ren) for w in c) for c in r.choices),
-        tuple((p, ren(i)) for p, i in r.taps),
-        tuple((to.get(x, x), ren(v), Equation(ren(q.expr), q.origin)) for x, v, q in r.definitions),
-        joining,
-        tuple((ren(x), ren(y)) for x, y in r.glued),
-    )
-
-
-def _way(w: Way, f: Callable[[sp.Expr], sp.Expr]) -> Way:
-    return Way(w.element, w.name, tuple(Equation(f(q.expr), q.origin) for q in w.equations), tuple(map(f, w.holds)))
-
-
-def reduced(
-    r: Relation, may_go: set[sp.Symbol] | None = None, unknown: set[sp.Symbol] | None = None, steady=None
-) -> Relation:
-    """Every variable that ``may_go`` (by default the circuit's own: not a named point's potential, not a
-    parameter) an equation of degree one gives — its factor holding nothing ``unknown`` and ``steady`` (never
-    0 as the circuit runs) — gone, defined. Never one on an end (the piece is seen by it), nor one inside a
-    function anywhere. The equations go smallest first, a joining variable before an element's, again while
-    any goes."""
-    laws = dict(enumerate(r.laws))
-    definitions, choices, taps, left, right = list(r.definitions), r.choices, r.taps, r.left, r.right
-    boundary = {x for end in (*left, *right) for x in (*symbols_in(end.v), *symbols_in(end.i))}
-    tangled = {x for q in laws.values() for f in q.expr.atoms(sp.Function) for x in symbols_in(f)}
-    steady = steady or _steady
-
-    def gone(x: sp.Symbol, value: sp.Expr, by: Equation) -> None:
-        nonlocal choices, taps, left, right
-
-        def put(e: sp.Expr) -> sp.Expr:
-            return e.xreplace({x: value}) if e.has(x) else e
-
-        definitions.append((x, value, by))
-        for j, q in laws.items():
-            if q.expr.has(x):
-                laws[j] = Equation(normal(put(q.expr)), _reason(q, by, x))
-        choices = tuple(tuple(_way(w, put) for w in c) for c in choices)
-        taps = tuple((p, put(i)) for p, i in taps)
-        left = tuple(End(put(e.v), put(e.i)) for e in left)
-        right = tuple(End(put(e.v), put(e.i)) for e in right)
-        tangled.update(y for f in value.atoms(sp.Function) for y in symbols_in(f))
-
-    def going(e: sp.Expr) -> set[sp.Symbol]:
-        here = symbols_in(e)
-        return (
-            here & may_go
-            if may_go is not None
-            else {x for x in here if isinstance(x, sp.Dummy) and x not in NAMED and x not in PARAMETERS}
-        )
-
-    def holding(e: sp.Expr) -> set[sp.Symbol]:
-        return going(e) | (symbols_in(e) & unknown if unknown is not None else set()) | (symbols_in(e) & NAMED)
-
-    progress = True
-    while progress:
-        progress = False
-        for k in sorted(laws, key=lambda k: len(holding(laws[k].expr))):
-            q = laws.get(k)
-            if q is None:
-                continue
-            held = holding(q.expr)
-            for x in sorted(going(q.expr) - tangled - boundary, key=lambda x: (x not in r.joining, str(x))):
-                value = _alone(q.expr, x, held, steady)
-                if value is not None:
-                    del laws[k]
-                    gone(x, value, q)
-                    progress = True
-                    break
-    kept = tuple(q for q in laws.values() if q.expr != 0)
-    return Relation(left, right, kept, choices, taps, tuple(definitions), r.joining, r.glued)
-
-
-def _alone(e: sp.Expr, x: sp.Symbol, held: set[sp.Symbol], steady) -> sp.Expr | None:
-    """``x`` from ``e`` = 0, when ``e`` is of degree one in it and its factor holds no variable, is steady and
-    is not zero."""
-    a = sp.diff(e, x)
-    if a.has(x) or symbols_in(a) & held or not steady(a) or sp.expand(a) == 0:
-        return None
-    return normal(-(e - a * x) / a)
-
-
 def _steady(a: sp.Expr) -> bool:
     """A factor that is never 0 as the circuit runs: no function in it (a state, a switch: 0 one moment), nor
     a time word."""
     return not a.atoms(sp.Function) and not a.has(TIME, D, Pre)
 
 
-def _reason(q: Equation, by: Equation, x: sp.Symbol) -> Origin:
-    """A wire's equation says nothing of itself: with what a law said put in, it is that law's."""
-    return by.origin if q.origin.what == "wire" and q.expr.has(x) and by.origin.what != "wire" else q.origin
-
-
-def said(r: Relation) -> str:
-    """A relation of one end each side as ``U = …`` (or ``I = …``), its voltage and current at its ends."""
-    if len(r.left) == len(r.right) == 1 and not r.choices:
+def said(r: Rel) -> str:
+    """A relation of one end each side as ``U = …`` (or ``I = …``): its laws and ``U``, ``I`` at its ends,
+    all else hidden."""
+    if len(r.left) == len(r.right) == 1 and not r.laws.choices:
         U, I = sp.symbols("U I")
         (a,), (b,) = r.left, r.right
-        eqs = [q.expr for q in r.laws] + [U - (a.v - b.v), I - a.i]
+        eqs = [q.expr for q in r.laws.equations] + [U - (a.v - b.v), I - a.i]
         inside = sorted({x for e in eqs for x in symbols_in(e) if isinstance(x, sp.Dummy)}, key=str)
         for x in (U, I):
             try:
@@ -401,4 +343,4 @@ def said(r: Relation) -> str:
             left = {sp.factor(sp.expand(e.xreplace(by[0]))) for e in eqs} - {0}
             if not {x for e in left for x in symbols_in(e) if isinstance(x, sp.Dummy)}:
                 return "; ".join(f"{e} = 0" for e in left)
-    return "; ".join(f"{q.expr} = 0" for q in r.laws)
+    return "; ".join(f"{q.expr} = 0" for q in r.laws.equations)

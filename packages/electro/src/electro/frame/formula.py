@@ -1,6 +1,7 @@
-"""A closed circuit's frame formula: its element read in a frame, its values in, what was left to join at its
-named points joined, reduced again — what is left to solve (``system``) and how every quantity comes back
-(``complete``). Nothing here knows any kind of element.
+"""A closed circuit's frame formula: its relation renamed as a book names it, read in a frame (a functor:
+``D`` and ``Pre`` become one frame's equations), its values in, Kirchhoff at its named points, and what can
+go hidden again — what is left to solve and, in the log, how every quantity comes back. Nothing here knows
+any kind of element.
 
 Its variables are named as a book names them: ``I_R_1``, ``R_1``, ``V_A``. Where nothing fixes how high its
 potentials stand (no ground in a piece), one of them is chosen 0: the laws only ever speak of differences
@@ -16,8 +17,8 @@ from typing import cast
 
 import sympy as sp
 
-from ..circuit.algebra import Equation, Origin, Way, expr, normal, symbols_in
-from ..circuit.element import NAMED, POTENTIALS, Element, Relation, reduced
+from ..circuit.algebra import Equation, Known, Laws, Origin, expr, linear, normal, symbols_in
+from ..circuit.element import NAMED, POTENTIALS, Element
 from ..circuit.points import Node
 from ..circuit.quantities import Across, Current, Parameter, Potential, Power, Quantity, Scaled, Sum, Voltage
 from ..circuit.time import TIME, D, Pre
@@ -35,18 +36,6 @@ class NotClosed(ValueError):
 
 class NoSuchParameter(ValueError):
     """A value given for a name no element has."""
-
-
-@dataclass(frozen=True)
-class System:
-    """What is left to solve: its equations, its unknowns, the ways of its elements of several, those never
-    negative, its parameters not given."""
-
-    equations: tuple[Equation, ...]
-    unknowns: tuple[sp.Symbol, ...]
-    choices: tuple[tuple[Way, ...], ...] = ()
-    positive: frozenset[sp.Symbol] = frozenset()
-    params: frozenset[sp.Symbol] = frozenset()
 
 
 @dataclass(frozen=True)
@@ -108,30 +97,18 @@ def names(circuit: Element) -> Names:
 
 @dataclass(frozen=True)
 class Formula:
-    """What is left to solve (``system``) and what was eliminated on the way (in order); ``remembered``:
-    what the laws keep under ``D`` and under ``Pre``; ``time``: the frame's end; ``names``."""
+    """What is left to solve (``laws``: its equations and ways; in its log, what went on the way) over its
+    ``unknowns`` — those never negative ``positive``, its parameters not given ``params``; ``remembered``:
+    what the laws keep under ``D`` and under ``Pre``; ``time``: the frame's end."""
 
-    system: System
-    definitions: tuple[tuple[sp.Symbol, sp.Expr, Equation], ...]
+    laws: Laws
+    unknowns: tuple[sp.Symbol, ...]
     names: Names
-    values: Mapping[sp.Symbol, sp.Expr] = field(default_factory=dict)
+    values: Known = field(default_factory=dict)
+    positive: frozenset[sp.Symbol] = frozenset()
+    params: frozenset[sp.Symbol] = frozenset()
     remembered: tuple[frozenset[sp.Expr], frozenset[sp.Expr]] = (frozenset(), frozenset())
     time: sp.Expr = sp.oo
-
-    def resolve(self, e: sp.Expr) -> sp.Expr:
-        """``e`` in what is left to solve: each eliminated variable by its definition, in order."""
-        for x, value, _ in self.definitions:
-            if e.has(x):
-                e = e.xreplace({x: value})
-        return sp.expand(e, power_exp=False)
-
-    def complete(self, found: Mapping[sp.Symbol, sp.Expr]) -> dict[sp.Symbol, sp.Expr]:
-        """Every variable from what was found: each eliminated one, the last first."""
-        out = dict(found)
-        for x, value, _ in reversed(self.definitions):
-            v = value.xreplace(out)
-            out[x] = normal(v) if v.free_symbols else v
-        return out
 
 
 def formula(
@@ -150,20 +127,17 @@ def formula(
     (every independent source scaled by ``sources``). ``kept``: what was a frame before and the time stay
     letters — the frame as a function of them, its named points' potentials kept among what is found (each
     gone, the next is worked out from it: a ladder of them is a polynomial in 1/dt of its length, numbers
-    no float holds). ``leak``: a whisper of a conductance from each named point to
-    ground."""
+    no float holds). ``leak``: a whisper of a conductance from each named point to ground."""
     if circuit.free != (0, 0):
         raise NotClosed(*circuit.free)
-    whole = circuit.relation
     n = names(circuit)
-    to = n.to
+    rel = circuit.rel.map(lambda e: e.xreplace(n.to))
     given = {**parameter_values(circuit, values, n), **(letters or {})}
     if sources != 1:
         given = _scaled(given, circuit, n, sources)
-    said = [q.expr for q in whole.laws] + [e for _, v, q in whole.definitions for e in (v, q.expr)]
-    said += [e for c in whole.choices for w in c for e in (*(q.expr for q in w.equations), *w.holds)]
-    under_d = frozenset(expr(a.args[0]).xreplace(to) for e in said for a in e.atoms(D))
-    under_pre = frozenset(expr(a.args[0]).xreplace(to) for e in said for a in e.atoms(Pre))
+    said = rel.laws.expressions()
+    under_d = frozenset(expr(a.args[0]) for e in said for a in e.atoms(D))
+    under_pre = frozenset(expr(a.args[0]) for e in said for a in e.atoms(Pre))
     time = sp.oo
     if not kept:
         given |= {before(x): after.evaluated(x) if after is not None else sp.Integer(0) for x in under_d | under_pre}
@@ -172,66 +146,50 @@ def formula(
             given[TIME] = time
 
     def read(e: sp.Expr) -> sp.Expr:
-        e = e.xreplace(to)
-        if e.has(D, Pre):
-            e = interpret(e, frame)
-        return frame.timed(e.xreplace(given))
+        return frame.timed((interpret(e, frame) if e.has(D, Pre) else e).xreplace(given))
 
     points = {p: n.of(Potential(p)) for p in _points(circuit)}
-    top = [
-        Equation(sp.Add(*(i for q, i in whole.taps if q == p)).xreplace(to) + leak * v, Origin("kcl", p))
+    kcl = [
+        Equation(sp.Add(*(i for q, i in rel.taps if q == p)) + leak * v, Origin("kcl", p))
         for p, v in points.items()
         if v != 0
     ]
-    top += [Equation(end.i.xreplace(to), Origin("kcl", None)) for end in (*whole.left, *whole.right)]
-    laws = [Equation(read(q.expr), q.origin) for q in (*whole.laws, *top)]
-    definitions = [(to.get(x, x), read(v), Equation(read(q.expr), q.origin)) for x, v, q in whole.definitions]
-    data = [Equation(read(q.expr), q.origin) for q in conditions(values, n)]
-    laws += [Equation(_resolved(q.expr, definitions), q.origin) for q in data]
-    choices = tuple(
-        tuple(
-            Way(
-                w.element,
-                w.name,
-                tuple(Equation(read(q.expr), q.origin) for q in w.equations),
-                tuple(map(read, w.holds)),
-            )
-            for w in c
-        )
-        for c in whole.choices
-    )
-    ways_said = [Equation(h, Origin("holds", w.element)) for c in choices for w in c for h in w.holds]
-    ways_said += [q for c in choices for w in c for q in w.equations]
-    laws += _references([*laws, *ways_said], {to.get(v, v) for v in POTENTIALS | NAMED})
+    kcl += [Equation(end.i, Origin("kcl", None)) for end in (*rel.left, *rel.right)]
+    laws = (rel.laws & Laws(tuple(kcl))).map(read)
+    laws &= Laws(tuple(Equation(laws.resolve(read(q.expr)), q.origin) for q in conditions(values, n)))
+    laws &= Laws(_references(laws, {n.to.get(v, v) for v in POTENTIALS | NAMED}))
     known = {x for v in given.values() for x in symbols_in(v)} | frame.letters() | {TIME}
-    appearing = {x for q in laws for x in symbols_in(q.expr)}
-    appearing |= {x for c in choices for w in c for q in w.equations for x in symbols_in(q.expr)}
+    appearing = {x for q in _said(laws) for x in symbols_in(q.expr)}
     variables = {x for x in appearing - known if not is_before(x)}
-    params = {p.xreplace(to) for e in circuit.members for p in e.P.values()} - set(given)
+    params = {p.xreplace(n.to) for e in circuit.members for p in e.P.values()} - set(given)
     staying = {v for v in points.values() if isinstance(v, sp.Symbol)} if kept else set()
-    left = reduced(
-        Relation(laws=tuple(laws), choices=choices, definitions=tuple(definitions)),
-        variables - params - staying,
-        variables,
-        _steady,
+    left = laws.eliminate(variables - params - staying, linear(variables, _steady))
+    left = Laws(_once(Equation(normal(q.expr), q.origin) for q in left.equations), left.choices, left.log)
+    unknowns = ({x for q in _said(left) for x in symbols_in(q.expr)} & variables) | params
+    positive = {e.P[w].xreplace(n.to) for e in circuit.members for w in e.positive} & unknowns
+    return Formula(
+        left,
+        tuple(sorted(unknowns, key=str)),
+        n,
+        given,
+        frozenset(positive),
+        frozenset(params & unknowns),
+        (under_d, under_pre),
+        time,
     )
-    eqs = _once(Equation(normal(q.expr), q.origin) for q in left.laws)
-    unknowns = {x for q in eqs for x in symbols_in(q.expr)} & variables
-    unknowns |= {x for c in left.choices for w in c for q in w.equations for x in symbols_in(q.expr)} & variables
-    unknowns |= params
-    positive = {e.P[w].xreplace(to) for e in circuit.members for w in e.positive} & unknowns
-    system = System(
-        eqs, tuple(sorted(unknowns, key=str)), left.choices, frozenset(positive), frozenset(params & unknowns)
-    )
-    return Formula(system, left.definitions, n, given, (under_d, under_pre), time)
 
 
-def parameter_values(circuit: Element, values: Mapping, n: Names) -> dict[sp.Symbol, sp.Expr]:
+def _said(laws: Laws) -> list[Equation]:
+    """Its equations and its ways'."""
+    return [*laws.equations, *(q for c in laws.choices for w in c for q in w.equations)]
+
+
+def parameter_values(circuit: Element, values: Mapping, n: Names) -> Known:
     """Each parameter's value: as given, else its kind's default. An element's value is its main parameter;
     several by name (``{D: {"I_S": …}}``); a real part's (``part("1N4148")``); a name shared by elements."""
     from ..parts import Part
 
-    out: dict[sp.Symbol, sp.Expr] = {}
+    out: Known = {}
     for e in circuit.members:
         out |= {e.P[w].xreplace(n.to): expr(parse(d)) for w, d in e.defaults.items()}
     for key, value in values.items():
@@ -274,24 +232,28 @@ def _read(value: object) -> object:
     return parse(value)
 
 
+def is_source(e: Element) -> bool:
+    """An independent source: a law keeps a term with none of its own quantities in it (``U + E``, ``I − J``),
+    read in DC (a capacitor's ``I − C·dU/dt`` keeps none)."""
+    from .reading import DC
+
+    own = [x for x in (*e.V.values(), *e.I.values(), *e.inner.values()) if isinstance(x, sp.Symbol)]
+    zero = dict.fromkeys(own, sp.Integer(0))
+    return not e.rel.laws.choices and any(
+        sp.simplify(interpret(q.expr, DC()).xreplace(zero)) != 0 for q in e.rel.laws.equations
+    )
+
+
 def _scaled(given: dict, circuit: Element, n: Names, by) -> dict:
     """Every independent source's parameters scaled by ``by`` (Newton's way up from nothing)."""
-    from .laws import is_source
-
     of_sources = {p.xreplace(n.to) for e in circuit.members if is_source(e) for p in e.P.values()}
     return {p: by * v if p in of_sources else v for p, v in given.items()}
 
 
-def _resolved(e: sp.Expr, definitions) -> sp.Expr:
-    for x, value, _ in definitions:
-        if e.has(x):
-            e = e.xreplace({x: value})
-    return sp.expand(e, power_exp=False)
-
-
-def _references(laws: list[Equation], potentials: set[sp.Symbol]) -> list[Equation]:
-    """Where nothing fixes how high a piece's potentials stand — its laws (each way's too) hold whatever is
-    added to all of them — one of them chosen 0."""
+def _references(laws: Laws, potentials: set[sp.Symbol]) -> tuple[Equation, ...]:
+    """Where nothing fixes how high a piece's potentials stand — its laws (each way's too, and what each
+    needs) hold whatever is added to all of them — one of them chosen 0."""
+    said = [q.expr for q in _said(laws)] + [h for c in laws.choices for w in c for h in w.holds]
     groups: dict[sp.Symbol, sp.Symbol] = {}
 
     def find(x: sp.Symbol) -> sp.Symbol:
@@ -299,8 +261,8 @@ def _references(laws: list[Equation], potentials: set[sp.Symbol]) -> list[Equati
             x = groups[x]
         return x
 
-    for q in laws:
-        here = sorted(symbols_in(q.expr) & potentials, key=str)
+    for e in said:
+        here = sorted(symbols_in(e) & potentials, key=str)
         for a, b in zip(here, here[1:]):
             groups[find(a)] = find(b)
     pieces: dict[sp.Symbol, list[sp.Symbol]] = {}
@@ -311,10 +273,10 @@ def _references(laws: list[Equation], potentials: set[sp.Symbol]) -> list[Equati
     for members in pieces.values():
         members.sort(key=str)
         shift = {x: x + lifted for x in members}
-        touched = [q for q in laws if symbols_in(q.expr) & set(members)]
-        if touched and all(sp.expand(q.expr.xreplace(shift) - q.expr) == 0 for q in touched):
+        touched = [e for e in said if symbols_in(e) & set(members)]
+        if touched and all(sp.expand(e.xreplace(shift) - e) == 0 for e in touched):
             out.append(Equation(members[0], Origin("reference", members[0])))
-    return out
+    return tuple(out)
 
 
 def _steady(a: sp.Expr) -> bool:
@@ -360,7 +322,7 @@ def _labels(members: tuple[Element, ...]) -> dict[Element, str]:
 def _points(circuit: Element) -> list[Node]:
     """Its named points, in the order they are first met."""
     out: list[Node] = []
-    for p, _ in circuit.relation.taps:
+    for p, _ in circuit.rel.taps:
         if p not in out:
             out.append(p)
     return out

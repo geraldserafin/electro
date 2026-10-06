@@ -8,9 +8,9 @@ from collections.abc import Mapping
 
 from electro import Element, Net, Node, U, V
 from electro.circuit.quantities import Quantity
-from electro.frame.laws import stores
 
 from .errors import NoInput, NoOutput
+from .kinds import stores
 from .methods import responses, spreads
 
 AUTO = re.compile(r"(.+_)?n\d+")

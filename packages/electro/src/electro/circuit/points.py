@@ -7,8 +7,8 @@ import re
 
 import sympy as sp
 
-from .algebra import Equation, Origin
-from .element import NAMED, POTENTIALS, BadName, Element, End, Relation
+from .algebra import Equation, Laws, Origin
+from .element import NAMED, POTENTIALS, BadName, Element, End, Rel
 
 
 class Spider(Element):
@@ -23,8 +23,7 @@ class Spider(Element):
         POTENTIALS.add(v)
         ins, outs = [sp.Dummy("i") for _ in range(dom)], [sp.Dummy("i") for _ in range(cod)]
         kcl = (Equation(sp.Add(*ins) - sp.Add(*outs), Origin("kcl", None)),) if ins or outs else ()
-        joining = frozenset([v, *ins, *outs])
-        self.relation = Relation(tuple(End(v, i) for i in ins), tuple(End(v, i) for i in outs), kcl, joining=joining)
+        self.rel = Rel(tuple(End(v, i) for i in ins), tuple(End(v, i) for i in outs), Laws(kcl))
 
     def __repr__(self) -> str:
         return f"Spider({self.dom}, {self.cod})"
@@ -39,7 +38,7 @@ class Swap(Element):
         self.name, self.members = None, ()
         a, b = End(sp.Dummy("v"), sp.Dummy("i")), End(sp.Dummy("v"), sp.Dummy("i"))
         POTENTIALS.update((a.v, b.v))
-        self.relation = Relation((a, b), (b, a), joining=frozenset([a.v, a.i, b.v, b.i]))
+        self.rel = Rel((a, b), (b, a))
 
 
 class Node(Element):
@@ -57,10 +56,10 @@ class Node(Element):
         POTENTIALS.add(self.potential)
 
     @property
-    def relation(self) -> Relation:
+    def rel(self) -> Rel:
         into, out = sp.Dummy("i"), sp.Dummy("i")
         v = self.potential
-        return Relation((End(v, into),), (End(v, out),), taps=((self, into - out),), joining=frozenset([into, out]))
+        return Rel((End(v, into),), (End(v, out),), taps=((self, into - out),))
 
     def __repr__(self) -> str:
         return f"Node({self.label!r})"

@@ -23,8 +23,9 @@ from electro import GND, Element, Net, Node, Part
 from electro.circuit.quantities import Across, Current, Parameter, Potential, Power, Quantity, Scaled, Sum, Voltage
 from electro.elements import BY_KIND
 from electro.frame.formula import names
-from electro.frame.laws import reading
 from electro.values import UNKNOWN, to_text
+
+from .kinds import reading
 
 GROUND_NAMES = ("GND", "0")
 
@@ -163,7 +164,7 @@ def wiring(circuit: Element) -> dict[Element, list[str]]:
             x = parent[x]
         return x
 
-    for a, b in circuit.relation.glued:
+    for a, b in circuit.rel.wires:
         parent[find(a)] = find(b)
     n = names(circuit)
     called = {find(p.potential): str(v)[2:] for p, v in n.points.items()} | {find(sp.Integer(0)): "GND"}

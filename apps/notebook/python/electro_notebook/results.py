@@ -8,9 +8,10 @@ from collections.abc import Callable, Mapping
 
 import sympy as sp
 from electro import Current, Element, Parameter, Power, Solution, Voltage
-from electro.frame.laws import is_source, reading
+from electro.frame.formula import is_source
 from electro.values import UNKNOWN, fmt
 
+from .kinds import reading
 from .methods import fill
 
 

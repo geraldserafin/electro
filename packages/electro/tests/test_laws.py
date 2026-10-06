@@ -7,7 +7,6 @@ import sympy as sp
 from electro import (
     GND,
     VCVS,
-    Current,
     D,
     Element,
     I,
@@ -17,11 +16,10 @@ from electro import (
     Nullator,
     Resistor,
     V,
-    Voltage,
     VoltageSource,
 )
 from electro.circuit.algebra import Origin
-from electro.frame.laws import is_source, reading, stores
+from electro.frame.formula import is_source
 
 
 def test_steps_say_where_each_value_comes_from():
@@ -44,21 +42,6 @@ def test_a_four_terminal_element_a_voltage_controlled_source():
     s = circuit.final({e: 2, r: 100, "mu": 10})
     assert s(V(out)) == 20 and s(I(amp, "cp")) == 0
     assert not is_source(amp) and is_source(e)
-
-
-def test_what_a_kind_is_follows_from_its_laws():
-    from electro.elements import ALL
-    from electro.elements import BY_KIND as BY_NAME
-
-    sources = {k.kind for k in ALL if len(k.terminals) == 2 and is_source(k())}
-    assert sources == {"voltage_source", "current_source", "sine_source", "square_source"}
-    assert {k.kind: reading(k()) for k in ALL if reading(k())} == {
-        "wire": Current,
-        "ammeter": Current,
-        "open": Voltage,
-        "voltmeter": Voltage,
-    }
-    assert stores(BY_NAME["capacitor"]()) and stores(BY_NAME["inductor"]()) and (not stores(BY_NAME["resistor"]()))
 
 
 def test_a_nullor_two_laws_and_none_an_inverting_amplifier_from_it_and_two_resistors():

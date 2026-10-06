@@ -25,7 +25,7 @@ from .circuit.element import Element
 from .circuit.quantities import Quantity, Scaled
 from .circuit.time import THETA, TIME, D
 from .errors import NotSimulated, ValueNeeded
-from .frame.formula import Formula, NotClosed, formula, parameter_values
+from .frame.formula import Formula, NotClosed, formula, names, parameter_values
 from .frame.reading import DT, Step, before, interpret, slope
 from .numeric.code import Code, Compiled, compile_equations, python, statements
 from .numeric.engine import Machine, NoConvergence
@@ -132,7 +132,7 @@ class StepFunction:
 
     def at(self, q: Quantity | Scaled) -> sp.Expr:
         """``q`` in the unknowns and parameters."""
-        return self.left.resolve(self.left.names.of(q))
+        return self.left.laws.resolve(self.left.names.of(q))
 
     def to_json(self) -> str:
         """For the page's engine (``simulation/engine.ts``)."""
@@ -172,36 +172,36 @@ def step_function(circuit: Element, values: Mapping) -> StepFunction:
     if circuit.free != (0, 0):
         raise NotClosed(*circuit.free)
     for e in circuit.members:
-        if e.relation.choices:
+        if e.rel.laws.choices:
             raise NotSimulated(e.name or e.kind)
-    first = formula(circuit, values, Step(DT, THETA), kept=True)
-    labels = first.names.labels
-    given = parameter_values(circuit, values, first.names)
+    n = names(circuit)
+    labels = n.labels
+    given = parameter_values(circuit, values, n)
     inputs = [
-        (e.P[w].xreplace(first.names.to), sp.Symbol(f"{labels[e]}_{w}"), float(given[e.P[w].xreplace(first.names.to)]))
+        (e.P[w].xreplace(n.to), sp.Symbol(f"{labels[e]}_{w}"), float(given[e.P[w].xreplace(n.to)]))
         for e in circuit.members
         for w in e.inputs
     ]
     letters = {param: letter for param, letter, _ in inputs}
     left = formula(circuit, values, Step(DT, THETA), kept=True, letters=letters, leak=G_NODE)
-    if left.system.params:
-        raise ValueNeeded(min(p.name for p in left.system.params))
-    exprs = [q.expr for q in left.system.equations]
-    unknowns = list(left.system.unknowns)
+    if left.params:
+        raise ValueNeeded(min(p.name for p in left.params))
+    exprs = [q.expr for q in left.laws.equations]
+    unknowns = list(left.unknowns)
     memory = _memory(left, {**given, **letters})
-    clocks = _clocks([*exprs, *(v for _, v, _ in left.definitions)])
+    clocks = _clocks(left.laws.expressions())
     states = memory + clocks
     params = [DT, TIME, THETA, *(st.symbol for st in states), *(letter for _, letter, _ in inputs)]
     parts = _observed(circuit, left)
     flowing = {f"{labels[e]}.{t}": c.xreplace(left.names.to) for e in circuit.members for t, c in e.I.items()}
     seen = {str(v): v for v in left.names.points.values()}
     seen |= {called: value for named in parts.values() for called, value in named.values()} | flowing
-    seen = {name: left.resolve(expr(value)) for name, value in seen.items()}
+    seen = {name: left.laws.resolve(expr(value)) for name, value in seen.items()}
     _check_square([*exprs, *seen.values()], unknowns, params, len(exprs))
     potentials = [v for v in left.names.to.values() if str(v).startswith("V_")]
     initial = [0.0, 0.0, 1.0, *(st.initial for st in states), *(value for _, _, value in inputs)]
     sample = [SAMPLE_DT, 0.0, *initial[2:]]
-    currents = [v for _, v, _ in left.definitions]
+    currents = [v for s in left.laws.log for v in s.values]
     compiled = compile_equations(exprs, unknowns, params, potentials, currents=currents, sample=sample)
     unknowns = compiled.unknowns
     place = {name: k for k, name in enumerate(seen)}
@@ -229,11 +229,11 @@ def _memory(left: Formula, values) -> list[_State]:
     trapezoids."""
     under_d, under_pre = left.remembered
     kept = [
-        _State(before(x), left.resolve(subs(x, values)), 0.0, None if x not in under_d and _inner(x) else _most(x))
+        _State(before(x), left.laws.resolve(subs(x, values)), 0.0, None if x not in under_d and _inner(x) else _most(x))
         for x in sorted(under_d | under_pre, key=str)
     ]
     slopes = [
-        _State(slope(x), left.resolve(subs(interpret(D(x), Step(DT, THETA)), values)), 0.0, ANY)
+        _State(slope(x), left.laws.resolve(subs(interpret(D(x), Step(DT, THETA)), values)), 0.0, ANY)
         for x in sorted(under_d, key=str)
     ]
     return kept + slopes
