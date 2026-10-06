@@ -10,7 +10,7 @@ from .circuit.kind import Case, Cases, Kind, Terminals, two_terminal
 from .circuit.netlist import ElementTwice, JoinsNodes, Netlist
 from .circuit.time import TIME, D, Pre, rising, square, when
 from .circuit.tree import GND, BadName, Circuit, Element, Net, Node, free, is_closed, netlist
-from .circuit.wiring import cap, cup, wire
+from .circuit.wiring import cap, cup, swap, wire
 from .methods.ac import AC, settled, solve
 from .methods.fill import Filled, fill
 from .methods.response import Response, respond, responses
@@ -143,6 +143,7 @@ __all__ = [
     "tolerance",
     "two_terminal",
     "when",
+    "swap",
     "wire",
     *_elements,
 ]

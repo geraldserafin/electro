@@ -1,4 +1,4 @@
-"""The spiders by name, and a circuit rebuilt from its netlist."""
+"""The spiders and the crossing by name, and a circuit rebuilt from its netlist."""
 
 from __future__ import annotations
 
@@ -7,7 +7,7 @@ from functools import reduce
 from operator import matmul
 
 from .netlist import Part, Point
-from .tree import Circuit, Element, Node, Spider
+from .tree import Circuit, Element, Node, Spider, Swap
 
 wire = Spider(1, 1)
 """One end in, one out, one point."""
@@ -17,6 +17,9 @@ cap = Spider(0, 2)
 
 cup = Spider(2, 0)
 """Two ends into nothing, one point."""
+
+swap = Swap()
+"""Two ends crossing."""
 
 
 def placed(e: Element, points: Iterable[Circuit]) -> Circuit:

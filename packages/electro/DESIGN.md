@@ -1039,3 +1039,16 @@ kodu, narzędzie AI, zadania) i oddaje tylko dane. Kursy pisze Python jako dane,
   `-` (transpozycja), pająki i `Node`/`Net`. Funkcje pomocnicze (`loop`, `close`, `at`, `beside`, `series`,
   `parallel`, `flip`) usunięte. Element o niewyrysowanym `gnd` (`Kind.ground`: wzmacniacz operacyjny,
   bramki, przerzutniki, licznik) ma o jeden koniec mniej — jego ostatni zacisk siedzi na masie.
+- Obwód to komponent (`solver/compose.py`): relacja jego końców (na każdym potencjał i prąd). Element —
+  jego prawa; pająk — jeden potencjał i Kirchhoff; `swap` — skrzyżowanie; `@` — obok; `>>` — sklejone końce,
+  a to, co przez to w środku, wyrzucone (∃) z definicją zachowaną jako wielkość wewnętrzna. Bez klatki i
+  bez danych: litery, słowa czasu zostają. Wyrzuca się tylko zmienną z równania stopnia pierwszego o
+  czynniku bez zmiennych obwodu, nie z końca (brzeg) i nie spod funkcji (`exp`, słowo czasu) — to zostaje
+  dla Newtona. `Node`/`Net` to nazwany koniec: jedyne, co łączy się po imieniu.
+- `solve` bierze komponent całego obwodu, nazywa jego zmienne jak książka (`I_R_1`, `V_A`), czyta go w
+  klatce z danymi, dokłada Kirchhoffa w nazwanych punktach i dane o wielkościach, redukuje jeszcze raz i
+  rozwiązuje resztę (ręcznie, przypadkami, Newtonem); wartości wracają przez definicje. Kroki to ślad
+  redukcji: każda definicja wielkości z nazwą (bez sklejeń), w kolejności, w jakiej da się je policzyć;
+  sklejenie, do którego wstawiono prawo, dziedziczy to prawo jako powód.
+- Symulacja (Φ), `settled`, wzór kroku i szukanie sprzecznych danych liczą jeszcze płaski układ równań
+  (`system.equations`) — do przeniesienia na komponent.

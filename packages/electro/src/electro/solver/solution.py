@@ -2,8 +2,9 @@
 
 from __future__ import annotations
 
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
+from typing import cast
 
 import sympy as sp
 
@@ -41,7 +42,8 @@ class Solution:
     values: Mapping[sp.Symbol, sp.Expr]
     unknowns: frozenset[sp.Symbol]
     symbols: Symbols
-    steps: tuple[SolutionStep, ...] = ()
+    worked: tuple[SolutionStep, ...] | Callable[[], tuple[SolutionStep, ...]] = ()
+    """The steps, or how to work them out when asked (``steps``)."""
     analysis: Analysis = field(default_factory=DC)
     time: sp.Expr = sp.oo
 
@@ -58,6 +60,13 @@ class Solution:
         if value.free_symbols & self.unknowns:
             raise Undetermined(q)
         return value
+
+    @property
+    def steps(self) -> tuple[SolutionStep, ...]:
+        """How it is worked out by hand, step by step: each worked out when first asked."""
+        if callable(self.worked):
+            object.__setattr__(self, "worked", self.worked())
+        return cast(tuple[SolutionStep, ...], self.worked)
 
     def _repr_latex_(self) -> str:
         from ..latex import solution

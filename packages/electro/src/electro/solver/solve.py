@@ -14,6 +14,7 @@ from .analysis import DC, Step
 from .analysis import before as before_of
 from .by_cases import solve_by_cases
 from .by_hand import solve_by_hand
+from .compose import framed
 from .errors import Contradiction, NotLinear, Undetermined
 from .expressions import expr, symbols_in
 from .numeric import compile_equations, homotopy
@@ -44,8 +45,11 @@ def _frame(problem: Problem, analysis: Step, before: Solution | None) -> dict[sp
 
 
 def _solve(problem: Problem, analysis: Step, frame: dict[sp.Symbol, sp.Expr]) -> Solution:
-    system = equations(problem, analysis, letters=frame)
-    if any(eq.expr.has(TIME) for eq in system.equations):
+    """The circuit's component (``compose``), read in the frame with the data, what is left solved, every
+    variable back through what was eliminated."""
+    framed_ = framed(problem, analysis, frame)
+    system = framed_.system
+    if any(eq.expr.has(TIME) for eq in system.equations) or any(v.has(TIME) for _, v, _ in framed_.definitions):
         raise Undetermined("its data change in time: simulate it")
     if system.choices:
         solution = solve_by_cases(problem, system, analysis)
@@ -54,8 +58,38 @@ def _solve(problem: Problem, analysis: Step, frame: dict[sp.Symbol, sp.Expr]) ->
     elif analysis.dt == 0:
         raise NotLinear("a non-linear circuit in frames infinitely short: around its working point (not yet)")
     else:
-        solution = _by_newton(problem, analysis, frame)
-    return replace(solution, time=frame.get(TIME, sp.oo))
+        framed_ = framed(problem, analysis, frame, sources=SOURCES)
+        solution = _by_newton(problem, framed_.system, analysis)
+    values = framed_.complete(solution.values)
+    unknown = frozenset(solution.unknowns | {x for x, v in values.items() if symbols_in(v) & solution.unknowns})
+    worked = _traced(solution.steps, framed_.definitions, values, unknown)
+    return replace(solution, values=values, unknowns=unknown, worked=worked, time=frame.get(TIME, sp.oo))
+
+
+def _traced(found, definitions, values, unknown) -> tuple[SolutionStep, ...]:
+    """The steps as the solving left them: what was found of what was left, then each eliminated quantity a
+    book names (an element's current, a point's potential — never a wire's own), its value now known, each
+    once all it is worked out from is."""
+    shown: set[sp.Symbol] = set()
+    waiting = []
+    for x, _, eq in definitions:
+        value = values.get(x)
+        named = not isinstance(x, sp.Dummy) and eq.origin.what != "wire"
+        if named and x not in shown and value is not None and not symbols_in(value) & unknown:
+            shown.add(x)
+            waiting.append((x, value, eq))
+    known = {x for step in found for x in step.found}
+    eliminated = []
+    while waiting:
+        ready = next(
+            (w for w in waiting if not {y for y in symbols_in(w[2].expr) - {w[0]} if y in shown} - known), waiting[0]
+        )
+        waiting.remove(ready)
+        x, value, eq = ready
+        known.add(x)
+        eliminated.append(SolutionStep((x,), (value,), (eq.origin,), equations=(eq.expr,)))
+    checks = next((k for k, st in enumerate(reversed(found)) if st.how != "checked"), len(found))
+    return (*found[: len(found) - checks], *eliminated, *found[len(found) - checks :])
 
 
 def solve_step(problem: Problem) -> Solution:
@@ -68,9 +102,11 @@ def solve_step(problem: Problem) -> Solution:
 
 def _is_algebraic(system: System) -> bool:
     """Polynomial in its unknowns (an unknown resistance times a current too)."""
+    if not system.unknowns:
+        return True
     try:
         for eq in system.equations:
-            sp.Poly(eq.expr, *system.unknowns)
+            sp.Poly(sp.numer(sp.together(eq.expr)), *system.unknowns)
         return True
     except sp.PolynomialError:
         return False
@@ -99,9 +135,8 @@ def _fits_without(problem: Problem, key: Key, analysis: Step) -> bool:
     return True
 
 
-def _by_newton(problem: Problem, analysis: Step, frame: dict[sp.Symbol, sp.Expr]) -> Solution:
+def _by_newton(problem: Problem, raised: System, analysis: Step) -> Solution:
     """Every value is needed; the sources are raised from nothing."""
-    raised = equations(problem, analysis, sources=SOURCES, letters=frame)
     exprs = [eq.expr for eq in raised.equations]
     unknowns = list(raised.unknowns)
     if any(x not in {*unknowns, SOURCES} for e in exprs for x in symbols_in(e)):

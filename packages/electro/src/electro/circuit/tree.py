@@ -12,7 +12,7 @@ from dataclasses import dataclass
 from functools import cache
 from typing import TYPE_CHECKING
 
-from .netlist import Netlist, in_series, lone_element, lone_point, side_by_side
+from .netlist import Netlist, crossing, in_series, lone_element, lone_point, side_by_side
 
 if TYPE_CHECKING:
     from .kind import Kind
@@ -44,6 +44,14 @@ class Circuit:
     def __invert__(self) -> Circuit:
         """Its two ends joined: a cap, the piece beside a wire, a cup."""
         return Spider(0, 2) >> (self @ Spider(1, 1)) >> Spider(2, 0)
+
+    @property
+    def component(self):
+        """It as one component: its free ends and the laws between them, what is inside eliminated
+        (``solver.compose``)."""
+        from ..solver.compose import component
+
+        return component(self)
 
     def __neg__(self) -> Circuit:
         """The other way round, its left end on the right: bent back through a cap and a cup, as any
@@ -99,6 +107,12 @@ class Spider(Circuit):
 
 
 @dataclass(frozen=True)
+class Swap(Circuit):
+    """Two ends crossing (2 → 2): the first on the left is the second on the right. With spiders, caps and
+    cups it wires any ends to any others — no point needs a name."""
+
+
+@dataclass(frozen=True)
 class Seq(Circuit):
     """``first``, then ``then``. Checked as it is built: a wrong one never exists."""
 
@@ -130,6 +144,8 @@ def netlist(c: Circuit) -> Netlist:
             return lone_element(c, len(kind.terminals), GND if kind.ground else None)
         case Spider(dom, cod):
             return lone_point(dom, cod)
+        case Swap():
+            return crossing()
         case Node() | Net():
             return lone_point(1, 1, c)
         case Seq(first, then):

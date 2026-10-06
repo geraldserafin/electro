@@ -27,7 +27,8 @@ mówi ten, kto pokazuje wynik — notatnik po polsku albo po angielsku.
 ## Klocki
 
 Każdy obwód ma typ `m → n`: `m` końców z lewej, `n` z prawej. Obwody buduje się tylko działaniami poniżej —
-bez funkcji pomocniczych. Element ma nazwę; jego tożsamość to ten obiekt.
+bez funkcji pomocniczych. Każdy obwód jest komponentem: `(E >> R_1 >> R_2).component` to jego końce i jedno
+prawo między nimi, `U = (R_1 + R_2)·I − E` — środek wyrzucony przy składaniu, nikt nie mówi o „szeregowo”. Element ma nazwę; jego tożsamość to ten obiekt.
 
 | zapis | znaczenie |
 |---|---|
@@ -40,6 +41,7 @@ bez funkcji pomocniczych. Element ma nazwę; jego tożsamość to ten obiekt.
 | `f >> g` | szeregowo (złożenie) |
 | `f \| g` | równolegle |
 | `f @ g` | obok siebie, bez połączenia (iloczyn monoidalny) |
+| `swap` | dwa końce na krzyż (2 → 2): z pająkami, `cap` i `cup` łączy dowolne końce bez nazwanych punktów |
 | `Node("A")`, `GND` | punkt (ten sam obiekt w dwóch miejscach = jeden punkt), masa |
 | `~f` | zamknięty: jego dwa końce połączone (pętla: `~(E >> R_1 >> R_2)`) |
 | `-f` | odwrócony (transpozycja przez `cap` i `cup`) |
@@ -89,7 +91,7 @@ obwodu liniowego `phi.formula(V(A))` to krok jako wzór (`V_A⁻` — krok wcze�
 |---|---|
 | `circuit/` | budowa: drzewo, netlista (kospan), rodzaje elementów i ich prawa, części z katalogów |
 | `problem/` | zadanie: wielkości, dane, nazwy, netlista jako dane, SPICE |
-| `solver/` | równania z praw, rozwiązanie krok po kroku, przypadki; liczbami: równania jako kod i Newton |
+| `solver/` | obwód jako komponent (`compose.py`: `>>` skleja końce i wyrzuca środek), klatka z niego; co zostało — ręcznie, przypadkami albo Newtonem |
 | `methods/` | metody nad solverem, bez nowych praw |
 | `simulation/` | Φ (`solver/step.py`) powtarzane: jak długi krok, przebieg, wejścia |
 | `latex.py` | rozwiązanie, wielkości i wartości w LaTeX |

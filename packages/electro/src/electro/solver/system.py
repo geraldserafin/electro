@@ -6,7 +6,7 @@ in from outside is what flows on into the elements there.
 
 from __future__ import annotations
 
-from collections.abc import Mapping, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 from typing import cast
 
@@ -79,7 +79,7 @@ def equations(
     s = symbols(problem.circuit)
     values = {**parameter_values(problem, s), **(letters or {})}
     if sources != 1:
-        values = _sources_scaled(values, s, sources)
+        values = scaled_sources(values, s, sources)
     rel = relation(problem.circuit)
     read = [_read(eq, analysis, values) for eq in (*rel.equations, *_conditions(problem, s))]
     choices = tuple(tuple(_read_way(w, analysis, values) for w in choice) for choice in rel.choices)
@@ -127,19 +127,22 @@ def _ends(s: Symbols, k: int) -> list[tuple[sp.Expr, int]]:
 
 
 def _conditions(problem: Problem, s: Symbols) -> list[Equation]:
-    """The data on quantities, each an equation."""
+    return conditions_of(problem, s, s.of)
+
+
+def conditions_of(problem: Problem, s: Symbols, of: Callable[[Quantity | Scaled], sp.Expr]) -> list[Equation]:
+    """The data on quantities, each an equation; ``of``: a quantity in the variables."""
     return [
-        Equation(s.of(key) - _value(value, s), Origin("given", key))
+        Equation(
+            of(key) - (of(value) if isinstance(value, Quantity | Scaled) else cast(sp.Expr, value)),
+            Origin("given", key),
+        )
         for key, value in problem.given.items()
         if isinstance(key, Quantity) and value is not UNKNOWN
     ]
 
 
-def _value(value: object, s: Symbols) -> sp.Expr:
-    return s.of(value) if isinstance(value, Quantity | Scaled) else cast(sp.Expr, value)
-
-
-def _sources_scaled(values: dict[sp.Symbol, sp.Expr], s: Symbols, by: sp.Expr | int) -> dict[sp.Symbol, sp.Expr]:
+def scaled_sources(values: dict[sp.Symbol, sp.Expr], s: Symbols, by: sp.Expr | int) -> dict[sp.Symbol, sp.Expr]:
     of_sources = {p for e, _ in s.net.parts if is_source(e) for p in s.params(e).values()}
     return {p: by * v if p in of_sources else v for p, v in values.items()}
 

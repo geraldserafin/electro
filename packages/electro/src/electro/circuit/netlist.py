@@ -44,6 +44,11 @@ def lone_point(dom: int, cod: int, at: Point | None = None) -> Netlist:
     return Netlist(1, (), (0,) * dom, (0,) * cod, ((0, at),) if at is not None else ())
 
 
+def crossing() -> Netlist:
+    """Two points, each from a left end to the other right end."""
+    return Netlist(2, (), (0, 1), (1, 0))
+
+
 def lone_element(e: Element, terminals: int, ground: Point | None = None) -> Netlist:
     """One element on points of its own. With two terminals it is 1 → 1; with any other number all its
     ends are on the right (0 → n). ``ground``: its last terminal on it, no end of its own."""
