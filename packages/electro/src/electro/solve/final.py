@@ -49,23 +49,14 @@ class Solution:
             from ..circuit.names import evaluated
 
             return evaluated(q, self)
-        if isinstance(q, Power):
-            return sp.simplify(self.frame.product(self(Voltage(q.of)), self(Current(q.of))))
-        value = sp.simplify(self.evaluated(self.names.of(q)))
-        free = sorted(value.free_symbols & self.unknowns, key=str)
-        if free:
-            options = self._pinning(free[0], value) if len(free) == 1 else []
-            err = MissingData(len(free), options, {}, [q] if isinstance(q, Quantity) else [])
-            err.circuit = self.circuit
-            raise err
-        return value
+        return self.answers(q)[q]
 
     def answers(self, *qs: Quantity | Scaled) -> dict:
         """Each of ``qs`` found; or ``MissingData``: how many data more all of them need, which one would do (when
         one is), and those found."""
         found, lacking, targets = {}, [], []
         for q in qs:
-            value = sp.simplify(self.evaluated(self.names.of(q)))
+            value = sp.simplify(self._value(q))
             if value.free_symbols & self.unknowns:
                 lacking.append(value)
                 targets.append(q)
@@ -75,9 +66,14 @@ class Solution:
             return found
         free = sorted({x for e in lacking for x in e.free_symbols} & self.unknowns, key=str)
         options = self._pinning(free[0], sp.Add(*lacking)) if len(free) == 1 else []
-        err = MissingData(len(free), options, found, targets)
+        err = MissingData(len(free), options, found, [q for q in targets if isinstance(q, Quantity)])
         err.circuit = self.circuit
         raise err
+
+    def _value(self, q: Quantity | Scaled) -> sp.Expr:
+        if isinstance(q, Power):
+            return self.frame.product(self._value(Voltage(q.of)), self._value(Current(q.of)))
+        return self.evaluated(self.names.of(q))
 
     def evaluated(self, e: sp.Expr) -> sp.Expr:
         """``e``, of the circuit's named variables, with what was found and what was given in."""

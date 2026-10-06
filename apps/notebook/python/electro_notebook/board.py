@@ -10,7 +10,7 @@ from typing import cast
 
 import sympy as sp
 from electro import I, U, step_function
-from electro.values import fmt, parse
+from electro.values import parse
 
 from . import plots
 from .drawing import Drawing, from_drawing, quantity
@@ -18,6 +18,7 @@ from .errors import NoSweepRange, error
 from .issues import issue
 from .methods import resistance, swept
 from .results import amplitude, element_result, number, solved
+from .text import fmt
 
 
 def _answer(work: Callable[[], dict]) -> str:

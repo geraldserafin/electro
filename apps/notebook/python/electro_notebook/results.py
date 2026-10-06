@@ -9,10 +9,11 @@ from collections.abc import Callable, Mapping
 import sympy as sp
 from electro import Current, Element, Parameter, Power, Solution, Voltage
 from electro.frame.formula import is_source
-from electro.values import UNKNOWN, fmt
+from electro.values import UNKNOWN
 
 from .kinds import reading
 from .methods import fill
+from .text import fmt
 
 
 def solved(circuit: Element, values: Mapping, elements: Mapping[str, Element]) -> tuple[Solution, dict[str, Element]]:

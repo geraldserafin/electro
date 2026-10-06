@@ -23,9 +23,10 @@ from electro import GND, Element, Net, Node, Part
 from electro.circuit.quantities import Across, Current, Parameter, Potential, Power, Quantity, Scaled, Sum, Voltage
 from electro.elements import BY_KIND
 from electro.frame.formula import names
-from electro.values import UNKNOWN, to_text
+from electro.values import UNKNOWN
 
 from .kinds import reading
+from .text import to_text
 
 GROUND_NAMES = ("GND", "0")
 

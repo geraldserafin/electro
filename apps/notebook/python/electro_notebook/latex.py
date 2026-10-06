@@ -8,8 +8,9 @@ from collections.abc import Mapping
 import sympy as sp
 from electro.circuit.quantities import Current, Parameter, Potential, Power, Quantity, Scaled, Voltage
 from electro.frame.formula import Names
-from electro.values import fmt
 from sympy.printing.latex import LatexPrinter
+
+from .text import fmt
 
 UNITS = {Current: "A", Voltage: "V", Potential: "V", Power: "W"}
 

@@ -9,10 +9,8 @@ conductance to ground: a floating one is never a singular matrix.
 from __future__ import annotations
 
 import bisect
-import importlib
 import json
 import math
-import sys
 from array import array
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
@@ -28,7 +26,7 @@ from .errors import NotSimulated, ValueNeeded
 from .frame.formula import Formula, NotClosed, formula, names, parameter_values
 from .frame.reading import DT, Step, before, interpret, slope
 from .numeric.code import Code, Compiled, compile_equations, python, statements
-from .numeric.engine import Machine, NoConvergence
+from .numeric.engine import Machine
 
 G_NODE = 1e-12
 SAMPLE_DT = 1e-5
@@ -374,6 +372,13 @@ def _setter(phi: StepFunction, name: str):
 # The run
 
 
+Runner = Callable[["StepFunction", float, float, "Schedule | None"], tuple[list[float], array, array] | None]
+
+RUNNER: Runner | None = None
+"""What runs the frames instead of the engine here, when something faster is at hand (the page's engine, the
+same printed as JavaScript): the times, the unknowns and the parameters of every frame; None: nothing is."""
+
+
 def simulate(
     circuit: Element, values: Mapping, until: float, dt: float | None = None, inputs: Mapping[Key, object] | None = None
 ) -> Trace:
@@ -382,12 +387,10 @@ def simulate(
     phi = step_function(circuit, values)
     when = schedule(phi, inputs)
     dt_max = dt or until / 500
-    engine = _engine()
+    if RUNNER is not None and (ran := RUNNER(phi, until, dt_max, when)) is not None:
+        return Trace(phi, *ran)
     times: list[float] = []
-    rows = array("d")
-    if engine is not None:
-        return Trace(phi, *_in_the_page(engine, phi, until, dt_max, when))
-    params = array("d")
+    rows, params = array("d"), array("d")
 
     def record(machine: Machine) -> None:
         times.append(machine.t)
@@ -396,31 +399,6 @@ def simulate(
 
     run(phi, until, dt_max, when, record)
     return Trace(phi, times, rows, params)
-
-
-def _engine():
-    if sys.platform != "emscripten":
-        return None
-    return getattr(importlib.import_module("js"), "electroSim", None)
-
-
-def _in_the_page(engine, phi: StepFunction, until: float, dt_max: float, when):
-    create_proxy = importlib.import_module("pyodide.ffi").create_proxy
-    callback = create_proxy(lambda now: [list(pair) for pair in when(now)]) if when else None
-    try:
-        result = engine.run(phi.to_json(), until, dt_max, callback)
-    except Exception as err:
-        if "NoConvergence" in str(err):
-            raise NoConvergence(float(str(err).rsplit(" ", 1)[-1])) from None
-        raise
-    finally:
-        if callback is not None:
-            callback.destroy()
-    times, rows, params = array("d"), array("d"), array("d")
-    times.frombytes(result.t.to_bytes())
-    rows.frombytes(result.rows.to_bytes())
-    params.frombytes(result.params.to_bytes())
-    return times.tolist(), rows, params
 
 
 @dataclass

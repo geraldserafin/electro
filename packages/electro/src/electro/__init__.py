@@ -15,8 +15,9 @@ from .elements.physics import V_T
 from .errors import Ambiguous, Contradiction, MissingData, NotLinear, NotSimulated, Undetermined, ValueNeeded
 from .frame.formula import NoSuchParameter, NotClosed
 from .frame.reading import AC, DC, Step
+from .numeric.engine import NoConvergence
 from .parts import BJT_PARTS, DIODE_PARTS, LED_COLORS, OPAMP_PARTS, Part, part
-from .simulate import NoConvergence, NoSuchInput, Trace, simulate, step_function
+from .simulate import NoSuchInput, Trace, simulate, step_function
 from .solve.final import Solution, final, frame_after, settled
 
 __all__ = [

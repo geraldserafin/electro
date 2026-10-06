@@ -94,23 +94,3 @@ def P(e: Element) -> Power:
 
 def V(p: Node) -> Potential:
     return Potential(p)
-
-
-def element_of(q: Quantity | Scaled) -> Element | None:
-    match q:
-        case Current(e) | Voltage(e) | Parameter(e) | Power(e):
-            return e
-        case Scaled(_, x):
-            return element_of(x)
-    return None
-
-
-def points_of(q: Quantity | Scaled) -> tuple[Node, ...]:
-    match q:
-        case Potential(p):
-            return (p,)
-        case Across(a, b):
-            return (a, b)
-        case Scaled(_, x):
-            return points_of(x)
-    return ()
