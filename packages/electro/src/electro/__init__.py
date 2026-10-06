@@ -1,26 +1,31 @@
-"""electro: circuits as components — composed with ``>>``, ``@``, ``|``, ``~``, ``-``, each a relation of its
-ends — and a solver that puts values into one and works out a frame of it, or frame after frame in time."""
+"""electro: circuits as elements — a resistor is one, so is ``E >> R`` and every circuit — each a relation of
+its ends, joined with ``>>``, ``@``, ``|``, ``~``, ``-``, what is inside eliminated as they are; and every
+frame of one worked out from its frame formula: ``circuit.final(values)`` where it comes to,
+``circuit.simulate(values, until)`` frame after frame."""
 
-from .circuit.elements import *
-from .circuit.elements import __all__ as _elements
-from .circuit.elements.parts import Part, part
-from .circuit.kind import Case, Cases, Kind, Terminals, two_terminal
-from .circuit.netlist import ElementTwice, JoinsNodes
-from .circuit.time import TIME, D, Pre, rising, square, when
-from .circuit.tree import GND, BadName, Circuit, Element, Net, Node, is_closed, netlist
-from .circuit.wiring import cap, cup, swap, wire
-from .problem.problem import NoSuchParameter, NotClosed, Problem
-from .problem.quantities import Across, Current, I, P, Parameter, Potential, Power, U, V, Voltage
-from .simulation.errors import NoConvergence, NoSuchInput
-from .simulation.simulate import simulate
-from .simulation.trace import Trace
-from .solver.ac import AC, settled, solve
-from .solver.analysis import DC, Step
-from .solver.errors import Ambiguous, Contradiction, MissingData, NotLinear, NotSimulated, Undetermined, ValueNeeded
-from .solver.solution import Solution, SolutionStep
-from .solver.step import Frame, StepFunction, step_function
+from .algebra import Case, Cases, SolutionStep
+from .element import BadName, Element, ElementTwice, JoinsNodes, Terminals, WrongEnds
+from .elements import *
+from .elements import __all__ as _elements
+from .elements.physics import V_T
+from .errors import Ambiguous, Contradiction, MissingData, NotLinear, NotSimulated, Undetermined, ValueNeeded
+from .formula import NoSuchParameter, NotClosed
+from .frame import AC, DC, Step
+from .names import NoSuchQuantity
+from .parts import BJT_PARTS, DIODE_PARTS, LED_COLORS, OPAMP_PARTS, Part, part
+from .points import GND, Net, Node, Spider, Swap, cap, cup, swap, wire
+from .quantities import Across, Current, I, P, Parameter, Potential, Power, U, V, Voltage
+from .simulate import NoConvergence, NoSuchInput, Trace, simulate, step_function
+from .solve import Solution, final, frame_after, settled
+from .time import TIME, D, Pre, rising, square, when
 
 __all__ = [
+    "BJT_PARTS",
+    "DIODE_PARTS",
+    "JoinsNodes",
+    "LED_COLORS",
+    "OPAMP_PARTS",
+    "V_T",
     "AC",
     "DC",
     "GND",
@@ -30,22 +35,19 @@ __all__ = [
     "BadName",
     "Case",
     "Cases",
-    "Circuit",
     "Contradiction",
     "Current",
     "D",
     "Element",
     "ElementTwice",
-    "Frame",
     "I",
-    "JoinsNodes",
-    "Kind",
     "MissingData",
     "Net",
     "NoConvergence",
     "NoSuchInput",
-    "NoSuchParameter",
+    "NoSuchQuantity",
     "Node",
+    "NoSuchParameter",
     "NotClosed",
     "NotLinear",
     "NotSimulated",
@@ -55,11 +57,11 @@ __all__ = [
     "Potential",
     "Power",
     "Pre",
-    "Problem",
     "Solution",
     "SolutionStep",
+    "Spider",
     "Step",
-    "StepFunction",
+    "Swap",
     "Terminals",
     "Trace",
     "U",
@@ -67,19 +69,18 @@ __all__ = [
     "V",
     "ValueNeeded",
     "Voltage",
+    "WrongEnds",
     "cap",
     "cup",
-    "is_closed",
-    "netlist",
+    "final",
+    "frame_after",
     "part",
     "rising",
     "settled",
     "simulate",
-    "solve",
     "square",
     "step_function",
     "swap",
-    "two_terminal",
     "when",
     "wire",
     *_elements,

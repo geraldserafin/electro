@@ -13,15 +13,15 @@ const check = (name, ok, got) => {
 };
 
 let out = run(`E, R_1, R_2 = VoltageSource("E"), Resistor("R_1"), Resistor("R_2")
-c = Problem(~(E >> R_1 >> R_2), {E: 12, R_1: 10, I(R_1): 0.5}, [Parameter(R_2)])
-sol = solve(c)
+c, v = ~(E >> R_1 >> R_2), {E: 12, R_1: 10, I(R_1): 0.5}
+sol = c.final(v)
 sol(Parameter(R_2))`);
 check("solver", out[0]?.data === "$\\displaystyle 14$", out);
-out = run("schematic(c, sol)");
+out = run("schematic(c, v, sol)");
 check("schematic", out[0]?.type === "schematic" && out[0].netlist?.elements?.length === 3, out);
-out = run('bode(Problem(GND >> E >> R_1 >> Node("A") >> (C := Capacitor("C")) >> GND, {E: 1, R_1: 1000, C: 1e-6}))');
+out = run('bode(GND >> E >> R_1 >> Node("A") >> (C := Capacitor("C")) >> GND, {E: 1, R_1: 1000, C: 1e-6})');
 check("bode", out[0]?.type === "plot" && out[0].bode?.cutoffs?.length === 1, out);
-out = run("steps(sol)");
+out = run("steps(sol, Parameter(R_2))");
 check("steps", out[0]?.type === "solution" && JSON.stringify(out[0].data).includes("R_{2}"), out);
 const led = {
   elements: [

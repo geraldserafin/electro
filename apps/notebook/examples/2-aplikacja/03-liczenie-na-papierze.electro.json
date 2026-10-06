@@ -452,7 +452,7 @@
                 "R_{1}"
               ],
               [
-                "V_{n3}"
+                "U_{R_{2}}"
               ],
               [
                 "R_{2}"
@@ -475,7 +475,7 @@
     {
       "id": "aa01a780",
       "type": "code",
-      "source": "steps(solve(mostek))",
+      "source": "steps(mostek.final())",
       "outputs": [
         {
           "type": "solution",
@@ -532,7 +532,7 @@
               },
               {
                 "type": "FormulaStep",
-                "chain": "V_{n2} = \\frac{20}{3} = 6.667\\,\\mathrm{V}",
+                "chain": "V_{n2} = V_{n3} = 6.667\\,\\mathrm{V}",
                 "reason": {
                   "type": "IdealAmmeter",
                   "label": "A_{1}"
@@ -577,7 +577,7 @@
     {
       "id": "26a565b3",
       "type": "code",
-      "source": "E, R_1, R_2, R_3 = VoltageSource(\"E\"), Resistor(\"R_1\"), Resistor(\"R_2\"), Resistor(\"R_3\")\nuklad = Problem(~(E >> R_1 >> (R_2 | R_3)), {E: \"E\", R_1: \"R_1\", R_2: \"R_2\", R_3: \"R_3\"})\nsolve(uklad)(I(R_1))",
+      "source": "E, R_1, R_2, R_3 = VoltageSource(\"E\"), Resistor(\"R_1\"), Resistor(\"R_2\"), Resistor(\"R_3\")\nuklad = ~(E >> R_1 >> (R_2 | R_3))\nuklad.final({E: \"E\", R_1: \"R_1\", R_2: \"R_2\", R_3: \"R_3\"})(I(R_1))",
       "outputs": [
         {
           "type": "markdown",

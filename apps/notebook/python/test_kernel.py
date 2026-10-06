@@ -11,8 +11,8 @@ def run(code, **problems):
 UNITS = json.dumps({"resistor": "Ω", "voltage_source": "V"})
 
 LOOP = """E, R_1, R_2 = VoltageSource("E"), Resistor("R_1"), Resistor("R_2")
-c = Problem(~(E >> R_1 >> R_2), {E: 12, R_1: 10, I(R_1): "0.5"}, [Parameter(R_2)])
-sol = solve(c)"""
+c, v = ~(E >> R_1 >> R_2), {E: 12, R_1: 10, I(R_1): "0.5"}
+sol = c.final(v)"""
 
 
 def test_cells_share_a_namespace_and_show_the_last_value():
@@ -24,27 +24,23 @@ def test_cells_share_a_namespace_and_show_the_last_value():
 def test_rich_outputs():
     kernel.reset()
     run(LOOP)
-    [drawn] = run("schematic(c, sol)")
+    [drawn] = run("schematic(c, v, sol)")
     assert drawn["type"] == "schematic" and drawn["netlist"]["elements"][0]["id"] == "E"
     assert drawn["results"]["R_2"]["value"] == "14 Ω" and drawn["results"]["R_2"]["solved"]
-    [shown] = run("steps(sol)")
+    [shown] = run("steps(sol, Parameter(R_2))")
     assert shown["type"] == "solution" and shown["data"]["answer"] == [r"R_{2} = 14\,\mathrm{\Omega}"]
     assert {"type": "OhmsLaw", "label": "R_{2}"} in [s["reason"] for s in shown["data"]["steps"]]
     out = run("print('hej')\ndisplay(c)\nsol")
     assert [o["type"] for o in out] == ["stream", "schematic", "solution"]
-    trace = run(
-        'plot(simulate(Problem(~(E >> R_1 >> (C := Capacitor("C"))), {E: 5, R_1: 1000, C: 1e-6}), until=0.005), "U_C")'
-    )
+    trace = run('plot((~(E >> R_1 >> (C := Capacitor("C")))).simulate({E: 5, R_1: 1000, C: 1e-6}, until=0.005), "U_C")')
     assert trace[0]["type"] == "plot" and list(trace[0]["trace"]["series"]) == ["U_C"]
-    [task] = run('task(c, "I_R_1", "Ile?")')
+    [task] = run('task(c, v, "I_R_1", "Ile?")')
     assert task["type"] == "task" and task["unit"] == "A" and len(task["hashes"]) == 3
 
 
 def test_errors_point_at_the_cell_line():
     kernel.reset()
-    [out] = run(
-        "a = 1\nsolve(Problem(~((E := VoltageSource('E')) >> (R := Resistor('R_1'))), {E: 12, R: 10, I(R): 5}))"
-    )
+    [out] = run("a = 1\n(~((E := VoltageSource('E')) >> (R := Resistor('R_1')))).final({E: 12, R: 10, I(R): 5})")
     assert out["type"] == "error" and out["line"] == 2 and out["issue"]["type"] == "ConflictingData"
     assert out["issue"]["conditions"] == [r"I_{R_{1}} = 5\,\mathrm{A}"]  # math in LaTeX
     assert run("Resistr")[0]["data"].startswith("NameError")  # Python's own words
@@ -58,7 +54,7 @@ def test_warnings_are_shown():
 def test_schematic_cells_are_available_by_name():
     kernel.reset()
     petla = _loop(("E_1", "voltage_source", "12"), ("R_1", "resistor", "4"))
-    assert run('solve(schemat("petla"))("I_R_1")', petla=petla) == [{"type": "markdown", "data": "$\\displaystyle 3$"}]
+    assert run('schemat("petla").final()("I_R_1")', petla=petla) == [{"type": "markdown", "data": "$\\displaystyle 3$"}]
     assert run('schemat("inny")', petla=petla)[0]["issue"] == {
         "type": "NoSuchSchematic",
         "name": "inny",
@@ -107,7 +103,9 @@ def test_sweep_and_spread_of_a_drawing():
 
 def test_code_view_read_back():
     # as the page writes it (schematic/code.ts), a value edited
-    source = 'E_1 = VoltageSource("E_1")\nR_1 = Resistor("R_1")\nuklad = Problem(~(E_1 >> R_1), {E_1: 12, R_1: 6})'
+    source = (
+        'E_1 = VoltageSource("E_1")\nR_1 = Resistor("R_1")\nuklad = ~(E_1 >> R_1)\nuklad_values = {E_1: 12, R_1: 6}'
+    )
     elements = json.loads(kernel.from_code(source, "uklad"))["netlist"]["elements"]
     assert [(e["id"], e["value"]) for e in elements] == [("E_1", "12"), ("R_1", "6")]
     # no variable called like the schematic: the last circuit the code defines
@@ -132,7 +130,7 @@ def test_a_schematic_is_a_variable_named_after_it():
     kernel.reset()
     drawing = _loop(("E_1", "voltage_source", "12"), ("R_1", "resistor", None))
     out = run(
-        "sol = solve(Problem(układ1.circuit, {**układ1.given, I(układ1['R_1']): 2}))\nsol('R_1')",
+        "sol = układ1.circuit.final({**układ1.values, I(układ1['R_1']): 2})\nsol('R_1')",
         **{"Układ 1": drawing},
     )
     assert out == [{"type": "markdown", "data": "$\\displaystyle 6$"}]

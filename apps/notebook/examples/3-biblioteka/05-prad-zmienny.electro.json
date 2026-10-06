@@ -17,7 +17,7 @@
     {
       "id": "d4ebe54b",
       "type": "code",
-      "source": "import cmath, math\nS, R, C, wy = SineSource(\"S\"), Resistor(\"R\"), Capacitor(\"C\"), Node(\"wy\")\nrc = Problem(GND >> S >> R >> wy >> C >> GND, {S: {\"\": 10, \"f\": 50}, R: 1000, C: \"3.3u\"})\nu = complex(solve(rc)(V(wy)))\nprint(f\"amplituda {abs(u):.2f} V, faza {math.degrees(cmath.phase(u)):.1f}°\")",
+      "source": "import cmath, math\nS, R, C, wy = SineSource(\"S\"), Resistor(\"R\"), Capacitor(\"C\"), Node(\"wy\")\nrc = GND >> S >> R >> wy >> C >> GND\nu = complex(rc.final({S: {\"\": 10, \"f\": 50}, R: 1000, C: \"3.3u\"})(V(wy)))\nprint(f\"amplituda {abs(u):.2f} V, faza {math.degrees(cmath.phase(u)):.1f}°\")",
       "outputs": [
         {
           "type": "stream",
@@ -28,12 +28,12 @@
     {
       "id": "5b3bc8b4",
       "type": "markdown",
-      "source": "## Charakterystyka filtru\n\nCzęstotliwość można też podać wprost: `solve(zadanie, AC(ω))` liczy wskazy przy $\\omega$, a zwykłe\nźródło napięcia jest wtedy wskazem o swojej wartości. Filtr RC przepuszcza niskie częstotliwości, a tłumi\nwysokie; częstotliwość graniczna $f_g = \\frac{1}{2\\pi RC} \\approx 48$ Hz — tam zostaje\n$\\frac{1}{\\sqrt 2} \\approx 71\\%$ amplitudy:"
+      "source": "## Charakterystyka filtru\n\nCzęstotliwość można też podać wprost: `obwód.final(wartości, AC(ω))` liczy wskazy przy $\\omega$, a zwykłe\nźródło napięcia jest wtedy wskazem o swojej wartości. Filtr RC przepuszcza niskie częstotliwości, a tłumi\nwysokie; częstotliwość graniczna $f_g = \\frac{1}{2\\pi RC} \\approx 48$ Hz — tam zostaje\n$\\frac{1}{\\sqrt 2} \\approx 71\\%$ amplitudy:"
     },
     {
       "id": "b7c3e319",
       "type": "code",
-      "source": "E = VoltageSource(\"E\")\nfiltr = Problem(GND >> E >> R >> wy >> C >> GND, {E: 10, R: 1000, C: \"3.3u\"})\nfor f in [5, 20, 48, 100, 500, 2000]:\n    u = abs(complex(solve(filtr, AC(2 * math.pi * f))(V(wy))))\n    print(f\"{f:>5} Hz: {u / 10 * 100:5.1f}% \", \"█\" * round(u * 4))",
+      "source": "E = VoltageSource(\"E\")\nfiltr = GND >> E >> R >> wy >> C >> GND\nfor f in [5, 20, 48, 100, 500, 2000]:\n    u = abs(complex(filtr.final({E: 10, R: 1000, C: \"3.3u\"}, AC(2 * math.pi * f))(V(wy))))\n    print(f\"{f:>5} Hz: {u / 10 * 100:5.1f}% \", \"█\" * round(u * 4))",
       "outputs": [
         {
           "type": "stream",
@@ -49,7 +49,7 @@
     {
       "id": "2930458c",
       "type": "code",
-      "source": "E, R, L_, C_ = VoltageSource(\"E\"), Resistor(\"R\"), Inductor(\"L\"), Capacitor(\"C\")\nrlc = Problem(~(E >> R >> L_ >> C_), {E: 1, R: 10, L_: 0.01, C_: 1e-6})\nf0 = 1 / (2 * math.pi * math.sqrt(0.01 * 1e-6))\nprint(f\"f0 = {f0:.0f} Hz\")\nfor f in [0.5 * f0, 0.9 * f0, f0, 1.1 * f0, 2 * f0]:\n    i = abs(complex(solve(rlc, AC(2 * math.pi * f))(I(R))))\n    print(f\"{f:7.0f} Hz: I = {i * 1000:6.2f} mA\")",
+      "source": "E, R, L_, C_ = VoltageSource(\"E\"), Resistor(\"R\"), Inductor(\"L\"), Capacitor(\"C\")\nrlc = ~(E >> R >> L_ >> C_)\nf0 = 1 / (2 * math.pi * math.sqrt(0.01 * 1e-6))\nprint(f\"f0 = {f0:.0f} Hz\")\nfor f in [0.5 * f0, 0.9 * f0, f0, 1.1 * f0, 2 * f0]:\n    i = abs(complex(rlc.final({E: 1, R: 10, L_: 0.01, C_: 1e-6}, AC(2 * math.pi * f))(I(R))))\n    print(f\"{f:7.0f} Hz: I = {i * 1000:6.2f} mA\")",
       "outputs": [
         {
           "type": "stream",

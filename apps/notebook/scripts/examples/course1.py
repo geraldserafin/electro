@@ -69,7 +69,7 @@ Te same wyniki możesz dostać w komórce z kodem. Schemat ma nazwę `latarka` i
 w kodzie:
 """)
     L.code("""
-sol = solve(latarka)
+sol = latarka.final()
 print("prąd żarówki:", sol("I_H_1"), "A")
 print("napięcie na żarówce:", sol("U_H_1"), "V")
 """)
@@ -140,13 +140,13 @@ Kliknij ▶ **Oblicz**, żeby zobaczyć, co pokazują.
 ## Im większy opór, tym mniejszy prąd
 
 Ten sam obwód można zapisać kodem — tu dla kilku różnych oporników naraz. Najpierw elementy: bateria
-`E` i opornik `R`. `~(E >> R)` to pętla z nich, a `Problem(obwód, {dane})` daje im wartości; `solve`
-rozwiązuje, a `I(R)` to prąd opornika:
+`E` i opornik `R`. `~(E >> R)` to pętla z nich, a `.final({dane})` rozwiązuje ją z tymi wartościami;
+`I(R)` to prąd opornika:
 """)
     L.code("""
 E, R = VoltageSource("E"), Resistor("R")
 for r in [100, 470, 1000, 4700, 10000]:
-    sol = solve(Problem(~(E >> R), {E: 9, R: r}))
+    sol = (~(E >> R)).final({E: 9, R: r})
     print(f"R = {r:>6} Ω   I = {float(sol(I(R))) * 1000:6.2f} mA")
 """)
     L.md("""
@@ -167,7 +167,7 @@ użyje prawa Ohma: $R = \\frac{U}{I} = \\frac{9\\,\\mathrm{V}}{0{,}02\\,\\mathrm
     L.drawing("nieznany", d, solve=True)
     L.md("A tak wygląda to samo rozwiązanie krok po kroku, z uzasadnieniem każdego kroku:")
     L.code("""
-steps(solve(nieznany))
+steps(nieznany.final())
 """)
     L.md("""
 ## Spróbuj sam
@@ -233,13 +233,13 @@ bez względu na to, ile urządzeń już działa.
     L.md("""
 ## Opór zastępczy w kodzie
 
-W kodzie `>>` łączy szeregowo, a `|` równolegle. Każdy kawałek obwodu to **komponent**: `.component`
+W kodzie `>>` łączy szeregowo, a `|` równolegle. Każdy kawałek obwodu to znowu element: `print`
 pokazuje, jak jego napięcie $U$ zależy od prądu $I$ — opór zastępczy wychodzi sam, nikt nie podaje wzoru:
 """)
     L.code("""
 R_1, R_2, R_3 = Resistor("R_1"), Resistor("R_2"), Resistor("R_3")
 for nazwa, kawalek in [("szeregowo", R_1 >> R_2), ("równolegle", R_2 | R_3), ("mieszane", R_1 >> (R_2 | R_3))]:
-    print(f"{nazwa}: {kawalek.component}")
+    print(f"{nazwa}: {kawalek}")
 """)
     L.md("""
 ## Spróbuj sam
@@ -284,7 +284,7 @@ schematem. Która świeci jaśniej, gdy uruchomisz ⚡?
     d.ground((0, 6))
     L.drawing("dwie_zarowki", d, solve=True, live=True)
     L.code("""
-sol = solve(dwie_zarowki)
+sol = dwie_zarowki.final()
 for h in ["H_1", "H_2"]:
     print(h, "P =", sol(f"P_{h}"), "W")
 """)
@@ -298,7 +298,7 @@ Każdy opornik ma dopuszczalną moc — zwykłe, małe oporniki tylko **0,25 W**
     L.code("""
 E, R = VoltageSource("E"), Resistor("R")
 for u in [5, 9, 12]:
-    p = solve(Problem(~(E >> R), {E: u, R: 100}))(P(R))
+    p = (~(E >> R)).final({E: u, R: 100})(P(R))
     print(f"{u:>2} V na 100 Ω: {float(p):.2f} W", "— za dużo!" if p > 0.25 else "")
 """)
     L.md("""
@@ -354,7 +354,7 @@ Każdy krok ma swoje uzasadnienie — przy niektórych zobaczysz właśnie „I 
 „II prawo Kirchhoffa”:
 """)
     L.code("""
-steps(solve(dwa_zrodla))
+steps(dwa_zrodla.final())
 """)
     L.md("""
 ## Sprawdź I prawo sam
@@ -362,7 +362,7 @@ steps(solve(dwa_zrodla))
 Prąd z $R_1$ wpływa do węzła u góry i rozdziela się na $R_2$ i $R_3$. Ich suma musi się zgadzać:
 """)
     L.code("""
-sol = solve(dwa_zrodla)
+sol = dwa_zrodla.final()
 print("I_R_1 =", sol("I_R_1"), " I_R_2 + I_R_3 =", sol("I_R_2 + I_R_3"))
 """)
     L.md("""
@@ -404,8 +404,8 @@ nazwany punkt między opornikami, `GND` to masa, a `>>` łączy elementy jeden z
 """)
     L.code("""
 U_z, R_a, R_b, wy = VoltageSource("U"), Resistor("R_a"), Resistor("R_b"), Node("wy")
-dz = Problem(GND >> U_z >> R_a >> wy >> R_b >> GND, {U_z: "U", R_a: "R_a", R_b: "R_b"})
-solve(dz)(V(wy))
+dz = GND >> U_z >> R_a >> wy >> R_b >> GND
+dz.final({U_z: "U", R_a: "R_a", R_b: "R_b"})(V(wy))
 """)
     L.md("""
 ## Potencjometr
@@ -497,14 +497,14 @@ mniej więcej sekundę. Oscyloskop pod schematem pokazuje, jak spada napięcie `
     L.md("""
 ## Ładowanie w kodzie
 
-`simulate()` liczy obwód krok po kroku w czasie. Tu źródło ładuje kondensator 100 µF przez 10 kΩ:
+`.simulate()` liczy obwód krok po kroku w czasie. Tu źródło ładuje kondensator 100 µF przez 10 kΩ:
 $\\tau = 10\\,000 \\cdot 0{,}0001 = 1$ s. Na wykresie widać, że po sekundzie napięcie ma ok. 63% z 5 V,
 czyli 3,16 V.
 """)
     L.code("""
 E, R, C, c = VoltageSource("E"), Resistor("R"), Capacitor("C"), Node("c")
-rc = Problem(GND >> E >> R >> c >> C >> GND, {E: 5, R: "10k", C: "100u"})
-przebieg = simulate(rc, until=5)
+rc = GND >> E >> R >> c >> C >> GND
+przebieg = rc.simulate({E: 5, R: "10k", C: "100u"}, until=5)
 print("po 1 s:", round(przebieg.at("V_c", 1), 2), "V")
 plot(przebieg, "V_c")
 """)
@@ -605,7 +605,7 @@ połówki w jedną stronę, a kondensator wygładza dziury między nimi. Na oscy
     d.label("wy", (10, 0))
     L.drawing("prostownik", d)
     L.code("""
-plot(simulate(prostownik, until=0.1), "V_we", "V_wy")
+plot(prostownik.simulate(until=0.1), "V_we", "V_wy")
 """)
     L.save()
 
@@ -718,7 +718,7 @@ i naciśnij dwa razy R), a silnik zakręci się w drugą stronę.
     d.ground((0, 6))
     L.drawing("silnik", d)
     L.code("""
-rozruch = simulate(silnik, until=0.4, inputs={"S_1_closed": 1})
+rozruch = silnik.simulate(until=0.4, inputs={"S_1_closed": 1})
 plot(rozruch, "I_M_1")
 """)
     L.md("""
@@ -786,7 +786,7 @@ skacze na setki woltów. Prawdziwy tranzystor by tego nie przeżył. Wykres poka
         name = "z_dioda" if diode else "bez_diody"
         L.drawing(name, d)
         L.code(f"""
-plot(simulate({name}, until=0.4), "V_c")
+plot({name}.simulate(until=0.4), "V_c")
 """)
     L.save()
 
@@ -934,7 +934,7 @@ Uruchom ⚡: dioda mruga ok. 0,7 razy na sekundę, a oscyloskop pokazuje piłę 
 R1, R2, C1 = 1_000, 10_000, 100e-6
 f = 1.44 / ((R1 + 2 * R2) * C1)
 print(f"f = {f:.2f} Hz, okres {1 / f:.2f} s")
-plot(simulate(migacz, until=6), "V_c")
+plot(migacz.simulate(until=6), "V_c")
 """)
     L.md("""
 ## Spróbuj sam

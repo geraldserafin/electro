@@ -15,7 +15,8 @@ it("writes a loop", () => {
   expect(codeOf({ elements, given: [] }, "petla").split("\n")).toEqual([
     'E_1 = VoltageSource("E_1")',
     'R_1 = Resistor("R_1")',
-    "petla = Problem(~(E_1 >> R_1), {E_1: 12, R_1: 4})",
+    "petla = ~(E_1 >> R_1)",
+    "petla_values = {E_1: 12, R_1: 4}",
   ]);
   expect(codeOf({ elements, given: [] }, "Układ 1")).toContain("\nukład1 = ");
 });

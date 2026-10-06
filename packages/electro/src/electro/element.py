@@ -79,8 +79,9 @@ Params = Mapping[str, sp.Expr]
 @dataclass(frozen=True)
 class Relation:
     """What an element is, seen from outside: its ends, its laws, its elements of several ways, the current
-    into each named point from it, what it eliminated (``x = value`` by ``eq``, in order), and which of its
-    variables only join (a spider's, a crossing's: fresh wherever the piece is used again)."""
+    into each named point from it, what it eliminated (``x = value`` by ``eq``, in order), which of its
+    variables only join (a spider's, a crossing's: fresh wherever the piece is used again), and which ends'
+    potentials ``>>`` glued (where each terminal is: what a drawing of it needs)."""
 
     left: tuple[End, ...] = ()
     right: tuple[End, ...] = ()
@@ -89,6 +90,7 @@ class Relation:
     taps: tuple[tuple[object, sp.Expr], ...] = ()
     definitions: tuple[tuple[sp.Symbol, sp.Expr, Equation], ...] = ()
     joining: frozenset[sp.Symbol] = frozenset()
+    glued: tuple[tuple[sp.Expr, sp.Expr], ...] = ()
 
 
 POTENTIALS: set[sp.Symbol] = set()
@@ -187,7 +189,8 @@ class Element:
             if sp.expand(one - two) != 0
         ]
         both = _beside(a, b)
-        glued = replace(both, left=a.left, right=b.right, laws=(*both.laws, *wires))
+        pairs = (*both.glued, *((x.v, y.v) for x, y in zip(a.right, b.left)))
+        glued = replace(both, left=a.left, right=b.right, laws=(*both.laws, *wires), glued=pairs)
         return composite(reduced(glued), _members(self, other))
 
     def __matmul__(self, other: Element) -> Element:
@@ -274,6 +277,7 @@ def _beside(a: Relation, b: Relation) -> Relation:
         a.taps + b.taps,
         a.definitions + b.definitions,
         a.joining | b.joining,
+        a.glued + b.glued,
     )
 
 
@@ -289,6 +293,7 @@ def _renamed(r: Relation, to: Mapping[sp.Symbol, sp.Expr], joining: frozenset) -
         tuple((p, ren(i)) for p, i in r.taps),
         tuple((to.get(x, x), ren(v), Equation(ren(q.expr), q.origin)) for x, v, q in r.definitions),
         joining,
+        tuple((ren(x), ren(y)) for x, y in r.glued),
     )
 
 
@@ -353,7 +358,7 @@ def reduced(
                     progress = True
                     break
     kept = tuple(q for q in laws.values() if q.expr != 0)
-    return Relation(left, right, kept, choices, taps, tuple(definitions), r.joining)
+    return Relation(left, right, kept, choices, taps, tuple(definitions), r.joining, r.glued)
 
 
 def _alone(e: sp.Expr, x: sp.Symbol, held: set[sp.Symbol], steady) -> sp.Expr | None:

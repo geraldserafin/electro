@@ -29,13 +29,15 @@ SOURCES = sp.Symbol("λ")
 @dataclass(frozen=True)
 class Solution:
     """One frame of a circuit: what was found of its named variables (``values``), what is left not found
-    (``unknowns``), the steps, the frame and when it ends (``time``; ∞: all settled)."""
+    (``unknowns``), what was given (``given``, as it was), the steps, the frame and when it ends (``time``; ∞:
+    all settled)."""
 
     circuit: Element
     values: Mapping[sp.Symbol, sp.Expr]
     unknowns: frozenset[sp.Symbol]
     names: Names
     data: Mapping[sp.Symbol, sp.Expr] = field(default_factory=dict)
+    given: Mapping = field(default_factory=dict)
     steps: tuple[SolutionStep, ...] = ()
     frame: Step = field(default_factory=DC)
     time: sp.Expr = sp.oo
@@ -142,9 +144,8 @@ def _frame(circuit: Element, values: Mapping, frame: Step, before: Solution | No
         found, unknown, steps = _by_newton(left)
     every = left.complete(found)
     unknown = frozenset(unknown | {x for x, v in every.items() if symbols_in(v) & unknown})
-    return Solution(
-        circuit, every, unknown, left.names, left.values, _traced(steps, left, every, unknown), frame, left.time
-    )
+    traced = _traced(steps, left, every, unknown)
+    return Solution(circuit, every, unknown, left.names, left.values, dict(values), traced, frame, left.time)
 
 
 def _is_algebraic(system: System) -> bool:
@@ -163,7 +164,7 @@ def _by_algebra(circuit: Element, values: Mapping, frame: Step, system: System):
     try:
         found, steps = solve_by_hand(system)
     except Contradiction as err:
-        raise Contradiction(str(err), _clashing(circuit, values, frame)) from None
+        raise Contradiction(str(err), {k: values[k] for k in _clashing(circuit, values, frame)}) from None
     return found, frozenset(system.unknowns) - set(found), steps
 
 

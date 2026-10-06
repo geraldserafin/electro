@@ -12,12 +12,12 @@
     {
       "id": "e1d409ea",
       "type": "markdown",
-      "source": "# Każdy obwód jest komponentem\n\nZłożenie dwóch kawałków to znowu kawałek: `R_1 >> R_2` ma dwa końce i jedno prawo między nimi. `>>` skleja\nkońce i **wyrzuca to, co jest w środku** — zostaje tylko związek napięcia $U$ z prądem $I$ na brzegu.\n`.component` go pokazuje. Opór szeregowy czy równoległy nie jest tu żadną regułą: wychodzi z praw elementów."
+      "source": "# Każdy obwód jest komponentem\n\nZłożenie dwóch kawałków to znowu kawałek: `R_1 >> R_2` ma dwa końce i jedno prawo między nimi. `>>` skleja\nkońce i **wyrzuca to, co jest w środku** — zostaje tylko związek napięcia $U$ z prądem $I$ na brzegu.\n`print` go pokazuje. Opór szeregowy czy równoległy nie jest tu żadną regułą: wychodzi z praw elementów."
     },
     {
       "id": "0a4f8ee8",
       "type": "code",
-      "source": "R_1, R_2, R_3, E = Resistor(\"R_1\"), Resistor(\"R_2\"), Resistor(\"R_3\"), VoltageSource(\"E\")\nprint(\"szeregowo: \", (R_1 >> R_2).component)\nprint(\"równolegle:\", (R_1 | R_2).component)\nprint(\"z źródłem: \", (E >> R_1 >> (R_2 | R_3)).component)\nprint(\"z kondensatorem:\", (R_1 >> Capacitor(\"C\")).component)",
+      "source": "R_1, R_2, R_3, E = Resistor(\"R_1\"), Resistor(\"R_2\"), Resistor(\"R_3\"), VoltageSource(\"E\")\nprint(\"szeregowo: \", R_1 >> R_2)\nprint(\"równolegle:\", R_1 | R_2)\nprint(\"z źródłem: \", E >> R_1 >> (R_2 | R_3))\nprint(\"z kondensatorem:\", R_1 >> Capacitor(\"C\"))",
       "outputs": [
         {
           "type": "stream",
@@ -28,12 +28,12 @@
     {
       "id": "2d3085db",
       "type": "markdown",
-      "source": "Dwa kawałki są równoważne dokładnie wtedy, gdy mają to samo prawo na końcach.\n\n## Thévenin\n\nKażdy liniowy obwód widziany z dwóch punktów to jedno źródło $E_{th}$ z jednym oporem $R_{th}$: $E_{th}$ to\nnapięcie, gdy nic nie jest podłączone, a $R_{th}$ — o ile napięcie spada na każdy amper pobrany.\n`resistance(zadanie, A, B)` liczy $R_{th}$ (wpuszcza prąd i patrzy, jak rośnie napięcie):"
+      "source": "Dwa kawałki są równoważne dokładnie wtedy, gdy mają to samo prawo na końcach.\n\n## Thévenin\n\nKażdy liniowy obwód widziany z dwóch punktów to jedno źródło $E_{th}$ z jednym oporem $R_{th}$: $E_{th}$ to\nnapięcie, gdy nic nie jest podłączone, a $R_{th}$ — o ile napięcie spada na każdy amper pobrany.\n`resistance(obwód, wartości, A, B)` liczy $R_{th}$ (wpuszcza prąd i patrzy, jak rośnie napięcie):"
     },
     {
       "id": "8dd5a0e1",
       "type": "code",
-      "source": "A = Node(\"A\")\ndzielnik = Problem(GND >> E >> R_1 >> A >> R_2 >> GND, {E: 12, R_1: 10, R_2: 10})\nprint(\"E_th =\", solve(dzielnik)(V(A)), \"V,  R_th =\", resistance(dzielnik, A, GND), \"Ω\")",
+      "source": "A = Node(\"A\")\ndzielnik, dane = GND >> E >> R_1 >> A >> R_2 >> GND, {E: 12, R_1: 10, R_2: 10}\nprint(\"E_th =\", dzielnik.final(dane)(V(A)), \"V,  R_th =\", resistance(dzielnik, dane, A, GND), \"Ω\")",
       "outputs": [
         {
           "type": "stream",
@@ -49,7 +49,7 @@
     {
       "id": "086ae0d8",
       "type": "code",
-      "source": "J = CurrentSource(\"J\")\nobwod = ((GND >> E >> R_1 >> A) @ (A >> R_2 >> GND) @ (GND >> J >> A))\ndane = {E: 12, R_1: 10, R_2: 10, J: 1}\nsamo_E = solve(Problem(obwod, {**dane, J: 0}))(U(R_2))\nsamo_J = solve(Problem(obwod, {**dane, E: 0}))(U(R_2))\nprint(\"samo E:\", samo_E, \"V,  samo J:\", samo_J, \"V,  razem:\", samo_E + samo_J, \"=\", solve(Problem(obwod, dane))(U(R_2)), \"V\")",
+      "source": "J = CurrentSource(\"J\")\nobwod = ((GND >> E >> R_1 >> A) @ (A >> R_2 >> GND) @ (GND >> J >> A))\ndane = {E: 12, R_1: 10, R_2: 10, J: 1}\nsamo_E = obwod.final({**dane, J: 0})(U(R_2))\nsamo_J = obwod.final({**dane, E: 0})(U(R_2))\nprint(\"samo E:\", samo_E, \"V,  samo J:\", samo_J, \"V,  razem:\", samo_E + samo_J, \"=\", obwod.final(dane)(U(R_2)), \"V\")",
       "outputs": [
         {
           "type": "stream",

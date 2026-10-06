@@ -241,7 +241,7 @@
     {
       "id": "a9322d89",
       "type": "code",
-      "source": "steps(solve(dwa_zrodla))",
+      "source": "steps(dwa_zrodla.final())",
       "outputs": [
         {
           "type": "solution",
@@ -306,7 +306,7 @@
               },
               {
                 "type": "FormulaStep",
-                "chain": "I_{E_{1}} = \\frac{4}{3} = 1.333\\,\\mathrm{A}",
+                "chain": "I_{E_{1}} = 3 - \\frac{V_{n2}}{4} = 3 - \\frac{6.66667}{4} = 1.333\\,\\mathrm{A}",
                 "reason": {
                   "type": "KirchhoffCurrent",
                   "node": "n1"
@@ -314,7 +314,7 @@
               },
               {
                 "type": "FormulaStep",
-                "chain": "I_{E_{2}} = - \\frac{2}{9} = -222.2\\,\\mathrm{mA}",
+                "chain": "I_{E_{2}} = 2 - \\frac{V_{n2}}{3} = 2 - \\frac{6.66667}{3} = -222.2\\,\\mathrm{mA}",
                 "reason": {
                   "type": "KirchhoffCurrent",
                   "node": "n3"
@@ -335,7 +335,7 @@
     {
       "id": "ece9f61a",
       "type": "code",
-      "source": "sol = solve(dwa_zrodla)\nprint(\"I_R_1 =\", sol(\"I_R_1\"), \" I_R_2 + I_R_3 =\", sol(\"I_R_2 + I_R_3\"))",
+      "source": "sol = dwa_zrodla.final()\nprint(\"I_R_1 =\", sol(\"I_R_1\"), \" I_R_2 + I_R_3 =\", sol(\"I_R_2 + I_R_3\"))",
       "outputs": [
         {
           "type": "stream",

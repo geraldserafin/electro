@@ -1,20 +1,15 @@
-"""A solution, its quantities, expressions and values pretty-printed in LaTeX: ``I_R_1`` is ``I_{R_{1}}``,
-0.5 A is ``500\\,\\mathrm{mA}``."""
+"""Quantities, expressions and values pretty-printed in LaTeX: ``I_R_1`` is ``I_{R_{1}}``, 0.5 A is
+``500\\,\\mathrm{mA}``."""
 
 from __future__ import annotations
 
 from collections.abc import Mapping
-from typing import TYPE_CHECKING
 
 import sympy as sp
-from electro.problem.quantities import Current, Parameter, Potential, Power, Quantity, Scaled, Voltage
-from electro.solver.errors import Undetermined
-from electro.solver.symbols import Symbols
+from electro.formula import Names
+from electro.quantities import Current, Parameter, Potential, Power, Quantity, Scaled, Voltage
 from electro.values import fmt
 from sympy.printing.latex import LatexPrinter
-
-if TYPE_CHECKING:
-    from electro.solver.solution import Solution, SolutionStep
 
 UNITS = {Current: "A", Voltage: "V", Potential: "V", Power: "W"}
 
@@ -50,47 +45,26 @@ def value(v: object, unit: str = "") -> str:
     return _text(text)
 
 
-def quantity(q: Quantity | Scaled, s: Symbols) -> str:
+def quantity(q: Quantity | Scaled, n: Names) -> str:
     """As a book names it: ``I_{R_{1}}``, ``U_{R_{1}}``, ``V_{A}``, ``R_{1}``; a sum of them written out."""
-    e = s.of(q)
-    if isinstance(e, sp.Symbol):
-        return name(e.name)
     match q:
-        case Voltage(of) | Power(of) | Current(of):
-            letter = {Voltage: "U", Power: "P", Current: "I"}[type(q)]
-            return name(f"{letter}_{s.labels[s.index(of)]}")
-    return expr(e)
+        case Voltage(of) | Power(of):
+            return name(f"{'U' if isinstance(q, Voltage) else 'P'}_{n.labels[of]}")
+        case Current(of, None):
+            return name(f"I_{n.labels[of]}")
+    e = n.of(q)
+    return name(e.name) if isinstance(e, sp.Symbol) else expr(e)
 
 
-def unit(q: Quantity | Scaled, units: Mapping[str, str], s: Symbols) -> str:
+def unit(q: Quantity | Scaled, units: Mapping[str, str], n: Names) -> str:
     """Its unit: a current's A, a voltage's V, a power's W, a parameter's its element's (``units``: by
     element)."""
     match q:
         case Parameter(of, which) if not which:
-            return units.get(s.labels[s.index(of)], "")
+            return units.get(n.labels[of], "")
         case Scaled(_, x):
-            return unit(x, units, s)
-    return UNITS.get(type(q), "A" if "I_" in str(s.of(q)) else "V")
-
-
-def solution(s: Solution) -> str:
-    """Each step's values, one line each, then what is sought."""
-    try:
-        answers = s.answers
-    except Undetermined:
-        answers = {}
-    lines = [step(st) for st in s.steps if st.found]
-    lines += [f"{quantity(q, s.symbols)} = {value(v, UNITS.get(type(q), ''))}" for q, v in answers.items()]
-    return r"\begin{aligned}" + r" \\ ".join(f"&{line}" for line in lines) + r"\end{aligned}"
-
-
-def step(st: SolutionStep) -> str:
-    """What it found: ``U_{R_{1}} = 5\\,\\mathrm{V}``, a current in amperes, a potential in volts."""
-    return ", ".join(f"{name(x.name)} = {value(v, LETTERS.get(x.name[0], ''))}" for x, v in zip(st.found, st.values))
-
-
-LETTERS = {"I": "A", "V": "V", "U": "V"}
-"""A variable's unit by its letter."""
+            return unit(x, units, n)
+    return UNITS.get(type(q), "A" if "I_" in str(n.of(q)) else "V")
 
 
 def _unit(text: str) -> str:

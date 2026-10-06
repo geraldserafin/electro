@@ -1,34 +1,33 @@
 # electro
 
-Obwody elektryczne jako morfizmy **kategorii hipergrafowej** i solver, który rozwiązuje zadania krok po kroku
-(każdy krok z równaniem i jego powodem) i radzi sobie z niewiadomymi, literami, prądem zmiennym i czasem.
+Obwody elektryczne jako morfizmy **kategorii hipergrafowej** i solver, który rozwiązuje je krok po kroku
+(każdy krok z równaniem i jego powodem) — z niewiadomymi, literami, prądem zmiennym i w czasie.
 
 ```python
 from electro import *
 
 E, R_1, R_2, A = VoltageSource("E"), Resistor("R_1"), Resistor("R_2"), Node("A")
-uklad = Problem(GND >> E >> R_1 >> A >> R_2 >> GND, {E: 12, R_1: 10, I(R_1): "500m"}, [Parameter(R_2)])
+uklad = GND >> E >> R_1 >> A >> R_2 >> GND
 
-sol = solve(uklad)
+sol = uklad.final({E: 12, R_1: 10, I(R_1): "500m"})
 sol(Parameter(R_2))   # 14
 sol(V(A))             # 7
 sol("U_R_1 / I_R_1")  # 10 — po nazwach też, wyrażenia bez eval
 sol.steps             # co wyliczono, z którego równania i dlaczego
+
+uklad.simulate({E: 12, R_1: 10, R_2: 14}, until=1)   # klatka po klatce
 ```
 
-Obwód to sama budowa, bez liczb; liczby i pytania dochodzą w **zadaniu** (`Problem`). Ten sam obwód
-rozwiązuje się z różnymi danymi, a analizy (prąd stały, wskazy, czas) tylko inaczej czytają te same prawa.
-
-Biblioteka nie mówi nic słowami: `solve` daje `Solution` — wartości i kroki (`SolutionStep`: co
-znaleziono, z jakiego równania, skąd to równanie), a to, co poszło nie tak, to wyjątki z polami
-(`MissingData`, `Contradiction`…). `latex` drukuje je ładnie (`Solution` też sam, w Jupyterze). Słowami
-mówi ten, kto pokazuje wynik — notatnik po polsku albo po angielsku.
+Obwód to sama budowa, bez liczb; liczby dochodzą, gdy się go rozwiązuje. Biblioteka nie mówi nic słowami:
+`final` daje `Solution` — wartości i kroki (`SolutionStep`: co znaleziono, z jakiego równania, skąd to
+równanie), a to, co poszło nie tak, to wyjątki z polami (`MissingData`, `Contradiction`, `Ambiguous`…).
+Słowami mówi ten, kto pokazuje wynik — notatnik po polsku albo po angielsku.
 
 ## Klocki
 
-Każdy obwód ma typ `m → n`: `m` końców z lewej, `n` z prawej. Obwody buduje się tylko działaniami poniżej —
-bez funkcji pomocniczych. Każdy obwód jest komponentem: `(E >> R_1 >> R_2).component` to jego końce i jedno
-prawo między nimi, `U = (R_1 + R_2)·I − E` — środek wyrzucony przy składaniu, nikt nie mówi o „szeregowo”. Element ma nazwę; jego tożsamość to ten obiekt.
+Wszystko jest `Element`em: opornik, `E >> R`, każdy obwód. Element to relacja swoich końców (na każdym
+potencjał i prąd) i prawa między nimi. Rodzaj elementu to podklasa `Element` z końcówkami i prawami —
+jedna na plik (`elements/`, rodziny w folderach: `diodes/`, `transistors/`…).
 
 | zapis | znaczenie |
 |---|---|
@@ -36,64 +35,60 @@ prawo między nimi, `U = (R_1 + R_2)·I − E` — środek wyrzucony przy skład
 | `VoltageSource`, `CurrentSource`, `SineSource`, `SquareSource` | źródła (`+` na drugim końcu; prąd pchany od pierwszego do drugiego) |
 | `Ammeter`, `Voltmeter` | idealne mierniki; odczyt to dana `I(A_1)`, `U(V_1)` |
 | `OpAmp`, `VCVS`, `VCCS`, `CCVS`, `CCCS`, `Transformer`, `Coupled` | wielokońcowe, 0 → n: `T >> (a @ b @ c)` (niewyrysowany `gnd` — na masie, bez końca) |
-| `Diode`, `LED`, `Zener`, `NPN`, `PNP`, `NMOS`, `PMOS`, bramki, `Timer555`, `Motor`, `Relay`, płytki… | nieliniowe i z pamięcią: w czasie |
-| `Hole` | nieznany element: `fill` wstawia najprostszy pasujący |
-| `f >> g` | szeregowo (złożenie) |
+| `Diode`, `LED`, `Zener`, `NPN`, `PNP`, `NMOS`, `PMOS`, bramki, `Timer555`, `Motor`, `Relay`, płytki… | nieliniowe i z pamięcią |
+| `Hole` | nieznany element |
+| `f >> g` | szeregowo: końce sklejone, a to, co w środku, od razu wyeliminowane |
 | `f \| g` | równolegle |
-| `f @ g` | obok siebie, bez połączenia (iloczyn monoidalny) |
-| `swap` | dwa końce na krzyż (2 → 2): z pająkami, `cap` i `cup` łączy dowolne końce bez nazwanych punktów |
+| `f @ g` | obok siebie, bez połączenia |
+| `~f` | zamknięty: dwa końce połączone (pętla: `~(E >> R_1 >> R_2)`) |
+| `-f` | odwrócony |
 | `Node("A")`, `GND` | punkt (ten sam obiekt w dwóch miejscach = jeden punkt), masa |
-| `~f` | zamknięty: jego dwa końce połączone (pętla: `~(E >> R_1 >> R_2)`) |
-| `-f` | odwrócony (transpozycja przez `cap` i `cup`) |
-| `a >> e >> b`, `f @ g` z `Node` | element między punktami, kawałki obok siebie — dowolny graf (mostek) |
-| `wire`, `cap`, `cup` | pająki: 1 → 1, 0 → 2, 2 → 0 |
+| `wire`, `cap`, `cup`, `swap` | pająki 1 → 1, 0 → 2, 2 → 0 i skrzyżowanie 2 → 2 |
+
+`print(R_1 >> R_2)` pokazuje prawo na końcach: `U = I*(R_1 + R_2)` — opór zastępczy wychodzi ze
+składania, nikt nie mówi o „szeregowo”. Element ma nazwę; jego tożsamość to ten obiekt.
 
 Wartości: `10`, `4.7`, `"4.7k"`, `"4k7"`, `"0,5 A"`, `"230∠-120"`, `"R"` (litera). Element o kilku
-parametrach dostaje słownik: `{S: {"": 10, "f": 50}}`, `{D: part("1N4148")}`.
+parametrach dostaje słownik: `{S: {"": 10, "f": 50}}`, `{D: part("1N4148")}`. Dana może też być
+wielkością: `I(e)`, `U(e)`, `P(e)`, `Parameter(e)`, `V(punkt)`, `U(a, b)`, także inną wielkością
+(`U(R_1): 2 * U(R_2)`).
 
-## Zadanie i rozwiązanie
+## Klatka
 
-```python
-Problem(obwod, given={element: wartość, wielkość: wartość}, find=[wielkość, …])
-```
+Obwód zamknięty (bez wolnych końców) to same prawa. Solver zamienia je na **wzór klatki** i nic więcej
+nie wie o elementach: `D(x)` w klatce długości `dt` to `(x − x⁻)/dt`, `Pre(x)` to `x⁻`.
 
-Wielkości: `I(e)`, `U(e)`, `P(e)`, `Parameter(e)`, `V(punkt)`, `U(a, b)`; dana może też być inną wielkością
-(`U(R_1): 2 * U(R_2)`). `solve(zadanie)` zwraca `Solution`: `sol(q)`, `sol.answers` (szukane), `sol.steps`.
-Czego nie da się wyznaczyć — `MissingData` (ile danych brakuje i które by wystarczyły); dane sprzeczne —
-`Contradiction` (które się wykluczają); dwa rozwiązania — `Ambiguous`.
+- `obwód.final(wartości)` — klatka, do której obwód dochodzi: nieskończenie długa (DC = `Step(∞)`), a z
+  sinusami jednej częstotliwości — obracająca się (`AC(ω)`, wskazy); `final(wartości, AC(ω))` przy danej ω.
+- `obwód.simulate(wartości, until=…, dt=…, inputs={…})` — klatki jedna po drugiej, od spoczynku; ślad:
+  `slad(q)`, `slad.at(q, t)`, `slad.spectrum(q)`.
+- `step_function(obwód, wartości)` — Φ: wzór klatki skompilowany raz; `phi(klatka, dt)` daje następną od
+  `phi.rest`, `phi(phi.rest, ∞)` to DC, `phi.machine()` — Φ z pamięcią, które liczy całe przebiegi.
 
-Prąd zmienny: zadanie z sinusami jednej częstotliwości `solve` liczy samo wskazami — domyślna klatka to ta,
-do której układ dochodzi po klatkach bez końca (`settled`: DC albo AC); `solve(zadanie, AC(ω))` przy danej ω. AC to też klatka: klatki bez końca, każda to poprzednia obrócona o ω·dt;
-solver nie wie nic o AC ani o żadnym elemencie — zamienia tylko prawa na wzór klatki (`methods/ac.py`). W czasie: `simulate(zadanie, until=…, dt=…, inputs={…})` zwraca ślad:
-`slad(q)`, `slad.at(q, t)`, `slad.spectrum(q)`. `solve` to jedna klatka: DC to klatka nieskończenie długa (`DC()` = `Step(∞)`, wszystko ustalone),
-`solve(zadanie, Step(dt), before=poprzednia)` — klatka `dt` po poprzedniej (domyślnie od spoczynku).
-Symulacja to nic więcej niż klatki jedna po drugiej; `simulate` liczy je skompilowane raz: `phi =
-step_function(zadanie)`, `phi(klatka, dt)` daje następną od `phi.rest`, `phi(phi.rest, ∞)` to DC, a dla
-obwodu liniowego `phi.formula(V(A))` to krok jako wzór (`V_A⁻` — krok wcześniej).
+Liniowe rozwiązuje się algebrą (kroki jak na kartce), elementy „albo-albo” (dioda podręcznikowa)
+przypadkami, a `exp` (dioda Shockleya, tranzystor) Newtonem.
 
-## Metody
+## Silnik
 
-| | |
-|---|---|
-| `blackbox(kawałek)`, `resistance(…)`, `matches(…, Kind)` | kawałek 1 → 1 widziany z końców: relacja, jaki to jeden element |
-| `thevenin(between(zadanie, A, B))` | Thévenin widziany z dwóch punktów |
-| `superposition(zadanie, q)` | wkład każdego źródła z osobna |
-| `simplify(zadanie)` | upraszczanie jak w zeszycie, krok po kroku |
-| `fill(zadanie, dziura)` | najprostszy element w miejsce `Hole` |
-| `respond`/`responses`, `sweep`/`sweeps`, `tolerance`/`spreads` | charakterystyka częstotliwościowa, przemiatanie wartości, rozrzut z tolerancji — każde rozwiązane raz, z literą |
-| `to_netlist`, `from_netlist` | zadanie jako dane (tak rozmawia z nim notatnik) |
-| `step_function` | `solve` jednej klatki skompilowane (Φ); `to_json()` dla silnika na stronie |
+`engine.py` to cały silnik liczący klatki — zwykły Python, bez importów poza `math`: Newton z
+ograniczaniem złącza jak w SPICE, eliminacja Gaussa, długość kroku. Strona dostaje go jako JavaScript
+wydrukowany z tego samego pliku przez pscript (`apps/notebook/scripts/engine_js.py`), więc obie strony
+liczą tak samo. Węzły zostają niewiadomymi Newtona, a to, co się odczytuje (napięcia i prądy elementów),
+liczy się po klatce prostym kodem.
 
 ## Pakiet
 
 | | |
 |---|---|
-| `circuit/` | budowa: drzewo, netlista (kospan), rodzaje elementów i ich prawa, części z katalogów |
-| `problem/` | zadanie: wielkości, dane, nazwy, netlista jako dane |
-| `solver/` | obwód jako komponent (`compose.py`: `>>` skleja końce i wyrzuca środek), klatka z niego; co zostało — ręcznie, przypadkami albo Newtonem |
-| `methods/` | metody nad solverem, bez nowych praw |
-| `simulation/` | Φ (`solver/step.py`) powtarzane: jak długi krok, przebieg, wejścia |
-| `latex.py` | rozwiązanie, wielkości i wartości w LaTeX |
-| `values.py` | liczby z jednostkami i przedrostkami, wyrażenia bez `eval` |
+| `element.py` | `Element`, relacja, składanie i eliminacja |
+| `points.py` | pająki, `Node`, `GND` |
+| `elements/` | rodzaje elementów, jeden na plik |
+| `formula.py` | wzór klatki obwodu zamkniętego: nazwy, dane, co zostało do rozwiązania |
+| `frame.py`, `time.py` | klatki (`Step`, `DC`, `AC`) i słowa czasu (`D`, `Pre`) |
+| `solve.py`, `by_hand.py` | `final`: klatka rozwiązana algebrą, przypadkami albo Newtonem; `Solution` |
+| `simulate.py`, `code.py`, `engine.py` | Φ skompilowane, przebieg, ślad |
+| `laws.py` | co wynika z praw elementu: źródło, miernik, pamięć |
+| `quantities.py`, `names.py`, `values.py` | wielkości, nazwy, wartości z jednostkami |
+| `parts.py` | części z katalogów |
 
-Projekt i decyzje: [`DESIGN.md`](DESIGN.md). Testy: `devenv shell`, potem `pytest` w katalogu głównym repo.
+Projekt i decyzje: [`DESIGN.md`](DESIGN.md). Testy: `devenv shell`, potem `pytest` w `packages/electro`.

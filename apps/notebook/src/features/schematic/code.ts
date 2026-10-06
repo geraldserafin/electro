@@ -226,7 +226,8 @@ function givenOf(e: NetlistElement, name: string): string[] {
   return [`${name}: {${all.map(([w, x]) => `${JSON.stringify(w)}: ${value(x)}`).join(", ")}}`];
 }
 
-/** A problem (its elements and what its marks give) as electro code, assigned to `name`'s variable. */
+/** A drawing (its elements and what its marks give) as electro code: the circuit assigned to `name`'s
+ *  variable, its values to `<variable>_values`. */
 export function codeOf(problem: { elements: NetlistElement[]; given: [Quantity, string][] }, name: string): string {
   const { elements, given } = problem;
   const names = new Map<string, string>();
@@ -252,9 +253,9 @@ export function codeOf(problem: { elements: NetlistElement[]; given: [Quantity, 
     ...elements.flatMap((e) => givenOf(e, of(e.id))),
     ...given.map(([q, v]) => `${quantity(q, of)}: ${value(v)}`),
   ].join(", ");
-  lines.push(`${variable(name)} = Problem(${circuit}${data ? `, {${data}}` : ""})`);
+  lines.push(`${variable(name)} = ${circuit}`, `${variable(name)}_values = {${data}}`);
   return lines.join("\n");
 }
 
-/** A drawing's code: what it shows as a problem, written as electro code. */
+/** A drawing's code: its circuit and values, written as electro code. */
 export const writeCode = (sch: SchematicData, lib: SymbolLibrary, name: string) => codeOf(problemOf(sch, lib), name);

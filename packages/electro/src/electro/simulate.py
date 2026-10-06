@@ -24,6 +24,7 @@ from .algebra import expr, subs, symbols_in
 from .code import Code, Compiled, compile_equations, python, statements
 from .element import Element
 from .engine import Machine, NoConvergence
+from .errors import NotSimulated, ValueNeeded
 from .formula import Formula, NotClosed, formula, parameter_values
 from .frame import DT, Step, before
 from .quantities import Quantity, Scaled
@@ -34,23 +35,6 @@ STEP_VOLTS, STEP_AMPS = 0.05, 1e-3
 """How far a remembered voltage (or anything else) may move in one step; a remembered current."""
 SINE_STEPS, EDGE_STEPS = 40, 100
 """Steps at least in a period of a sine, of a square wave."""
-
-
-class NotSimulated(ValueError):
-    """``label`` has no law to step in time (the textbook's diode: one of its ways, assumed on paper), or the
-    circuit's laws are not one for each quantity."""
-
-    def __init__(self, label: str) -> None:
-        super().__init__(label)
-        self.label = label
-
-
-class ValueNeeded(ValueError):
-    """A simulation needs every value: ``label``'s is not given."""
-
-    def __init__(self, label: str) -> None:
-        super().__init__(label)
-        self.label = label
 
 
 class NoSuchInput(KeyError):
@@ -393,8 +377,7 @@ def simulate(
     times: list[float] = []
     rows = array("d")
     if engine is not None:
-        times, rows = _in_the_page(engine, phi, until, dt_max, when)
-        return Trace(phi, times, rows, None)
+        return Trace(phi, *_in_the_page(engine, phi, until, dt_max, when))
     params = array("d")
 
     def record(machine: Machine) -> None:
@@ -424,21 +407,22 @@ def _in_the_page(engine, phi: StepFunction, until: float, dt_max: float, when):
     finally:
         if callback is not None:
             callback.destroy()
-    times, rows = array("d"), array("d")
+    times, rows, params = array("d"), array("d"), array("d")
     times.frombytes(result.t.to_bytes())
     rows.frombytes(result.rows.to_bytes())
-    return times.tolist(), rows
+    params.frombytes(result.params.to_bytes())
+    return times.tolist(), rows, params
 
 
 @dataclass
 class Trace:
-    """What happened in a run: the time of each frame, its unknowns (``data``) and, run here, its parameters —
-    8 bytes a number (Pyodide's memory never shrinks back)."""
+    """What happened in a run: the time of each frame, its unknowns (``data``) and its parameters — 8 bytes a
+    number (Pyodide's memory never shrinks back)."""
 
     phi: StepFunction
     t: list[float]
     data: array
-    params: array | None
+    params: array
 
     def __call__(self, q: Quantity | Scaled | str) -> list[float]:
         """``q`` at each frame: a quantity, or an unknown's or a point's name (``"I_R_1"``, ``"V_A"``)."""
@@ -475,7 +459,7 @@ class Trace:
         phi = self.phi
         if name in phi.unknowns:
             return self.data[phi.unknowns.index(name) :: len(phi.unknowns)].tolist()
-        if name in phi.params and self.params is not None:
+        if name in phi.params:
             return self.params[phi.params.index(name) :: len(phi.params)].tolist()
         if name in phi.seen:
             return self._of(phi.seen[name])

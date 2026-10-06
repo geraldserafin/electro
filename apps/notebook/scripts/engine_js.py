@@ -1,4 +1,4 @@
-"""The simulation engine for the page: electro's own (``electro_next/engine.py``) printed as JavaScript by
+"""The simulation engine for the page: electro's own (``electro/engine.py``) printed as JavaScript by
 pscript, into ``src/features/simulation/engine.gen.js``. Run by ``bundle-python.mjs``."""
 
 import ast
@@ -8,7 +8,7 @@ import sys
 import pscript
 
 repo = pathlib.Path(__file__).resolve().parents[3]
-source = (repo / "packages/electro/src/electro_next/engine.py").read_text()
+source = (repo / "packages/electro/src/electro/engine.py").read_text()
 out = repo / "apps/notebook/src/features/simulation/engine.gen.js"
 
 tree = ast.parse(source)
@@ -18,7 +18,7 @@ for f in ast.walk(tree):
         f.body.insert(0, ast.parse("PSCRIPT_OVERLOAD = False").body[0])
 body = pscript.py2js(ast.unparse(tree))
 header = (
-    "// Printed by scripts/engine_js.py from packages/electro/src/electro_next/engine.py: edit that one.\n"
+    "// Printed by scripts/engine_js.py from packages/electro/src/electro/engine.py: edit that one.\n"
     "/* eslint-disable */\n// @ts-nocheck\n"
     "const math = { exp: Math.exp, log: Math.log, isnan: Number.isNaN, inf: Infinity };\n"
     "class OverflowError extends Error {}\n"

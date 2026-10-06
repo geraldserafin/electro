@@ -155,7 +155,7 @@
     {
       "id": "aa24fee4",
       "type": "code",
-      "source": "sol = solve(latarka)\nprint(\"prąd żarówki:\", sol(\"I_H_1\"), \"A\")\nprint(\"napięcie na żarówce:\", sol(\"U_H_1\"), \"V\")",
+      "source": "sol = latarka.final()\nprint(\"prąd żarówki:\", sol(\"I_H_1\"), \"A\")\nprint(\"napięcie na żarówce:\", sol(\"U_H_1\"), \"V\")",
       "outputs": [
         {
           "type": "stream",

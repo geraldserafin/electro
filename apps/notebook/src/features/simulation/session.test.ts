@@ -140,7 +140,7 @@ test("a pin wired to nothing toggling: no steps of the circuit for it, only its 
     session.attach("ARD_1", chip);
     let steps = 0;
     session.advanceTo(0.01, 1e-3, () => steps++);
-    return { steps, driven: session.sim.p[session.sim.program.inputs[`ARD_1_${pin}_E`]], level };
+    return { steps, driven: session.sim.state.p[session.sim.program.inputs[`ARD_1_${pin}_E`]], level };
   };
   const free = run("D2"),
     wired = run("D9");

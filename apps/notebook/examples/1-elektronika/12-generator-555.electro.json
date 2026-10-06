@@ -346,7 +346,7 @@
     {
       "id": "c6753c75",
       "type": "code",
-      "source": "R1, R2, C1 = 1_000, 10_000, 100e-6\nf = 1.44 / ((R1 + 2 * R2) * C1)\nprint(f\"f = {f:.2f} Hz, okres {1 / f:.2f} s\")\nplot(simulate(migacz, until=6), \"V_c\")",
+      "source": "R1, R2, C1 = 1_000, 10_000, 100e-6\nf = 1.44 / ((R1 + 2 * R2) * C1)\nprint(f\"f = {f:.2f} Hz, okres {1 / f:.2f} s\")\nplot(migacz.simulate(until=6), \"V_c\")",
       "outputs": [
         {
           "type": "stream",

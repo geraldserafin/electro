@@ -17,18 +17,18 @@
     {
       "id": "5a968c07",
       "type": "code",
-      "source": "R_1, R_2 = Resistor(\"R_1\"), Resistor(\"R_2\")\npetla = cap >> ((R_1 >> R_2) @ wire) >> cup\nprint(netlist(petla).parts)\nprint(netlist(~(R_1 >> R_2)).parts)",
+      "source": "R_1, R_2 = Resistor(\"R_1\"), Resistor(\"R_2\")\nprint(R_1 >> R_2)\nprint(-(R_1 >> R_2))\nprint(\"wolne końce pętli:\", (cap >> ((R_1 >> R_2) @ wire) >> cup).free, (~(R_1 >> R_2)).free)",
       "outputs": [
         {
           "type": "stream",
-          "data": "((resistor('R_1'), (1, 0)), (resistor('R_2'), (0, 1)))\n((resistor('R_1'), (1, 0)), (resistor('R_2'), (0, 1)))\n"
+          "data": "U = I*(R_1 + R_2)\nU = I*(R_1 + R_2)\nwolne końce pętli: (0, 0) (0, 0)\n"
         }
       ]
     },
     {
       "id": "e9d9b1a4",
       "type": "markdown",
-      "source": "## Semantyka\n\nKażdy element to **relacja** między potencjałami i prądami na końcach (opornik: $U = RI$), a obwód złożony\nz elementów — relacja złożona z relacji. `>>` eliminuje zmienne wewnętrzne i zostawia relację na brzegu\n(`.component`): dwa obwody są równoważne, gdy mają tę samą. Złożenie w kategorii obwodów przechodzi\nna złożenie relacji — dlatego solver może pracować na dowolnie złożonych kawałkach i zawsze dostanie ten\nsam wynik, jakby liczył całość.\n\n**Netlista** to kospan: końce lewe → punkty ← końce prawe. Złożenie `>>` to wypchnięcie (*pushout*):\nsklejenie punktów. Schemat narysowany na siatce jest jeszcze jedną składnią tego samego — dwa zaciski\nw tym samym punkcie siatki to jeden punkt, dokładnie jak ten sam `Node` w dwóch miejscach kodu.\n\nPo więcej: John Baez i Brendan Fong, *A Compositional Framework for Passive Linear Networks* (2015)."
+      "source": "## Semantyka\n\nKażdy element to **relacja** między potencjałami i prądami na końcach (opornik: $U = RI$), a obwód złożony\nz elementów — relacja złożona z relacji. `>>` eliminuje zmienne wewnętrzne i zostawia relację na brzegu\n(to ją pokazuje `print`): dwa obwody są równoważne, gdy mają tę samą. Złożenie w kategorii obwodów\nprzechodzi na złożenie relacji — dlatego solver może pracować na dowolnie złożonych kawałkach i zawsze\ndostanie ten sam wynik, jakby liczył całość. Obwód zamknięty (bez wolnych końców) to relacja bez brzegu:\nsame prawa, które `final` czyta w klatce, a `simulate` — klatka po klatce.\n\nSchemat narysowany na siatce jest jeszcze jedną składnią tego samego — dwa zaciski w tym samym punkcie\nsiatki to jeden punkt, dokładnie jak ten sam `Node` w dwóch miejscach kodu.\n\nPo więcej: John Baez i Brendan Fong, *A Compositional Framework for Passive Linear Networks* (2015)."
     }
   ]
 }

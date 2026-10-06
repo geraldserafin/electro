@@ -18,10 +18,10 @@ class NoSuchQuantity(KeyError):
         self.name, self.available = name, available
 
 
-def named(name: str, solution) -> Quantity:
-    """The quantity ``name`` is, in ``solution``'s circuit."""
-    elements = {label: e for e, label in solution.names.labels.items()}
-    points = {str(v)[2:]: p for p, v in solution.names.points.items()}
+def named(name: str, names) -> Quantity:
+    """The quantity ``name`` is, in a circuit of these ``names`` (``formula.names``)."""
+    elements = {label: e for e, label in names.labels.items()}
+    points = {str(v)[2:]: p for p, v in names.points.items()}
     if name in elements:
         return Parameter(elements[name])
     letter, _, rest = name.partition("_")
@@ -36,4 +36,4 @@ def named(name: str, solution) -> Quantity:
 def evaluated(text: str, solution) -> sp.Expr:
     """``text`` with each name's value in ``solution``."""
     e = expression(text)
-    return e.subs({s: solution(named(s.name, solution)) for s in e.free_symbols if isinstance(s, sp.Symbol)})
+    return e.subs({s: solution(named(s.name, solution.names)) for s in e.free_symbols if isinstance(s, sp.Symbol)})

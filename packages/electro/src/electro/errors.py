@@ -6,22 +6,22 @@ from collections.abc import Mapping, Sequence
 
 import sympy as sp
 
-from ..problem.problem import Key, Problem
-from ..problem.quantities import Quantity
+from .quantities import Quantity
 
 
 class Undetermined(ValueError):
-    """What is sought does not follow from what is given. ``problem``: whose (set where it is solved)."""
+    """What is sought does not follow from what is given. ``circuit``: whose (set where it is solved)."""
 
-    problem: Problem | None = None
+    circuit: object = None
 
 
 class Contradiction(Undetermined):
-    """No circuit fits the data. ``data``: the given ones that clash, without any one of which it fits."""
+    """No circuit fits the data. ``data``: the given ones that clash (what to, by what), without any one of
+    which it fits."""
 
-    def __init__(self, message: str, data: Sequence[Key] = ()) -> None:
+    def __init__(self, message: str, data: Mapping[object, object] | None = None) -> None:
         super().__init__(message)
-        self.data = tuple(data)
+        self.data = dict(data or {})
 
 
 class Ambiguous(Undetermined):
@@ -50,10 +50,6 @@ class MissingData(Undetermined):
 
 class NotLinear(ValueError):
     """What is asked holds only for a linear circuit (a phasor, superposition)."""
-
-
-class NotOnePort(ValueError):
-    """A black box here is of a piece with one free end each side (1 → 1)."""
 
 
 class NotSimulated(ValueError):

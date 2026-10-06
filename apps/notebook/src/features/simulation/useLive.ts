@@ -257,7 +257,7 @@ export function useLive(schematic: SchematicData) {
         serialText.current = "";
         setSerial("");
         setSketches({});
-        const known = scopeRef.current.filter((n) => compiled.program.unknowns.includes(n) || n.startsWith("V_"));
+        const known = scopeRef.current.filter((n) => compiled.program.seen.includes(n) || n.startsWith("V_"));
         const first = known.length ? known : defaultScope(compiled);
         scopeRef.current = first;
         setScopeState(first);
@@ -372,7 +372,7 @@ export function useLive(schematic: SchematicData) {
     quantitiesOf: (id: string): string[] => {
       const c = circuit.current;
       const parts = c?.program.parts[id];
-      return c && parts ? Object.values(parts).map((i) => c.program.unknowns[i]) : [];
+      return c && parts ? Object.values(parts).map((i) => c.program.seen[i]) : [];
     },
     /** The node a wire is on, as the scope names its voltage (V_…); null: on none. */
     wireVoltage: (index: number): string | null => {
@@ -386,9 +386,7 @@ export function useLive(schematic: SchematicData) {
       const nodes = Object.keys(c.program.nodes)
         .filter((n) => n !== "GND")
         .map((n) => `V_${n}`);
-      const parts = Object.entries(c.program.parts).flatMap(([, q]) =>
-        Object.values(q).map((i) => c.program.unknowns[i]),
-      );
+      const parts = Object.entries(c.program.parts).flatMap(([, q]) => Object.values(q).map((i) => c.program.seen[i]));
       return [...nodes, ...parts.filter((n) => !nodes.includes(n))];
     },
     upload,

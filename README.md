@@ -5,21 +5,21 @@ schematy, a docelowo notatnik webowy z eksportem sprawozdań do PDF.
 
 | katalog | co to jest |
 |---|---|
-| [`packages/electro`](packages/electro) | biblioteka (Python): obwody jako morfizmy kategorii (`>>`, `\|`, `@`), zadania, solver z rozwiązaniem krok po kroku, prąd zmienny, symulacja w czasie, metody (Thévenin, superpozycja, upraszczanie, Bode, tolerancje), SPICE |
+| [`packages/electro`](packages/electro) | biblioteka (Python): obwody jako morfizmy kategorii (`>>`, `\|`, `@`), solver z rozwiązaniem krok po kroku, prąd zmienny, symulacja w czasie; jej silnik idzie na stronę jako JavaScript |
 | [`packages/notes-api`](packages/notes-api) | kontrakt front ↔ backend notatek (TypeScript): schematy Effect Schema i `HttpApi` z błędami |
 | [`apps/auth-worker`](apps/auth-worker) | Cloudflare Worker: połączenie z GitHubem (code → token) i proxy gita do GitHuba (którego git nie ma CORS) |
 | [`apps/server`](apps/server) | dawny backend notatek (Effect, Postgres) — na razie nieużywany: notatki są w przeglądarce |
 | [`apps/notebook`](apps/notebook) | notatnik w przeglądarce (React + Pyodide): Markdown, kod, edytor schematów na siatce, symulacja na żywo, eksport PDF |
 
 Python liczy, strona pokazuje: `electro` to model i matematyka, a rysunek, układanie schematu, symbole,
-wykresy i plik notatki są w TypeScripcie. Między nimi płyną tylko dane (netlista, wyniki, kroki, serie liczb).
+wykresy i plik notatki są w TypeScripcie. Między nimi płyną tylko dane (rysunek, wyniki, kroki, serie liczb).
 
 ```python
 from electro import *
 
 E, R_1, R_2, A = VoltageSource("E"), Resistor("R_1"), Resistor("R_2"), Node("A")
-uklad = Problem(GND >> E >> R_1 >> A >> R_2 >> GND, {E: 12, R_1: 10, I(R_1): 1}, [Parameter(R_2)])
-sol = solve(uklad)
+uklad = GND >> E >> R_1 >> A >> R_2 >> GND
+sol = uklad.final({E: 12, R_1: 10, I(R_1): 1})
 sol(Parameter(R_2))   # 2
 sol.steps             # kroki, każdy z równaniem i jego powodem
 ```

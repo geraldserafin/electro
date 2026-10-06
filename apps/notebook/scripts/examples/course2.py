@@ -83,7 +83,7 @@ Schemat ma **nazwę** (na pasku nad nim) — i pod tą nazwą jest zmienną w ko
     d.ground((0, 6))
     L.drawing("przyklad", d)
     L.code("""
-wynik = simulate(przyklad, until=0.01)
+wynik = przyklad.simulate(until=0.01)
 print("prąd diody:", round(wynik.at("I_LED_1", 0.01) * 1000, 1), "mA")
 """)
     L.md("""
@@ -220,7 +220,7 @@ W komórce z kodem `steps(...)` pokazuje całe rozwiązanie: dane, każdy krok z
 puste i wielkości z listy **Szukane**).
 """)
     L.code("""
-steps(solve(mostek))
+steps(mostek.final())
 """)
     L.md("""
 ## Wzory zamiast liczb
@@ -229,8 +229,8 @@ Wartość może być literą. Wtedy wynik jest wzorem — dobrze to sprawdza roz
 """)
     L.code("""
 E, R_1, R_2, R_3 = VoltageSource("E"), Resistor("R_1"), Resistor("R_2"), Resistor("R_3")
-uklad = Problem(~(E >> R_1 >> (R_2 | R_3)), {E: "E", R_1: "R_1", R_2: "R_2", R_3: "R_3"})
-solve(uklad)(I(R_1))
+uklad = ~(E >> R_1 >> (R_2 | R_3))
+uklad.final({E: "E", R_1: "R_1", R_2: "R_2", R_3: "R_3"})(I(R_1))
 """)
     L.save()
 
@@ -295,16 +295,16 @@ a dioda zapala się, dopóki go trzymasz.
     L.md("""
 ## Symulacja w kodzie
 
-To samo da się zrobić w komórce z kodem: `simulate(obwod, until=...)` liczy przebiegi, a `plot(...)` je
+To samo da się zrobić w komórce z kodem: `schemat.simulate(until=...)` liczy przebiegi, a `plot(...)` je
 rysuje. Wejścia (łączniki, przyciski, suwaki) podajesz w `inputs` — liczbą albo funkcją czasu:
 """)
     L.code("""
-przebieg = simulate(filtr_rc, until=0.1)
+przebieg = filtr_rc.simulate(until=0.1)
 plot(przebieg, "V_we", "V_wy")
 """)
     L.code("""
 wcisniety = lambda t: 1 if 0.02 < t < 0.06 else 0
-plot(simulate(spacja, until=0.08, inputs={"B_1_closed": wcisniety}), "I_LED_1")
+plot(spacja.simulate(until=0.08, inputs={"B_1_closed": wcisniety}), "I_LED_1")
 """)
     L.save()
 
@@ -480,7 +480,7 @@ w środku. W kodzie elementy ze środka mają nazwy z przedrostkiem: tranzystor 
     d.ground(d.pin("E_1", 0))
     L.drawing("dwa_klucze", d)
     L.code("""
-p = simulate(dwa_klucze, until=2)
+p = dwa_klucze.simulate(until=2)
 plot(p, "I_U_1_Q_1_c", "I_U_2_Q_1_c")
 """)
     L.md("""

@@ -1,13 +1,14 @@
 """Writes src/features/simulation/fixtures/*.live.json: circuits compiled for the page's engine, as
-kernel.live() would give them, for session.test.ts. Run from the repo root with PYTHONPATH set (e.g.
-in devenv shell) after changing how electro compiles a circuit in time.
+kernel.live() would give them, for the engine's tests. Run from the repo root with PYTHONPATH set to
+packages/electro/src and apps/notebook/python (e.g. in devenv shell) after changing how electro compiles
+a circuit in time.
 """
 
 import json
 from pathlib import Path
 
-from electro import Arduino, Pico, compile_program
-from electro.problem.netlist import from_netlist
+from electro import Arduino, Pico, step_function
+from electro_notebook.drawing import from_drawing
 
 here = Path(__file__).parent.parent / "src/features/simulation/fixtures"
 ARDUINO_PINS = Arduino.terminals[:-2]
@@ -19,7 +20,8 @@ def element(id: str, kind: str, *nodes: str, value=None, **params) -> dict:
 
 
 def write(name: str, elements: list[dict], pins: dict | None = None) -> None:
-    program = json.loads(compile_program(from_netlist({"elements": elements}).problem).to_json())
+    drawing = from_drawing({"elements": elements})
+    program = json.loads(step_function(drawing.circuit, drawing.values).to_json())
     data = program if pins is None else {"program": program, "wires": [], "pins": pins}
     (here / name).write_text(json.dumps(data) + "\n")
     print(here / name)

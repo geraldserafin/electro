@@ -205,12 +205,12 @@
     {
       "id": "52e197e8",
       "type": "markdown",
-      "source": "## Ładowanie w kodzie\n\n`simulate()` liczy obwód krok po kroku w czasie. Tu źródło ładuje kondensator 100 µF przez 10 kΩ:\n$\\tau = 10\\,000 \\cdot 0{,}0001 = 1$ s. Na wykresie widać, że po sekundzie napięcie ma ok. 63% z 5 V,\nczyli 3,16 V."
+      "source": "## Ładowanie w kodzie\n\n`.simulate()` liczy obwód krok po kroku w czasie. Tu źródło ładuje kondensator 100 µF przez 10 kΩ:\n$\\tau = 10\\,000 \\cdot 0{,}0001 = 1$ s. Na wykresie widać, że po sekundzie napięcie ma ok. 63% z 5 V,\nczyli 3,16 V."
     },
     {
       "id": "20c5cf98",
       "type": "code",
-      "source": "E, R, C, c = VoltageSource(\"E\"), Resistor(\"R\"), Capacitor(\"C\"), Node(\"c\")\nrc = Problem(GND >> E >> R >> c >> C >> GND, {E: 5, R: \"10k\", C: \"100u\"})\nprzebieg = simulate(rc, until=5)\nprint(\"po 1 s:\", round(przebieg.at(\"V_c\", 1), 2), \"V\")\nplot(przebieg, \"V_c\")",
+      "source": "E, R, C, c = VoltageSource(\"E\"), Resistor(\"R\"), Capacitor(\"C\"), Node(\"c\")\nrc = GND >> E >> R >> c >> C >> GND\nprzebieg = rc.simulate({E: 5, R: \"10k\", C: \"100u\"}, until=5)\nprint(\"po 1 s:\", round(przebieg.at(\"V_c\", 1), 2), \"V\")\nplot(przebieg, \"V_c\")",
       "outputs": [
         {
           "type": "stream",

@@ -6,9 +6,9 @@ from __future__ import annotations
 import re
 from collections.abc import Mapping
 
-from electro import Element, Net, Node, Problem, U, V
-from electro.problem.quantities import Quantity
-from electro.solver.laws import stores
+from electro import Element, Net, Node, U, V
+from electro.laws import stores
+from electro.quantities import Quantity
 
 from .errors import NoInput, NoOutput
 from .methods import responses, spreads
@@ -27,7 +27,7 @@ def outputs(
     }
     if named or named_only:
         return named
-    return {f"U_{id}": U(e) for id, e in elements.items() if len(e.kind.terminals) == 2 and stores(e.kind)}
+    return {f"U_{id}": U(e) for id, e in elements.items() if len(e.terminals) == 2 and stores(e)}
 
 
 def trace(x: Mapping[str, str], t: list[float], series: Mapping[str, list[float]]) -> dict:
@@ -35,10 +35,10 @@ def trace(x: Mapping[str, str], t: list[float], series: Mapping[str, list[float]
     return {"trace": {"x": dict(x), "t": list(t), "series": {n: list(v) for n, v in series.items()}}}
 
 
-def bode(problem: Problem, shown: Mapping[str, Quantity], source: Element, input: str) -> dict:
+def bode(circuit: Element, values: Mapping, shown: Mapping[str, Quantity], source: Element, input: str) -> dict:
     if not shown:
         raise NoOutput()
-    found = responses(problem, list(shown.values()), source)
+    found = responses(circuit, values, list(shown.values()), source)
     first = found[next(iter(shown.values()))]
     outputs = {n: {"gain": list(found[q].gain_db), "phase": list(found[q].phase_deg)} for n, q in shown.items()}
     return {"bode": {"f": list(first.f), "input": input, "outputs": outputs, "cutoffs": first.cutoffs()}}
@@ -47,11 +47,11 @@ def bode(problem: Problem, shown: Mapping[str, Quantity], source: Element, input
 def input_of(elements: Mapping[str, Element]) -> tuple[str, Element]:
     """A frequency response's input: the first source of a voltage."""
     for id, e in elements.items():
-        if e.kind.name in ("voltage_source", "sine_source"):
+        if e.kind in ("voltage_source", "sine_source"):
             return id, e
     raise NoInput()
 
 
-def histogram(problem: Problem, shown: Mapping[str, Quantity], tol: float) -> dict:
-    found = spreads(problem, list(shown.values()), tol)
+def histogram(circuit: Element, values: Mapping, shown: Mapping[str, Quantity], tol: float) -> dict:
+    found = spreads(circuit, values, list(shown.values()), tol)
     return {"histogram": {"values": {n: list(found[q]) for n, q in shown.items()}}}

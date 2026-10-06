@@ -38,6 +38,11 @@ jobs:
           node-version: 24
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      # electro's engine is Python, printed as JavaScript for the page by pscript (scripts/engine_js.py)
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install pscript==0.8.0
       - id: pages
         uses: actions/configure-pages@v5
       - name: Build

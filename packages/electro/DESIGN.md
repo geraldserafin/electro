@@ -1,1054 +1,116 @@
-# electro — projekt przebudowy
+# electro — projekt
 
-Stan: ustalenia z dyskusji (październik 2026), przed wdrożeniem. Dokument żywy: każdy nowy „fakt”
-o dziedzinie dopisujemy tutaj, zanim trafi do kodu.
+Dokument żywy: każdy nowy „fakt” o dziedzinie dopisujemy tutaj, zanim trafi do kodu.
 
-Cel: biblioteka spójna z teorią, na której stoi (obwody jako morfizmy kategorii hipergrafowej),
-napisana jak w Haskellu — małe czyste funkcje, które się komponuje, niezmienne wartości, porządne
-typy, zero ręcznego grzebania we wspólnym stanie.
-
----
+Cel: biblioteka spójna z teorią, na której stoi (obwody jako morfizmy kategorii hipergrafowej), jak
+najmniejsza: jedna klasa `Element`, składanie, wzór klatki. Bez magii i bez funkcji pomocniczych.
 
 ## 1. Teoria
 
 ### 1.1 Kategoria obwodów
 
-- **Kategoria** to „rzeczy + strzałki, które da się łączyć”: strzałkę `A → B` ze strzałką `B → C`
-  łączy się w `A → C`. Monoid (`a → a`) to kategoria z jednym obiektem — czyli „monoid z typami”.
-- **U nas:** obiekt = liczba wolnych końcówek; strzałka (morfizm) = kawałek obwodu `n → m`
-  (rezystor `1 → 1`, masa `1 → 0`, zamknięty układ `0 → 0`). Szeregowe łączenie składa strzałki
-  tylko, gdy końcówki pasują — dlatego kategoria, a nie monoid (byłby nim, gdyby wszystko było `1 → 1`).
-- **Jedyna prawdziwa operacja to sklejanie węzłów.** Idealny kabel = dwa punkty o tym samym
-  potencjale = jeden węzeł. Szeregowo, równolegle, zamykanie, etykiety — to tylko przepisy, co z czym
-  skleić:
+- **Obiekt** to liczba wolnych końców; **morfizm** — kawałek obwodu `m → n` (opornik `1 → 1`, zamknięty
+  układ `0 → 0`). Na każdym końcu jest potencjał i prąd (wpływa lewym, wypływa prawym).
+- `f >> g` to złożenie (prawe końce `f` sklejone z lewymi `g`), `f @ g` — iloczyn monoidalny (obok siebie).
+- **Pająki** (algebra Frobeniusa: jeden potencjał, prądy się sumują — prawo Kirchhoffa) dają resztę:
+  `f | g`, `~f` (pętla: `cap >> (f @ wire) >> cup`), `-f` (transpozycja), `swap`. `Node` to pająk
+  z nazwą: ten sam obiekt w kilku miejscach to jeden punkt.
+- Złożenie relacji to sklejenie **i eliminacja** (∃) tego, co zostało w środku. Dlatego każdy obwód
+  jest elementem jak każdy inny: `R_1 >> R_2` to jedno prawo `U = I·(R_1 + R_2)` — nikt nie mówi
+  o „szeregowo”. Definicje wyeliminowanych zmiennych zostają, więc o środek dalej można pytać.
 
-  | operacja | skleja |
-  |---|---|
-  | `a >> b` | prawe końce `a` z lewymi `b` |
-  | `a \| b` | lewe z lewymi, prawe z prawymi |
-  | `close(a)` | prawe końce `a` z jego własnymi lewymi (ślad, *trace*; to samo co pętla sprzężenia zwrotnego) |
-  | węzeł / sieć | wszystkie miejsca z tym samym węzłem |
+Baez, Fong, *A Compositional Framework for Passive Linear Networks* (2015).
 
-- **Iloczyn tensorowy** `@` (obwody obok siebie) i **pająki** (węzły jako sklejenie `n → m` w jeden
-  punkt; z nich `cup`, `cap`, `close`, `transpose`) czynią z tego kategorię hipergrafową
-  (Frobeniusa) — wszystko da się zgiąć, odwrócić, zamknąć.
+### 1.2 Relacje, nie funkcje
 
-### 1.2 Jak to jest zbudowane dziś (i zostaje)
+Prawa to równania bez kierunku: dane i szukane są symetryczne. Zadania odwrotne (dany prąd → szukany
+opór) działają za darmo; dana to po prostu jeszcze jedno równanie.
 
-Trzy warstwy połączone funktorami (`circuit.py`):
+### 1.3 Klatka
 
-```
-Circuit (drzewo składni, kategoria wolna) --netlist--> Netlist (kospan węzłów) --semantics--> równania (relacje)
-```
+Obwód zamknięty (zero wolnych końców; nazwane punkty liczą się jako złączone) to same prawa, w słowach
+czasu: `D(x)` (pochodna) i `Pre(x)` (wartość chwilę wcześniej: pamięć). Solver zamienia je na
+**wzór klatki** — i nic poza tym nie wie o elementach, diodach ani AC:
 
-- **Drzewo składni** zachowane, jak je zbudowano — renderer może je narysować.
-- **`Netlist`** to postać normalna: kospan `lewe końce → węzły ← prawe końce`, udekorowany elementami
-  (konstrukcja Fonga, *decorated cospans*). Złożenie = sklejenie węzłów brzegu (pushout).
-- **Semantyka**: równania. Konstrukcja z Baez–Fong, *A compositional framework for passive linear
-  networks*: czarna skrzynka (*black-boxing*) to funktor z obwodów do relacji.
+| klatka | `D(x)` | `Pre(x)` |
+|---|---|---|
+| `Step(dt)` | `(x − x⁻)/dt` | `x⁻` |
+| `DC() = Step(∞)` | 0 | `x⁻` |
+| `AC(ω)` | `jω·x` (granica dt → 0 klatki obróconej o ω·dt) | `x` |
 
-### 1.3 Funktor = tłumaczenie, które szanuje łączenie
+- `final` to jedna klatka, ta, do której obwód dochodzi (DC; z sinusami jednej częstotliwości — AC).
+- `simulate` to klatki jedna po drugiej, od spoczynku. Kartka to równowaga symulacji; ich zgodność to
+  darmowy test (kartka ≠ symulacja po ustaleniu = błąd w modelu).
 
-Każdy kawałek obwodu tłumaczy się na równania (rezystor → `U = R·I`). Własność: złożyć i
-przetłumaczyć = przetłumaczyć osobno i skleić równania. Takie tłumaczenie to **funktor**.
+### 1.4 Czego teoria nie załatwia
 
-Równania to **relacje, nie funkcje** — nie mają kierunku. Stąd:
-- zadania odwrotne działają za darmo (dany prąd → szukane R),
-- dane i szukane są symetryczne: jedne i drugie to zmienne, jedne ograniczone, drugie odczytywane.
+- Równowaga to nie granica: oscylator ma równowagę, do której nie dojdzie.
+- Krok dyskretny jest funktorem tylko w przybliżeniu.
+- Nieliniowe (`exp`) składają się dalej, ale rozwiązuje je Newton, nie algebra.
+- Stan dyskretny (przerzutnik, program): równowag może być kilka albo żadna.
 
-### 1.4 Jeden obwód, trzy tłumaczenia („+1 wymiar”)
+## 2. Eliminacja
 
-Składnia ta sama, zmienia się tylko to, **nad czym** są relacje (pierścień skalarów):
+Zmienna znika przy składaniu tylko z równania stopnia 1, gdy jej współczynnik:
 
-| tłumaczenie | wielkość to | kondensator | analiza |
+- nie zawiera zmiennych,
+- jest **stały w czasie**: bez funkcji (stan, przełącznik — bywają 0), bez `t`, `dt` i wartości sprzed
+  klatki (C/dt jest 0 w klatce nieskończenie długiej),
+
+i gdy zmienna nie leży na końcu (kawałek jest widziany przez końce) ani wewnątrz funkcji (`exp`: zostaje
+dla Newtona). Najpierw najmniejsze równania i zmienne łączące (pająków), potem elementów.
+
+`normal(e)`: `cancel` tylko, gdy w mianowniku jest litera (inaczej `expand`, bez rozbijania `exp`
+sumy); mianownik zostaje (wyczyszczony dawałby fałszywe pierwiastki, np. R = 0). `dt` nie jest skracane:
+x/dt to 0 przy dt = ∞, x·dt/dt nie.
+
+Masa: w grupie potencjałów, których prawa (także każdego wariantu elementu „albo-albo”) nie zmieniają się
+po dodaniu stałej do wszystkich, jeden wybierany jest 0.
+
+## 3. Rozwiązywanie klatki
+
+- **Algebra** (wielomianowe w niewiadomych): krok po kroku — równanie z jedną niewiadomą, potem razem.
+  Kroki to ślad eliminacji i rozwiązywania: co znaleziono, z jakiego równania, dlaczego.
+- **Przypadki**: element „albo-albo” (dioda podręcznikowa: przewodzi albo nie) — zakładamy wariant,
+  rozwiązujemy, sprawdzamy warunek; jak na kartce.
+- **Newton**: `exp` (dioda Shockleya, tranzystor). Złącze ograniczane jak w SPICE (`pnjlim`), skala
+  z prądów w prawach; DC z homotopią po źródłach (λ od 0 do 1).
+- Czego nie da się wyznaczyć: `MissingData` (ile danych brakuje, które by wystarczyły); sprzeczne:
+  `Contradiction` (które się wykluczają); kilka rozwiązań: `Ambiguous`.
+
+## 4. Czas: Φ i silnik
+
+`step_function` to wzór klatki skompilowany raz: wejścia (przełącznik, pin) i stan to litery, reszta
+liczb wstawiona. W symulacji **nazwane punkty zostają niewiadomymi** (eliminowane jeden po drugim dają
+w drabince wielomian w 1/dt jej długości — liczby, których float nie utrzyma), a to, co się odczytuje
+(napięcia, prądy elementów), liczy się po klatce prostym kodem, nie w Newtonie.
+
+`engine.py` (Newton, Gauss, długość kroku, pamięć wejść) to zwykły Python bez importów poza `math`;
+strona dostaje go jako JavaScript drukowany z tego samego pliku przez pscript (bez przeciążania
+operatorów: `PSCRIPT_OVERLOAD = False` w każdej funkcji). Jedno źródło prawdy, bez ręcznego portu.
+
+Pomiar (Node, ten sam wynik; październik 2026), klatek na sekundę:
+
+| obwód | stary silnik JS | nowy (Python → JS) | ngspice |
 |---|---|---|---|
-| kartka (DC) | liczba | przerwa (d/dt = 0) | `solve` |
-| częstotliwość (AC) | funkcja ω, fazor | impedancja 1/(jωC) (d/dt → jω) | `solve` z sinusem, `respond` (Bode) |
-| czas | funkcja t | `i = C·du/dt` | `simulate` |
-
-- DC = ewaluacja s → 0, AC = ewaluacja s → jω tłumaczenia „po s” (impedancje jako funkcje
-  wymierne, pole ℝ(s)); czas = relacje na sygnałach (podejście behawioralne, Willems).
-- Ciekawostka: dla samych rezystorów i stałych źródeł wymiar czasu jest pusty — każda klatka
-  symulacji = kartka. Elementy żyjące tylko w czasie (Arduino, 555, fala prostokątna) nie mają
-  sensownego „punktu” — dla nich jest tylko czas.
-
-### 1.5 Symulacja jako rekurencja; kartka jako jej równowaga
-
-- Symulacja to maszyna ze stanem (automat Mealy'ego): `step :: State -> State`, wywoływany na
-  własnym wyniku. Wynik symulacji to **cały przebieg**, nie ostatnia klatka.
-- Kartka to **równowaga** tej dynamiki: stan, w którym nic się nie zmienia. Branie stanów
-  ustalonych też jest funktorem (Baez–Pollard): równowaga złożenia = złożenie równowag — więc da się
-  ją liczyć wprost, kompozycyjnie, bez kręcenia filmu. Szybciej, dokładnie, w obie strony.
-- Przykład (RC, E = 10 V, R = 1 kΩ, C = 100 µF): kartka U_C = 10 V; symulacja 0 → 3,9 → 6,3 →
-  8,6 → 9,93 V (t = 0; 0,05; 0,1; 0,2; 0,5 s) — dąży do kartki.
-
-### 1.6 Czego teoria sama nie załatwia (żeby jej nie przecenić)
-
-Żadna z tych rzeczy nie jest wyjątkiem w systemie — każdy element podlega temu samemu mechanizmowi
-(F16, §9.2). To są granice tego, co analiza może *odpowiedzieć*, i trzeba je mówić w wyniku.
-
-
-- Funktor stanów ustalonych daje **równowagi, nie granice**: oscylator ma równowagę, do której
-  symulacja nigdy nie dojdzie. Stabilność to osobna własność, nie wynika z kategorii.
-- Symulacja numeryczna (krok dyskretny) jest funktorem tylko w przybliżeniu — dyskretyzacja
-  złożenia ≠ złożenie dyskretyzacji.
-- Elementy nieliniowe (dioda): relacje dalej się składają, ale przestają być liniowe — tracimy
-  rachunek macierzowy, nie kategorię. DC dla nich to i tak iteracja (Newton) do punktu stałego.
-- Arduino, 555, przerzutniki: stan dyskretny + ciągły (systemy hybrydowe). W systemie to zwykłe
-  elementy — relacje z `Pre` (pamięć) zamiast albo obok `D` (§9.2). Teoria takich układów to np.
-  snopy czasowe (Schultz–Spivak–Vasilakopoulou); dla nas: równowaga może być niejedna (przerzutnik)
-  albo żadna (działający program), co analiza DC mówi w wyniku.
-- Całość zakłada **elementy skupione** (obwód mały wobec długości fali — wtedy działają prawa
-  Kirchhoffa). Co to łamie (linie, anteny), wchodzi jako element z `Delay`.
-
-### 1.7 Co z tego wynika w praktyce
-
-1. **Nowy element dopisuje się raz** — jego równanie w każdym tłumaczeniu; łączenie, własne
-   komponenty, wszystkie analizy działają od razu. I odwrotnie: nowa analiza działa dla każdego obwodu.
-2. **Własny komponent to zwykły kawałek** — zagnieżdża się bez końca; można go zastąpić czarną
-   skrzynką (same równania na zaciskach, np. Thévenin) — szybciej, a na zewnątrz to samo.
-3. **Równoważność obwodów da się sprawdzić** (te same równania na zaciskach) → sprawdzanie układu
-   zastępczego ucznia; kroki rozwiązania („R₁, R₂ szeregowo → R₁+R₂”) jako zamiany na równoważne,
-   z gwarancją, że wynik się nie zmieni.
-4. **Zadania odwrotne i warianty zadań** za darmo (dane = równania).
-5. **Darmowy test poprawności:** kartka i symulacja to dwa tłumaczenia tego samego obwodu — ich
-   niezgodność (kartka ≠ symulacja po ustaleniu) to błąd w którymś. Test losujący obwody wyłapie
-   błędy modeli elementów.
-
-### 1.8 Odrzucone alternatywy
-
-- **Parametry jako wejście funkcji (`Para(C)`: morfizm `P ⊗ A → B`, `obwod(R_1=5)` jako częściowe
-  podstawienie).** Kierunkowe — parametry wchodzą, wynik wychodzi; nie wyrazi „dany prąd → szukane R”.
-  Wybrane: parametry to zmienne relacji, a dane to dodatkowe warunki (`Given`). Funkcja to
-  szczególny przypadek relacji. Istniejące `circuit(**data)` (commit 7e35e06) zastąpi `Problem`.
-- **Liczenie kartki przez symulację do końca.** Odpada: tracimy zadania odwrotne i symbole,
-  przybliżenie zamiast dokładności, brak wyniku dla układów, które się nie ustalają.
-- **Węzły nazywane napisem.** Odpada: przypadkowe sklejenia przy składaniu (F8).
-
-## 2. Fakty o dziedzinie
-
-Każdy fakt to coś, co w rzeczywistości jest osobnym pojęciem — więc w kodzie też ma nim być.
-
-| # | fakt | konsekwencja w kodzie |
-|---|---|---|
-| F1 | Dane to **warunki**, nie tylko wartości: `R_1 = 10` i zmierzone `I_R1 = 0.2 A` to ten sam rodzaj rzeczy (jedno równanie więcej). | `Given` = warunek; wartość elementu to najprostszy przypadek. |
-| F2 | **Szukane należą do zadania** — rozwiązywalność zależy od tego, czego szukamy. | `Problem(circuit, given, find)`; `find: list[Sought]`. |
-| F3 | **Zadanie to osobny typ.** Obwód + dane + szukane = coś, co można trzymać, przekazać, podać kilku analizom. | `Problem` jako wartość. |
-| F4 | **Zamknięty układ ≠ kawałek.** Rozwiązuje się tylko układ bez wolnych końców (`0 → 0`). Kawałek `n → m` ma inne pytania: zachowanie na zaciskach (Thévenin, rezystancja zastępcza, transmitancja). `1 → 1` to **nie** `0 → 0` — są dwa sposoby domknięcia (połączyć końce / zatkać je) i dają różne wyniki. | `Problem` przyjmuje tylko zamknięte; `equivalent(part)` osobno. Domknięcie zawsze jawne. |
-| F5 | **Mierniki to obserwacje, nie elementy.** Idealny amperomierz = kabel + pytanie „ile płynie?” (jak strzałka prądu). | Odczyt miernika to `Given` albo `Sought`; na rysunku symbol zostaje. |
-| F6 | **Masa ma dwie role:** łączy (wszystkie symbole masy to jeden węzeł) i jest odniesieniem potencjałów (V_A). Napięcia i prądy od masy nie zależą. | Rozdzielone pojęcia: sieć globalna `GND` + wybór odniesienia. |
-| F7 | **Element ma tożsamość; nazwa to parametr.** Dwa `Resistor("R")` to dwa różne rezystory o wspólnej wartości R (każdy ma swój prąd). Pytamy o prąd **elementu**, nie nazwy. | Element = obiekt niezmienny z tożsamością; `Sought` wskazuje element. |
-| F8 | **Węzeł ma tożsamość, nie nazwę.** Napis jako tożsamość działa jak zmienna globalna — dwa niezależne kawałki z węzłem `"A"` skleją się po cichu. | `Node()` — tożsamość obiektu; napis tylko do wyświetlenia. Globalne sieci (`GND`, `VCC`, etykieta na schemacie) jawnie: `Net("VCC")`. |
-| F9 | **Kierunek odniesienia.** Każdy element ma kierunek (od lewej do prawej); wyniki są względem niego. Elementy **symetryczne** (R, C, L): odwrócenie zmienia tylko znaki. **Biegunowe** (źródło, dioda, tranzystor): odwrócenie to inny układ. | `transpose` zachowuje układ dla symetrycznych (z dokładnością do znaku), zmienia dla biegunowych. |
-| F10 | **Stan przełącznika, pozycja potencjometru, częstotliwość źródła to dane**, nie struktura i nie parametr analizy. | Do `Given`; `solve` nie bierze `omega` — wynika z danych źródeł. |
-| F11 | **Dane mogą mieć wymiar czasu** (przełącznik zamknięty od 1 s, przebieg z pomiaru). Stała to szczególny przypadek. | Wartość danej: liczba, symbol albo funkcja czasu. |
-| F12 | **Wynik ma wspólny interfejs** — rozwiązanie, przebieg i charakterystyka odpowiadają na to samo pytanie, różni się wymiar odpowiedzi. | `result(sought)` → liczba / funkcja t / funkcja ω. |
-| F13 | **Własny komponent to nazwana wartość** (jak `let`). | Zwykły `Circuit` przypisany do nazwy; szablon wielokrotnego użytku = funkcja zwracająca `Circuit` (świeże węzły na każde wywołanie). |
-| F14 | **Wartości mają jednostki.** `R_1 = 5 V` to błąd. | Sprawdzane przy budowie `Problem`. |
-| F16 | **Minimalny i ogólny rdzeń, bez wyjątków.** Prawa obwodu (sklejanie → Kirchhoff) nie zależą od elementów. Element to relacja między sygnałami na końcówkach i swoim stanem, zapisana raz w czasie słownikiem `D`, `Pre`, `Delay`, `when` i czystymi funkcjami. Rezystor, kondensator, dioda, przerzutnik, Arduino, linia transmisyjna — ten sam mechanizm. Dodanie elementu = jedna definicja; analiza = interpretacja słownika czasu. | §9.2: `two_terminal(…)`, `element(…)`; analiza = `interpret(law, analysis)`. |
-| F15 | **Składanie nie jest przemienne.** `a >> b ≠ b >> a` (inny brzeg, inny kierunek). Równoległe naprawdę jest przemienne. Uwaga: `R1 >> R2` i `R2 >> R1` to różne obwody (węzeł środkowy gdzie indziej), ale z zacisków zachowują się tak samo (R₁+R₂) — przemienność na poziomie zachowania, nie struktury. Biblioteka opisuje strukturę. | `>>` zamiast `+` (patrz §4). |
-| F17 | **Plan rozwiązania zależy od struktury i kształtu zadania, nie od liczb.** Które kawałki uprościć, w jakiej kolejności, gdzie dzielnik — wynika z połączeń, z tego, co dane, i z tego, co szukane (zadanie odwrotne = inny plan). Liczby wchodzą na końcu do gotowych wzorów; po drodze rozwiązanie ogólne (wzór). Wyjątek: niektóre skróty otwierają dopiero wartości (mostek w równowadze, symetrie, zera: R = 0 zwarcie, J = 0 przerwa) — plan ogólny działa zawsze, najładniejszy bywa możliwy po zobaczeniu liczb. Nieliniowe: plan wymaga punktu pracy. | `plan(problem bez wartości)`, `plan(values)`; plan liczony już przy rysowaniu (podgląd, warianty zadań, „czego brakuje” bez liczenia). |
-
-## 3. Typy
-
-```haskell
--- składnia
-Circuit n m                 -- niezmienny; n końcówek z lewej, m z prawej
-Element                     -- rodzaj + nazwa parametru, bez wartości; tożsamość = obiekt
-Node                        -- tożsamość = obiekt; opcjonalny podpis do wyświetlania
-Net                         -- globalna sieć z nazwą (GND, VCC, etykieta)
-
--- zadanie
-Given   = Value Element Quantity      -- R_1 = 10, E_1 = 230∠0°, S_1 = closed od 1 s
-        | Equals Quantity Quantity    -- I_R1 = 0.2 A, U_AB = 5 V, I_R2 = 2·I_R1
-Sought  = Of Quantity Element         -- U, I, P elementu; wartość elementu
-        | Potential Node
-        | Between Node Node           -- napięcie, rezystancja zastępcza między punktami
-Problem = Problem (Circuit 0 0) [Given] [Sought]
-
--- analizy (czyste funkcje)
-solve      :: Problem -> Solution            -- DC / fazory (ω z danych źródeł)
-respond    :: Problem -> Response            -- po częstotliwości
-simulate   :: Duration -> Problem -> Trace   -- w czasie
-equivalent :: Circuit n n -> Equivalent      -- kawałek widziany z zacisków
-
--- wynik: to samo pytanie, różny wymiar odpowiedzi
-Solution (s) :: Sought -> Quantity
-Trace    (s) :: Sought -> (Time -> Quantity)
-Response (s) :: Sought -> (Frequency -> Quantity)
-```
-
-Nazwy zawsze angielskie i przemyślane. Wielkości (`Quantity`) to wartości z jednostką, nie gołe
-liczby ani napisy.
-
-## 4. Składanie
-
-**Prymitywy** (jedyne konstruktory drzewa): `Element`, `wire` (identyczność `1 → 1`), `swap`,
-pająk (sklejenie węzłów: `n → m` w jeden węzeł), `Node`, `Net`.
-
-**Operatory:**
-
-| zapis | znaczenie | uwagi |
-|---|---|---|
-| `a >> b` | szeregowo: prawe końce `a` z lewymi `b` | nieprzemienne — czyta się jak przepływ (jak `>>>` w Haskellu) |
-| `a \| b` | równolegle | przemienne |
-| `a @ b` | obok siebie (iloczyn tensorowy) | przemienne z dokładnością do `swap` |
-
-Kolejność w Pythonie pasuje: `@` > `>>` > `|`. `+` znika.
-
-**Funkcje pochodne** (każda jednolinijkowa, z prymitywów, bez magii): `cup` (`2 → 0`), `cap`
-(`0 → 2`), `close(f) = cap >> (f @ wire) >> cup`, `loop(*parts) = close(series(*parts))`, `|`
-(pająki po obu stronach), `shunt`, `transpose`.
-
-### Sklejanie przez węzły i zasada domknięcia
-
-```python
-a = Node()
-circuit = a >> E1 >> R1 >> a             # zamknięty: oba końce na węźle a
-
-a, b = Node(), Node()
-bridge = (a >> E1 >> R1 >> b) @ (b >> R2 >> a) @ (b >> R3 >> E2 >> a)   # dwa oczka
-```
-
-- Ten sam obiekt `Node` użyty kilka razy = jeden węzeł (sklejenie przez tożsamość).
-- **Zasada domknięcia:** koniec leżący na węźle (`Node`/`Net`) nie jest wolny. Składanie (`>>`)
-  działa na wszystkich końcach, ale **typ zadania** liczy tylko końce wolne: wyrażenie, którego każdy
-  koniec leży na węźle, jest zamknięte (`0 → 0`). `a >> E >> R >> a` jest zamknięty.
-- Jeden wspólny węzeł nie łączy pętli elektrycznie — dwie pętle sklejone w jednym punkcie
-  („ósemka”) płyną niezależnie (prąd nie ma którędy wrócić); wspólny węzeł daje tylko wspólny
-  potencjał. Oczka wpływają na siebie dopiero przez wspólną gałąź (dwa wspólne węzły):
-
-  ```python
-  a, b = Node(), Node()
-  figure_eight = (a >> E1 >> R1 >> a) >> (b >> E2 >> R2 >> b)   # sklejone w a ≡ b: niezależne
-  two_meshes   = (a >> E1 >> R1 >> b) @ (b >> R2 >> a) @ (b >> R3 >> E2 >> a)   # R2 wspólny
-  ```
-- Dwa sposoby zrobienia `0 → 0` z kawałka `1 → 1` (F4), np. E = 10 V, R₁ = R₂ = 1 kΩ:
-  `close(E >> R1 >> R2)` — końce połączone, I = 5 mA; `cap`-owanie końców (zostawione wolne) —
-  I = 0, napięcie jałowe na końcach 10 V (to pytanie o kawałek: `equivalent`, E_th = 10 V,
-  R_th = 2 kΩ). Dlatego domknięcie musi być jawne.
-- Kawałek wielokrotnego użytku to funkcja zwracająca obwód — każde wywołanie ma świeże węzły i
-  świeże elementy (jak zmienne lokalne), więc dwie kopie się nie skleją i nie podzielą elementu:
-
-  ```python
-  def divider(top: str, bottom: str) -> Circuit:
-      mid = Node()
-      return Resistor(top) >> mid >> Resistor(bottom)
-  ```
+| dioda + RC | 343 000 | 1 025 000 | 231 000 |
+| drabinka RC × 10 | 23 000 | 368 000 | 252 000 |
+| 555 | 110 000 | 611 000 | — |
 
 ## 5. Zasady kodu
 
-1. **Niezmienne wartości.** Wszystko `@dataclass(frozen=True)` (albo `NamedTuple`). Żadnych `self.x = …`
-   poza konstrukcją, żadnego `setattr`, żadnego kopiowania obiektów i czyszczenia im cache'u.
-2. **Czyste funkcje.** Wejście → wyjście, bez efektów ubocznych. Klasy to dane (typy sum/iloczynów),
-   zachowanie to funkcje na nich. Metody tylko jako cukier składniowy wywołujący funkcję.
-3. **Typy sum zamiast flag.** Np. `Context(omega, dt, t)` z polami „albo-albo” → `Analysis = DC | AC(ω) | Step(dt, t)`.
-4. **Wielkości typowane, nie napisy.** `"I_R_1"` parsowane w locie → `Sought`/`Quantity`. Napis tylko na
-   granicy (UI, notatnik), zamieniany na typ raz.
-5. **Jedna implementacja jednej rzeczy.** Np. union-find (sklejanie) jest dziś w trzech miejscach.
-6. **Funkcyjny rdzeń, imperatywna skorupa.** Środek solvera (sympy, macierze) i pętla symulacji (Newton,
-   krok czasu) mogą być imperatywne w środku — interfejs czysty. Symulacja jako `step :: State -> State`
-   + rozwinięcie w czasie (unfold), stan jawnie przekazywany.
-7. **Błędy jako dane.** Zostają typowane `Issue` (już są) — ale bez kanałów bocznych (np. `warnings.warn`
-   jako sposób zwracania informacji): to, co wynik ma do powiedzenia, jest w wyniku.
-8. **Pełne typowanie + sprawdzanie.** Każda funkcja z typami argumentów i wyniku; pyright/mypy w CI.
-   Arność `n → m` sprawdzana przy budowie (Python nie ma typów zależnych), reszta statycznie.
-9. **Efekt jest jeden i jawny: świeża tożsamość.** `Node()` i nowy element przydzielają nową tożsamość
-   (w Haskellu: monada świeżych nazw). Trzymamy to tylko tam — reszta czysta.
-10. **Minimalny rdzeń bez wyjątków (F16).** Nowy element = jego relacja i nic więcej; nowa analiza =
-    interpretacja słownika czasu i nic więcej. Żadnych specjalnych rodzajów elementów. Jeśli dodanie
-    czegoś wymaga zmian w kilku miejscach albo osobnej ścieżki, to błąd projektu.
-
-## 6. Przegląd obecnego kodu (`src/electro`, ~5800 linii)
-
-| problem | gdzie | kierunek |
-|---|---|---|
-| Elementy zmienne: wartość w konstruktorze, `Parts._use` robi `setattr`, `circuit(**data)` musi kopiować obiekt i czyścić `netlist` z cache'u | `components.py:102`, `:166`, `circuit.py` (`__call__`) | element bez wartości, frozen; dane w `Problem` |
-| Prawa elementów przez dziedziczenie i metodę `build(self, label, V, param, ctx) -> Model` — każdy element sam rozpatruje DC/AC/krok; `Model` to zmienny dataclass z mutowalnymi domyślnymi słownikami | `components.py`, `devices.py` | element = jedna relacja w czasie, analizy interpretują słownik czasu (F16, §9.2) |
-| Wielkie imperatywne `compile_netlist`: akumuluje listy i słowniki, w środku własny union-find | `semantics.py:122` | rozbić na małe funkcje: węzły → potencjały → prawa elementów → KCL → odniesienia |
-| Union-find trzy razy | `circuit.py` (`glue`), `semantics.py` (odniesienia), `electro_schematic/model.py` (`nodes`) | jedna funkcja `components(pairs) -> partition` |
-| Etykiety: automatyczne nadawanie (`_labels`) i „luźne” dopasowanie (`"R1"` znajduje `R_1`) — ukryta magia na napisach | `semantics.py:87`, `System.symbol` | tożsamość elementu (F7); nazwy parametrów jawne |
-| `solve(circuit, *equations, omega, find, **given)` miesza zadanie z ustawieniami analizy; wewnętrzne ponawianie z `drop`/`assumed` | `solver.py:392`, `:466` | `solve(problem)`; ω z danych (F10) |
-| `Solution` zmienny, wyszukiwanie po `str` albo obiekcie elementu | `solver.py:151` | niezmienny, zapytania typem `Sought` |
-| `Context(omega, dt, t)` — pola wzajemnie wykluczające się | `components.py` | typ sum `Analysis` |
-| `Simulation` trzyma i mutuje stan (`self.x`, `self.t`, `self.p`) | `sim.py:288` | `step(state) -> state`, pętla jako unfold |
-| Ostrzeżenia przez `warnings.warn` jako kanał wyniku | `solver.py:440` | informacja w `Solution` |
-| Typowanie: ok. połowa funkcji (~210 z ~390) bez typu wyniku, brak type-checkera | całość | §5.8 |
-| Stan przełącznika itp. jako argument konstruktora (`Switch(closed=True)`) | `devices.py` | dane (F10, F11) |
-
-## 7. Wdrożenie (etapami, każdy kończy się zielonymi testami)
-
-1. **Rdzeń danych:** niezmienne `Element` bez wartości, `Node`, `Net`, `Given`, `Sought`, `Problem`;
-   `solve`/`simulate` na `Problem`. Wartości w konstruktorach usunięte twardo; cały kod w repo
-   (testy, przykłady, skrypty kursów, prompt AI, README, schemat, kernel) poprawiony. Zapisane notatki
-   użytkowników ze starym kodem przestaną działać.
-2. **Składanie:** `>>`, prymitywy, funkcje pochodne (`close`, `loop`, `cup`, `cap`), zasada domknięcia.
-3. **Semantyka jako funkcje:** prawa elementów jako czyste funkcje, `compile_netlist` rozbity, jeden
-   union-find, `Analysis` jako typ sum.
-4. **Wyniki:** wspólny interfejs `Solution`/`Trace`/`Response`, symulacja jako `step` + unfold.
-5. **Typy:** pełne adnotacje, pyright w CI.
-6. **Generator kodu i UI:** kod ze schematu w formie `circuit = …` / `Problem(circuit, given, find)`;
-   mierniki jako obserwacje (F5).
-
-## 8. Związek z aplikacją
-
-Notatnik już działa jak `Problem` (commit 9299796): schemat = `Circuit` (na rysunku tylko nazwy),
-zakładka **Dane** = `given`, lista **Szukane** = `find` (wybrane + wszystko bez wartości), zakładka
-**Wyniki** = odpowiedzi na `find`, przycisk ▶ = analiza (kartka, a gdy się da — czas). Strzałki prądu i
-napięcia, punkty i prądy oczkowe na schemacie to `Sought`/`Given` przypięte do miejsca w obwodzie.
-Przebudowa biblioteki ma to odzwierciedlić w kodzie, nie zmieniać zachowania.
-
-## 9. Docelowy kod (szkic do review)
-
-Szkic, nie implementacja — pokazuje, w co idziemy. Najpierw jak się tego używa, potem jak to jest
-zbudowane w środku.
-
-### 9.1 Użycie
-
-```python
-from electro import *
-
-# --- obwód: sama struktura, bez liczb ---------------------------------------------------------
-e  = VoltageSource("E")          # element: rodzaj + nazwa parametru; tożsamość = ten obiekt
-r1 = Resistor("R_1")
-r2 = Resistor("R_2")
-r3 = Resistor("R_3")
-b  = Node("B")                   # węzeł: tożsamość = obiekt, "B" to tylko podpis
-
-circuit = (GND >> e >> r1 >> b) @ (b >> r2 >> GND) @ (b >> r3 >> GND)
-# każdy koniec leży na węźle (GND, b) → zamknięty, typ 0 → 0
-
-# --- zadanie: obwód + dane + szukane ------------------------------------------------------------
-problem = Problem(
-    circuit,
-    given={e: 12, r1: 10, r2: 20, r3: 20},          # klucz = element (albo nazwa parametru: "R_1")
-    find=[I(r1), U(r3), R(b, GND)],                 # szukane to typy, nie napisy
-)
-
-solution = solve(problem)
-solution(I(r1))        # 600 mA
-solution(U(r3))        # 6 V
-solution(R(b, GND))    # 5 Ω   (widziana z B: R1 ∥ R2 ∥ R3, źródło zwarte)
-solution.answers       # {I(r1): 600 mA, U(r3): 6 V, R(b, GND): 5 Ω}
-solution.steps         # kroki z uzasadnieniem (jak dziś)
-
-# --- zadanie odwrotne: dany prąd, szukany opór ---------------------------------------------------
-inverse = Problem(circuit, given={e: 12, r1: 10, r2: 20, I(r1): "500 mA"}, find=[Parameter(r3)])
-solve(inverse)(Parameter(r3))      # 46,67 Ω
-
-# --- ten sam problem, inny wymiar: czas ------------------------------------------------------------
-c = Capacitor("C")
-rc = Problem(
-    (GND >> e >> r1 >> b) @ (b >> c >> GND),
-    given={e: 10, r1: "1 kΩ", c: "100 µF"},
-    find=[U(c)],
-)
-solve(rc)(U(c))                         # 10 V      — gdzie się kończy
-trace = simulate(rc, until="0.5 s")
-trace(U(c))                             # Signal: funkcja czasu
-trace(U(c))(0.1)                        # 6,32 V    — jak tam dochodzi
-
-# dane z wymiarem czasu (F11): przełącznik zamknięty od 1 s, źródło sinusoidalne
-s = Switch("S")
-given = {s: closed_from("1 s"), e: sine(amplitude="10 V", frequency="50 Hz")}
-
-# --- kawałek, nie zadanie (F4) ---------------------------------------------------------------------
-equivalent(e >> r1)     # Thevenin(E=12 V, R=10 Ω) — widziany z końcówek
-
-# --- wspólny parametr (F7): dwa różne rezystory, jedna wartość R ----------------------------------
-ra, rb = Resistor("R"), Resistor("R")
-Problem(GND >> e >> ra >> rb >> GND, given={"R": 100, e: 10}, find=[I(ra), I(rb)])
-
-# --- kawałek wielokrotnego użytku (F13): funkcja, świeże węzły i elementy ---------------------------
-def divider(top: str, bottom: str) -> Circuit:
-    mid = Node()
-    return Resistor(top) >> mid >> Resistor(bottom)
-
-# --- prymitywy i funkcje pochodne -----------------------------------------------------------------
-loop(e, r1, r2)          # = close(e >> r1 >> r2)
-r1 | r2                  # równolegle
-r1 @ r2                  # obok siebie (2 → 2)
-```
-
-### 9.2 Element: jedna relacja w czasie, analizy ją tylko interpretują
-
-Rdzeń wie tylko o sklejaniu węzłów (KCL/KVL wynikają z niego) i o tym, że **element to relacja
-między sygnałami na jego końcówkach (U, I każdej) i jego stanem wewnętrznym**, zapisana raz, w czasie.
-Nic więcej. Żadnych furtek ani „specjalnych” rodzajów: rezystor, kondensator, dioda, przerzutnik,
-Arduino i linia transmisyjna to ten sam mechanizm (F16).
-
-**Słownik czasu** — całość tego, czym relacja może mówić o czasie:
-
-| operator | znaczenie | kto go używa |
-|---|---|---|
-| `D(x)` | pochodna po czasie (zmiana ciągła) | kondensator, cewka |
-| `Pre(x)` | wartość tuż przed chwilą obecną (pamięć) | przerzutnik, licznik, rejestr, stan procesora |
-| `Delay(x, τ)` | wartość sprzed τ | linia transmisyjna, element opóźniający |
-| `when(c, a, b)` | warunek | logika, zbocze (`rising(x) = x > próg ∧ Pre(x) ≤ próg`) |
-| czyste funkcje | dowolne, także nieliniowe i „nieprzezroczyste” | dioda (`exp`), tranzystor, krok procesora |
-
-**Elementy** — każdy to jedna definicja:
-
-```python
-# dwukońcówkowe: (U, I, parametr) -> wyrażenie = 0
-Resistor  = two_terminal("resistor",  "R", OHM,   lambda U, I, R: U - R * I)
-Capacitor = two_terminal("capacitor", "C", FARAD, lambda U, I, C: I - C * D(U))
-Inductor  = two_terminal("inductor",  "L", HENRY, lambda U, I, L: U - L * D(I))
-Diode     = two_terminal("diode",     "D", None,
-                         lambda U, I, d: I - d.I_S * (exp(U / (d.n * V_T)) - 1), symmetric=False)
-VoltageSource = two_terminal("voltage_source", "E", VOLT, lambda U, I, E: U - E, symmetric=False)
-
-# dowolne: końcówki, stan, relacja (lista wyrażeń = 0)
-DFlipFlop = element(
-    "d_flip_flop", "FF", ports=("d", "clk", "q"), state=("s",),
-    law=lambda p, s: [
-        s.s - when(rising(p.clk.V), p.d.V > V_HIGH / 2, Pre(s.s)),   # zapamiętaj d na zboczu zegara
-        p.q.V - V_HIGH * s.s,                                         # wyjście
-        p.d.I, p.clk.I,                                               # wejścia nie pobierają prądu
-    ],
-)
-
-Arduino = element(
-    "arduino", "ARD", ports=ARDUINO_PINS, state=("cpu",),
-    law=lambda p, s, firmware: [
-        # stan procesora: na takcie zegara krok emulatora, poza nim bez zmian
-        s.cpu - when(tick(F_CPU), mcu_step(firmware, Pre(s.cpu), read_pins(p)), Pre(s.cpu)),
-        # każdy pin: to, co procesor na nim ustawia (wyjście / wejście z podciąganiem / wysoka impedancja)
-        *(pin_law(p[k], drive(s.cpu, k)) for k in ARDUINO_PINS),
-    ],
-)
-
-TransmissionLine = element(          # bezstratna linia: fale biegnące, opóźnienie τ, impedancja Z₀
-    "line", "TL", ports=("a", "b"), state=(),
-    law=lambda p, _, line: [
-        p.a.V + line.Z0 * p.a.I - Delay(p.b.V - line.Z0 * p.b.I, line.tau),
-        p.b.V + line.Z0 * p.b.I - Delay(p.a.V - line.Z0 * p.a.I, line.tau),
-    ],
-)
-```
-
-`mcu_step(firmware, state, inputs) -> state` to czysta funkcja (emulator procesora) — dla rdzenia
-zwykła nieprzezroczysta funkcja w relacji. **Program to dana**, nie struktura:
-`given={arduino: firmware}` — tak jak wartość rezystora (F10).
-
-Rodzaj wywołany z nazwą daje element: `Resistor("R_1")` → `Element(kind=Resistor, name="R_1")`
-(niezmienny, tożsamość = obiekt — §9.3).
-
-**Analiza = interpretacja słownika czasu** — jedna funkcja na analizę, nie gałąź w każdym elemencie:
-
-| analiza | `D(x)` | `Pre(x)` | `Delay(x, τ)` | wynik |
-|---|---|---|---|---|
-| `Step(dt)` — symulacja | (x − x⁻)/dt | wartość z poprzedniego kroku | wartość sprzed τ z historii | przebieg |
-| `DC` — równowaga | 0 | x | x | relacja równowag (może mieć wiele rozwiązań albo żadnego) |
-| `AC(ω)` — mały sygnał wokół równowagi | jω·x | x | e^(−jωτ)·x | charakterystyka |
-
-```python
-@dataclass(frozen=True)
-class DC: ...
-
-@dataclass(frozen=True)
-class AC:
-    omega: sp.Expr
-    around: Solution | None = None     # punkt pracy (nieliniowe: linearyzacja wychodzi z prawa sama)
-
-@dataclass(frozen=True)
-class Step:
-    dt: sp.Symbol
-
-Analysis = DC | AC | Step
-
-def interpret(law: Relation, analysis: Analysis) -> tuple[Relation, Memory]:
-    """Relacja elementu w danej analizie: operatory czasu zastąpione; co pamiętać między krokami."""
-```
-
-Co z tego wynika:
-
-- **Nowy element = jedna definicja** (relacja). Kartka, fazory, Bode, symulacja działają od razu.
-- **Nowa analiza = jedna interpretacja słownika czasu.** Działa od razu dla każdego elementu.
-- **Odpowiedzi analiz są uczciwe, a nie wyjątkami.** Przerzutnik w DC ma dwie równowagi (pamięć —
-  tak jest naprawdę); działające Arduino zwykle nie ma równowagi (program się wykonuje) — `solve`
-  mówi to w wyniku, a symulacja liczy przebieg. To fakty o elemencie, nie dziury w systemie.
-- **Kroki rozwiązania** biorą uzasadnienie z relacji elementu („prawo R_1”, nazwa prawa z definicji).
-- Jedyne założenie całości to założenie teorii obwodów: **elementy skupione** (obwód mały wobec
-  długości fali, więc działają prawa Kirchhoffa). Co go łamie (linie, anteny), wchodzi jako element
-  z `Delay` — dalej bez wyjątków.
-
-### 9.3 Obwód: niezmienne drzewo, operatory jako cukier
-
-```python
-@dataclass(frozen=True)
-class Circuit:
-    """n → m. Podklasy to konstruktory typu sum: Element, Wire, Swap, Spider, Node, Net, Seq, Tensor."""
-
-    def __rshift__(self, other: Circuit) -> Circuit: return series(self, other)
-    def __or__(self, other: Circuit) -> Circuit:     return parallel(self, other)
-    def __matmul__(self, other: Circuit) -> Circuit: return beside(self, other)
-
-
-@dataclass(frozen=True)
-class Seq(Circuit):
-    first: Circuit
-    then: Circuit
-
-@dataclass(frozen=True)
-class Tensor(Circuit):
-    left: Circuit
-    right: Circuit
-
-@dataclass(frozen=True)
-class Spider(Circuit):          # n końców sklejonych w jeden punkt
-    dom: int
-    cod: int
-
-@dataclass(frozen=True, eq=False)
-class Node(Circuit):            # punkt z tożsamością; 1 → 1, jego końce nie są wolne
-    label: str | None = None
-
-@dataclass(frozen=True)
-class Net(Circuit):             # globalna sieć: wszystkie Net("VCC") to jeden węzeł (F8)
-    name: str
-
-GND = Net("GND")
-
-
-# --- funkcje pochodne: z prymitywów, bez magii ---
-wire = Spider(1, 1)
-cup, cap = Spider(2, 0), Spider(0, 2)
-
-def series(*parts: Circuit) -> Circuit:       return reduce(Seq, parts)
-def beside(*parts: Circuit) -> Circuit:       return reduce(Tensor, parts)
-def parallel(f: Circuit, g: Circuit) -> Circuit:
-    return split(arity(f).dom) >> (f @ g) >> merge(arity(f).cod)
-def close(f: Circuit) -> Circuit:             return cap >> (f @ wire) >> cup
-def loop(*parts: Circuit) -> Circuit:         return close(series(*parts))
-
-
-# --- typ: liczony, nie przechowywany ---
-@dataclass(frozen=True)
-class Arity:
-    dom: int
-    cod: int
-
-def arity(c: Circuit) -> Arity: ...        # wszystkie końce (do składania)
-def free(c: Circuit) -> Arity: ...         # końce, które nie leżą na węźle (do zasady domknięcia)
-def is_closed(c: Circuit) -> bool:  return free(c) == Arity(0, 0)
-
-
-# --- postać normalna: czysta funkcja przez dopasowanie wzorca ---
-@cache                                      # wolno: wszystko niezmienne i hashowalne
-def netlist(c: Circuit) -> Netlist:
-    match c:
-        case Element():        return Netlist.of_element(c)
-        case Seq(f, g):        return glue_series(netlist(f), netlist(g))
-        case Tensor(f, g):     return disjoint(netlist(f), netlist(g))
-        case Spider(n, m):     return Netlist.point(n, m)
-        case Node() | Net():   return Netlist.point(1, 1, at=c)
-```
-
-### 9.4 Zadanie
-
-```python
-# wielkości: o co można pytać i co można zadać (F2, F7) — typy, nie napisy
-@dataclass(frozen=True)
-class Current:   of: Element
-@dataclass(frozen=True)
-class Voltage:   of: Element
-@dataclass(frozen=True)
-class Power:     of: Element
-@dataclass(frozen=True)
-class Parameter: of: Element          # wartość elementu
-@dataclass(frozen=True)
-class Potential: at: Node | Net
-@dataclass(frozen=True)
-class Across:    a: Node | Net; b: Node | Net      # napięcie między punktami
-@dataclass(frozen=True)
-class Resistance: a: Node | Net; b: Node | Net     # rezystancja zastępcza między punktami
-
-Quantity = Current | Voltage | Power | Parameter | Potential | Across | Resistance
-Sought = Quantity
-
-# krótkie konstruktory, jak w podręczniku
-def I(e: Element) -> Current: return Current(e)
-def U(x: Element | Node, y: Node | None = None) -> Voltage | Across: ...
-def P(e: Element) -> Power: return Power(e)
-def V(n: Node | Net) -> Potential: return Potential(n)
-def R(a: Node | Net, b: Node | Net) -> Resistance: return Resistance(a, b)
-
-# dane: wartość może być liczbą, napisem z jednostką albo funkcją czasu (F11)
-Value = sp.Expr | str | int | float | Signal
-
-@dataclass(frozen=True)
-class Problem:
-    circuit: Circuit
-    given: Mapping[Element | str | Quantity, Value]   # element / nazwa parametru → wartość; wielkość → warunek
-    find: tuple[Sought, ...] = ()
-
-    def __post_init__(self) -> None:
-        # walidacja przy budowie, nie przy rozwiązywaniu
-        if not is_closed(self.circuit):
-            raise NotClosed(free(self.circuit))
-        check_units(self.circuit, self.given)       # F14: R_1 = 5 V → BadUnit
-        check_names(self.circuit, self.given)       # nazwa, której nie ma → NoSuchParameter
-```
-
-### 9.5 Analizy i wyniki
-
-```python
-def solve(problem: Problem) -> Solution:
-    analysis = steady_analysis(problem)              # DC albo AC(ω) — ω z danych źródeł (F10)
-    system = equations(problem, analysis)            # czysta: obwód + dane → układ równań
-    return solve_system(system, problem.find)        # w środku sympy (imperatywnie, za czystym interfejsem)
-
-
-@dataclass(frozen=True)
-class Solution:
-    problem: Problem
-    values: Mapping[sp.Symbol, sp.Expr]
-    steps: tuple[Step, ...]
-    undetermined: tuple[Sought, ...]                 # zamiast warnings.warn: wynik mówi sam
-
-    def __call__(self, q: Quantity) -> Measure: ...  # liczba z jednostką
-    @property
-    def answers(self) -> Mapping[Sought, Measure]: ...
-
-
-def simulate(problem: Problem, until: Duration) -> Trace:
-    phi = step_function(problem)                     # Φ: solve jednej klatki, skompilowane
-    states = unfold(phi, phi.rest, until)            # każda klatka to Φ poprzedniej
-    return Trace(problem, tuple(states))
-
-
-@dataclass(frozen=True)
-class Trace:
-    problem: Problem
-    states: tuple[State, ...]
-
-    def __call__(self, q: Quantity) -> Signal: ...   # funkcja czasu
-
-
-def respond(problem: Problem) -> Response: ...       # Response(q) → funkcja ω
-def equivalent(part: Circuit) -> Thevenin: ...       # kawałek 1 → 1 widziany z końcówek
-```
-
-To samo pytanie (`result(U(c))`) do każdego wyniku, różny wymiar odpowiedzi: `Measure`
-(liczba), `Signal` (t ↦ wartość), funkcja ω (F12).
-
-### 9.6 Kod generowany ze schematu
-
-```python
-# Zadanie 8 (wygenerowane z rysunku)
-e_1, r_1, r_2, r_3 = VoltageSource("E_1"), Resistor("R_1"), Resistor("R_2"), Resistor("R_3")
-n_1 = Node()
-
-circuit = (GND >> e_1 >> r_1 >> n_1) @ (n_1 >> r_2 >> GND) @ (n_1 >> r_3 >> GND)
-problem = Problem(
-    circuit,
-    given={e_1: 12, r_1: 10, r_2: 20},          # zakładka Dane
-    find=[Parameter(r_3), U(r_2)],              # Szukane (r_3 bez wartości — dopisane samo)
-)
-solution = solve(problem)
-```
-
-## 10. Ryzyka (spisane po review — patrz też §11)
-
-1. **Problem bez zgłoszenia.** Opóźnienie odczytu pinów Arduino (1 ms) nie psuje żadnej znanej
-   notatki; warianty synchronizacji (dziennik + cofanie, leniwy obwód) czekają na konkretny przykład.
-   Most `chip.ts` + `session.ts` zostaje.
-2. **Zapisane notatki użytkowników.** Usunięcie wartości z konstruktorów psuje kod w notatkach na
-   produkcji — potrzebna migracja (przepisanie kodu przy otwarciu), nie samo „twarde usunięcie”.
-3. **Koszt bez zmiany dla użytkownika.** Przebudowa to inwestycja; trzeba ją świadomie postawić
-   przed innymi pracami.
-4. **Ogólny silnik a zbieżność.** Dziś dioda ma ręczne sztuczki dla Newtona; ogólny silnik musi je
-   odtworzyć ogólnie, inaczej symulacje zaczną zgłaszać `NoConvergence`.
-5. **Synchronizacja z emulatorem**: zostaje wykonaniem (most), nie modelem — patrz 1.
-
-## 11. Prototyp rdzenia (dziś cały pakiet `electro`; testy w `tests/`)
-
-Obok biblioteki, nic w niej nie zmienia. ~720 linii (bez eksportów): składnia + postać normalna
-(`syntax.py`), zadanie + analizy (`problem.py`), zapis do danych (`data.py`).
-
-**Co pokazał (12 testów):**
-
-- Zamykanie węzłem, masą i `close` (z `cup`/`cap`) daje to samo; równoległe przez wspólne węzły = `|`.
-- Element = jedno prawo z `D`: RC na kartce (DC: 10 V), w czasie (6,32 V po τ) i fazorem (|U| = E/√2)
-  z jednej definicji; nowy rodzaj (konduktancja) dopisany w teście jedną linijką działa w DC i AC.
-- Zadanie odwrotne, wspólny parametr (dwa „R”), `NotClosed`, `NoSuchParameter`.
-- **Ryzyko z review: sklejanie przez `>>`** — rozwiązane regułą: `>>` nie skleja dwóch różnych
-  węzłów (`JoinsNodes`); ósemkę pisze się przez `@` i wspólny węzeł. Jeden element w dwóch miejscach:
-  `ElementTwice`. Błędy przy budowie, nie przy pierwszym użyciu (każde `>>`/`@` liczy postać
-  normalną od razu; zapamiętaną).
-- **Ryzyko z review: tożsamość a zapis** — mniejsze, niż się zdawało: w pamięci element i węzeł są
-  sobą, w danych mają pozycję na liście (element) i numer (punkt); odczytane wracają jako świeże
-  obiekty, zadanie rozwiązuje się tak samo (test). Nazwy potrzebne są tylko na granicy.
-- Złapany błąd: podpis węzła trafiał do nazwy symbolu — dwa `Node("B")` zlewały się w równaniach.
-  Poprawione (podpis tylko, gdy jedyny) i dodany test: dokładnie ta klasa błędów, przed którą
-  chroni tożsamość obiektu.
-- **Typy:** pyright (tryb zwykły) bez błędów. Tryb ścisły blokuje głównie brak stubów sympy
-  (zamknięte w trzech funkcjach pomocniczych w `problem.py`) i niezatypowany JSON w `data.py`
-  (do zrobienia: `TypedDict`).
-
-**Czego nie ma (żeby nie porównywać jabłek z gruszkami):** kroki z uzasadnieniem, diagnoza braków
-(`MissingData`), dziury (`Hole`), mierniki, jednostki (F14), elementy nieliniowe i wielokońcówkowe,
-własne komponenty, Thévenin, szybka symulacja (dziś: sympy co krok, wolne), stan dyskretny (`Pre`).
-Dopiero z nimi da się uczciwie porównać rozmiar i prostotę z obecną biblioteką.
-
-**Warstwa metod w prototypie** (`core/methods.py`, operacje w `core/problem.py`, 3 testy więcej):
-
-- `port`/`blackbox` (relacja na zaciskach kawałka) i `matches` (relacja → rodzaj + parametr) **odkrywają
-  reguły, których nikt nie wpisał**: szeregowo R₁+R₂, równolegle R₁R₂/(R₁+R₂), źródła szeregowo E₁+E₂, a
-  w AC R z C to impedancja R + 1/(jωC) — z samego prawa kondensatora.
-- `simplify` daje kroki jak w zeszycie, z nazwami i liczbami: R₃₄ = R₃+R₄ = 3 Ω → R₂₃₄ = R₂·R₃₄/(R₂+R₃₄)
-  = 2 Ω → R₁₂₃₄ = 4 Ω; uproszczony obwód daje ten sam prąd co oryginał.
-- `superposition`: liniowość i to, co jest źródłem, czytane z praw; dioda odrzucona (`NotLinear`).
-
-**Czego to nauczyło:**
-
-- **Upraszczanie z ochroną szukanej to pół metody.** Gdy szukane jest I₃, chroniony R₃ blokuje
-  upraszczanie. Podręcznik upraszcza wszystko, liczy prąd całkowity i **wraca** dzielnikami do I₃ —
-  potrzebna droga powrotna (dzielnik = symboliczne rozwiązanie kawałka, wg §12).
-- **Źródło z rezystorem to nie jeden element** — zamiana źródeł (Thévenin ↔ Norton) wymaga dopasowania
-  do szablonu z dwóch elementów (źródło ∥ R), nie do jednego rodzaju.
-- **Prawo `(U, I, parametr)` jest za wąskie.** Źródło sterowane (U = μ·U_innego), transformator,
-  tranzystor potrzebują praw nad kilkoma parami (U, I) albo nad wielkościami innego elementu. Typ prawa
-  trzeba uogólnić, zanim dojdą — to też sprawdzian F16 („bez wyjątków”).
-
-**Następne kroki prototypu, w kolejności ryzyka:** ~~uogólnione prawo~~ (zrobione: §13) →
-~~przerzutnik~~ (zrobione: §13.3) → porównanie z obecną biblioteką na jej testach → zgadywanie wariantów
-Newtonem → fazory nieliniowych (linearyzacja z prawa) → jednostki → droga powrotna upraszczania
-(dzielniki) → zamiana źródeł (szablony dwuelementowe) → LCP (Lemke) i czarna skrzynka wielu zacisków
-przy dużych układach.
-
-**Poprzednia kolejka (już zrobione: czarna skrzynka, superpozycja, upraszczanie):** czarna skrzynka kawałka (bez niej warstwa metod
-z §12 nie ruszy) → superpozycja i upraszczanie szeregowo-równoległe z regułami odkrywanymi rachunkiem
-(porównać kroki z rozwiązaniem z zeszytu) → dioda (nieliniowość, Newton bez ręcznych sztuczek) →
-przerzutnik (`Pre`, zdarzenia) → jednostki → porównanie z obecną biblioteką na jej testach.
-
-## 12. Warstwa metod (nad silnikiem, bez nowych praw)
-
-Metody z podręcznika nie są osobno zaprogramowanym liczeniem — to drogi przez te same równania, z
-warunkami stosowalności sprawdzanymi na prawach elementów. Silnik nie dostaje nowych praw ani wyjątków;
-udostępnia trzy operacje, a warstwa metod je składa.
-
-```
-prawa elementów + sklejanie          ← rdzeń
-czarna skrzynka kawałka, solve,      ← operacje silnika
-dopasowanie relacji do rodzaju
-superpozycja, Thévenin/Norton,       ← warstwa metod: strategia + słownictwo, zero praw
-upraszczanie, kroki „jak w zeszycie”
-```
-
-**Operacje silnika, których warstwa potrzebuje:**
-
-1. `blackbox(piece)` — relacja na zaciskach otwartego kawałka (zmienne wewnętrzne wyeliminowane). W
-   obecnej bibliotece: `analysis.blackbox`; w prototypie jeszcze nie ma (umie tylko zamknięte zadania).
-2. Rozwiązanie symboliczne małego kawałka (wzór, nie liczba) — dzielnik napięcia/prądu.
-3. `matches(relation, kind) -> parametr | None` — czy relacja to prawo danego rodzaju z jakimś
-   parametrem (`U = (R₂+R₃)·I` → rezystor, R = R₂+R₃).
-
-**Metody z tego wynikające:**
-
-| metoda | z czego | warunek stosowalności (sprawdzany na prawach) |
-|---|---|---|
-| superpozycja | po kolei: parametry pozostałych źródeł = 0, rozwiąż, zsumuj | wszystkie prawa liniowe w U, I; źródło = prawo ze składnikiem niezależnym od U, I (sterowane zostają) |
-| Thévenin / Norton | `blackbox` kawałka `1 → 1`: `U = E_th + Z·I` | liniowość |
-| szeregowo / równolegle / zamiana źródeł / gwiazda-trójkąt | `blackbox` małego kawałka + `matches` z rodzajami — **reguły odkrywane rachunkiem, nie wpisywane** | liniowość; kształt kawałka (wspólny węzeł / oba) |
-| dzielnik napięcia / prądu | symboliczne rozwiązanie kawałka | liniowość |
-| potencjały węzłowe | niewiadome = potencjały; prąd elementu z jego prawa (`I = U/R`); prawo nierozwiązywalne względem I (źródło napięcia) → superwęzeł | — |
-| prądy pętlowe | baza cykli grafu (algebraicznie) | — |
-| prądy oczkowe (oczka jak na rysunku) | **potrzebna geometria rysunku** (płaskie twarze) — kategoria jej nie ma; liczy schemat (`electro_schematic`) | płaski rysunek |
-
-**Kroki „jak w zeszycie”** (np. „R₂ i R₃ szeregowo → 30 Ω; dzielnik prądu: I₃ = J·R₁₂/(R₁₂+R₃)”) zamiast
-„rozwiązano układ 9 równań”: wyszukiwanie kolejnych uproszczeń. Każdy krok poprawny z gwarancji
-(zachowanie na zaciskach się nie zmienia). Poza prawami potrzebne są tylko:
-
-- **strategia** (który krok najpierw): szybko zmniejszać liczbę elementów, nie ruszać elementu, o który
-  pyta szukana — preferencja do strojenia, nie prawo;
-- **słownictwo** kroków („szeregowo”, „dzielnik”) — rozpoznawane z kształtu kawałka, do wyświetlania.
-
-Granice: nieliniowe elementy (brak prostej czarnej skrzynki — jak w podręczniku); duże obwody (wyszukiwanie
-rośnie szybko; dla zadań szkolnych, do ~10 elementów, bez znaczenia).
-
-**Upraszczanie samego schematu:** `simplify(circuit, keep=[…]) -> Circuit` — czysta funkcja; każdy krok
-podmienia kawałek na równoważny (ta sama czarna skrzynka), więc wynik zachowuje się tak samo w punktach,
-które zostały. Ciąg kroków = „układy zastępcze” z podręcznika. Krok to dane
-`(kawałek, czym go zastąpiono, wzór)` — z nich jednocześnie **tekst** („R₂ ∥ R₄ = 12 Ω”) i **rysunek**
-(podświetlony kawałek → nowy element w jego miejscu, reszta schematu bez zmian; krok wstecz przy dzielniku
-— podświetlony odzyskiwany prąd). Jeden model kroku, jedno UI dla każdej metody.
-
-Haczyki:
-
-- upraszczanie gubi informację (po R₂ ∥ R₄ nie ma I₂, I₄) — `keep` chroni szukane, reszta wraca drogą
-  powrotną (dzielnik), jak w podręczniku;
-- uproszczenie nie jest jedno — wybór to strategia, nie prawo;
-- **najwięcej pracy to rysunek i UI, nie teoria:** scalenie elementów stojących w różnych miejscach
-  zostawia wiszące kable (usunąć, przeciągnąć, uprościć); układ od zera (`electro_schematic.layout`)
-  wygląda gorzej niż podmiana w miejscu; do tego krokowy podgląd w panelu.
-
-**Uwaga, żeby nie mylić przyczyn:** te możliwości wynikają z teorii (czarna skrzynka, kompozycyjność),
-którą obecna biblioteka już ma (`analysis.blackbox`, `equivalent`) — przebudowa ich nie warunkuje, tylko
-porządkuje (reguły odkrywane z praw zamiast wpisanych, nowe elementy wchodzą do metod same). „Uprość krok
-po kroku” dla użytkowników da się zrobić także przed przebudową.
-
-Zysk: nowy rodzaj elementu wchodzi do metod sam (kondensator w AC upraszcza się z rezystorem do impedancji
-bez linijki o kondensatorze w warstwie metod — dopasowanie dzieje się na relacjach).
-
-## 13. Rdzeń: wszystko jest relacją
-
-Najmniejsza podstawa: **relacja** (zmienne + lista równań, każde z metką pochodzenia), `join` (wspólna
-zmienna = to samo), `hide` (co widać z zewnątrz). To dokładnie kategoria **Rel**: złożenie relacji =
-`join` + wyrugowanie wspólnych zmiennych; węzeł = pająk (wszystkie potencjały jednym, suma prądów zero),
-co czyni ją kategorią hipergrafową jak nasze obwody. Składnia (`>>`, `@`, `Node`, `Resistor`) to cukier
-kompilowany do relacji; struktura (co jest czym, nazwy) to adnotacje — potrzebne rysunkowi i metodom,
-nie matematyce.
-
-**Ogólna postać elementu** (koniec „brakuje nam X”): rodzaj = końcówki + **lista** równań nad ich
-potencjałami, prądami do nich i własnymi zmiennymi (`Terminals.inner`), w czasie (`D`, `Pre`, …).
-Dwukońcówkowe prawo `(U, I, p)` to skrót (`two_terminal`). Zachowanie ładunku **z konstrukcji**: prąd
-ostatniej końcówki to minus suma pozostałych — żadne prawo go nie złamie.
-
-Dlaczego to wystarcza: element skupiony to z definicji relacja na przebiegach swoich końcówek (Willems);
-zmienne własne + `D` to realizacja w postaci stanu (każdy przyczynowy układ o skończonej pamięci);
-`Pre` — skoki dyskretne. Poza tym tylko granice samej teorii obwodów skupionych: równania cząstkowe
-(linia ze stratami — przybliża drabinka), szum (procesy losowe), pola.
-
-**Kroki rozwiązania przy relacjach:** każde równanie niesie `Origin` (prawo elementu i które z jego praw /
-Kirchhoff w punkcie / dana). Rozwiązanie jak ręką: równanie z jedną niewiadomą na raz, z metką jako
-uzasadnieniem; gdy żadnego nie ma — reszta razem (pętla: w podręczniku równanie oczkowe). Test: V_A z
-prawa źródła, prądy rezystorów z ich praw (Ohm), prąd źródła z Kirchhoffa w A.
-
-**Prototyp na tym rdzeniu** (19 testów; wszystkie wcześniejsze przeszły bez zmian treści):
-źródło napięcia sterowane napięciem (4 końcówki, 3 równania) — i `is_source` sam je odróżnia od źródła
-niezależnego; nullator (2 równania) i norator (0) — wzmacniacz odwracający z nullora i dwóch rezystorów
-daje −R₂/R₁; cewka zapisana ogólnie przez swój strumień (zmienna własna) liczy się w czasie identycznie
-jak wbudowana. Żadna z tych rzeczy nie wymagała zmiany silnika.
-
-### 13.1 Dioda: pierwsze prawo poza algebrą (24 testy)
-
-- **Ryzyko z §10.4 („ogólny silnik a zbieżność") — na razie odparte.** Newton bez żadnej sztuczki
-  diody (dzisiejsza biblioteka ma ograniczanie napięcia złącza, `_pnjlim`, skrojone pod nią). Wystarczyły
-  dwie ogólne techniki: **narastanie źródeł** (z wyłączonymi źródłami wszystko jest zerem, potem w górę;
-  co jest źródłem — z praw elementów) i **cofanie kroku po błędzie względnym** — każde równanie mierzone
-  własną skalą (wiersz pochodnych × wielkość zmiennych), bo inaczej porównuje się ampery z woltami i
-  dobre kroki Newtona są odrzucane (tak było: 0,14 A przy 18 600 A „gorsze" niż 0,0001 V).
-- Rozwiązane: dioda w przód (zgodnie z niezależną bisekcją, do 10⁻⁹ V), w tył (−I_S), 4 szeregowo,
-  mostek prostowniczy, para antyrównoległa, dioda wprost na źródle (13 A; i absurdalne 10⁷⁰ A).
-  Po 4 wywołania Newtona, setne części sekundy.
-- **Kartka = gdzie czas się ustala, także z diodą** (§1.5): symulacja układu z diodą i kondensatorem po
-  ~20 stałych czasowych zgadza się z `solve` do 10⁻⁴.
-- **Algebra, gdzie się da:** układ wielomianowy w niewiadomych (także zadanie odwrotne: R × I) idzie
-  algebrą, z krokami; dopiero `exp` i podobne — Newtonem (jeden krok „numerycznie"). Symulacja zawsze
-  Newtonem (liniowy kończy w jednej iteracji) — jedna droga.
-- **Złapane „brakuje X" (i od razu uogólnione):** element miał jeden parametr, dioda ma kilka. Rodzaj ma
-  teraz listę parametrów z wartościami domyślnymi (część katalogowa = dane), dane podają jeden albo kilka
-  (`{d: {"I_S": "1e-12", "n": 2}}`).
-- **Jeszcze nie:** fazory układu nieliniowego (wymagają linearyzacji wokół punktu pracy — da się ją
-  wyprowadzić z prawa automatycznie, `NotLinear` na razie). Szybkość symulacji dużych układów (Python,
-  lambdify; dziś biblioteka generuje JS).
-
-### 13.2 Element „albo-albo": dioda podręcznikowa (28 testów)
-
-- **Ogólne pojęcie, nie dioda:** prawo elementu może być wyborem wariantów (`Cases`): każdy wariant to
-  swoje równania i warunek, który musi się zgadzać (`holds ≥ 0`). Dioda podręcznikowa: „przewodzi” (spadek
-  U_F = 0,7 V, prąd ≥ 0) albo „nie przewodzi” (prąd 0, napięcie poniżej U_F). Tak samo zapisze się idealny
-  przełącznik, komparator, wzmacniacz w nasyceniu — elementy kawałkami liniowe (Chua).
-- **Teoria bez zmian:** relacja z wariantami to suma kawałków — dalej zbiór dozwolonych przebiegów, czyli Rel.
-- **Rozwiązanie jak ręką, kroki same:** załóż wariant każdego elementu → algebra → sprawdź warunki →
-  jeśli nie, następne założenie. Próby są krokami: dioda w tył — „zakładam: przewodzi” → prąd ujemny →
-  „odrzucone” → „zakładam: nie przewodzi” → I = 0, U = −5 V → „sprawdzone”.
-- Wyniki: dioda w przód 4,3 mA (Shockley: 4,37 — różnica < 2 %); mostek z czterech: dokładnie (10 − 1,4)/1 kΩ.
-  Wariant, w którym część obwodu wisi w powietrzu (wszystkie diody zatkane), nie jest rozstrzygnięty
-  niczym — pomijany. Więcej niż jeden pasujący wariant (zatrzask, pamięć) → `Undetermined`: to układ z
-  pamięcią, nie jedno rozwiązanie.
-- **W czasie:** w każdym kroku wariant z poprzedniego, dopóki jego warunek się zgadza, potem następne;
-  symulacja ustala się na wyniku z kartki (43/11 V, do 10⁻⁴).
-- **Koszt:** warianty sprawdzane po kolei — 2ⁿ kombinacji dla n elementów. Dla zadań szkolnych nic; dla
-  dużych układów potrzebne mądrzejsze szukanie (zaczynać od wariantów sugerowanych przez Shockleya / poprzedni
-  stan, odcinać sprzeczne wcześnie).
-
-### 13.3 Pamięć: przerzutnik (31 testów)
-
-- **Model wytrzymał — ostatnie ryzyko w rdzeniu.** Przerzutnik D i bramka NOT to zwykłe elementy:
-  relacje z `Pre` (pamięć) i `when` (warunek). Silnik ich nie zna.
-- **Nowy fakt (F18): pamięć bierze to, co było tuż przed.** Przerzutnik na zboczu zegara bierze `Pre(d)`,
-  nie `d` z tej samej chwili — jak prawdziwy (czas ustalenia). To nie szczegół: z `d` z tej samej chwili
-  pętla Q → NOT → D dawała równanie bez rozwiązania („s = NOT s"). Przyczynowość przerywa pętle.
-- **Dane w czasie (F11) naprawdę:** symbol czasu `t` w danych, `square`, `when`; zegar to źródło napięcia
-  z falą prostokątną jako wartością. Kartka (`solve`) uczciwie odmawia: dane zmieniają się w czasie, a układ
-  z pamięcią „zależy od tego, co było wcześniej — zasymuluj".
-- Wyniki: przerzutnik bierze D tylko na zboczu i trzyma między nimi; z NOT w pętli dzieli zegar przez dwa.
-- **Numeryka — dwie ogólne poprawki, żadna pod przerzutnik:** (1) prawa logiczne skaczą (0 albo 5 V, nic
-  pomiędzy), a cofanie kroku zakłada gładkość — przy skoku Newton bierze pełne kroki (logika liczona aż się
-  ustabilizuje); (2) błąd: Newton kończył, gdy krok skrócony do zera — to utknięcie, nie sukces; kończy
-  teraz, gdy pełny krok Newtona jest zerowy albo błąd znikomy.
-- **Arduino w tym samym kształcie:** stan procesora `s`, `s = when(takt, krok_emulatora(Pre(s), Pre(piny)),
-  Pre(s))` — przerzutnik to najmniejszy taki „procesor". Wykonanie zostaje mostem (§10.1).
-
-### 13.4 Porównanie z biblioteką na jej zadaniach szkolnych (`tests/test_school.py`)
-
-Zadania z `test_school.py` przeniesione jedno do jednego, z tymi samymi liczbami.
-
-- **24 działają** (dzielnik z niewiadomą, dane w różnych formach, szeregowo-równolegle — reguły odkryte
-  czarną skrzynką, pętla, gałęzie równoległe, węzeł nazwany, Thévenin dzielnika, odpowiedź symboliczna,
-  mostek Wheatstone'a w obie strony, wzmacniacz odwracający, impedancja AC, kondensator w DC, sprzeczność,
-  niedookreślenie, dwa rozwiązania z mocy, trzy źródła + superpozycja, amperomierz jako dana i bez danej,
-  VCVS/VCCS/CCVS/CCCS, wzmocnienie znalezione z danych, fazory z napisu).
-- **Dopisane przy okazji (tanie):** moc `P(e)`, amperomierz (kabel, którego prąd się czyta — F5), wzmacniacz
-  operacyjny, źródła sterowane prądem, `between`/`resistance`/`thevenin` (widok z dwóch punktów — wyprowadzone
-  z czarnej skrzynki, bez osobnych reguł).
-- **Nowy fakt (F19): zachowanie ładunku wymusza drogę powrotną.** Idealny wzmacniacz z trzema końcówkami
-  (+, −, wyjście) nie może oddać prądu z wyjścia — suma prądów do elementu musi być zero. Prawdziwy oddaje go
-  przez zasilanie; nasz ma czwartą końcówkę (gnd). Biblioteka to ukrywała, rdzeń to wymusił.
-- **Złapany poważny błąd prototypu:** sprzeczne dane przechodziły po cichu (równanie bez niewiadomych było
-  wyrzucane bez sprawdzenia, równanie bez rozwiązania pomijane). „12 V, 10 Ω, a prąd 5 A" dawało wynik.
-  Naprawione: sprzeczność jest błędem, dwa rozwiązania też.
-- **8 luk (xfail, z powodem):** moc w AC (średnia, ½·Re(U·I*)); Bode / przemiatanie / tolerancje (analyzy po
-  zakresie); nazwanie, które dane są sprzeczne; nazwanie obu rozwiązań; `find` + `MissingData` (czego brakuje
-  i co by pomogło); `Hole` (nieznany element); dodatniość nieznanego oporu (prototyp daje −34 Ω bez słowa);
-  transformator, cewki sprzężone, trójfazowe. Każda to znana robota; żadna nie wymaga zmiany rdzenia.
-- **Rozmiar (nie jabłka do jabłek):** prototyp ~1800 linii (rdzeń, metody, numeryka, zapis) wobec ~4800 linii
-  odpowiadających modułów biblioteki — ale bez luk wyżej, kroków z uzasadnieniem w pełni i bez urządzeń
-  (Arduino, wyświetlacze). Uczciwe porównanie dopiero po domknięciu luk.
-- **Wygoda zapisu — tu prototyp przegrywa:** `supply(12) + Resistor(10) + Resistor() + ground` to jedna linia;
-  w prototypie trzeba nazwać elementy i węzły (`e, r1, r2 = …`; `GND >> e >> r1 >> Node() >> r2 >> GND`).
-  To cena tożsamości obiektów (F7, F8). Do rozważenia: skróty dla prostych łańcuchów, które same tworzą
-  elementy i zwracają je do danych.
-
-### 13.5 Luki domknięte (wszystkie zadania szkolne biblioteki działają na prototypie)
-
-Każda bez zmiany rdzenia — wszystko jako dane rodzaju elementu, funkcje na `solve` albo złożenie:
-
-| luka | jak |
-|---|---|
-| ujemny opór | rodzaj mówi, które parametry są dodatnie (`Kind.positive`); ujemny wynik = sprzeczność, odfiltrowany z wariantów |
-| które dane są sprzeczne | `Contradiction.data`: te, bez których zadanie pasuje (sprawdzane po kolei) |
-| oba rozwiązania | `Ambiguous.options`: każde z wartościami niewiadomych parametrów; warunek między wielkościami (`U(r1) = 2·U(r2)`) wybiera |
-| czego brakuje | `Solution.answers` → `MissingData`: ile danych brakuje (wolne niewiadome szukanych) i które pojedyncze wielkości by wystarczyły; to, co się dało, zostaje |
-| moc w AC | średnia ½·Re(U·I*) — `Solution` wie, jaką analizą powstało |
-| nieznany element | `Hole` = element bez prawa (norator); `fill` próbuje kabel, przerwę, rezystor, źródło napięcia, źródło prądu — zwykłym `solve`, pierwszy bez sprzeczności |
-| transformator | przez strumień i indukcyjność magnesowania, jak prawdziwy: w AC przekładnia, w DC uzwojenie = zwarcie — bez `if DC` w elemencie |
-| cewki sprzężone | rodzaj z L₁, L₂, M i `D` |
-| trójfazowe | **nic w bibliotece**: trzy źródła złożone funkcją (F13) |
-| Bode, przemiatanie, tolerancje | czyste funkcje na `solve`; Bode i tolerancje rozwiązane raz z ω / wartościami jako literami, potem tylko liczby |
-
-Stan: 200 testów zielonych (prototyp ~2100 linii). Przy pisaniu wyszły jeszcze: symbol ω analizy nie może
-trafiać do niewiadomych; dane opisane zapisem elektroniki („1u") czyta jeden wspólny czytnik.
-
-**Czego prototyp dalej nie ma (względem biblioteki):** kroków podanych jako wzory do wyświetlenia (są kroki
-z pochodzeniem, bez ładnego formatu), generowania kodu, importu SPICE, rysowania, urządzeń (Arduino, Pico,
-wyświetlacze, czujniki), szybkiej symulacji w JS. To już nie luki modelu, tylko warstwy nad nim.
-
-### 13.6 Układ kodu
-
-Pliki opisane w §11–13 (`syntax.py`, `problem.py`, `methods.py`, `numeric.py`, `data.py`) rozbite według
-warstw. Kierunek zależności jest jeden: `circuit` ← `problem` ← `solver` ← `methods`.
-
-- **`circuit/`**: czym jest układ. Drzewo i operatory (`tree.py`), postać normalna i sklejanie
-  (`netlist.py`), łączenie kawałków (`wiring.py`), rodzaj elementu (`kind.py`), słowa czasu (`time.py`),
-  biblioteka elementów (`elements/`, plik na rodzinę).
-- **`problem/`**: o co pytamy. Wielkości (`quantities.py`), zadanie (`problem.py`), zapis do danych
-  (`data.py`).
-- **`solver/`**: liczenie. Relacja (`relation.py`), analizy (`analysis.py`), co prawa mówią o sobie
-  (`laws.py`), nazwy zmiennych (`symbols.py`), równania zadania (`system.py`), rozwiązywanie ręczne
-  (`by_hand.py`), przez przypadki (`by_cases.py`), liczbami — równania jako kod i Newton (`numeric.py`),
-  wybór drogi (`solve.py`), czarna skrzynka (`port.py`).
-- **`simulation/`**: krok w czasie to te same równania (`Step(dt)`) i ten sam Newton co w `solve`; własne
-  ma tylko długość kroku (`run.py`). `solve` to jedna klatka (DC: `dt = ∞`), a krok to ta sama klatka skompilowana: Φ (`solver/step.py`), klatka po klatce
-  `Φ(klatka, dt)`, a parametry Φ to `dt`, czas, to, co pamiętane, i to, co ustawia świat. Liniowy obwód ma Φ
-  jako wzór z literami (`Φ.formula`), nieliniowy — jako pierwiastek równań kroku, liczony Newtonem.
-- **`methods/`**: metody podręcznikowe, po pliku na metodę.
-
-Zasady: w kodzie nie ma komentarzy, jest tylko dokumentacja (docstringi). Gdy coś trzeba objaśnić, staje
-się funkcją o nazwie, która to mówi; gdy plik ma części, każda staje się plikiem. Pola, których nikt nie
-czytał (`unit`, `symmetric`), usunięte. Tak samo napisane prawa (kabel = amperomierz, norator = dziura)
-dzielą jedną funkcję. Wszystkie źródła sterowane idą jedną drogą. Testy podzielone tematycznie
-(`test_core_*.py`).
-
-## 14. Otwarte
-
-- Jak pokazać `Given` z wymiarem czasu w zakładce Dane (przełącznik od 1 s, przebieg z pliku).
-- `Net` a etykiety na schemacie: czy każda etykieta to `Net`, czy tylko jawnie globalne.
-- Element wielokońcówkowy (tranzystor, wzmacniacz) a `Sought`: o które prądy końcówek pytać.
-
-## 15. Przepięcie biblioteki na rdzeń (plan)
-
-Cel: pakiet `electro` to rdzeń (`circuit`, `problem`, `solver`, `methods`) i warstwy nad nim; stare
-moduły (`circuit.py`, `components.py`, `semantics.py`, `solver.py`, `sim.py`, `devices.py`,
-`analysis.py`, `numeric.py`, `codegen.py`, `spice.py`, `reasons.py`, `task.py`) znikają. Kod w
-komórkach notatnika pisze się nowym API (`Problem`, `solve`, `>>`), stare notatki przestają działać
-(decyzja z §7). Każdy etap kończy się zielonymi testami i pushem; aplikacja działa po każdym.
-
-Kontrakty z aplikacją zostają: program symulacji dla `engine.ts` (ten sam JSON), kroki rozwiązania
-(`Steps`: `FormulaStep`, `SystemStep`, powody jako typy), problemy jako typy z polami.
-
-**Podział Python / strona.** Python liczy, strona pokazuje; między nimi płyną tylko dane. W `electro`
-zostaje model i matematyka: obwód, elementy, zadanie, rozwiązywanie, metody, kroki i problemy jako dane
-(wzory w LaTeX: pisze je sympy), program symulacji, liczby do wykresów, kod z obwodu, SPICE, zadania.
-Do strony (TS) idzie wszystko o rysunku i wyglądzie: siatka, węzły z przewodów, znaczenie strzałek,
-rysunek → netlista, układanie obwodu na siatce, symbole, rysowanie schematów i wykresów, PDF, format
-pliku notatnika. Paczki `electro-schematic`, `electro-render`, `electro-notes` i `electro/plot.py`
-znikają; kernel notatnika zostaje cienki (uruchamia komórki, oddaje JSON). Granica: strona → Python
-zadanie jako dane (netlista, dane, szukane); Python → strona wyniki, kroki, problemy, program, serie
-liczb, struktura obwodu do ułożenia, tekst kodu.
-
-Furtka na `electro` poza notatnikiem (Jupyter, `pip`): formaty danych na granicy są opisane i stałe,
-więc ten sam renderer z TS da się kiedyś tam wpiąć. Dziś nic pod to nie budujemy.
-
-| etap | co |
-|---|---|
-| A | elementy: wszystkie urządzenia jako rodzaje (prawa w słowach czasu, bez sztuczek elementu); nazwy rodzajów = nazwy ze schematu; części i kolory jako gotowe dane; nazwy jak dotąd (`R_1`) — zrobione |
-| B | symulacja: program z równań `Step` (stany z `D`/`Pre`, wejścia = parametry ustawiane w biegu, ograniczanie złącz ogólnie dla każdego `exp`), ten sam JSON; `live` i `simulate` na rdzeniu — zrobione |
-| C | granica danych: netlista z rysunku (TS) → `Problem`; wyniki, kroki, problemy jako dane; kernel na rdzeniu — zrobione |
-| D | strona przejmuje rysunek: węzły, strzałki, układanie, symbole, render, wykresy z serii liczb, format pliku — zrobione |
-| E | Bode, przemiatanie, tolerancje (liczby), SPICE, zadania na rdzeniu — zrobione |
-| F | kursy, przykłady, prompt AI, README na nowe API; stare moduły i paczki usunięte — zrobione |
-
-**Etap B — co wyszło.** Program symulacji liczy się z równań rdzenia (dziś `solver/step.py`), ten sam
-JSON co dotąd; `live` w notatniku idzie przez netlistę jako dane (`problem/netlist.py`), którą na razie
-robi z rysunku kernel. Wszystkie testy symulacji starej biblioteki działają na rdzeniu
-(`test_simulation.py`). Ustalenia:
-
-- Pomoc dla Newtona jest ogólna, w kompilatorze (`solver/numeric.py`, wspólny z `solve`): szept przewodności do masy w każdym punkcie, `limexp`
-  dla każdej wykładniczej, a dla tej z maleńkim prądem w zerze (złącze) krok jak w SPICE.
-- Krok pilnuje tego, co pamiętane: napięcie o ≤ 0,05 V, prąd o ≤ 1 mA na krok; stan wewnętrzny tylko pod
-  `Pre` (przerzutnik) skacze; sinus i fala prostokątna wyznaczają najdłuższy krok, zbocze w czasie skraca
-  następny.
-- Przerzutnik przy włączeniu: decyduje z tego, co było chwilę przed — przy pierwszym zboczu (t = 0)
-  wejścia jeszcze spoczywają, więc nie przełącza (stara biblioteka przełączała).
-- Dioda podręcznikowa (przypadki) jest tylko na kartkę: w czasie `NotSimulated`.
-- Sinus w czasie w analizie AC to jego wskaz. AC to klatka jak każda (`methods/ac.py`): każda klatka to
-  poprzednia obrócona o ω·dt, dt → 0, więc jω wychodzi z granicy w solverze, nie jest mu podane. Solver nie
-  zna AC ani żadnego elementu: co strona czyta z elementu (`Kind.shows`) i tryby pinów płytki
-  (`Kind.modes`) mówi sam rodzaj; domyślną klatkę wybiera publiczne `solve` (`methods/ac.py`): tę po klatkach bez końca, `settled` — DC albo AC.
-
-**Etapy C–F — co wyszło.** Rdzeń jest pakietem `electro` (stare moduły, `electro-schematic`, `electro-render`
-i `electro-notes` usunięte). Strona robi z rysunku netlistę i zadanie jako dane (`schematic/netlist.ts`,
-`problem.ts`), układa obwód z kodu (`layout.ts` ze struktury z `code.ts`), pisze kod rysunku (`code.ts`), rysuje schematy
-(`Drawing`, `picture.tsx`) i wykresy z serii liczb (`plots/svg.ts`), czyta obwód z danych i obrazka AI
-(`fromDrawing.ts`). Kernel notatnika jest cienki (`electro_notebook`: komórki, przyciski schematu, widok
-kodu, narzędzie AI, zadania) i oddaje tylko dane. Kursy pisze Python jako dane, a uruchamia i sprawdza je
-`scripts/examples/run.ts` tym samym kodem co strona. Ustalenia:
-
-- Napięcie elementu to zawsze spadek od pierwszego końca do drugiego, także źródła (12 V źródło ma
-  $U = -12$ V); rysunek pokazuje źródło po swojemu (wzrost, moc oddawana).
-- Odczyt miernika to wartość elementu w danych i dana `I(A)`/`U(V)` w zadaniu, w obie strony.
-- Wielkość po nazwie (`"I_R_1"`, `"V_A"`, wyrażenia) czyta `problem/names.py` bez `eval`; element po
-  nazwie: `zadanie["R_1"]` (schemat z notatki nie ma zmiennych na elementy).
-- Kroki: jedno równanie z jedną niewiadomą to łańcuch wzór = liczby = wynik, kilka naraz to układ;
-  powód z pochodzenia równania (prawo elementu wg rodzaju, Kirchhoff w punkcie).
-- Obwód buduje się tylko kombinatorami: `>>`, `@`, `|`, `~` (zamknięcie: `cap >> (f @ wire) >> cup`),
-  `-` (transpozycja), pająki i `Node`/`Net`. Funkcje pomocnicze (`loop`, `close`, `at`, `beside`, `series`,
-  `parallel`, `flip`) usunięte. Element o niewyrysowanym `gnd` (`Kind.ground`: wzmacniacz operacyjny,
-  bramki, przerzutniki, licznik) ma o jeden koniec mniej — jego ostatni zacisk siedzi na masie.
-- Obwód to komponent (`solver/compose.py`): relacja jego końców (na każdym potencjał i prąd). Element —
-  jego prawa; pająk — jeden potencjał i Kirchhoff; `swap` — skrzyżowanie; `@` — obok; `>>` — sklejone końce,
-  a to, co przez to w środku, wyrzucone (∃) z definicją zachowaną jako wielkość wewnętrzna. Bez klatki i
-  bez danych: litery, słowa czasu zostają. Wyrzuca się tylko zmienną z równania stopnia pierwszego o
-  czynniku bez zmiennych obwodu, nie z końca (brzeg) i nie spod funkcji (`exp`, słowo czasu) — to zostaje
-  dla Newtona. `Node`/`Net` to nazwany koniec: jedyne, co łączy się po imieniu.
-- `solve` bierze komponent całego obwodu, nazywa jego zmienne jak książka (`I_R_1`, `V_A`), czyta go w
-  klatce z danymi, dokłada Kirchhoffa w nazwanych punktach i dane o wielkościach, redukuje jeszcze raz i
-  rozwiązuje resztę (ręcznie, przypadkami, Newtonem); wartości wracają przez definicje. Kroki to ślad
-  redukcji: każda definicja wielkości z nazwą (bez sklejeń), w kolejności, w jakiej da się je policzyć;
-  sklejenie, do którego wstawiono prawo, dziedziczy to prawo jako powód.
-- Symulacja (Φ), `settled`, wzór kroku i szukanie sprzecznych danych liczą jeszcze płaski układ równań
-  (`system.equations`) — do przeniesienia na komponent.
+- Jeden `Element`; rodzaj elementu to podklasa z `terminals` i `laws`, jedna na plik, rodziny w folderach.
+- Obwody tylko z kombinatorów. Bez `Problem`, bez netlist, bez SPICE w bibliotece.
+- Nazwy elementów i punktów to identyfikatory (`BadName`): nic z nich nie trafia do kodu; wyrażenia po
+  nazwach czytane bez `eval`.
+- Biblioteka nie mówi słowami: wyniki i błędy to dane. Metody (Bode, przemiatanie, tolerancje, dziura,
+  opór między punktami), kroki jako tekst i LaTeX są w notatniku, nad `final`.
+
+## 6. Odrzucone
+
+- **Zadanie (`Problem`) jako osobny byt** — obwód z wartościami to `circuit.final(values)`.
+- **Netlista jako postać obwodu** — obwód to relacja; to, które końce sklejono (`Relation.glued`),
+  wystarcza do narysowania go.
+- **Osobny silnik JS pisany ręcznie** — dwa źródła prawdy rozjeżdżały się.
+- **Liczenie kartki przez symulację do końca** — tracimy zadania odwrotne, litery i dokładność.
+- **Węzły nazywane napisem** — przypadkowe sklejenia; punkt to obiekt.

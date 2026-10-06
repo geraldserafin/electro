@@ -12,12 +12,12 @@
     {
       "id": "26536f5b",
       "type": "markdown",
-      "source": "# Rozwiązywanie\n\n`solve(zadanie)` zwraca **rozwiązanie**. Pytasz je o wielkości:\n\n- `sol(I(R_1))`, `sol(U(R_1))`, `sol(P(R_1))` — prąd, napięcie, moc elementu,\n- `sol(V(A))` — potencjał punktu, `sol(U(A, B))` — napięcie między dwoma,\n- `sol(Parameter(R_1))` — wartość elementu,\n- `sol(\"I_R_1\")`, `sol(\"U_E / I_E\")` — to samo po nazwach, także wyrażenia.\n\nLiczby są dokładne (`sympy`): $\\frac{1}{3}$ zostaje ułamkiem, a nie 0,333…."
+      "source": "# Rozwiązywanie\n\n`obwód.final(wartości)` zwraca **rozwiązanie** — stan, do którego obwód dochodzi. Pytasz je o wielkości:\n\n- `sol(I(R_1))`, `sol(U(R_1))`, `sol(P(R_1))` — prąd, napięcie, moc elementu,\n- `sol(V(A))` — potencjał punktu, `sol(U(A, B))` — napięcie między dwoma,\n- `sol(Parameter(R_1))` — wartość elementu,\n- `sol(\"I_R_1\")`, `sol(\"U_E / I_E\")` — to samo po nazwach, także wyrażenia.\n\nLiczby są dokładne (`sympy`): $\\frac{1}{3}$ zostaje ułamkiem, a nie 0,333…."
     },
     {
       "id": "c3069839",
       "type": "code",
-      "source": "E, R_1, R_2, wy = VoltageSource(\"E\"), Resistor(\"R_1\"), Resistor(\"R_2\"), Node(\"wy\")\ndzielnik = Problem(GND >> E >> R_1 >> wy >> R_2 >> GND, {E: 12, R_1: 1000, R_2: 2000})\nsol = solve(dzielnik)\nprint(\"V_wy =\", sol(V(wy)), \"V\")\nprint(\"moc R_2:\", sol(P(R_2)), \"W  ≈\", float(sol(P(R_2))), \"W\")",
+      "source": "E, R_1, R_2, wy = VoltageSource(\"E\"), Resistor(\"R_1\"), Resistor(\"R_2\"), Node(\"wy\")\ndzielnik = GND >> E >> R_1 >> wy >> R_2 >> GND\nsol = dzielnik.final({E: 12, R_1: 1000, R_2: 2000})\nprint(\"V_wy =\", sol(V(wy)), \"V\")\nprint(\"moc R_2:\", sol(P(R_2)), \"W  ≈\", float(sol(P(R_2))), \"W\")",
       "outputs": [
         {
           "type": "stream",
@@ -28,12 +28,12 @@
     {
       "id": "a6a2b175",
       "type": "markdown",
-      "source": "## Dane i szukane\n\nElement bez wartości to niewiadoma. Danymi mogą być też **wielkości**: `I(R_1): \"0,5\"` znaczy, że przez\n$R_1$ płynie 0,5 A. Trzeci argument `Problem` to lista **szukanych** — wtedy `sol.answers` daje odpowiedzi,\na `steps(sol)` pokazuje rozwiązanie krok po kroku, każdy krok z uzasadnieniem."
+      "source": "## Dane i szukane\n\nElement bez wartości to niewiadoma. Danymi mogą być też **wielkości**: `I(R_1): \"0,5\"` znaczy, że przez\n$R_1$ płynie 0,5 A. `sol.answers(szukane…)` daje odpowiedzi naraz, a `steps(sol, szukane…)` pokazuje\nrozwiązanie krok po kroku, każdy krok z uzasadnieniem."
     },
     {
       "id": "0402d6a3",
       "type": "code",
-      "source": "E, R_1, R_2, R_3, R_4, A_1 = (VoltageSource(\"E\"), Resistor(\"R_1\"), Resistor(\"R_2\"), Resistor(\"R_3\"),\n                              Resistor(\"R_4\"), Ammeter(\"A_1\"))\nzadanie = Problem(\n    ~(E >> R_1 >> ((R_2 >> A_1) | (R_3 >> R_4))),\n    {R_1: 3, R_2: 18, R_3: 3, R_4: 6, I(A_1): 2},\n    [Parameter(E)],\n)\nsol = solve(zadanie)\nsol(Parameter(E))",
+      "source": "E, R_1, R_2, R_3, R_4, A_1 = (VoltageSource(\"E\"), Resistor(\"R_1\"), Resistor(\"R_2\"), Resistor(\"R_3\"),\n                              Resistor(\"R_4\"), Ammeter(\"A_1\"))\nzadanie = ~(E >> R_1 >> ((R_2 >> A_1) | (R_3 >> R_4)))\nsol = zadanie.final({R_1: 3, R_2: 18, R_3: 3, R_4: 6, I(A_1): 2})\nsol(Parameter(E))",
       "outputs": [
         {
           "type": "markdown",
@@ -44,7 +44,7 @@
     {
       "id": "c3852d3e",
       "type": "code",
-      "source": "steps(sol)",
+      "source": "steps(sol, Parameter(E))",
       "outputs": [
         {
           "type": "solution",
@@ -61,23 +61,15 @@
             "steps": [
               {
                 "type": "FormulaStep",
-                "chain": "E = 54\\,\\mathrm{V}",
+                "chain": "I_{A_{1}} = \\frac{v}{18} - \\frac{v}{18} = 2\\,\\mathrm{A}",
                 "reason": {
                   "type": "OhmsLaw",
-                  "label": "R_{1}"
+                  "label": "R_{2}"
                 }
               },
               {
                 "type": "FormulaStep",
-                "chain": "I_{R_{4}} = \\frac{v}{9} - \\frac{v}{9} = 4\\,\\mathrm{A}",
-                "reason": {
-                  "type": "OhmsLaw",
-                  "label": "R_{4}"
-                }
-              },
-              {
-                "type": "FormulaStep",
-                "chain": "I_{A_{1}} = i - I_{R_{4}} = i - 4 = 2\\,\\mathrm{A}",
+                "chain": "I_{R_{4}} = i - I_{A_{1}} = i - 2 = 4\\,\\mathrm{A}",
                 "reason": {
                   "type": "Given"
                 }
@@ -87,30 +79,6 @@
                 "chain": "I_{E} = i = 6\\,\\mathrm{A}",
                 "reason": {
                   "type": "Given"
-                }
-              },
-              {
-                "type": "FormulaStep",
-                "chain": "V_{4} = - E = - 54 = -54\\,\\mathrm{V}",
-                "reason": {
-                  "type": "SourceVoltage",
-                  "label": "E"
-                }
-              },
-              {
-                "type": "FormulaStep",
-                "chain": "V_{1} = - E = - 54 = -54\\,\\mathrm{V}",
-                "reason": {
-                  "type": "IdealAmmeter",
-                  "label": "A_{1}"
-                }
-              },
-              {
-                "type": "FormulaStep",
-                "chain": "V_{3} = - \\frac{E}{3} - 12 = - \\frac{54}{3} - 12 = -30\\,\\mathrm{V}",
-                "reason": {
-                  "type": "OhmsLaw",
-                  "label": "R_{3}"
                 }
               }
             ],
@@ -130,7 +98,7 @@
     {
       "id": "21aa803d",
       "type": "code",
-      "source": "E, R_1, R_2 = VoltageSource(\"E\"), Resistor(\"R_1\"), Resistor(\"R_2\")\nsolve(Problem(~(E >> R_1 >> R_2), {E: \"E\", R_1: \"R_1\", R_2: \"R_2\"}))(U(R_2))",
+      "source": "E, R_1, R_2 = VoltageSource(\"E\"), Resistor(\"R_1\"), Resistor(\"R_2\")\n(~(E >> R_1 >> R_2)).final({E: \"E\", R_1: \"R_1\", R_2: \"R_2\"})(U(R_2))",
       "outputs": [
         {
           "type": "markdown",
@@ -141,7 +109,7 @@
     {
       "id": "b5216564",
       "type": "markdown",
-      "source": "## Jak to działa\n\nKażdy element to **prawo** (opornik: $U = R \\cdot I$), a punkty dokładają prawa Kirchhoffa. Solver szuka\nrównania z jedną niewiadomą, wylicza ją i zapisuje krok — jak na kartce. Gdy to nie wystarcza (np.\nw mostku), rozwiązuje pozostałe równania naraz. Napięcie elementu to spadek od jego pierwszego końca do\ndrugiego — także źródła: źródło 12 V ma $U = -12$ V, bo napięcie na nim rośnie."
+      "source": "## Jak to działa\n\nKażdy element to **prawo** (opornik: $U = R \\cdot I$), a punkty dokładają prawa Kirchhoffa. Już przy\nskładaniu `>>` wyrzuca to, co jest w środku; solver szuka równania z jedną niewiadomą, wylicza ją\ni zapisuje krok — jak na kartce. Gdy to nie wystarcza (np.\nw mostku), rozwiązuje pozostałe równania naraz. Napięcie elementu to spadek od jego pierwszego końca do\ndrugiego — także źródła: źródło 12 V ma $U = -12$ V, bo napięcie na nim rośnie."
     }
   ]
 }

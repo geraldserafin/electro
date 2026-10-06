@@ -5,19 +5,17 @@ to what is sought."""
 
 from __future__ import annotations
 
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 
 import sympy as sp
-from electro import AC, DC
-from electro.circuit.tree import Element
-from electro.problem.quantities import Quantity
-from electro.solver.errors import MissingData
-from electro.solver.relation import Origin
-from electro.solver.solution import Solution, SolutionStep
+from electro import AC, DC, Element, Node, Solution, SolutionStep
+from electro.algebra import Origin
+from electro.errors import MissingData
+from electro.quantities import Quantity
+from electro.values import parse
 
 from . import latex as tex
 from .issues import issue
-from .netlist import point_names
 
 REASONS = {
     "resistor": "OhmsLaw",
@@ -42,8 +40,8 @@ BY_ANALYSIS = {
 }
 
 
-def steps(solution: Solution, units: Mapping[str, str] | None = None) -> dict:
-    """``units``: each element's value's, by its label."""
+def steps(solution: Solution, find: Sequence[Quantity] = (), units: Mapping[str, str] | None = None) -> dict:
+    """``find``: what is sought; ``units``: each element's value's, by its label."""
     units = units or {}
     known: dict[sp.Symbol, sp.Expr] = {}
     shown = []
@@ -58,10 +56,10 @@ def steps(solution: Solution, units: Mapping[str, str] | None = None) -> dict:
         known |= dict(zip(step.found, step.values))
     answer, missing = None, None
     try:
-        answer = _answer(solution, units) if solution.problem.find else None
+        answer = _answer(solution, find, units) if find else None
     except MissingData as err:
-        missing = {**(issue(err, solution.problem, units) or {}), "type": "Underdetermined"}
-    if solution.unknowns and not solution.problem.find:
+        missing = {**(issue(err, units) or {}), "type": "Underdetermined"}
+    if solution.unknowns and not find:
         missing = _missing(solution)
     return {
         "type": "Steps",
@@ -91,15 +89,14 @@ def _formula(step: SolutionStep, known: Mapping[sp.Symbol, sp.Expr], solution: S
 
 
 def reason(origin: Origin, solution: Solution) -> dict:
-    s = solution.symbols
+    n = solution.names
     match origin:
-        case Origin("law", Element() as e):
-            analysis = type(solution.analysis)
-            kind = e.kind.name
-            name = BY_ANALYSIS.get((kind, analysis)) or REASONS.get(kind, "DeviceModel")
-            return {"type": name, "label": tex.name(s.labels[s.index(e)])}
-        case Origin("kcl", int() as n):
-            return {"type": "KirchhoffCurrent", "node": tex.name(point_names(s.net)[n])}
+        case Origin("law", Element() as e) if e in n.labels:
+            name = BY_ANALYSIS.get((e.kind, type(solution.frame))) or REASONS.get(e.kind, "DeviceModel")
+            return {"type": name, "label": tex.name(n.labels[e])}
+        case Origin("kcl", Node() as p):
+            point = n.points.get(p)
+            return {"type": "KirchhoffCurrent", "node": tex.name(str(point)[2:] if point is not None else "GND")}
     return {"type": "Given"}
 
 
@@ -115,20 +112,21 @@ def _equals(x: sp.Symbol, v: sp.Expr, units: Mapping[str, str]) -> str:
 
 
 def _data(solution: Solution, units: Mapping[str, str]) -> list[str]:
-    s = solution.symbols
+    n = solution.names
     out = []
-    for key, value in solution.problem.given.items():
+    for key, given in solution.given.items():
+        value = parse(given) if isinstance(given, str | int | float) else given
         if isinstance(key, Element) and not isinstance(value, Mapping) and getattr(value, "is_number", False):
-            label = s.labels[s.index(key)]
+            label = n.labels[key]
             out.append(f"{tex.name(label)} = {tex.value(value, units.get(label, ''))}")
-        elif isinstance(key, Quantity):
-            out.append(f"{tex.quantity(key, s)} = {tex.value(value, tex.unit(key, units, s))}")
+        elif isinstance(key, Quantity) and isinstance(value, sp.Basic):
+            out.append(f"{tex.quantity(key, n)} = {tex.value(value, tex.unit(key, units, n))}")
     return out
 
 
-def _answer(solution: Solution, units: Mapping[str, str]) -> list[str]:
-    s = solution.symbols
-    return [f"{tex.quantity(q, s)} = {tex.value(v, tex.unit(q, units, s))}" for q, v in solution.answers.items()]
+def _answer(solution: Solution, find: Sequence[Quantity], units: Mapping[str, str]) -> list[str]:
+    n = solution.names
+    return [f"{tex.quantity(q, n)} = {tex.value(v, tex.unit(q, units, n))}" for q, v in solution.answers(*find).items()]
 
 
 def _missing(solution: Solution) -> dict:

@@ -1,8 +1,8 @@
 """Code cells: run in one shared namespace, like Jupyter, with ``electro`` in it, each schematic cell's
 problem as a variable named after it, and helpers that show things.
 
-The value of a cell's last expression is shown, and whatever it gives ``display``: a problem or a circuit as
-a drawing (``schematic``), a solution as its worked steps (``steps``), plots (``plot``, ``bode``,
+The value of a cell's last expression is shown, and whatever it gives ``display``: a circuit or a schematic
+as a drawing (``schematic``), a solution as its worked steps (``steps``), plots (``plot``, ``bode``,
 ``spread``), a task to answer (``task``), an error caught on purpose, math, else its text. All as data: the
 page draws and says them (``Output`` in ``shared/model/types.ts``)."""
 
@@ -13,17 +13,19 @@ import contextlib
 import io
 import json
 import warnings
+from collections.abc import Mapping
 
 import sympy as sp
-from electro import Circuit, Problem, Solution, Trace
-from electro.problem.names import name_of, named, naming
-from electro.problem.quantities import Quantity
+from electro import Element, Node, Solution, Trace
+from electro.formula import names
+from electro.names import named
+from electro.quantities import Current, Parameter, Power, Quantity, Voltage
 
 from . import plots
 from . import task as tasks
 from .code_view import PRELUDE, variable
+from .drawing import Drawing, from_drawing, to_drawing
 from .errors import CELL, NoSuchSchematic, error, issue, warning
-from .netlist import from_netlist, to_netlist
 from .results import element_result
 from .steps import steps as steps_data
 
@@ -42,73 +44,83 @@ class Shown:
         return self.output
 
 
-def _units_of(problem: Problem) -> dict[str, str]:
+def _parts(circuit: Element) -> tuple[dict[str, Element], dict[str, Node]]:
+    """Its elements by label, its points by name."""
+    n = names(circuit)
+    return {label: e for e, label in n.labels.items()}, {str(v)[2:]: p for p, v in n.points.items()}
+
+
+def _units_of(circuit: Element) -> dict[str, str]:
     """Each element's value's unit, by its label."""
-    elements, _ = naming(problem.circuit)
-    return {label: units.get(e.kind.name, "") for label, e in elements.items()}
+    elements, _ = _parts(circuit)
+    return {label: units.get(e.kind, "") for label, e in elements.items()}
 
 
-def steps(solution: Solution) -> Shown:
-    """A solution's worked steps: the data, each step and why it holds, the answer."""
-    return Shown({"type": "solution", "data": steps_data(solution, _units_of(solution.problem))})
+def _name(q: Quantity, circuit: Element) -> str:
+    """A quantity as one writes it: ``I_R_1``, ``U_R_1``, ``P_R_1``, ``R_1``, ``V_A``."""
+    n = names(circuit)
+    match q:
+        case Current(e, None) | Voltage(e) | Power(e):
+            return f"{'I' if isinstance(q, Current) else 'U' if isinstance(q, Voltage) else 'P'}_{n.labels[e]}"
+        case Parameter(e, ""):
+            return n.labels[e]
+    return str(n.of(q))
 
 
-def schematic(what: Problem | Circuit, solution: Solution | None = None) -> Shown:
-    """A circuit as a drawing (laid out by the page); with ``solution``, each element's values on it."""
-    problem = what if isinstance(what, Problem) else Problem(what)
-    out: dict = {"type": "schematic", "netlist": to_netlist(problem)}
+def steps(solution: Solution, *find: Quantity) -> Shown:
+    """A solution's worked steps: the data, each step and why it holds, the answer to ``find``."""
+    return Shown({"type": "solution", "data": steps_data(solution, find, _units_of(solution.circuit))})
+
+
+def schematic(what: Element | Drawing, values: Mapping | None = None, solution: Solution | None = None) -> Shown:
+    """A circuit (and its ``values``) as a drawing, laid out by the page; with ``solution``, each element's
+    values on it."""
+    circuit, values = (what.circuit, what.values) if isinstance(what, Drawing) else (what, values or {})
+    out: dict = {"type": "schematic", "netlist": to_drawing(circuit, values)}
     if solution is not None:
-        elements, _ = naming(problem.circuit)
-        by_unit = _units_of(problem)
-        out["results"] = {id: element_result(solution, e, by_unit[id]) for id, e in elements.items()}
+        elements, _ = _parts(circuit)
+        by_unit = _units_of(circuit)
+        out["results"] = {id: element_result(solution, values, e, by_unit[id]) for id, e in elements.items()}
     return Shown(out)
-
-
-def _quantities(problem: Problem, qs: tuple[str | Quantity, ...]) -> dict[str, Quantity]:
-    """Each by its name: ``"V_A"``, or a quantity named so."""
-    elements, points = naming(problem.circuit)
-    by_element, by_point = {e: k for k, e in elements.items()}, {p: k for k, p in points.items()}
-    out = {}
-    for q in qs:
-        if isinstance(q, str):
-            out[q] = named(q, elements, points)
-        else:
-            out[name_of(q, by_element, by_point)] = q
-    return out
 
 
 def plot(trace: Trace, *qs: str | Quantity) -> Shown:
     """A run's quantities in time, each a quantity or a name (by default its named points' potentials, else
     its capacitors' and inductors' voltages)."""
-    elements, points = naming(trace.problem.circuit)
-    if qs:  # by name, any of its unknowns: a pin's current too ("I_Q_1_c")
-        by_element, by_point = {e: k for k, e in elements.items()}, {p: k for k, p in points.items()}
-        series = {q if isinstance(q, str) else name_of(q, by_element, by_point): trace(q) for q in qs}
+    circuit = trace.phi.circuit
+    if qs:  # by name, anything it reads: a pin's current too ("I_Q_1_c")
+        series = {q if isinstance(q, str) else _name(q, circuit): trace(q) for q in qs}
     else:
-        series = {n: trace(q) for n, q in plots.outputs(elements, points).items()}
+        series = {n: trace(q) for n, q in plots.outputs(*_parts(circuit)).items()}
     return Shown({"type": "plot", **plots.trace({"name": "t", "unit": "s"}, trace.t, series)})
 
 
-def bode(problem: Problem, *qs: str | Quantity) -> Shown:
+def bode(circuit: Element, values: Mapping, *qs: str | Quantity) -> Shown:
     """The frequency response of ``qs`` (by default as ``plot``'s), per the circuit's source."""
-    elements, points = naming(problem.circuit)
+    elements, points = _parts(circuit)
     name, source = plots.input_of(elements)
-    shown = _quantities(problem, qs) if qs else plots.outputs(elements, points)
-    return Shown({"type": "plot", **plots.bode(problem, shown, source, name)})
+    shown = _by_name(circuit, qs) if qs else plots.outputs(elements, points)
+    return Shown({"type": "plot", **plots.bode(circuit, values, shown, source, name)})
 
 
-def spread(problem: Problem, *qs: str | Quantity, tol: float = 0.05) -> Shown:
+def spread(circuit: Element, values: Mapping, *qs: str | Quantity, tol: float = 0.05) -> Shown:
     """``qs`` over 500 builds, every R, C and L within ``tol``."""
-    return Shown({"type": "plot", **plots.histogram(problem, _quantities(problem, qs), tol)})
+    return Shown({"type": "plot", **plots.histogram(circuit, values, _by_name(circuit, qs), tol)})
 
 
-def task(problem: Problem, find: str | Quantity, prompt: str = "", *, tol: float = 0.01) -> tasks.Task:
+def _by_name(circuit: Element, qs: tuple[str | Quantity, ...]) -> dict[str, Quantity]:
+    """Each by its name: ``"V_A"``, or a quantity named so."""
+    n = names(circuit)
+    return {q if isinstance(q, str) else _name(q, circuit): named(q, n) if isinstance(q, str) else q for q in qs}
+
+
+def task(circuit: Element, values: Mapping, find: str | Quantity, prompt: str = "", *, tol: float = 0.01) -> tasks.Task:
     """A field to answer ``find`` in, the answer checked (``task.py``)."""
-    return tasks.task(problem, find, prompt, tol=tol, units=units)
+    return tasks.task(circuit, values, find, prompt, tol=tol, units=units)
 
 
 def to_output(obj: object) -> dict:
-    if isinstance(obj, Problem | Circuit):
+    if isinstance(obj, Element | Drawing):
         obj = schematic(obj)
     if isinstance(obj, Solution):
         obj = steps(obj)
@@ -146,9 +158,9 @@ def run(code: str, problems_json: str = "{}", units_json: str = "{}") -> str:
     JSON list of outputs."""
     units.update(json.loads(units_json))
     outputs: list[dict] = []
-    problems = {name: from_netlist(data).problem for name, data in json.loads(problems_json).items()}
+    problems = {name: from_drawing(data) for name, data in json.loads(problems_json).items()}
 
-    def schemat(name: str) -> Problem:
+    def schemat(name: str) -> Drawing:
         if name not in problems:
             raise NoSuchSchematic(name=name, available=list(problems))
         return problems[name]

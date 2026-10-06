@@ -7,30 +7,21 @@ from __future__ import annotations
 from collections.abc import Callable, Mapping
 
 import sympy as sp
-from electro import (
-    Current,
-    Element,
-    Parameter,
-    Power,
-    Problem,
-    Solution,
-    Voltage,
-    solve,
-)
-from electro.solver.laws import is_source, reading
+from electro import Current, Element, Parameter, Power, Solution, Voltage
+from electro.laws import is_source, reading
 from electro.values import UNKNOWN, fmt
 
 from .methods import fill
 
 
-def solved(problem: Problem, elements: Mapping[str, Element]) -> tuple[Solution, dict[str, Element]]:
+def solved(circuit: Element, values: Mapping, elements: Mapping[str, Element]) -> tuple[Solution, dict[str, Element]]:
     """Solved, a hole filled with the simplest element that fits (``{id: what it is}``)."""
-    holes = [(id, e) for id, e in elements.items() if e.kind.name == "hole"]
+    holes = [(id, e) for id, e in elements.items() if e.kind == "hole"]
     if len(holes) == 1:
         id, hole = holes[0]
-        filled = fill(problem, hole)
+        filled = fill(circuit, values, hole)
         return filled.solution, {id: filled.by}
-    return solve(problem), {}
+    return circuit.final(values), {}
 
 
 def shown(solution: Solution, q) -> sp.Expr:
@@ -49,34 +40,34 @@ def number(read: Callable, q) -> sp.Expr | None:
     return v if v.is_number else None
 
 
-def element_result(solution: Solution, e: Element, unit: str, filled: Element | None = None) -> dict:
-    two = len(e.kind.terminals) == 2
+def element_result(solution: Solution, values: Mapping, e: Element, unit: str, filled: Element | None = None) -> dict:
+    """``values``: what was given."""
+    two = len(e.terminals) == 2
     by = filled if filled is not None else e
 
     def read(q):
         return shown(solution, q)
 
-    value = number(solution, Parameter(by)) if "" in by.kind.parameters else None
+    value = number(solution, Parameter(by)) if "" in by.parameters else None
     u = number(read, Voltage(by)) if two else None
     i = number(read, Current(by)) if two else None
     p = number(read, Power(by)) if two else None
-    reads = reading(e.kind)
+    reads = reading(e)
     if reads is not None:
         shows = u if reads is Voltage else i
         text = fmt(shows, unit) if shows is not None else "?"
-        solved = not given(solution.problem.given.get(reads(e)))
+        solved = not given(values.get(reads(e)))
         return {"value": text, "solved": solved, "U": None, "I": None, "P": None, "reversed": False}
     if filled is not None:
         text = notation(filled, value)
-    elif "" in e.kind.parameters:
+    elif "" in e.parameters:
         text = fmt(value, unit) if value is not None else "?"
     else:
         text = ""
     sign = -1 if i is not None and i.is_real and i < 0 else 1
     return {
         "value": text,
-        "solved": filled is not None
-        or ("" in e.kind.parameters and not given(solution.problem.given.get(e)) and value is not None),
+        "solved": filled is not None or ("" in e.parameters and not given(values.get(e)) and value is not None),
         "U": fmt(sign * u, "V") if u is not None else None,
         "I": fmt(sign * i, "A") if i is not None else None,
         "P": fmt(p, "W") if p is not None and not p.has(sp.I) else None,
@@ -93,7 +84,7 @@ def given(value: object) -> bool:
 
 def notation(by: Element, value) -> str:
     """What a hole turned out to be, in values: ``R = 2 Ω``, ``E = 12 V``, ``R = ∞`` (a break), ``R = 0 Ω``."""
-    match by.kind.name:
+    match by.kind:
         case "wire":
             return f"R = {fmt(0, 'Ω')}"
         case "open":

@@ -6,32 +6,32 @@ from __future__ import annotations
 from collections.abc import Mapping
 
 import sympy as sp
-from electro.circuit.tree import Element
-from electro.problem.names import NoSuchQuantity
-from electro.problem.problem import Problem
-from electro.problem.quantities import Quantity
-from electro.solver.errors import Ambiguous, Contradiction, MissingData
-from electro.solver.symbols import symbols
+from electro import Element
+from electro.errors import Ambiguous, Contradiction, MissingData
+from electro.formula import names
+from electro.names import NoSuchQuantity
+from electro.quantities import Quantity
+from electro.values import parse
 
 from . import latex as tex
 
 
-def issue(err: BaseException, problem: Problem | None = None, units: Mapping[str, str] | None = None) -> dict | None:
+def issue(err: BaseException, units: Mapping[str, str] | None = None) -> dict | None:
     """``err`` as data, or None when it is not one of electro's. ``units``: each element's value's."""
     units = units or {}
-    problem = problem or getattr(err, "problem", None)
-    if problem is not None:
-        s = symbols(problem.circuit)
+    circuit = getattr(err, "circuit", None)
+    if circuit is not None:
+        n = names(circuit)
         match err:
             case MissingData():
                 return {
                     "type": "MissingData",
-                    "targets": [tex.quantity(q, s) for q in err.targets],
+                    "targets": [tex.quantity(q, n) for q in err.targets],
                     "needed": err.needed,
-                    "options": [[tex.quantity(q, s)] for q in err.options],
+                    "options": [[tex.quantity(q, n)] for q in err.options],
                 }
             case Contradiction():
-                return _clash(err, problem, units)
+                return _clash(err, n, units)
             case Ambiguous():
                 return {
                     "type": "Ambiguous",
@@ -53,17 +53,18 @@ def _plain(v: object) -> bool:
     return isinstance(v, str | int | float | bool)
 
 
-def _clash(err: Contradiction, problem: Problem, units: Mapping[str, str]) -> dict:
+def _clash(err: Contradiction, n, units: Mapping[str, str]) -> dict:
     """The data that clash: conditions on quantities, and elements' values."""
-    s = symbols(problem.circuit)
     conditions, values = [], []
-    for key in err.data:
-        given = problem.given[key]
+    for key, given in err.data.items():
+        given = parse(given) if isinstance(given, str | int | float) else given
+        if isinstance(given, Mapping):
+            continue
         if isinstance(key, Element):
-            label = s.labels[s.index(key)]
+            label = n.labels[key]
             values.append(_equals(sp.Symbol(label), given, units.get(label, "")))
         elif isinstance(key, Quantity):
-            conditions.append(f"{tex.quantity(key, s)} = {tex.value(given, tex.unit(key, units, s))}")
+            conditions.append(f"{tex.quantity(key, n)} = {tex.value(given, tex.unit(key, units, n))}")
     return {"type": "ConflictingData", "conditions": conditions, "values": values}
 
 

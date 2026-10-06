@@ -1,4 +1,4 @@
-"""A problem to solve, its answer checked but not shown: ``task(problem, "I_R_1", "Find the current…")``.
+"""A circuit to solve, its answer checked but not shown: ``task(circuit, values, "I_R_1", "Find the current…")``.
 
 The answer is kept only as hashes of where it falls on a logarithmic scale with steps of ``tol`` (and the
 two steps beside it), so a reader's value within about ``tol`` of it is right (``cells/task.ts`` checks it),
@@ -13,9 +13,10 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 
 import sympy as sp
-from electro import Problem, solve
-from electro.problem.names import name_of, named, naming
-from electro.problem.quantities import Quantity
+from electro import Element
+from electro.formula import names
+from electro.names import named
+from electro.quantities import Quantity
 
 from .latex import name
 from .results import shown
@@ -61,19 +62,25 @@ class Task:
 
 
 def task(
-    problem: Problem, find: str | Quantity, prompt: str = "", *, tol: float = 0.01, units: Mapping[str, str] = {}
+    circuit: Element,
+    values: Mapping,
+    find: str | Quantity,
+    prompt: str = "",
+    *,
+    tol: float = 0.01,
+    units: Mapping[str, str] = {},
 ) -> Task:
-    """Find ``find`` (``"I_R_1"``, ``"R_2"``, ``"V_A"``, or the quantity) in ``problem``; the notebook shows
-    ``prompt`` and a field to answer in, checked within ``tol`` (1 %). ``units``: each kind's value's."""
-    elements, points = naming(problem.circuit)
-    if isinstance(find, str):
-        quantity, label = named(find, elements, points), find
-    else:
-        quantity = find
-        label = name_of(find, {e: k for k, e in elements.items()}, {p: k for k, p in points.items()})
-    value = complex(sp.N(shown(solve(problem), quantity)))
+    """Find ``find`` (``"I_R_1"``, ``"R_2"``, ``"V_A"``, or the quantity) in ``circuit``, its ``values`` in;
+    the notebook shows ``prompt`` and a field to answer in, checked within ``tol`` (1 %). ``units``: each
+    kind's value's."""
+    from .cells import _name
+
+    n = names(circuit)
+    elements = {label: e for e, label in n.labels.items()}
+    quantity, label = (named(find, n), find) if isinstance(find, str) else (find, _name(find, circuit))
+    value = complex(sp.N(shown(circuit.final(values), quantity)))
     amplitude = abs(value.imag) > 1e-12 * max(1.0, abs(value))
     number = abs(value) if amplitude else value.real
     letter = label.partition("_")[0]
-    unit = units.get(elements[label].kind.name, "") if label in elements else LETTERS.get(letter, "")
+    unit = units.get(elements[label].kind, "") if label in elements else LETTERS.get(letter, "")
     return Task(prompt, label, unit, tol, hashes(label, number, tol), amplitude)

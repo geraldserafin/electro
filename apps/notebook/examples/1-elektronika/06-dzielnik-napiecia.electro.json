@@ -179,7 +179,7 @@
     {
       "id": "9cef51b7",
       "type": "code",
-      "source": "U_z, R_a, R_b, wy = VoltageSource(\"U\"), Resistor(\"R_a\"), Resistor(\"R_b\"), Node(\"wy\")\ndz = Problem(GND >> U_z >> R_a >> wy >> R_b >> GND, {U_z: \"U\", R_a: \"R_a\", R_b: \"R_b\"})\nsolve(dz)(V(wy))",
+      "source": "U_z, R_a, R_b, wy = VoltageSource(\"U\"), Resistor(\"R_a\"), Resistor(\"R_b\"), Node(\"wy\")\ndz = GND >> U_z >> R_a >> wy >> R_b >> GND\ndz.final({U_z: \"U\", R_a: \"R_a\", R_b: \"R_b\"})(V(wy))",
       "outputs": [
         {
           "type": "markdown",

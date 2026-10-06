@@ -174,7 +174,7 @@
     {
       "id": "de08f928",
       "type": "code",
-      "source": "sol = solve(dwie_zarowki)\nfor h in [\"H_1\", \"H_2\"]:\n    print(h, \"P =\", sol(f\"P_{h}\"), \"W\")",
+      "source": "sol = dwie_zarowki.final()\nfor h in [\"H_1\", \"H_2\"]:\n    print(h, \"P =\", sol(f\"P_{h}\"), \"W\")",
       "outputs": [
         {
           "type": "stream",
@@ -190,7 +190,7 @@
     {
       "id": "758fecb4",
       "type": "code",
-      "source": "E, R = VoltageSource(\"E\"), Resistor(\"R\")\nfor u in [5, 9, 12]:\n    p = solve(Problem(~(E >> R), {E: u, R: 100}))(P(R))\n    print(f\"{u:>2} V na 100 Ω: {float(p):.2f} W\", \"— za dużo!\" if p > 0.25 else \"\")",
+      "source": "E, R = VoltageSource(\"E\"), Resistor(\"R\")\nfor u in [5, 9, 12]:\n    p = (~(E >> R)).final({E: u, R: 100})(P(R))\n    print(f\"{u:>2} V na 100 Ω: {float(p):.2f} W\", \"— za dużo!\" if p > 0.25 else \"\")",
       "outputs": [
         {
           "type": "stream",

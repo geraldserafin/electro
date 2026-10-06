@@ -12,12 +12,12 @@
     {
       "id": "061ea64c",
       "type": "markdown",
-      "source": "# Schematy w kodzie\n\nKażdy schemat z notatki jest w kodzie zmienną o swojej nazwie — zadaniem (`Problem`) z tym, co na\nrysunku: wartościami, odczytami mierników, strzałkami z danymi i szukanymi. Nazwa ze spacjami i polskimi\nznakami zamienia się w zmienną bez nich: „Układ 1” to `układ1`. Można też sięgnąć po schemat po nazwie:\n`schemat(\"Układ 1\")`. Jego elementy mają nazwy z rysunku: `uklad1[\"R_1\"]` to opornik, a `sol(\"I_R_1\")` jego\nprąd.\n\n`schematic(zadanie, sol)` rysuje obwód z wynikami przy elementach — do sprawozdania:"
+      "source": "# Schematy w kodzie\n\nKażdy schemat z notatki jest w kodzie zmienną o swojej nazwie — obwodem (`.circuit`) z tym, co na\nrysunku (`.values`): wartościami, odczytami mierników, strzałkami z danymi. Rozwiązuje się go jak obwód:\n`uklad1.final()`, `uklad1.simulate(until=1)`. Nazwa ze spacjami i polskimi znakami zamienia się w zmienną\nbez nich: „Układ 1” to `układ1`. Można też sięgnąć po schemat po nazwie: `schemat(\"Układ 1\")`. Jego elementy\nmają nazwy z rysunku: `uklad1[\"R_1\"]` to opornik, a `sol(\"I_R_1\")` jego prąd.\n\n`schematic(obwód, wartości, sol)` rysuje obwód z wynikami przy elementach — do sprawozdania:"
     },
     {
       "id": "b1229d50",
       "type": "code",
-      "source": "E, R_1, R_2, R_3 = VoltageSource(\"E\"), Resistor(\"R_1\"), Resistor(\"R_2\"), Resistor(\"R_3\")\nzadanie = Problem(~(E >> R_1 >> (R_2 | R_3)), {E: 12, R_1: 4, R_2: 2, R_3: 3})\nschematic(zadanie, solve(zadanie))",
+      "source": "E, R_1, R_2, R_3 = VoltageSource(\"E\"), Resistor(\"R_1\"), Resistor(\"R_2\"), Resistor(\"R_3\")\nzadanie, dane = ~(E >> R_1 >> (R_2 | R_3)), {E: 12, R_1: 4, R_2: 2, R_3: 3}\nschematic(zadanie, dane, zadanie.final(dane))",
       "outputs": [
         {
           "type": "svg",

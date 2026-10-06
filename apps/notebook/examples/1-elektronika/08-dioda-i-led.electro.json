@@ -507,7 +507,7 @@
     {
       "id": "7ee7a1bf",
       "type": "code",
-      "source": "plot(simulate(prostownik, until=0.1), \"V_we\", \"V_wy\")",
+      "source": "plot(prostownik.simulate(until=0.1), \"V_we\", \"V_wy\")",
       "outputs": [
         {
           "type": "svg",

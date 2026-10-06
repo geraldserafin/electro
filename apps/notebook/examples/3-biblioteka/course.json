@@ -1,4 +1,4 @@
 {
  "title": "Biblioteka electro",
- "description": "Obwody zapisane w Pythonie: elementy łączone >> (szeregowo) i | (równolegle), zadanie z danymi i szukanymi, a solver rozwiązuje je krok po kroku — z niewiadomymi, literami i prądem zmiennym. Do tego twierdzenia Thévenina i superpozycji, symulacja w czasie z kodu, SPICE i trochę teorii kategorii, na której to wszystko stoi."
+ "description": "Obwody zapisane w Pythonie: elementy łączone >> (szeregowo) i | (równolegle), wartości podane przy rozwiązywaniu, a solver rozwiązuje je krok po kroku — z niewiadomymi, literami i prądem zmiennym. Do tego twierdzenia Thévenina i superpozycji, symulacja w czasie z kodu i trochę teorii kategorii, na której to wszystko stoi."
 }

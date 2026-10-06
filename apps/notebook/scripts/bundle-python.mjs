@@ -1,5 +1,7 @@
 // Packs electro (and the notebook kernel) into public/py/bundle.json,
-// a {path: source} map the Pyodide worker writes into its file system.
+// a {path: source} map the Pyodide worker writes into its file system; and prints electro's engine as
+// JavaScript for the page (scripts/engine_js.py: src/features/simulation/engine.gen.js).
+import { execFileSync } from "node:child_process";
 import { mkdirSync, readdirSync, readFileSync, statSync, watch, writeFileSync } from "node:fs";
 import { dirname, join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -26,6 +28,9 @@ function bundle() {
   mkdirSync(dirname(out), { recursive: true });
   writeFileSync(out, JSON.stringify(files));
   console.log(`python bundle: ${Object.keys(files).length} files → public/py/bundle.json`);
+  execFileSync(process.env.PYTHON ?? "python3", [join(repo, "apps/notebook/scripts/engine_js.py")], {
+    stdio: "inherit",
+  });
 }
 
 bundle();

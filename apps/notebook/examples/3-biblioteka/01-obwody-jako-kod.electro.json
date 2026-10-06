@@ -12,12 +12,12 @@
     {
       "id": "10a96395",
       "type": "markdown",
-      "source": "# Obwody jako kod\n\nW każdej komórce z kodem jest już załadowana biblioteka `electro`. Najpierw tworzysz **elementy** —\nkażdy z nazwą:\n\n```python\nE = VoltageSource(\"E\")\nR_1 = Resistor(\"R_1\")\n```\n\nPotem łączysz je w **obwód**. To sama budowa, bez żadnych liczb:\n\n- `a >> b` — **szeregowo**: jeden za drugim,\n- `a | b` — **równolegle**: obok siebie, między tymi samymi punktami,\n- `~(a >> b >> c)` — **zamknięte**: koniec połączony z początkiem, pętla,\n- `a @ b` — **obok siebie**, bez połączenia,\n- `-a` — **odwrócony**,\n- `Node(\"A\")` — nazwany punkt, `GND` — masa.\n\nNic więcej: każdy obwód to te działania na elementach.\n\nLiczby dochodzą dopiero w **zadaniu**: `Problem(obwód, {element: wartość})`. Zadanie pokazane w komórce\nto jego schemat."
+      "source": "# Obwody jako kod\n\nW każdej komórce z kodem jest już załadowana biblioteka `electro`. Najpierw tworzysz **elementy** —\nkażdy z nazwą:\n\n```python\nE = VoltageSource(\"E\")\nR_1 = Resistor(\"R_1\")\n```\n\nPotem łączysz je w **obwód**. To sama budowa, bez żadnych liczb:\n\n- `a >> b` — **szeregowo**: jeden za drugim,\n- `a | b` — **równolegle**: obok siebie, między tymi samymi punktami,\n- `~(a >> b >> c)` — **zamknięte**: koniec połączony z początkiem, pętla,\n- `a @ b` — **obok siebie**, bez połączenia,\n- `-a` — **odwrócony**,\n- `Node(\"A\")` — nazwany punkt, `GND` — masa.\n\nNic więcej: każdy obwód to te działania na elementach. Obwód pokazany w komórce to jego schemat.\n\nLiczby dochodzą dopiero przy **rozwiązywaniu**: `obwód.final({element: wartość})`; `schematic(obwód,\nwartości)` rysuje go razem z nimi."
     },
     {
       "id": "cdb0091f",
       "type": "code",
-      "source": "E, R_1, R_2, R_3 = VoltageSource(\"E\"), Resistor(\"R_1\"), Resistor(\"R_2\"), Resistor(\"R_3\")\nuklad = Problem(~(E >> R_1 >> (R_2 | R_3)), {E: 12, R_1: 100, R_2: 200, R_3: 300})\nuklad",
+      "source": "E, R_1, R_2, R_3 = VoltageSource(\"E\"), Resistor(\"R_1\"), Resistor(\"R_2\"), Resistor(\"R_3\")\nuklad = ~(E >> R_1 >> (R_2 | R_3))\nschematic(uklad, {E: 12, R_1: 100, R_2: 200, R_3: 300})",
       "outputs": [
         {
           "type": "svg",
@@ -33,7 +33,7 @@
     {
       "id": "12919208",
       "type": "code",
-      "source": "for r in [100, 1000]:\n    sol = solve(Problem(~(E >> R_1 >> (R_2 | R_3)), {E: 12, R_1: r, R_2: 200, R_3: 300}))\n    print(f\"R_1 = {r} Ω: prąd ze źródła {sol(I(R_1))} A\")",
+      "source": "for r in [100, 1000]:\n    sol = uklad.final({E: 12, R_1: r, R_2: 200, R_3: 300})\n    print(f\"R_1 = {r} Ω: prąd ze źródła {sol(I(R_1))} A\")",
       "outputs": [
         {
           "type": "stream",
@@ -49,7 +49,7 @@
     {
       "id": "112e1e60",
       "type": "code",
-      "source": "E, A, B = VoltageSource(\"E\"), Node(\"A\"), Node(\"B\")\nR = [Resistor(f\"R_{k}\") for k in range(1, 6)]\ndrabinka = Problem(\n    ((GND >> E >> R[0] >> A >> R[1] >> GND) @ (A >> R[2] >> B >> R[3] >> GND) @ (B >> R[4] >> GND)),\n    {E: 10, R[0]: 1, R[1]: 2, R[2]: 1, R[3]: 2, R[4]: 2},\n)\nprint(\"prąd ze źródła:\", solve(drabinka)(I(R[0])), \"A\")\ndrabinka",
+      "source": "E, A, B = VoltageSource(\"E\"), Node(\"A\"), Node(\"B\")\nR = [Resistor(f\"R_{k}\") for k in range(1, 6)]\ndrabinka = (GND >> E >> R[0] >> A >> R[1] >> GND) @ (A >> R[2] >> B >> R[3] >> GND) @ (B >> R[4] >> GND)\nprint(\"prąd ze źródła:\", drabinka.final({E: 10, R[0]: 1, R[1]: 2, R[2]: 1, R[3]: 2, R[4]: 2})(I(R[0])), \"A\")\ndrabinka",
       "outputs": [
         {
           "type": "stream",
@@ -64,7 +64,7 @@
     {
       "id": "6fcc2eba",
       "type": "markdown",
-      "source": "## Ze schematu do kodu i z powrotem\n\nKażdy schemat w notatce jest w kodzie zmienną o swojej nazwie (np. `uklad1`) — zadaniem, na którym działa\nwszystko z tej lekcji. A każdy obwód z kodu można **narysować jako schemat do edycji**: w komórce Schemat\notwórz kartę **Kod**, wklej kod i wróć do rysunku."
+      "source": "## Ze schematu do kodu i z powrotem\n\nKażdy schemat w notatce jest w kodzie zmienną o swojej nazwie (np. `uklad1`) — obwodem z wartościami\nz rysunku (`uklad1.circuit`, `uklad1.values`), który rozwiązuje się tak samo: `uklad1.final()`. A każdy obwód z kodu można **narysować jako schemat do edycji**: w komórce Schemat\notwórz kartę **Kod**, wklej kod i wróć do rysunku."
     }
   ]
 }

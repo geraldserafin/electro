@@ -2,46 +2,36 @@
 
 import pytest
 import sympy as sp
-from electro import (
-    GND,
-    Diode,
-    DiodeDrop,
-    I,
-    Node,
-    Problem,
-    Resistor,
-    U,
-    VoltageSource,
-    solve,
-)
+from electro import GND, Diode, DiodeDrop, I, Node, Resistor, U, VoltageSource
 
 
 def test_the_textbook_diode_assumed_on_checked_and_its_steps_say_so():
-    e, r, d = VoltageSource("E"), Resistor("R"), DiodeDrop("D")
-    s = solve(Problem(GND >> e >> r >> Node() >> d >> GND, {e: 5, r: 1000}))
+    e, r, d = (VoltageSource("E"), Resistor("R"), DiodeDrop("D"))
+    s = (GND >> e >> r >> Node() >> d >> GND).final({e: 5, r: 1000})
     assert s(U(d)) == sp.Rational(7, 10) and s(I(d)) == sp.Rational(43, 10000)
     hows = [step.how for step in s.steps]
-    assert hows[0] == "assumed" and s.steps[0].because[0].case == "on" and hows[-1] == "checked"
+    assert hows[0] == "assumed" and s.steps[0].because[0].case == "on" and (hows[-1] == "checked")
 
 
 def test_the_textbook_diode_backwards_on_rejected_then_off():
-    e, r, d = VoltageSource("E"), Resistor("R"), DiodeDrop("D")
+    e, r, d = (VoltageSource("E"), Resistor("R"), DiodeDrop("D"))
     b = Node()
-    s = solve(Problem((GND >> e >> r >> b) @ (GND >> d >> b), {e: 5, r: 1000}))
+    s = ((GND >> e >> r >> b) @ (GND >> d >> b)).final({e: 5, r: 1000})
     assert s(I(d)) == 0 and s(U(d)) == -5
     tries = [(step.how, step.because[0].case) for step in s.steps if step.how in ("assumed", "rejected", "checked")]
     assert tries == [("assumed", "on"), ("rejected", "on"), ("assumed", "off"), ("checked", "off")]
 
 
 def test_textbook_and_shockley_differ_by_little_and_four_textbook_diodes_make_a_bridge():
+
     def drop(kind) -> float:
-        e, r, d = VoltageSource("E"), Resistor("R"), kind("D")
-        return float(solve(Problem(GND >> e >> r >> Node() >> d >> GND, {e: 5, r: 1000}))(I(d)))
+        e, r, d = (VoltageSource("E"), Resistor("R"), kind("D"))
+        return float((GND >> e >> r >> Node() >> d >> GND).final({e: 5, r: 1000})(I(d)))
 
     assert drop(DiodeDrop) == pytest.approx(drop(Diode), rel=0.02)
-    e, r, rg = VoltageSource("E"), Resistor("R"), Resistor("R_g")
+    e, r, rg = (VoltageSource("E"), Resistor("R"), Resistor("R_g"))
     d1, d2, d3, d4 = (DiodeDrop(f"D{k}") for k in range(1, 5))
-    p, n, a, b = Node("P"), Node("N"), Node("A"), Node("B")
+    p, n, a, b = (Node("P"), Node("N"), Node("A"), Node("B"))
     bridge = (
         (n >> e >> p)
         @ (p >> d1 >> a)
@@ -51,4 +41,4 @@ def test_textbook_and_shockley_differ_by_little_and_four_textbook_diodes_make_a_
         @ (a >> r >> b)
         @ (n >> rg >> GND)
     )
-    assert solve(Problem(bridge, {e: 10, r: 1000, rg: 10**6}))(I(r)) == sp.Rational(86, 10000)
+    assert bridge.final({e: 10, r: 1000, rg: 10**6})(I(r)) == sp.Rational(86, 10000)

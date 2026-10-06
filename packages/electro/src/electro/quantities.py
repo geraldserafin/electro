@@ -7,7 +7,8 @@ from typing import cast
 
 import sympy as sp
 
-from ..circuit.tree import GND, Element, Net, Node
+from .element import Element
+from .points import GND, Node
 
 
 class _Scalable:
@@ -44,15 +45,15 @@ class Parameter(_Scalable):
 
 @dataclass(frozen=True)
 class Potential(_Scalable):
-    at: Node | Net
+    at: Node
 
 
 @dataclass(frozen=True)
 class Across(_Scalable):
     """V_a − V_b."""
 
-    a: Node | Net
-    b: Node | Net
+    a: Node
+    b: Node
 
 
 @dataclass(frozen=True)
@@ -82,16 +83,16 @@ def I(e: Element, at: str | None = None) -> Current:
     return Current(e, at)
 
 
-def U(a: Element | Node | Net, b: Node | Net | None = None) -> Voltage | Across:
+def U(a: Element | Node, b: Node | None = None) -> Voltage | Across:
     """Of an element, or between two points (one: against ground)."""
-    return Voltage(a) if isinstance(a, Element) else Across(a, b if b is not None else GND)
+    return Across(a, b if b is not None else GND) if isinstance(a, Node) else Voltage(a)
 
 
 def P(e: Element) -> Power:
     return Power(e)
 
 
-def V(p: Node | Net) -> Potential:
+def V(p: Node) -> Potential:
     return Potential(p)
 
 
@@ -104,7 +105,7 @@ def element_of(q: Quantity | Scaled) -> Element | None:
     return None
 
 
-def points_of(q: Quantity | Scaled) -> tuple[Node | Net, ...]:
+def points_of(q: Quantity | Scaled) -> tuple[Node, ...]:
     match q:
         case Potential(p):
             return (p,)
