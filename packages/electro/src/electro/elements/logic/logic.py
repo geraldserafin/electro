@@ -5,8 +5,8 @@ flip-flop decides on its clock's rising edge, from what its inputs were just bef
 
 import sympy as sp
 
-from ...element import Element
-from ...time import D, Pre, rising, when
+from ...circuit.element import Element
+from ...circuit.time import D, Pre, rising, when
 from ..physics import high
 
 V_HIGH = 5

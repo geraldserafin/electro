@@ -20,8 +20,8 @@ from electro import (
     Voltage,
     VoltageSource,
 )
-from electro.algebra import Origin
-from electro.laws import is_source, reading, stores
+from electro.circuit.algebra import Origin
+from electro.frame.laws import is_source, reading, stores
 
 
 def test_steps_say_where_each_value_comes_from():

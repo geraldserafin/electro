@@ -1,6 +1,6 @@
 import sympy as sp
 
-from ...element import Element
+from ...circuit.element import Element
 
 B, KELVIN = 3950, sp.Rational(27315, 100)
 

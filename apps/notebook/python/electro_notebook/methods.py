@@ -27,7 +27,7 @@ from electro import (
     VoltageSource,
     Wire,
 )
-from electro.quantities import Quantity
+from electro.circuit.quantities import Quantity
 from electro.values import parse
 
 from .drawing import rebuilt

@@ -85,12 +85,12 @@ liczb wstawiona. W symulacji **nazwane punkty zostają niewiadomymi** (eliminowa
 w drabince wielomian w 1/dt jej długości — liczby, których float nie utrzyma), a to, co się odczytuje
 (napięcia, prądy elementów), liczy się po klatce prostym kodem, nie w Newtonie.
 
-`engine.py` (Newton, rzadka eliminacja, długość kroku, pamięć wejść) to zwykły Python bez importów poza
+`numeric/engine.py` (Newton, rzadka eliminacja, długość kroku, pamięć wejść) to zwykły Python bez importów poza
 `math`; strona dostaje go jako JavaScript drukowany z tego samego pliku przez pscript (bez przeciążania
 operatorów: `PSCRIPT_OVERLOAD = False` w każdej funkcji). Jedno źródło prawdy, bez ręcznego portu.
 
 Jacobian jest rzadki (drabinka: każdy węzeł ma dwóch sąsiadów). Kolejność eliminacji wybiera raz
-kompilacja (`sparse.py`): Markowitz jak w SPICE (najmniej nowych niezer), pivot nie mniejszy niż 0,1
+kompilacja (`numeric/sparse.py`): Markowitz jak w SPICE (najmniej nowych niezer), pivot nie mniejszy niż 0,1
 największego w kolumnie na liczbach próbnej klatki, a najpierw wiersze i kolumny, których niewiadome nie
 zmieniają (oporniki, C/dt). Silnik (`engine.System`) chodzi tylko po niezerach:
 

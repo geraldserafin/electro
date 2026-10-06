@@ -13,8 +13,8 @@ from typing import cast
 
 import sympy as sp
 
-from .algebra import symbols_in
-from .time import DT, TIME, D, Pre
+from ..circuit.algebra import symbols_in
+from ..circuit.time import DT, TIME, D, Pre
 
 
 @dataclass(frozen=True)

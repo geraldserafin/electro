@@ -1,0 +1,1 @@
+"""Numbers only: equations printed as code (``code``), the order sparse elimination takes (``sparse``), and the engine — Newton and the frame loop — in plain Python the page gets as JavaScript (``engine``)."""

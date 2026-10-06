@@ -230,13 +230,13 @@ class Element:
     def final(self, values: Mapping | None = None, frame=None):
         """Where the circuit comes to: one frame infinitely long — or, with sines of one frequency, turning at
         it — from rest, its values in."""
-        from .solve import final
+        from ..solve.final import final
 
         return final(self, values or {}, frame)
 
     def simulate(self, values: Mapping | None = None, until: float = 1.0, dt: float | None = None, inputs=None):
         """Frame after frame from rest for ``until`` seconds."""
-        from .simulate import simulate
+        from ..simulate import simulate
 
         return simulate(self, values or {}, until, dt, inputs)
 

@@ -6,8 +6,8 @@ from __future__ import annotations
 
 import sympy as sp
 
+from ..values import expression
 from .quantities import Current, Parameter, Potential, Power, Quantity, Voltage
-from .values import expression
 
 OF_ELEMENTS = {"I": Current, "U": Voltage, "P": Power}
 

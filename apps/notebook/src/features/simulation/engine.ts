@@ -1,4 +1,4 @@
-// The circuit in time, in the page: electro's own engine (electro/engine.py, its Machine), printed as
+// The circuit in time, in the page: electro's own engine (electro/numeric/engine.py, its Machine), printed as
 // JavaScript at build time (engine.gen.js, by scripts/engine_js.py), on a program the Python side
 // compiled (sympy wrote its residuals, Jacobian and readings as JavaScript). Here only what the page
 // reads of it: `x` is what is seen of the circuit now (each point's potential, each element's voltage
@@ -15,7 +15,7 @@ export interface ProgramData {
   junctions: [number, number, number][]; // unknown index, n·V_T, V_crit
   constant: string; // fills A with the Jacobian's entries the unknowns do not change
   moving: string; // fills F with the residuals, A with the rest
-  shape: object; // how they are eliminated (electro/sparse.py)
+  shape: object; // how they are eliminated (electro/numeric/sparse.py)
   update: string;
   seen: string[]; // what is read of a frame, by name ("V_A", "U_R_1", "R_1.a")
   see: string; // fills out with them

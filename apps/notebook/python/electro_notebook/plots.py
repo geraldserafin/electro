@@ -7,8 +7,8 @@ import re
 from collections.abc import Mapping
 
 from electro import Element, Net, Node, U, V
-from electro.laws import stores
-from electro.quantities import Quantity
+from electro.circuit.quantities import Quantity
+from electro.frame.laws import stores
 
 from .errors import NoInput, NoOutput
 from .methods import responses, spreads

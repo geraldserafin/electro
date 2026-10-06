@@ -5,8 +5,8 @@ pivot that comes out nothing here (it then falls back to partial pivoting)."""
 import random
 
 import pytest
-from electro.engine import System, solve_linear
-from electro.sparse import shape
+from electro.numeric.engine import System, solve_linear
+from electro.numeric.sparse import shape
 
 
 def _system(n: int, seed: int):

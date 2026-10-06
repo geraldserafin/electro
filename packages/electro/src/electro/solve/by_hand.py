@@ -5,9 +5,9 @@ from __future__ import annotations
 
 import sympy as sp
 
-from .algebra import Equation, SolutionStep, expr, subs, symbols_in
-from .errors import Ambiguous, Contradiction
-from .formula import System
+from ..circuit.algebra import Equation, SolutionStep, expr, subs, symbols_in
+from ..errors import Ambiguous, Contradiction
+from ..frame.formula import System
 
 Known = dict[sp.Symbol, sp.Expr]
 

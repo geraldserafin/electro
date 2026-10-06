@@ -1,7 +1,7 @@
 import sympy as sp
 
-from ...element import Element
-from ...time import TIME
+from ...circuit.element import Element
+from ...circuit.time import TIME
 
 
 class SineSource(Element):

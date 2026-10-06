@@ -1,4 +1,4 @@
-from ...element import Element
+from ...circuit.element import Element
 
 
 class CCVS(Element):

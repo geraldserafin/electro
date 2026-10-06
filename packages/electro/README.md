@@ -70,8 +70,8 @@ przypadkami, a `exp` (dioda Shockleya, tranzystor) Newtonem.
 
 ## Silnik
 
-`engine.py` to cały silnik liczący klatki — zwykły Python, bez importów poza `math`: Newton z
-ograniczaniem złącza jak w SPICE, rzadka eliminacja w kolejności wybranej przy kompilacji (`sparse.py`;
+`numeric/engine.py` to cały silnik liczący klatki — zwykły Python, bez importów poza `math`: Newton z
+ograniczaniem złącza jak w SPICE, rzadka eliminacja w kolejności wybranej przy kompilacji (`numeric/sparse.py`;
 część stała liczona raz, Newton tylko na tym, czego dotyka `exp`), długość kroku. Strona dostaje go jako JavaScript
 wydrukowany z tego samego pliku przez pscript (`apps/notebook/scripts/engine_js.py`), więc obie strony
 liczą tak samo. Węzły zostają niewiadomymi Newtona, a to, co się odczytuje (napięcia i prądy elementów),
@@ -79,17 +79,50 @@ liczy się po klatce prostym kodem.
 
 ## Pakiet
 
-| | |
-|---|---|
-| `element.py` | `Element`, relacja, składanie i eliminacja |
-| `points.py` | pająki, `Node`, `GND` |
-| `elements/` | rodzaje elementów, jeden na plik |
-| `formula.py` | wzór klatki obwodu zamkniętego: nazwy, dane, co zostało do rozwiązania |
-| `frame.py`, `time.py` | klatki (`Step`, `DC`, `AC`) i słowa czasu (`D`, `Pre`) |
-| `solve.py`, `by_hand.py` | `final`: klatka rozwiązana algebrą, przypadkami albo Newtonem; `Solution` |
-| `simulate.py`, `code.py`, `sparse.py`, `engine.py` | Φ skompilowane, kolejność eliminacji, przebieg, ślad |
-| `laws.py` | co wynika z praw elementu: źródło, miernik, pamięć |
-| `quantities.py`, `names.py`, `values.py` | wielkości, nazwy, wartości z jednostkami |
-| `parts.py` | części z katalogów |
+Foldery idą od budowy do liczb; każdy korzysta tylko z tych nad nim (plus `errors`, `values`, `parts`):
+
+```
+circuit/    budowa obwodu — nic tu nie rozwiązuje
+elements/   rodzaje elementów (na circuit/)
+frame/      obwód zamknięty jako równania jednej klatki (na circuit/)
+numeric/    same liczby: kod, kolejność eliminacji, silnik — nie zna elementów; sympy tylko w code.py
+solve/      jedna klatka rozwiązana: final (na frame/ i numeric/)
+simulate.py klatka za klatką (na frame/ i numeric/)
+```
+
+| plik | co robi | korzysta z | dlaczego |
+|---|---|---|---|
+| `__init__.py` | to, co daje `from electro import *` | prawie wszystkiego | jedno miejsce dla użytkownika |
+| `errors.py` | wyjątki z polami: `MissingData`, `Contradiction`… | `circuit/quantities` | błąd mówi, której wielkości dotyczy |
+| `values.py` | `"4k7"`, `"0,5 A"`, `"230∠-120"` na liczby i z powrotem | — | wartości wpisuje człowiek |
+| `parts.py` | części z katalogu (`part("1N4148")`) | — | parametry prawdziwych części |
+| **`circuit/`** | | | |
+| `algebra.py` | równanie z pochodzeniem (`Origin`, `SolutionStep`), sposoby elementu „albo-albo”, pomocniki sympy | `time` | każde równanie pamięta, skąd jest — z tego są kroki |
+| `time.py` | słowa czasu w prawach: `D` (zmiana), `Pre` (co było), `TIME`, `DT`, `THETA` | — | prawa mówią o czasie, nie wiedząc, jak się go liczy |
+| `element.py` | `Element`: końce + prawa; `>>`, `\|`, `@`, `~`, `-`; eliminacja środka przy składaniu | `algebra`, `time` | serce: wszystko jest elementem |
+| `points.py` | punkty: `Node`, `GND`, pająki `wire`, `cap`, `cup`, `swap` | `element`, `algebra` | punkt to też element (Kirchhoff) |
+| `quantities.py` | `I(e)`, `U(e)`, `P(e)`, `V(punkt)`, `Parameter(e)` | `element`, `points` | czym są dane i szukane |
+| `names.py` | `"I_R_1"`, `"U_R_1 / I_R_1"` na wielkości, bez `eval` | `quantities`, `values` | nazwy pisane przez człowieka, bezpiecznie |
+| **`elements/`** | rodzaje: jeden na plik, rodziny w folderach; `physics.py` — złącze p-n, poziom logiczny | `circuit/element`, `circuit/time` | nowy element = nowy plik, nic więcej |
+| **`frame/`** | | | |
+| `reading.py` | `Step`, `DC`, `AC`: jak `D` i `Pre` stają się równaniem jednej klatki (trapezy, Euler) | `circuit/algebra`, `circuit/time` | jedno miejsce wie, jak się liczy czas |
+| `formula.py` | wzór klatki obwodu zamkniętego: nazwy jak w książce, dane wstawione, co zostało do rozwiązania i jak wrócić do reszty | `circuit/*`, `reading`, `values`, `laws` | od tego miejsca nikt nie zna rodzajów elementów |
+| `laws.py` | co mówią same prawa elementu: źródło? liniowy? co czyta miernik? pamięta? | `circuit/*`, `reading` | notatnik pyta o to bez znajomości rodzajów |
+| **`numeric/`** | | | |
+| `code.py` | równania klatki jako kod (reszty i niezerowe miejsca Jakobianu), Python tu, JavaScript na stronę | `circuit/algebra`, `engine`, `sparse` | sympy raz przy kompilacji, potem same liczby |
+| `sparse.py` | kolejność eliminacji (Markowitz), wybrana raz; część stała osobno | — | szybkość: nie dotyka zer, nie liczy stałego dwa razy |
+| `engine.py` | `Machine` (pętla klatek, długość kroku), `System`, `newton`, `homotopy` | tylko `math` | zwykły Python, pscript drukuje go jako JS dla strony — obie liczą tak samo |
+| **`solve/`** | | | |
+| `by_hand.py` | jak na kartce: równanie z jedną niewiadomą naraz, jego pochodzenie to powód kroku | `circuit/algebra`, `frame/formula`, `errors` | kroki do pokazania uczniowi |
+| `final.py` | `final`: klatka DC/AC rozwiązana algebrą, przypadkami albo Newtonem; `Solution` | `by_hand`, `frame/*`, `numeric/code`, `numeric/engine` | odpowiedź i kroki |
+| **`simulate.py`** | `step_function` (Φ skompilowane raz), `simulate`, `Trace` (ślad) | `frame/*`, `numeric/*`, `circuit/*` | obwód w czasie, w Pythonie i na stronie |
+
+Droga `obwód.final(dane)`: `element.py` → `solve/final.py` → `frame/formula.py` (wzór klatki, przez
+`reading.py`) → `solve/by_hand.py` (liniowe) albo `numeric/code.py` + `numeric/engine.py` (Newton) →
+`Solution`.
+
+Droga `obwód.simulate(dane)`: `simulate.py` → `frame/formula.py` przy `Step(dt)` → `numeric/code.py`
+(kod + `sparse.py`) → `numeric/engine.py` `Machine` klatka za klatką → `Trace`. Strona bierze ten sam kod
+(`to_json`) i ten sam silnik, wydrukowany jako JavaScript (`apps/notebook/scripts/engine_js.py`).
 
 Projekt i decyzje: [`DESIGN.md`](DESIGN.md). Testy: `devenv shell`, potem `pytest` w `packages/electro`.

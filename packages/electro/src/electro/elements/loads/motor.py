@@ -1,7 +1,7 @@
 import sympy as sp
 
-from ...element import Element
-from ...time import D
+from ...circuit.element import Element
+from ...circuit.time import D
 
 R, K, J, B = 5, sp.Rational(1, 100), sp.Rational(1, 10**6), sp.Rational(16, 10**7)
 

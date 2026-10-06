@@ -14,9 +14,9 @@ from dataclasses import dataclass
 
 import sympy as sp
 from electro import Element
-from electro.formula import names
-from electro.names import named
-from electro.quantities import Quantity
+from electro.circuit.names import named
+from electro.circuit.quantities import Quantity
+from electro.frame.formula import names
 
 from .latex import name
 from .results import shown

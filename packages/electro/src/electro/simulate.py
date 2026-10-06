@@ -20,15 +20,15 @@ from typing import cast
 
 import sympy as sp
 
-from .algebra import expr, subs, symbols_in
-from .code import Code, Compiled, compile_equations, python, statements
-from .element import Element
-from .engine import Machine, NoConvergence
+from .circuit.algebra import expr, subs, symbols_in
+from .circuit.element import Element
+from .circuit.quantities import Quantity, Scaled
+from .circuit.time import THETA, TIME, D
 from .errors import NotSimulated, ValueNeeded
-from .formula import Formula, NotClosed, formula, parameter_values
-from .frame import DT, Step, before, interpret, slope
-from .quantities import Quantity, Scaled
-from .time import THETA, TIME, D
+from .frame.formula import Formula, NotClosed, formula, parameter_values
+from .frame.reading import DT, Step, before, interpret, slope
+from .numeric.code import Code, Compiled, compile_equations, python, statements
+from .numeric.engine import Machine, NoConvergence
 
 G_NODE = 1e-12
 STEP_VOLTS, STEP_AMPS = 0.05, 1e-3

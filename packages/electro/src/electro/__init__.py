@@ -3,21 +3,21 @@ its ends, joined with ``>>``, ``@``, ``|``, ``~``, ``-``, what is inside elimina
 frame of one worked out from its frame formula: ``circuit.final(values)`` where it comes to,
 ``circuit.simulate(values, until)`` frame after frame."""
 
-from .algebra import Case, Cases, SolutionStep
-from .element import BadName, Element, ElementTwice, JoinsNodes, Terminals, WrongEnds
+from .circuit.algebra import Case, Cases, SolutionStep
+from .circuit.element import BadName, Element, ElementTwice, JoinsNodes, Terminals, WrongEnds
+from .circuit.names import NoSuchQuantity
+from .circuit.points import GND, Net, Node, Spider, Swap, cap, cup, swap, wire
+from .circuit.quantities import Across, Current, I, P, Parameter, Potential, Power, U, V, Voltage
+from .circuit.time import TIME, D, Pre, rising, square, when
 from .elements import *
 from .elements import __all__ as _elements
 from .elements.physics import V_T
 from .errors import Ambiguous, Contradiction, MissingData, NotLinear, NotSimulated, Undetermined, ValueNeeded
-from .formula import NoSuchParameter, NotClosed
-from .frame import AC, DC, Step
-from .names import NoSuchQuantity
+from .frame.formula import NoSuchParameter, NotClosed
+from .frame.reading import AC, DC, Step
 from .parts import BJT_PARTS, DIODE_PARTS, LED_COLORS, OPAMP_PARTS, Part, part
-from .points import GND, Net, Node, Spider, Swap, cap, cup, swap, wire
-from .quantities import Across, Current, I, P, Parameter, Potential, Power, U, V, Voltage
 from .simulate import NoConvergence, NoSuchInput, Trace, simulate, step_function
-from .solve import Solution, final, frame_after, settled
-from .time import TIME, D, Pre, rising, square, when
+from .solve.final import Solution, final, frame_after, settled
 
 __all__ = [
     "BJT_PARTS",

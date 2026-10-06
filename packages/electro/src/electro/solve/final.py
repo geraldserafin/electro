@@ -11,16 +11,16 @@ from dataclasses import dataclass, field, replace
 
 import sympy as sp
 
-from .algebra import Origin, SolutionStep, Way, subs, symbols_in
+from ..circuit.algebra import Origin, SolutionStep, Way, subs, symbols_in
+from ..circuit.element import Element
+from ..circuit.quantities import Current, Parameter, Power, Quantity, Scaled, Voltage
+from ..circuit.time import TIME
+from ..errors import Contradiction, MissingData, NotLinear, Undetermined
+from ..frame.formula import Formula, Names, System, formula
+from ..frame.reading import AC, DC, Step, frequencies
+from ..numeric.code import compile_equations
+from ..numeric.engine import homotopy
 from .by_hand import Known, solve_by_hand
-from .code import compile_equations
-from .element import Element
-from .engine import homotopy
-from .errors import Contradiction, MissingData, NotLinear, Undetermined
-from .formula import Formula, Names, System, formula
-from .frame import AC, DC, Step, frequencies
-from .quantities import Current, Parameter, Power, Quantity, Scaled, Voltage
-from .time import TIME
 
 SOURCES = sp.Symbol("λ")
 """How far every independent source is raised: 0 is all off, 1 as given (Newton's way up)."""
@@ -46,7 +46,7 @@ class Solution:
         """``q``'s value; or by name, ``"I_R_1"``, an expression of names too (``"U_E_1 / I_E_1"``). What the
         data do not pin down: ``MissingData`` — how many data more, and which would do."""
         if isinstance(q, str):
-            from .names import evaluated
+            from ..circuit.names import evaluated
 
             return evaluated(q, self)
         if isinstance(q, Power):

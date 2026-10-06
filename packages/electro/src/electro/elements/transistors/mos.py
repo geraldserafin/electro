@@ -3,8 +3,8 @@ power one unless given. A PMOS is an NMOS with every voltage and current the oth
 
 import sympy as sp
 
-from ...element import Element
-from ...time import D
+from ...circuit.element import Element
+from ...circuit.time import D
 from ..physics import junction
 
 

@@ -1,6 +1,6 @@
 import sympy as sp
 
-from ...element import Element
+from ...circuit.element import Element
 
 GAMMA = sp.Rational(7, 10)
 

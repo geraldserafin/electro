@@ -5,11 +5,11 @@ from __future__ import annotations
 
 import sympy as sp
 
-from .algebra import symbols_in
-from .element import Element
-from .frame import DC, Step, interpret
-from .quantities import Current, Voltage
-from .time import D
+from ..circuit.algebra import symbols_in
+from ..circuit.element import Element
+from ..circuit.quantities import Current, Voltage
+from ..circuit.time import D
+from .reading import DC, Step, interpret
 
 
 def _own(e: Element) -> tuple[list[sp.Expr], list[sp.Symbol]] | None:

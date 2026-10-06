@@ -9,9 +9,9 @@ from collections.abc import Mapping, Sequence
 
 import sympy as sp
 from electro import AC, DC, Element, Node, Solution, SolutionStep
-from electro.algebra import Origin
+from electro.circuit.algebra import Origin
+from electro.circuit.quantities import Quantity
 from electro.errors import MissingData
-from electro.quantities import Quantity
 from electro.values import parse
 
 from . import latex as tex

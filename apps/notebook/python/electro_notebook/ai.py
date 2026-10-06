@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 
 import sympy as sp
-from electro.names import named
+from electro.circuit.names import named
 from electro.values import expression
 
 from .drawing import from_drawing

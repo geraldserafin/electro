@@ -6,7 +6,7 @@ from collections.abc import Mapping, Sequence
 
 import sympy as sp
 
-from .quantities import Quantity
+from .circuit.quantities import Quantity
 
 
 class Undetermined(ValueError):

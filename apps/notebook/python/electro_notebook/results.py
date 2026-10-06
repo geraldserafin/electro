@@ -8,7 +8,7 @@ from collections.abc import Callable, Mapping
 
 import sympy as sp
 from electro import Current, Element, Parameter, Power, Solution, Voltage
-from electro.laws import is_source, reading
+from electro.frame.laws import is_source, reading
 from electro.values import UNKNOWN, fmt
 
 from .methods import fill

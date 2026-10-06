@@ -1,5 +1,5 @@
-from ..element import Element
-from ..time import D
+from ..circuit.element import Element
+from ..circuit.time import D
 
 
 class Inductor(Element):

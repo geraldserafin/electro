@@ -20,10 +20,10 @@ from operator import matmul
 
 import sympy as sp
 from electro import GND, Element, Net, Node, Part
+from electro.circuit.quantities import Across, Current, Parameter, Potential, Power, Quantity, Scaled, Sum, Voltage
 from electro.elements import BY_KIND
-from electro.formula import names
-from electro.laws import reading
-from electro.quantities import Across, Current, Parameter, Potential, Power, Quantity, Scaled, Sum, Voltage
+from electro.frame.formula import names
+from electro.frame.laws import reading
 from electro.values import UNKNOWN, to_text
 
 GROUND_NAMES = ("GND", "0")

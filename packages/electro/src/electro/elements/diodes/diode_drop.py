@@ -1,7 +1,7 @@
 import sympy as sp
 
-from ...algebra import Case, Cases
-from ...element import Element
+from ...circuit.algebra import Case, Cases
+from ...circuit.element import Element
 
 
 class DiodeDrop(Element):

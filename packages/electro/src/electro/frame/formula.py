@@ -16,13 +16,13 @@ from typing import cast
 
 import sympy as sp
 
-from .algebra import Equation, Origin, Way, expr, normal, symbols_in
-from .element import NAMED, POTENTIALS, Element, Relation, reduced
-from .frame import DT, Step, before, interpret, is_before
-from .points import Node
-from .quantities import Across, Current, Parameter, Potential, Power, Quantity, Scaled, Sum, Voltage
-from .time import TIME, D, Pre
-from .values import UNKNOWN, parse
+from ..circuit.algebra import Equation, Origin, Way, expr, normal, symbols_in
+from ..circuit.element import NAMED, POTENTIALS, Element, Relation, reduced
+from ..circuit.points import Node
+from ..circuit.quantities import Across, Current, Parameter, Potential, Power, Quantity, Scaled, Sum, Voltage
+from ..circuit.time import TIME, D, Pre
+from ..values import UNKNOWN, parse
+from .reading import DT, Step, before, interpret, is_before
 
 
 class NotClosed(ValueError):
@@ -229,7 +229,7 @@ def formula(
 def parameter_values(circuit: Element, values: Mapping, n: Names) -> dict[sp.Symbol, sp.Expr]:
     """Each parameter's value: as given, else its kind's default. An element's value is its main parameter;
     several by name (``{D: {"I_S": …}}``); a real part's (``part("1N4148")``); a name shared by elements."""
-    from .parts import Part
+    from ..parts import Part
 
     out: dict[sp.Symbol, sp.Expr] = {}
     for e in circuit.members:
@@ -267,7 +267,7 @@ def conditions(values: Mapping, n: Names) -> list[Equation]:
 
 
 def _read(value: object) -> object:
-    from .parts import Part
+    from ..parts import Part
 
     if isinstance(value, Mapping | Quantity | Scaled | Part):
         return value

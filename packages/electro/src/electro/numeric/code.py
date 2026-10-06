@@ -16,7 +16,7 @@ import sympy as sp
 from sympy.printing.jscode import JavascriptCodePrinter
 from sympy.printing.pycode import PythonCodePrinter
 
-from .algebra import expr, subs, symbols_in
+from ..circuit.algebra import expr, subs, symbols_in
 from .engine import System, limited_exp, limited_exp_slope, newton
 from .sparse import shape
 

@@ -3,8 +3,8 @@ current the other way."""
 
 import sympy as sp
 
-from ...element import Element
-from ...time import D
+from ...circuit.element import Element
+from ...circuit.time import D
 from ..physics import V_T
 
 

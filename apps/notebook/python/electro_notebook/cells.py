@@ -17,9 +17,9 @@ from collections.abc import Mapping
 
 import sympy as sp
 from electro import Element, Node, Solution, Trace
-from electro.formula import names
-from electro.names import named
-from electro.quantities import Current, Parameter, Power, Quantity, Voltage
+from electro.circuit.names import named
+from electro.circuit.quantities import Current, Parameter, Power, Quantity, Voltage
+from electro.frame.formula import names
 
 from . import plots
 from . import task as tasks
