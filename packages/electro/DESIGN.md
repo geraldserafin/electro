@@ -15,9 +15,11 @@ najmniejsza: jedna klasa `Element`, składanie, wzór klatki. Bez magii i bez fu
 - **Pająki** (algebra Frobeniusa: jeden potencjał, prądy się sumują — prawo Kirchhoffa) dają resztę:
   `f | g`, `~f` (pętla: `cap >> (f @ wire) >> cup`), `-f` (transpozycja), `swap`. `Node` to pająk
   z nazwą: ten sam obiekt w kilku miejscach to jeden punkt.
-- Złożenie relacji to sklejenie **i eliminacja** (∃) tego, co zostało w środku. Dlatego każdy obwód
-  jest elementem jak każdy inny: `R_1 >> R_2` to jedno prawo `U = I·(R_1 + R_2)` — nikt nie mówi
-  o „szeregowo”. Definicje wyeliminowanych zmiennych zostają, więc o środek dalej można pytać.
+- Złożenie relacji to sklejenie **i eliminacja** (∃) tego, co zostało w środku. Sklejenie to
+  utożsamienie zmiennych (pushout: jedna z pary znika, zapisana jako „przewód”), eliminacja — to samo
+  `Laws.eliminate`, co rozwiązuje zadanie. Dlatego każdy obwód jest elementem jak każdy inny: `R_1 >> R_2`
+  to jedno prawo `U = I·(R_1 + R_2)` — nikt nie mówi o „szeregowo”. Wyeliminowane zmienne zostają
+  w logu, więc o środek dalej można pytać.
 
 Baez, Fong, *A Compositional Framework for Passive Linear Networks* (2015).
 
@@ -42,7 +44,21 @@ czasu: `D(x)` (pochodna) i `Pre(x)` (wartość chwilę wcześniej: pamięć). So
 - `simulate` to klatki jedna po drugiej, od spoczynku. Kartka to równowaga symulacji; ich zgodność to
   darmowy test (kartka ≠ symulacja po ustaleniu = błąd w modelu).
 
-### 1.4 Czego teoria nie załatwia
+### 1.4 Znane abstrakcje, nie własna logika
+
+Każda część elementu składa się sama (element to morfizm w iloczynie kategorii: `>>` po polach):
+
+| część | abstrakcja | `>>` / `&` |
+|---|---|---|
+| `Rel` — końce i prawa | kategoria relacji (Baez–Fong, „black box”) | sklej granicę, ∃ środka |
+| `Laws.equations` | koniunkcja | `&`: obie naraz |
+| `Laws.choices` — „albo-albo” | monada listy (suma relacji, złożenie rozdziela się po sumie), trzymana w postaci rozłożonej; rozwiązanie to `sequence` | dopisanie wyborów |
+| `Laws.log` | monada Writer: co znikło, czym i dlaczego — naraz kroki dla ucznia i droga powrotu do każdej wielkości | log ++ log |
+| `Rel.taps` | Kirchhoff w nazwanych punktach czeka na cały obwód | dopisanie |
+| klatka (`Step`, `DC`, `AC`) | funktor z praw w słowach czasu w prawa jednej klatki (`Laws.map`) | — |
+| przebieg | koalgebra: `phi(klatka, dt)` → następna; `simulate` to jej rozwinięcie (`Machine` to samo, z pamięcią i szybko) | — |
+
+### 1.5 Czego teoria nie załatwia
 
 - Równowaga to nie granica: oscylator ma równowagę, do której nie dojdzie.
 - Krok dyskretny jest funktorem tylko w przybliżeniu.
@@ -51,7 +67,13 @@ czasu: `D(x)` (pochodna) i `Pre(x)` (wartość chwilę wcześniej: pamięć). So
 
 ## 2. Eliminacja
 
-Zmienna znika przy składaniu tylko z równania stopnia 1, gdy jej współczynnik:
+Jedna operacja, `Laws.eliminate(xs, alone)`: dopóki jakieś równanie daje któryś z `xs` sam (`alone`),
+ten znika wszędzie (w równaniach, w wariantach, w tym, czego wariant wymaga), a jego wartość idzie do
+logu. Najpierw równania z najmniejszą liczbą `xs`, najpierw zmienne łączące (pająków). Nigdy zmienna
+wewnątrz funkcji (`exp`, słowo czasu): zostaje dla Newtona. Składanie i rozwiązywanie różnią się tylko
+regułą `alone`.
+
+Przy składaniu (`linear`) zmienna znika tylko z równania stopnia 1, gdy jej współczynnik:
 
 - nie zawiera zmiennych,
 - jest **stały w czasie**: bez funkcji (stan, przełącznik — bywają 0), bez `t`, `dt` i wartości sprzed
@@ -69,10 +91,11 @@ po dodaniu stałej do wszystkich, jeden wybierany jest 0.
 
 ## 3. Rozwiązywanie klatki
 
-- **Algebra** (wielomianowe w niewiadomych): krok po kroku — równanie z jedną niewiadomą, potem razem.
-  Kroki to ślad eliminacji i rozwiązywania: co znaleziono, z jakiego równania, dlaczego.
-- **Przypadki**: element „albo-albo” (dioda podręcznikowa: przewodzi albo nie) — zakładamy wariant,
-  rozwiązujemy, sprawdzamy warunek; jak na kartce.
+- **Algebra** (wielomianowe w niewiadomych): to samo `eliminate`, z regułą „w równaniu została jedna
+  niewiadoma i ma jedną wartość” (`sp.solve`), potem reszta razem. Kroki to log: co znaleziono, z jakiego
+  równania, dlaczego.
+- **Przypadki**: element „albo-albo” (dioda podręcznikowa: przewodzi albo nie) — każda kombinacja
+  wariantów (`sequence` monady listy) zakładana, rozwiązywana, sprawdzana; jak na kartce.
 - **Newton**: `exp` (dioda Shockleya, tranzystor). Złącze ograniczane jak w SPICE (`pnjlim`), skala
   z prądów w prawach; DC z homotopią po źródłach (λ od 0 do 1).
 - Czego nie da się wyznaczyć: `MissingData` (ile danych brakuje, które by wystarczyły); sprzeczne:
@@ -104,20 +127,28 @@ maleje jak dt²); dwie klatki po skoku (start, przełączenie, wejście ustawion
 (`θ = 1`, Euler), bo trapezy przez skok dzwonią: nachylenie z klatki skoku odbija się co krok ze zmienionym
 znakiem. Na RC przy tej samej liczbie klatek błąd jest ~100 razy mniejszy niż samym Eulerem.
 
+**Długość kroku** wynika z jednej reguły — błędu, który krok robi. Trapezy mylą się o dt³/12 razy trzecią
+pochodną, krok wstecz o dt²/2 razy drugą; obie czytane z ilorazów różnicowych tego, co pamiętane, z kilku
+ostatnich klatek od ostatniego skoku (jak SPICE). Nie z nachyleń: przy sztywnym złączu (pojemność bramki,
+złącza tranzystora) zapamiętane nachylenie trapezów dzwoni ±170 V/s krok po kroku, choć napięcie stoi —
+oszacowanie z nachyleń skracało krok do mikrosekund (480 000 klatek zamiast 1 500). Krok za długi
+liczony jest jeszcze raz, krótszy; następny tak długi, jak pozwala błąd (`TRTOL` 10⁻³ wartości plus `TRABS`
+10⁻⁶). Jedyne inne ograniczenie: co najmniej 40 kroków na okres sinusa i fali prostokątnej w danych.
+
 Uczciwie z ngspice — czas do tej samej dokładności (wzorzec: ngspice z krokiem 0,1 µs; czas ngspice z jego
-licznika samej analizy, nasz — silnik strony w Node, bez kompilacji; 0,1 s, sinus 5 V, 50 Hz):
+licznika samej analizy, nasz — silnik strony w Node, bez kompilacji; 0,1 s, sinus 5 V, 50 Hz; „sam” — krok
+dobrany przez błąd, bez `dt`):
 
 | obwód | dokładność | my | ngspice |
 |---|---|---|---|
-| drabinka RC × 10 | 2,5·10⁻⁶ | 1,4 ms | 4,4 ms |
-| drabinka RC × 10 | 4,5·10⁻⁷ | 2,7 ms | 10,9 ms |
-| drabinka RC × 40 | 2,5·10⁻⁸ | 4,3 ms | 10,8 ms |
-| drabinka RC × 40 | 1·10⁻⁹ | 21,9 ms | 53,6 ms |
-| dioda + RC | 2·10⁻⁴ | 0,6 ms | 0,9 ms |
+| drabinka RC × 10 | 1,4·10⁻⁴ (sam) | 0,37 ms | — |
+| drabinka RC × 10 | 2,8·10⁻⁶ | 1,1 ms | 4,4 ms (2,5·10⁻⁶) |
+| drabinka RC × 40 | 5,7·10⁻⁷ (sam) | 1,2 ms | — |
+| drabinka RC × 40 | 2,5·10⁻⁸ | 3,6 ms | 10,8 ms |
+| dioda + RC | 8·10⁻⁴ (sam) | 0,28 ms | — |
+| dioda + RC | 8·10⁻⁵ | 0,9 ms | 0,9 ms (2·10⁻⁴) |
 
 Dioda niżej niż ~7·10⁻⁵ nie schodzi: to nie krok, a model (ngspice liczy V_T w 300,15 K, my w 300 K).
-ngspice sam dobiera krok z oszacowania błędu; u nas krok ogranicza to, jak szybko zmienia się pamięć,
-i `dt` — kontroli błędu jeszcze nie ma.
 
 Klatek na sekundę (przed trapezami; Node, ten sam wynik w każdym):
 
@@ -140,8 +171,12 @@ Klatek na sekundę (przed trapezami; Node, ten sam wynik w każdym):
 ## 6. Odrzucone
 
 - **Zadanie (`Problem`) jako osobny byt** — obwód z wartościami to `circuit.final(values)`.
-- **Netlista jako postać obwodu** — obwód to relacja; to, które końce sklejono (`Relation.glued`),
+- **Netlista jako postać obwodu** — obwód to relacja; to, które zmienne sklejono (`Rel.wires`, z logu),
   wystarcza do narysowania go.
+- **Ręczne limity kroku** (ile wolt na krok, ile kroków na okres, osobno dla prądów) — zastąpione jedną
+  regułą błędu.
+- **Kroki odtwarzane po rozwiązaniu, osobny solver „na kartce”** — kroki to log tej samej eliminacji.
+- **Widmo (FFT) w Pythonie** — liczy je strona (`spectrum.ts`).
 - **Osobny silnik JS pisany ręcznie** — dwa źródła prawdy rozjeżdżały się.
 - **Liczenie kartki przez symulację do końca** — tracimy zadania odwrotne, litery i dokładność.
 - **Węzły nazywane napisem** — przypadkowe sklejenia; punkt to obiekt.
