@@ -8,7 +8,6 @@ from __future__ import annotations
 
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, field
-from typing import TypeVar
 
 import sympy as sp
 
@@ -54,9 +53,6 @@ class Cases:
 Laws = Callable[[Terminals, Params], Sequence[sp.Expr] | Cases]
 
 
-T = TypeVar("T")
-
-
 @dataclass(frozen=True)
 class Kind:
     """A kind of element. The currents into an element always add up to zero (charge is kept): the
@@ -68,7 +64,8 @@ class Kind:
     microcontroller on its pin): on paper each is a datum like any other. ``shows``: what a page reads of it
     besides its currents and inner quantities — a voltage between two of its terminals, or the current into
     one, by name. ``modes``: a board's pin's ways (``"high"``, ``"pullup"``), each its conductance to the pin's
-    source and that source's voltage, set as the pin's ``_G`` and ``_E``."""
+    source and that source's voltage, set as the pin's ``_G`` and ``_E``. ``ground``: its last terminal, not
+    drawn, is on ground (an op-amp's supply return): it has one end fewer."""
 
     name: str
     prefix: str
@@ -80,18 +77,13 @@ class Kind:
     inputs: tuple[str, ...] = ()
     shows: tuple[tuple[str, tuple[str, str] | str], ...] = ()
     modes: tuple[tuple[str, tuple[float, float]], ...] = ()
+    ground: bool = False
 
     def __call__(self, name: str | None = None) -> Element:
         return Element(self, name)
 
     def __repr__(self) -> str:
         return self.name
-
-    def grounded(self, points: tuple[T, ...], ground: T) -> tuple[T, ...]:
-        """``points`` for each terminal, a ``gnd`` its kind does not draw on ``ground`` when left out."""
-        if len(points) == len(self.terminals) - 1 and self.terminals[-1] == "gnd":
-            return (*points, ground)
-        return points
 
 
 def two_terminal(

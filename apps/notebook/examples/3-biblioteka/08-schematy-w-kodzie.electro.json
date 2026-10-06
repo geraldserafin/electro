@@ -17,7 +17,7 @@
     {
       "id": "b1229d50",
       "type": "code",
-      "source": "E, R_1, R_2, R_3 = VoltageSource(\"E\"), Resistor(\"R_1\"), Resistor(\"R_2\"), Resistor(\"R_3\")\nzadanie = Problem(loop(E, R_1, R_2 | R_3), {E: 12, R_1: 4, R_2: 2, R_3: 3})\nschematic(zadanie, solve(zadanie))",
+      "source": "E, R_1, R_2, R_3 = VoltageSource(\"E\"), Resistor(\"R_1\"), Resistor(\"R_2\"), Resistor(\"R_3\")\nzadanie = Problem(~(E >> R_1 >> (R_2 | R_3)), {E: 12, R_1: 4, R_2: 2, R_3: 3})\nschematic(zadanie, solve(zadanie))",
       "outputs": [
         {
           "type": "svg",

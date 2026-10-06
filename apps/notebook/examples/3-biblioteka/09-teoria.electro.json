@@ -12,12 +12,12 @@
     {
       "id": "be4b687c",
       "type": "markdown",
-      "source": "# Co jest pod spodem\n\nTa lekcja jest dla ciekawych — nie trzeba jej znać, żeby korzystać z biblioteki. `electro` traktuje obwody\njako **morfizmy kategorii hipergrafowej**. Brzmi groźnie, ale znaczy coś prostego: obwód to „pudełko\nz końcami po lewej i prawej”, a jedyne, co z pudełkami robimy, to składanie.\n\n- **Obiekty** to liczby naturalne — ile końców. **Morfizmy** to obwody: $m \\to n$. Opornik to $1 \\to 1$.\n- `f >> g` to **złożenie** (szeregowo): prawe końce `f` sklejone z lewymi `g`.\n- `f @ g` to **iloczyn monoidalny**: obok siebie, bez połączenia.\n- **Punkt** to *pająk* algebry Frobeniusa: `wire` ($1 \\to 1$), `cap` ($0 \\to 2$), `cup` ($2 \\to 0$)\n  i każdy inny z dowolną liczbą końców. Że pająki się sklejają, to fizycznie I prawo Kirchhoffa (prądy się\n  sumują) i jeden potencjał w punkcie.\n- **Pętla** nie jest osobnym działaniem: `loop(a, b)` to `cap >> ((a >> b) @ wire) >> cup`, a `flip(f)`\n  to `f` zgięty przez `cap` i `cup` — transpozycja."
+      "source": "# Co jest pod spodem\n\nTa lekcja jest dla ciekawych — nie trzeba jej znać, żeby korzystać z biblioteki. `electro` traktuje obwody\njako **morfizmy kategorii hipergrafowej**. Brzmi groźnie, ale znaczy coś prostego: obwód to „pudełko\nz końcami po lewej i prawej”, a jedyne, co z pudełkami robimy, to składanie.\n\n- **Obiekty** to liczby naturalne — ile końców. **Morfizmy** to obwody: $m \\to n$. Opornik to $1 \\to 1$.\n- `f >> g` to **złożenie** (szeregowo): prawe końce `f` sklejone z lewymi `g`.\n- `f @ g` to **iloczyn monoidalny**: obok siebie, bez połączenia.\n- **Punkt** to *pająk* algebry Frobeniusa: `wire` ($1 \\to 1$), `cap` ($0 \\to 2$), `cup` ($2 \\to 0$)\n  i każdy inny z dowolną liczbą końców. Że pająki się sklejają, to fizycznie I prawo Kirchhoffa (prądy się\n  sumują) i jeden potencjał w punkcie.\n- **Pętla** nie jest osobnym klockiem: `~(a >> b)` to `cap >> ((a >> b) @ wire) >> cup`, a `-f`\n  to `f` zgięty przez `cap` i `cup` — transpozycja."
     },
     {
       "id": "5a968c07",
       "type": "code",
-      "source": "R_1, R_2 = Resistor(\"R_1\"), Resistor(\"R_2\")\npetla = cap >> ((R_1 >> R_2) @ wire) >> cup\nprint(netlist(petla).parts)\nprint(netlist(loop(R_1, R_2)).parts)",
+      "source": "R_1, R_2 = Resistor(\"R_1\"), Resistor(\"R_2\")\npetla = cap >> ((R_1 >> R_2) @ wire) >> cup\nprint(netlist(petla).parts)\nprint(netlist(~(R_1 >> R_2)).parts)",
       "outputs": [
         {
           "type": "stream",

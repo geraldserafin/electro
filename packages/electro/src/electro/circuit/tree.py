@@ -1,7 +1,8 @@
 """A circuit as an immutable tree of a few primitives (DESIGN.md §9), and its netlist.
 
 ``a >> b`` puts ``b`` after ``a`` (``a``'s right ends onto ``b``'s left ends), ``a @ b`` side by side,
-``a | b`` both between the same two points.
+``a | b`` both between the same two points, ``~a`` a 1 → 1 piece closed on itself (its two ends joined),
+``-a`` a 1 → 1 piece the other way round. Nothing else builds a circuit.
 """
 
 from __future__ import annotations
@@ -39,6 +40,16 @@ class Circuit:
 
     def __or__(self, other: Circuit) -> Circuit:
         return Spider(1, 2) >> (self @ other) >> Spider(2, 1)
+
+    def __invert__(self) -> Circuit:
+        """Its two ends joined: a cap, the piece beside a wire, a cup."""
+        return Spider(0, 2) >> (self @ Spider(1, 1)) >> Spider(2, 0)
+
+    def __neg__(self) -> Circuit:
+        """The other way round, its left end on the right: bent back through a cap and a cup, as any
+        transpose is in a hypergraph category."""
+        wire = Spider(1, 1)
+        return (wire @ Spider(0, 2)) >> (wire @ self @ wire) >> (Spider(2, 0) @ wire)
 
 
 @dataclass(frozen=True, eq=False)
@@ -116,7 +127,7 @@ GND = Net("GND")
 def netlist(c: Circuit) -> Netlist:
     match c:
         case Element(kind):
-            return lone_element(c, len(kind.terminals))
+            return lone_element(c, len(kind.terminals), GND if kind.ground else None)
         case Spider(dom, cod):
             return lone_point(dom, cod)
         case Node() | Net():

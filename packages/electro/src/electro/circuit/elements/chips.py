@@ -70,5 +70,6 @@ OpAmpModel = Kind(
     _op_amp_model,
     parameters=("A", "GBW", "SR", "LOW", "HIGH"),
     defaults=tuple(OPAMP_PARTS["LM358"].items()),
+    ground=True,
 )
 """A real op-amp (``OPAMP_PARTS``; an LM358 unless given)."""

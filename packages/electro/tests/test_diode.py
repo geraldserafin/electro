@@ -15,7 +15,6 @@ from electro import (
     U,
     V,
     VoltageSource,
-    at,
     simulate,
     solve,
 )
@@ -41,7 +40,7 @@ def test_a_diode_forward_its_drop_as_shockley_and_ohm_have_it():
 def test_a_diode_backwards_lets_through_only_its_saturation_current():
     e, r, d = VoltageSource("E"), Resistor("R"), Diode("D")
     b = Node()
-    s = solve(Problem((GND >> e >> r >> b) @ at(d, GND, b), {e: 5, r: 1000}))
+    s = solve(Problem((GND >> e >> r >> b) @ (GND >> d >> b), {e: 5, r: 1000}))
     assert float(s(I(d))) == pytest.approx(-1e-14, rel=1e-6)
 
 
@@ -67,7 +66,13 @@ def test_diodes_in_a_bridge_and_one_beyond_reason_newton_gets_there_without_a_tr
     d1, d2, d3, d4 = (Diode(f"D{k}") for k in range(1, 5))
     p, n, a, b = Node("P"), Node("N"), Node("A"), Node("B")
     bridge = (
-        (n >> e >> p) @ at(d1, p, a) @ at(d2, n, a) @ at(d3, b, p) @ at(d4, b, n) @ (a >> r >> b) @ (n >> rg >> GND)
+        (n >> e >> p)
+        @ (p >> d1 >> a)
+        @ (n >> d2 >> a)
+        @ (b >> d3 >> p)
+        @ (b >> d4 >> n)
+        @ (a >> r >> b)
+        @ (n >> rg >> GND)
     )
     s = solve(Problem(bridge, {e: 10, r: 1000, rg: 10**6}))
     assert float(s(I(r))) == pytest.approx(8.579e-3, rel=1e-3)

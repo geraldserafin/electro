@@ -12,7 +12,6 @@ from electro import (
     Resistor,
     U,
     VoltageSource,
-    at,
     solve,
 )
 
@@ -28,7 +27,7 @@ def test_the_textbook_diode_assumed_on_checked_and_its_steps_say_so():
 def test_the_textbook_diode_backwards_on_rejected_then_off():
     e, r, d = VoltageSource("E"), Resistor("R"), DiodeDrop("D")
     b = Node()
-    s = solve(Problem((GND >> e >> r >> b) @ at(d, GND, b), {e: 5, r: 1000}))
+    s = solve(Problem((GND >> e >> r >> b) @ (GND >> d >> b), {e: 5, r: 1000}))
     assert s(I(d)) == 0 and s(U(d)) == -5
     tries = [(step.how, step.because[0].case) for step in s.steps if step.how in ("assumed", "rejected", "checked")]
     assert tries == [("assumed", "on"), ("rejected", "on"), ("assumed", "off"), ("checked", "off")]
@@ -44,6 +43,12 @@ def test_textbook_and_shockley_differ_by_little_and_four_textbook_diodes_make_a_
     d1, d2, d3, d4 = (DiodeDrop(f"D{k}") for k in range(1, 5))
     p, n, a, b = Node("P"), Node("N"), Node("A"), Node("B")
     bridge = (
-        (n >> e >> p) @ at(d1, p, a) @ at(d2, n, a) @ at(d3, b, p) @ at(d4, b, n) @ (a >> r >> b) @ (n >> rg >> GND)
+        (n >> e >> p)
+        @ (p >> d1 >> a)
+        @ (n >> d2 >> a)
+        @ (b >> d3 >> p)
+        @ (b >> d4 >> n)
+        @ (a >> r >> b)
+        @ (n >> rg >> GND)
     )
     assert solve(Problem(bridge, {e: 10, r: 1000, rg: 10**6}))(I(r)) == sp.Rational(86, 10000)

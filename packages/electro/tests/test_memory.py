@@ -13,7 +13,6 @@ from electro import (
     Undetermined,
     V,
     VoltageSource,
-    at,
     simulate,
     solve,
     square,
@@ -24,7 +23,15 @@ from electro import (
 def _clocked():
     clk_src, ff, load = VoltageSource("E_clk"), DFlipFlop(), Resistor("R")
     clk, d, q = Node("CLK"), Node("D"), Node("Q")
-    return clk_src, ff, load, clk, d, q, (GND >> clk_src >> clk) @ at(ff, d, clk, q, Node(), GND) @ (q >> load >> GND)
+    return (
+        clk_src,
+        ff,
+        load,
+        clk,
+        d,
+        q,
+        (GND >> clk_src >> clk) @ (ff >> (d @ clk @ q @ Node())) @ (q >> load >> GND),
+    )
 
 
 def test_a_flip_flop_takes_d_only_on_the_clocks_edge_and_holds_it_between():
@@ -41,7 +48,7 @@ def test_a_flip_flop_takes_d_only_on_the_clocks_edge_and_holds_it_between():
 
 def test_a_flip_flop_and_a_not_gate_in_a_loop_halve_the_clock():
     clk_src, _, load, _, d, q, circuit = _clocked()
-    p = Problem(circuit @ at(NOT(), q, d, GND), {clk_src: square(5, sp.Rational(1, 1000)), load: 1000})
+    p = Problem(circuit @ (NOT() >> (q @ d)), {clk_src: square(5, sp.Rational(1, 1000)), load: 1000})
     trace = simulate(p, until=0.005, dt=1e-5)
     q_at = lambda t: trace.at(V(q), t)
     assert [round(q_at(t)) for t in (0.0003, 0.0008, 0.0018, 0.0028, 0.0038, 0.0048)] == [0, 5, 0, 5, 0, 5]

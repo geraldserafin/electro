@@ -13,7 +13,7 @@ const check = (name, ok, got) => {
 };
 
 let out = run(`E, R_1, R_2 = VoltageSource("E"), Resistor("R_1"), Resistor("R_2")
-c = Problem(loop(E, R_1, R_2), {E: 12, R_1: 10, I(R_1): 0.5}, [Parameter(R_2)])
+c = Problem(~(E >> R_1 >> R_2), {E: 12, R_1: 10, I(R_1): 0.5}, [Parameter(R_2)])
 sol = solve(c)
 sol(Parameter(R_2))`);
 check("solver", out[0]?.data === "$\\displaystyle 14$", out);

@@ -17,7 +17,7 @@
     {
       "id": "e9577b83",
       "type": "code",
-      "source": "E, R_1, R_2 = VoltageSource(\"E\"), Resistor(\"R_1\"), Resistor(\"R_2\")\ndzielnik = Problem(loop(E, R_1, R_2), {E: 12, R_1: 100, U(R_2): 4}, [Parameter(R_2)])\nsteps(solve(dzielnik))",
+      "source": "E, R_1, R_2 = VoltageSource(\"E\"), Resistor(\"R_1\"), Resistor(\"R_2\")\ndzielnik = Problem(~(E >> R_1 >> R_2), {E: 12, R_1: 100, U(R_2): 4}, [Parameter(R_2)])\nsteps(solve(dzielnik))",
       "outputs": [
         {
           "type": "solution",
@@ -87,7 +87,7 @@
     {
       "id": "9ca034ff",
       "type": "code",
-      "source": "E_1, R, E_2 = VoltageSource(\"E_1\"), Resistor(\"R\"), VoltageSource(\"E_2\")\nsolve(Problem(loop(E_1, R, E_2), {E_1: 12, R: 4, I(R): 2}))(Parameter(E_2))",
+      "source": "E_1, R, E_2 = VoltageSource(\"E_1\"), Resistor(\"R\"), VoltageSource(\"E_2\")\nsolve(Problem(~(E_1 >> R >> E_2), {E_1: 12, R: 4, I(R): 2}))(Parameter(E_2))",
       "outputs": [
         {
           "type": "markdown",
@@ -103,7 +103,7 @@
     {
       "id": "3f76ee23",
       "type": "code",
-      "source": "E, R_1, R_2 = VoltageSource(\"E\"), Resistor(\"R_1\"), Resistor(\"R_2\")\ntry:\n    solve(Problem(loop(E, R_1, R_2), {E: 12, R_1: 100}, [Parameter(R_2)])).answers\nexcept MissingData as e:\n    display(e)",
+      "source": "E, R_1, R_2 = VoltageSource(\"E\"), Resistor(\"R_1\"), Resistor(\"R_2\")\ntry:\n    solve(Problem(~(E >> R_1 >> R_2), {E: 12, R_1: 100}, [Parameter(R_2)])).answers\nexcept MissingData as e:\n    display(e)",
       "outputs": [
         {
           "type": "issue",
@@ -147,7 +147,7 @@
     {
       "id": "452a8b9d",
       "type": "code",
-      "source": "try:\n    solve(Problem(loop(E, R_1, R_2), {E: 12, R_1: 10, R_2: 20, I(R_1): 1}))\nexcept Contradiction as e:\n    display(e)",
+      "source": "try:\n    solve(Problem(~(E >> R_1 >> R_2), {E: 12, R_1: 10, R_2: 20, I(R_1): 1}))\nexcept Contradiction as e:\n    display(e)",
       "outputs": [
         {
           "type": "issue",
@@ -174,7 +174,7 @@
     {
       "id": "498a9ede",
       "type": "code",
-      "source": "try:\n    solve(Problem(loop(E, R_1, R_2), {E: 12, R_2: 4, P(R_1): 8}, [Parameter(R_1)])).answers\nexcept Ambiguous as e:\n    display(e)",
+      "source": "try:\n    solve(Problem(~(E >> R_1 >> R_2), {E: 12, R_2: 4, P(R_1): 8}, [Parameter(R_1)])).answers\nexcept Ambiguous as e:\n    display(e)",
       "outputs": [
         {
           "type": "issue",
@@ -442,7 +442,7 @@
     {
       "id": "355e3af7",
       "type": "code",
-      "source": "E, R, X = VoltageSource(\"E\"), Resistor(\"R\"), Hole(\"X\")\nf = fill(Problem(loop(E, R, X), {E: 12, R: 2, I(R): -1}), X)\nprint(f.by.kind.name, f.solution(Parameter(f.by)))",
+      "source": "E, R, X = VoltageSource(\"E\"), Resistor(\"R\"), Hole(\"X\")\nf = fill(Problem(~(E >> R >> X), {E: 12, R: 2, I(R): -1}), X)\nprint(f.by.kind.name, f.solution(Parameter(f.by)))",
       "outputs": [
         {
           "type": "stream",

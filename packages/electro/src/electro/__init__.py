@@ -10,7 +10,7 @@ from .circuit.kind import Case, Cases, Kind, Terminals, two_terminal
 from .circuit.netlist import ElementTwice, JoinsNodes, Netlist
 from .circuit.time import TIME, D, Pre, rising, square, when
 from .circuit.tree import GND, BadName, Circuit, Element, Net, Node, free, is_closed, netlist
-from .circuit.wiring import at, beside, cap, close, cup, flip, loop, parallel, rebuild, series, wire
+from .circuit.wiring import cap, cup, wire
 from .methods.ac import AC, settled, solve
 from .methods.fill import Filled, fill
 from .methods.response import Response, respond, responses
@@ -103,15 +103,11 @@ __all__ = [
     "V",
     "ValueNeeded",
     "Voltage",
-    "at",
-    "beside",
     "between",
     "blackbox",
     "cap",
-    "close",
     "cup",
     "fill",
-    "flip",
     "free",
     "from_netlist",
     "hide",
@@ -119,19 +115,15 @@ __all__ = [
     "is_linear",
     "is_source",
     "join",
-    "loop",
     "matches",
     "netlist",
-    "parallel",
     "part",
     "reading",
-    "rebuild",
     "relation",
     "resistance",
     "respond",
     "responses",
     "rising",
-    "series",
     "simplify",
     "simulate",
     "settled",

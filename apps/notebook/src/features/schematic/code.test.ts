@@ -15,7 +15,7 @@ it("writes a loop", () => {
   expect(codeOf({ elements, given: [] }, "petla").split("\n")).toEqual([
     'E_1 = VoltageSource("E_1")',
     'R_1 = Resistor("R_1")',
-    "petla = Problem(loop(E_1, R_1), {E_1: 12, R_1: 4})",
+    "petla = Problem(~(E_1 >> R_1), {E_1: 12, R_1: 4})",
   ]);
   expect(codeOf({ elements, given: [] }, "Układ 1")).toContain("\nukład1 = ");
 });
@@ -29,7 +29,7 @@ it("writes parallel, named points, parameters, parts, readings and marks", () =>
   ];
   const code = codeOf({ elements, given: [[["I", "R"], "2m"]] }, "uklad");
   expect(code).toContain('node_A = Node("A")\nnode_B = Node("B")');
-  expect(code).toContain("loop(E, node_A, R, node_B, (D | V))");
+  expect(code).toContain("~(E >> node_A >> R >> node_B >> (D | V))");
   expect(code).toContain('{E: {"": 5, "f": "1k", "phase": 0}, R: "1k", D: part("1N4148"), U(V): 0.7, I(R): "2m"}');
 });
 
@@ -43,7 +43,7 @@ it("writes a bridge element by element", () => {
     { id: "R5", kind: "resistor", nodes: ["C", "GND"], value: "1" },
   ];
   expect(codeOf({ elements, given: [] }, "m")).toContain(
-    "beside(\n    at(E, GND, node_A),\n    at(R1, node_A, node_B),",
+    "(\n    (GND >> E >> node_A)\n    @ (node_A >> R1 >> node_B)\n",
   );
 });
 

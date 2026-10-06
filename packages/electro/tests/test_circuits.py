@@ -23,11 +23,9 @@ from electro import (
     V,
     Voltage,
     VoltageSource,
-    close,
     free,
     from_netlist,
     is_closed,
-    loop,
     simulate,
     solve,
     to_netlist,
@@ -52,7 +50,7 @@ def test_closing_by_a_node_by_ground_and_by_cup_and_cap_is_the_same():
     a = Node()
     assert current(lambda e, r: a >> e >> r >> a) == 2
     assert current(lambda e, r: GND >> e >> r >> GND) == 2
-    assert current(lambda e, r: close(e >> r)) == 2
+    assert current(lambda e, r: ~(e >> r)) == 2
 
 
 def test_parallel_by_shared_nodes_or_by_the_bar_is_the_same():
@@ -62,7 +60,7 @@ def test_parallel_by_shared_nodes_or_by_the_bar_is_the_same():
 
     a, b = Node(), Node()
     assert total(lambda e, r1, r2: (a >> e >> b) @ (b >> r1 >> a) @ (b >> r2 >> a)) == 2
-    assert total(lambda e, r1, r2: close(e >> (r1 | r2))) == 2
+    assert total(lambda e, r1, r2: ~(e >> (r1 | r2))) == 2
 
 
 def test_only_a_closed_circuit_is_a_problem_and_a_piece_says_how_many_ends_it_has_free():
@@ -134,7 +132,7 @@ def test_written_down_and_read_back_it_solves_the_same():
 
 def test_a_meters_reading_is_written_down_as_its_value():
     e, r, a = VoltageSource("E"), Resistor("R"), Ammeter("A_1")
-    data = to_netlist(Problem(loop(e, r, a), {r: 3, I(a): 2}))
+    data = to_netlist(Problem(~(e >> r >> a), {r: 3, I(a): 2}))
     assert [x.get("value") for x in data["elements"]] == [None, "3", "2"] and data["given"] == []
     again = from_netlist(data)
     assert solve(again.problem)(Voltage(again.elements["R"])) == 6

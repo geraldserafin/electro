@@ -3,7 +3,7 @@ from notes other people send (a link, a course), so nothing in them may reach ev
 
 import pytest
 import sympy as sp
-from electro import GND, BadName, I, Node, Problem, Resistor, VoltageSource, from_netlist, from_spice, loop, solve
+from electro import GND, BadName, I, Node, Problem, Resistor, VoltageSource, from_netlist, from_spice, solve
 from electro.values import BadExpression, expression
 
 RUN = "__import__('os').system('echo pwned')"
@@ -46,7 +46,7 @@ def test_an_expression_is_read_not_run(text):
 
 def test_queries_as_people_write_them_still_work():
     e, r = VoltageSource("E"), Resistor("R_1")
-    s = solve(Problem(loop(e, r), {e: 12, r: 10}))
+    s = solve(Problem(~(e >> r), {e: 12, r: 10}))
     assert s("U_R_1 / I_R_1") == 10 and s("sqrt(P_R_1 * R_1)") == 12
     with pytest.raises(BadExpression):
         s(RUN)

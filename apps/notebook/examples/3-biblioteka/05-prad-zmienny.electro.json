@@ -49,7 +49,7 @@
     {
       "id": "2930458c",
       "type": "code",
-      "source": "E, R, L_, C_ = VoltageSource(\"E\"), Resistor(\"R\"), Inductor(\"L\"), Capacitor(\"C\")\nrlc = Problem(loop(E, R, L_, C_), {E: 1, R: 10, L_: 0.01, C_: 1e-6})\nf0 = 1 / (2 * math.pi * math.sqrt(0.01 * 1e-6))\nprint(f\"f0 = {f0:.0f} Hz\")\nfor f in [0.5 * f0, 0.9 * f0, f0, 1.1 * f0, 2 * f0]:\n    i = abs(complex(solve(rlc, AC(2 * math.pi * f))(I(R))))\n    print(f\"{f:7.0f} Hz: I = {i * 1000:6.2f} mA\")",
+      "source": "E, R, L_, C_ = VoltageSource(\"E\"), Resistor(\"R\"), Inductor(\"L\"), Capacitor(\"C\")\nrlc = Problem(~(E >> R >> L_ >> C_), {E: 1, R: 10, L_: 0.01, C_: 1e-6})\nf0 = 1 / (2 * math.pi * math.sqrt(0.01 * 1e-6))\nprint(f\"f0 = {f0:.0f} Hz\")\nfor f in [0.5 * f0, 0.9 * f0, f0, 1.1 * f0, 2 * f0]:\n    i = abs(complex(solve(rlc, AC(2 * math.pi * f))(I(R))))\n    print(f\"{f:7.0f} Hz: I = {i * 1000:6.2f} mA\")",
       "outputs": [
         {
           "type": "stream",

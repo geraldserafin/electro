@@ -1,7 +1,7 @@
 // A circuit as electro code, written by the page: the series and parallel it is made of (found by the
 // classic reduction — two elements between the same two points are one in parallel, a point where exactly
-// two meet and nothing is named joins them in series), written with `>>` and `|`; a circuit that is not
-// made of them (a bridge, an op-amp) each element at its points. The shape also lays a circuit out
+// two meet and nothing is named joins them in series), written with `>>`, `|` and `~` (a loop closed); a
+// circuit that is not made of them (a bridge, an op-amp) each element on its points, side by side (`@`). The shape also lays a circuit out
 // (`layout.ts`). Python only runs code; it never writes it.
 
 import type { SchematicData, SymbolLibrary } from "@/shared/model/types";
@@ -190,7 +190,7 @@ function quantity(q: Quantity, of: (id: string) => string): string {
 }
 
 function tree(t: ShapePart, of: (id: string) => string, top = false): string {
-  if ("element" in t) return t.flip ? `flip(${of(t.element)})` : of(t.element);
+  if ("element" in t) return t.flip ? `-${of(t.element)}` : of(t.element);
   if ("node" in t) return point(t.node);
   if ("series" in t) {
     const text = t.series.map((p) => tree(p, of)).join(" >> ");
@@ -209,6 +209,10 @@ function pointsIn(s: Shape): Set<string> {
   ("loop" in s ? s.loop : [s.between]).forEach(visit);
   return used;
 }
+
+/** An element with each end on its point: `(a >> R >> b)`, or `(T >> (b @ c @ e))`. */
+const placed = (name: string, points: string[]) =>
+  points.length === 2 ? `(${points[0]} >> ${name} >> ${points[1]})` : `(${name} >> (${points.join(" @ ")}))`;
 
 /** What is given of an element, as code: its value (a meter's its reading), its other parameters, its part. */
 function givenOf(e: NetlistElement, name: string): string[] {
@@ -240,9 +244,9 @@ export function codeOf(problem: { elements: NetlistElement[]; given: [Quantity, 
   const points = [...all].filter((n) => n !== GROUND).sort();
   lines.push(...points.map((n) => `${point(n)} = Node(${JSON.stringify(n)})`));
   const circuit = !shape
-    ? `beside(\n${elements.map((e) => `    at(${[of(e.id), ...e.nodes.map(point)].join(", ")}),\n`).join("")})`
+    ? `(\n    ${elements.map((e) => placed(of(e.id), e.nodes.map(point))).join("\n    @ ")}\n)`
     : "loop" in shape
-      ? `loop(${shape.loop.map((p) => tree(p, of, true)).join(", ")})`
+      ? `~(${shape.loop.map((p) => tree(p, of, true)).join(" >> ")})`
       : `${point(shape.a)} >> ${tree(shape.between, of)} >> ${point(shape.b)}`;
   const data = [
     ...elements.flatMap((e) => givenOf(e, of(e.id))),

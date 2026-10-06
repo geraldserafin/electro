@@ -93,7 +93,7 @@ def _counter(t: Terminals, _: Params) -> list[sp.Expr]:
 
 
 def _gate_kind(name: str, inputs: tuple[str, ...], logic: Callable[..., sp.Expr]) -> Kind:
-    return Kind(name, "U", (*inputs, "y", "gnd"), _gate(inputs, logic), parameters=())
+    return Kind(name, "U", (*inputs, "y", "gnd"), _gate(inputs, logic), parameters=(), ground=True)
 
 
 NOT = _gate_kind("not_gate", ("a",), lambda a: 1 - a)
@@ -103,7 +103,9 @@ OR = _gate_kind("or_gate", ("a", "b"), lambda a, b: 1 - (1 - a) * (1 - b))
 NOR = _gate_kind("nor_gate", ("a", "b"), lambda a, b: (1 - a) * (1 - b))
 XOR = _gate_kind("xor_gate", ("a", "b"), lambda a, b: a + b - 2 * a * b)
 
-DFlipFlop = Kind("dff", "U", ("d", "clk", "q", "nq", "gnd"), _flip_flop(("d",), lambda q, d: d), parameters=())
+DFlipFlop = Kind(
+    "dff", "U", ("d", "clk", "q", "nq", "gnd"), _flip_flop(("d",), lambda q, d: d), parameters=(), ground=True
+)
 """On a rising edge q takes d (a half of a 74HC74)."""
 
 JKFlipFlop = Kind(
@@ -112,8 +114,9 @@ JKFlipFlop = Kind(
     ("j", "clk", "k", "q", "nq", "gnd"),
     _flip_flop(("j", "k"), lambda q, j, k: j * (1 - q) + (1 - k) * q),
     parameters=(),
+    ground=True,
 )
 """On a rising edge j sets, k resets, both toggle, neither holds."""
 
-Counter = Kind("counter", "U", ("clk", "reset", "q0", "q1", "q2", "q3", "gnd"), _counter, parameters=())
+Counter = Kind("counter", "U", ("clk", "reset", "q0", "q1", "q2", "q3", "gnd"), _counter, parameters=(), ground=True)
 """A 4-bit synchronous binary counter (a 74HC161 without its load and enable)."""

@@ -12,12 +12,12 @@
     {
       "id": "b31dd769",
       "type": "markdown",
-      "source": "# Węzły\n\nNie każdy obwód jest szeregowo-równoległy — mostek Wheatstone'a albo trójkąt oporników nie są ani jednym,\nani drugim. Wtedy łączysz przez **nazwane punkty**: ten sam `Node` w kilku miejscach to jeden punkt.\n`at(element, a, b)` stawia element między punktami, a `beside(...)` zbiera kawałki — tak jak netlista\nw SPICE."
+      "source": "# Węzły\n\nNie każdy obwód jest szeregowo-równoległy — mostek Wheatstone'a albo trójkąt oporników nie są ani jednym,\nani drugim. Wtedy łączysz przez **nazwane punkty**: ten sam `Node` w kilku miejscach to jeden punkt.\n`a >> element >> b` stawia element między punktami, a `@` zbiera kawałki obok siebie — tak jak netlista\nw SPICE."
     },
     {
       "id": "03a5328f",
       "type": "code",
-      "source": "A, B, C = Node(\"A\"), Node(\"B\"), Node(\"C\")\nE, R = VoltageSource(\"E\"), [Resistor(f\"R_{k}\") for k in range(1, 6)]\nmostek = Problem(\n    beside(at(E, GND, A), at(R[0], A, B), at(R[1], B, GND), at(R[2], A, C), at(R[3], C, GND), at(R[4], B, C)),\n    {E: 10, R[0]: 100, R[1]: 200, R[2]: 150, R[3]: 150, R[4]: 50},\n)\nsol = solve(mostek)\nprint(\"U_BC =\", sol(U(B, C)), \"V,  prąd przez mostek:\", sol(I(R[4])), \"A\")",
+      "source": "A, B, C = Node(\"A\"), Node(\"B\"), Node(\"C\")\nE, R = VoltageSource(\"E\"), [Resistor(f\"R_{k}\") for k in range(1, 6)]\nmostek = Problem(\n    ((GND >> E >> A) @ (A >> R[0] >> B) @ (B >> R[1] >> GND) @ (A >> R[2] >> C) @ (C >> R[3] >> GND) @ (B >> R[4] >> C)),\n    {E: 10, R[0]: 100, R[1]: 200, R[2]: 150, R[3]: 150, R[4]: 50},\n)\nsol = solve(mostek)\nprint(\"U_BC =\", sol(U(B, C)), \"V,  prąd przez mostek:\", sol(I(R[4])), \"A\")",
       "outputs": [
         {
           "type": "stream",
@@ -28,12 +28,12 @@
     {
       "id": "2ae3a16c",
       "type": "markdown",
-      "source": "Elementy o więcej niż dwóch zaciskach podaje się tak samo — punkt na każdy zacisk. Idealny wzmacniacz\noperacyjny `OpAmp` ma wejście nieodwracające, odwracające i wyjście. Tu wzmacniacz odwracający\no wzmocnieniu $-\\frac{R_2}{R_1} = -10$:"
+      "source": "Element o więcej niż dwóch zaciskach ma wszystkie końce po prawej: `OA >> (plus @ minus @ wy)` — punkt\nna każdy zacisk. Idealny wzmacniacz operacyjny `OpAmp` ma wejście nieodwracające, odwracające i wyjście. Tu wzmacniacz odwracający\no wzmocnieniu $-\\frac{R_2}{R_1} = -10$:"
     },
     {
       "id": "ced523d7",
       "type": "code",
-      "source": "we, minus, wy = Node(\"we\"), Node(\"minus\"), Node(\"wy\")\nE, R_1, R_2, R_L, OA = VoltageSource(\"E\"), Resistor(\"R_1\"), Resistor(\"R_2\"), Resistor(\"R_L\"), OpAmp(\"OA\")\nwzmacniacz = Problem(\n    beside(at(E, GND, we), at(R_1, we, minus), at(R_2, minus, wy), at(OA, GND, minus, wy), at(R_L, wy, GND)),\n    {E: \"0,5\", R_1: 1000, R_2: 10000, R_L: 2000},\n)\nprint(\"U_wy =\", solve(wzmacniacz)(V(wy)), \"V\")",
+      "source": "we, minus, wy = Node(\"we\"), Node(\"minus\"), Node(\"wy\")\nE, R_1, R_2, R_L, OA = VoltageSource(\"E\"), Resistor(\"R_1\"), Resistor(\"R_2\"), Resistor(\"R_L\"), OpAmp(\"OA\")\nwzmacniacz = Problem(\n    ((GND >> E >> we) @ (we >> R_1 >> minus) @ (minus >> R_2 >> wy) @ (OA >> (GND @ minus @ wy)) @ (wy >> R_L >> GND)),\n    {E: \"0,5\", R_1: 1000, R_2: 10000, R_L: 2000},\n)\nprint(\"U_wy =\", solve(wzmacniacz)(V(wy)), \"V\")",
       "outputs": [
         {
           "type": "stream",

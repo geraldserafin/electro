@@ -200,12 +200,12 @@
     {
       "id": "81efaff4",
       "type": "markdown",
-      "source": "## Im większy opór, tym mniejszy prąd\n\nTen sam obwód można zapisać kodem — tu dla kilku różnych oporników naraz. Najpierw elementy: bateria\n`E` i opornik `R`. `loop(E, R)` to pętla z nich, a `Problem(obwód, {dane})` daje im wartości; `solve`\nrozwiązuje, a `I(R)` to prąd opornika:"
+      "source": "## Im większy opór, tym mniejszy prąd\n\nTen sam obwód można zapisać kodem — tu dla kilku różnych oporników naraz. Najpierw elementy: bateria\n`E` i opornik `R`. `~(E >> R)` to pętla z nich, a `Problem(obwód, {dane})` daje im wartości; `solve`\nrozwiązuje, a `I(R)` to prąd opornika:"
     },
     {
       "id": "b571a1f9",
       "type": "code",
-      "source": "E, R = VoltageSource(\"E\"), Resistor(\"R\")\nfor r in [100, 470, 1000, 4700, 10000]:\n    sol = solve(Problem(loop(E, R), {E: 9, R: r}))\n    print(f\"R = {r:>6} Ω   I = {float(sol(I(R))) * 1000:6.2f} mA\")",
+      "source": "E, R = VoltageSource(\"E\"), Resistor(\"R\")\nfor r in [100, 470, 1000, 4700, 10000]:\n    sol = solve(Problem(~(E >> R), {E: 9, R: r}))\n    print(f\"R = {r:>6} Ω   I = {float(sol(I(R))) * 1000:6.2f} mA\")",
       "outputs": [
         {
           "type": "stream",

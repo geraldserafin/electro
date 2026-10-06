@@ -11,7 +11,7 @@ def run(code, **problems):
 UNITS = json.dumps({"resistor": "Ω", "voltage_source": "V"})
 
 LOOP = """E, R_1, R_2 = VoltageSource("E"), Resistor("R_1"), Resistor("R_2")
-c = Problem(loop(E, R_1, R_2), {E: 12, R_1: 10, I(R_1): "0.5"}, [Parameter(R_2)])
+c = Problem(~(E >> R_1 >> R_2), {E: 12, R_1: 10, I(R_1): "0.5"}, [Parameter(R_2)])
 sol = solve(c)"""
 
 
@@ -33,7 +33,7 @@ def test_rich_outputs():
     out = run("print('hej')\ndisplay(c)\nsol")
     assert [o["type"] for o in out] == ["stream", "schematic", "solution"]
     trace = run(
-        'plot(simulate(Problem(loop(E, R_1, C := Capacitor("C")), {E: 5, R_1: 1000, C: 1e-6}), until=0.005), "U_C")'
+        'plot(simulate(Problem(~(E >> R_1 >> (C := Capacitor("C"))), {E: 5, R_1: 1000, C: 1e-6}), until=0.005), "U_C")'
     )
     assert trace[0]["type"] == "plot" and list(trace[0]["trace"]["series"]) == ["U_C"]
     [task] = run('task(c, "I_R_1", "Ile?")')
@@ -42,7 +42,9 @@ def test_rich_outputs():
 
 def test_errors_point_at_the_cell_line():
     kernel.reset()
-    [out] = run("a = 1\nsolve(Problem(loop(E := VoltageSource('E'), R := Resistor('R_1')), {E: 12, R: 10, I(R): 5}))")
+    [out] = run(
+        "a = 1\nsolve(Problem(~((E := VoltageSource('E')) >> (R := Resistor('R_1'))), {E: 12, R: 10, I(R): 5}))"
+    )
     assert out["type"] == "error" and out["line"] == 2 and out["issue"]["type"] == "ConflictingData"
     assert out["issue"]["conditions"] == [r"I_{R_{1}} = 5\,\mathrm{A}"]  # math in LaTeX
     assert run("Resistr")[0]["data"].startswith("NameError")  # Python's own words
@@ -112,11 +114,11 @@ def test_sweep_and_spread_of_a_drawing():
 
 def test_code_view_read_back():
     # as the page writes it (schematic/code.ts), a value edited
-    source = 'E_1 = VoltageSource("E_1")\nR_1 = Resistor("R_1")\nuklad = Problem(loop(E_1, R_1), {E_1: 12, R_1: 6})'
+    source = 'E_1 = VoltageSource("E_1")\nR_1 = Resistor("R_1")\nuklad = Problem(~(E_1 >> R_1), {E_1: 12, R_1: 6})'
     elements = json.loads(kernel.from_code(source, "uklad"))["netlist"]["elements"]
     assert [(e["id"], e["value"]) for e in elements] == [("E_1", "12"), ("R_1", "6")]
     # no variable called like the schematic: the last circuit the code defines
-    assert "netlist" in json.loads(kernel.from_code('a = Resistor("R")\nb = loop(VoltageSource("E"), a)', "x"))
+    assert "netlist" in json.loads(kernel.from_code('a = Resistor("R")\nb = ~(VoltageSource("E") >> a)', "x"))
 
 
 def test_code_view_errors_name_the_line():

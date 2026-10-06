@@ -3,7 +3,7 @@
 ``{"elements": [{"id": "R_1", "kind": "resistor", "nodes": ["n1", "GND"], "value": "4.7k",
 "params": {...}}, ...]}`` — ``id`` is the element's name, ``kind`` its kind's (``elements.BY_NAME``),
 ``nodes`` the points of its terminals in their order (``"GND"`` or ``"0"`` is ground; a terminal its
-kind does not draw, ``gnd``, may be left out: it is ground), ``value`` its main parameter (left out or
+kind does not draw, ``gnd``, may be left out: it is ground — ``Kind.ground``), ``value`` its main parameter (left out or
 ``"?"``: to be found), ``params`` the others by name, ``part`` a real part's name (``elements.parts``) or an
 LED's colour. A meter's value is its reading. ``given``: ``[[quantity, value], ...]``, conditions on
 quantities; ``find``: quantities sought. A quantity is ``["I" | "U" | "P" | "value", element]``,
@@ -14,6 +14,8 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 from dataclasses import dataclass
+from functools import reduce
+from operator import matmul
 
 import sympy as sp
 
@@ -23,7 +25,7 @@ from ..circuit.elements import BY_NAME
 from ..circuit.elements.parts import Part
 from ..circuit.netlist import labels
 from ..circuit.tree import GND, Circuit, Element, Net, Node, netlist
-from ..circuit.wiring import at, beside
+from ..circuit.wiring import placed
 from ..solver.laws import reading
 from .problem import Key, Problem
 from .quantities import Across, Current, Parameter, Potential, Power, Quantity, Scaled, Sum, Voltage
@@ -58,18 +60,18 @@ class Netlist:
 def from_netlist(data: Mapping) -> Netlist:
     points: dict[str, Node | Net] = dict.fromkeys(GROUND_NAMES, GND)
     elements: dict[str, Element] = {}
-    placed: list[Circuit] = []
+    pieces: list[Circuit] = []
     given: dict[Key, object] = {}
     for item in data["elements"]:
         e = _element(item)
         elements[item["id"]] = e
         names = _nodes(item, e)
-        placed.append(at(e, *(points.setdefault(n, Node(n)) for n in names)))
+        pieces.append(placed(e, (points.setdefault(n, Node(n)) for n in names)))
         given |= _given(item, e)
     for q, value in data.get("given") or ():
         given[quantity(q, elements, points)] = value
     find = [quantity(q, elements, points) for q in data.get("find") or ()]
-    return Netlist(Problem(beside(*placed), given, find), elements, points)
+    return Netlist(Problem(reduce(matmul, pieces), given, find), elements, points)
 
 
 def quantity(data: list, elements: Mapping[str, Element], points: Mapping[str, Node | Net]) -> Quantity:
@@ -100,10 +102,14 @@ def _element(item: Mapping) -> Element:
 
 
 def _nodes(item: Mapping, e: Element) -> list[str]:
-    names = list(e.kind.grounded(tuple(str(n) for n in item["nodes"]), "GND"))
-    terminals = e.kind.terminals
-    if len(names) != len(terminals):
-        raise WrongNodeCount(item["id"], len(terminals), names)
+    """Each end's point: of a kind on ground (``Kind.ground``) all but its last terminal's, which may be
+    given (as ground) or left out."""
+    names = [str(n) for n in item["nodes"]]
+    ends = len(e.kind.terminals) - e.kind.ground
+    if e.kind.ground and len(names) == ends + 1 and names[-1] in GROUND_NAMES:
+        names = names[:-1]
+    if len(names) != ends:
+        raise WrongNodeCount(item["id"], ends, names)
     return names
 
 

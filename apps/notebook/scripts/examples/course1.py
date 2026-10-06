@@ -140,13 +140,13 @@ Kliknij ▶ **Oblicz**, żeby zobaczyć, co pokazują.
 ## Im większy opór, tym mniejszy prąd
 
 Ten sam obwód można zapisać kodem — tu dla kilku różnych oporników naraz. Najpierw elementy: bateria
-`E` i opornik `R`. `loop(E, R)` to pętla z nich, a `Problem(obwód, {dane})` daje im wartości; `solve`
+`E` i opornik `R`. `~(E >> R)` to pętla z nich, a `Problem(obwód, {dane})` daje im wartości; `solve`
 rozwiązuje, a `I(R)` to prąd opornika:
 """)
     L.code("""
 E, R = VoltageSource("E"), Resistor("R")
 for r in [100, 470, 1000, 4700, 10000]:
-    sol = solve(Problem(loop(E, R), {E: 9, R: r}))
+    sol = solve(Problem(~(E >> R), {E: 9, R: r}))
     print(f"R = {r:>6} Ω   I = {float(sol(I(R))) * 1000:6.2f} mA")
 """)
     L.md("""
@@ -300,7 +300,7 @@ Każdy opornik ma dopuszczalną moc — zwykłe, małe oporniki tylko **0,25 W**
     L.code("""
 E, R = VoltageSource("E"), Resistor("R")
 for u in [5, 9, 12]:
-    p = solve(Problem(loop(E, R), {E: u, R: 100}))(P(R))
+    p = solve(Problem(~(E >> R), {E: u, R: 100}))(P(R))
     print(f"{u:>2} V na 100 Ω: {float(p):.2f} W", "— za dużo!" if p > 0.25 else "")
 """)
     L.md("""

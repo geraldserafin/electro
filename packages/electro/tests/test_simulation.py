@@ -2,6 +2,8 @@
 
 import json
 import math
+from functools import reduce
+from operator import matmul
 
 import pytest
 import sympy as sp
@@ -58,8 +60,6 @@ from electro import (
     ValueNeeded,
     VoltageSource,
     Zener,
-    at,
-    beside,
     settled,
     simulate,
     solve,
@@ -73,7 +73,12 @@ def net(*items):
     for _, *names in items:
         for n in names:
             points.setdefault(n, Node(n))
-    return beside(*(at(e, *(points[n] for n in names)) for e, *names in items)), points
+
+    def placed(e, *ps):
+        ps = ps[:-1] if e.kind.ground and ps[-1] is GND else ps
+        return ps[0] >> e >> ps[1] if len(ps) == 2 else e >> reduce(matmul, ps)
+
+    return reduce(matmul, (placed(e, *(points[n] for n in names)) for e, *names in items)), points
 
 
 def test_rc_charges_like_the_exponential():
@@ -494,14 +499,14 @@ def test_real_parts():
 
     assert 0.6 < drop(DIODE_PARTS["1N4148"]) < drop(None) < 0.75
     e, amp = SineSource(), OpAmpModel()
-    circuit, n = net((e, "GND", "IN"), (amp, "IN", "GND", "OUT", "GND"))
+    circuit, n = net((e, "GND", "IN"), (amp, "IN", "GND", "OUT"))
     trace = simulate(Problem(circuit, {e: {"": 1, "f": 100}, amp: OPAMP_PARTS["LM358"]}), until=0.02)
     v, t = trace(V(n["OUT"])), trace.t
     assert min(v) == pytest.approx(-15, abs=0.3) and max(v) == pytest.approx(13.5, abs=0.3)
     slope = max((v[i] - v[i - 1]) / (t[i] - t[i - 1]) for i in range(1, len(t)) if t[i] > t[i - 1])
     assert slope == pytest.approx(0.3e6, rel=0.1)
     e, amp, rf, rg = SineSource(), OpAmpModel(), Resistor(), Resistor()
-    circuit, n = net((e, "GND", "IN"), (amp, "IN", "F", "OUT", "GND"), (rf, "OUT", "F"), (rg, "F", "GND"))
+    circuit, n = net((e, "GND", "IN"), (amp, "IN", "F", "OUT"), (rf, "OUT", "F"), (rg, "F", "GND"))
     trace = simulate(Problem(circuit, {e: {"": "0.1", "f": 1000}, rf: "9k", rg: "1k"}), until=0.005)
     out = trace(V(n["OUT"]))
     assert max(out[len(out) // 2 :]) == pytest.approx(1, rel=0.02)

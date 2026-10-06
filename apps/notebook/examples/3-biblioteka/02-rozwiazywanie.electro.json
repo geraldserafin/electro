@@ -33,7 +33,7 @@
     {
       "id": "0402d6a3",
       "type": "code",
-      "source": "E, R_1, R_2, R_3, R_4, A_1 = (VoltageSource(\"E\"), Resistor(\"R_1\"), Resistor(\"R_2\"), Resistor(\"R_3\"),\n                              Resistor(\"R_4\"), Ammeter(\"A_1\"))\nzadanie = Problem(\n    loop(E, R_1, (R_2 >> A_1) | (R_3 >> R_4)),\n    {R_1: 3, R_2: 18, R_3: 3, R_4: 6, I(A_1): 2},\n    [Parameter(E)],\n)\nsol = solve(zadanie)\nsol(Parameter(E))",
+      "source": "E, R_1, R_2, R_3, R_4, A_1 = (VoltageSource(\"E\"), Resistor(\"R_1\"), Resistor(\"R_2\"), Resistor(\"R_3\"),\n                              Resistor(\"R_4\"), Ammeter(\"A_1\"))\nzadanie = Problem(\n    ~(E >> R_1 >> ((R_2 >> A_1) | (R_3 >> R_4))),\n    {R_1: 3, R_2: 18, R_3: 3, R_4: 6, I(A_1): 2},\n    [Parameter(E)],\n)\nsol = solve(zadanie)\nsol(Parameter(E))",
       "outputs": [
         {
           "type": "markdown",
@@ -109,7 +109,7 @@
     {
       "id": "21aa803d",
       "type": "code",
-      "source": "E, R_1, R_2 = VoltageSource(\"E\"), Resistor(\"R_1\"), Resistor(\"R_2\")\nsolve(Problem(loop(E, R_1, R_2), {E: \"E\", R_1: \"R_1\", R_2: \"R_2\"}))(U(R_2))",
+      "source": "E, R_1, R_2 = VoltageSource(\"E\"), Resistor(\"R_1\"), Resistor(\"R_2\")\nsolve(Problem(~(E >> R_1 >> R_2), {E: \"E\", R_1: \"R_1\", R_2: \"R_2\"}))(U(R_2))",
       "outputs": [
         {
           "type": "markdown",

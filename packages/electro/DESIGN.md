@@ -1035,4 +1035,7 @@ kodu, narzędzie AI, zadania) i oddaje tylko dane. Kursy pisze Python jako dane,
   nazwie: `zadanie["R_1"]` (schemat z notatki nie ma zmiennych na elementy).
 - Kroki: jedno równanie z jedną niewiadomą to łańcuch wzór = liczby = wynik, kilka naraz to układ;
   powód z pochodzenia równania (prawo elementu wg rodzaju, Kirchhoff w punkcie).
-
+- Obwód buduje się tylko kombinatorami: `>>`, `@`, `|`, `~` (zamknięcie: `cap >> (f @ wire) >> cup`),
+  `-` (transpozycja), pająki i `Node`/`Net`. Funkcje pomocnicze (`loop`, `close`, `at`, `beside`, `series`,
+  `parallel`, `flip`) usunięte. Element o niewyrysowanym `gnd` (`Kind.ground`: wzmacniacz operacyjny,
+  bramki, przerzutniki, licznik) ma o jeden koniec mniej — jego ostatni zacisk siedzi na masie.

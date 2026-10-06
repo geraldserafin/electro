@@ -227,83 +227,18 @@
             ]
           }
         ]
-      },
-      "_solve": false,
-      "_checks": {
-        "live": true,
-        "joined": [],
-        "nets": {
-          "a0": [
-            [
-              "ARD_1",
-              14
-            ],
-            [
-              "RT_1",
-              1
-            ],
-            [
-              "R_1",
-              0
-            ]
-          ],
-          "SDA": [
-            [
-              "ARD_1",
-              18
-            ],
-            [
-              "LCD_1",
-              2
-            ]
-          ],
-          "SCL": [
-            [
-              "ARD_1",
-              19
-            ],
-            [
-              "LCD_1",
-              3
-            ]
-          ],
-          "5V": [
-            [
-              "ARD_1",
-              20
-            ],
-            [
-              "RT_1",
-              0
-            ],
-            [
-              "LCD_1",
-              1
-            ]
-          ],
-          "GND": [
-            [
-              "ARD_1",
-              21
-            ],
-            [
-              "R_1",
-              1
-            ],
-            [
-              "LCD_1",
-              0
-            ]
-          ]
-        }
       }
     },
     {
       "id": "dd44a6c6",
       "type": "code",
       "source": "import math\n# ta sama zależność w Pythonie: temperatura → opór termistora → napięcie na A0\nfor t in [0, 10, 20, 25, 30, 40, 50]:\n    r = 10_000 * math.exp(3950 * (1 / (t + 273.15) - 1 / 298.15))\n    u = 5 * 10_000 / (r + 10_000)\n    print(f\"{t:>3} °C: R = {r / 1000:5.2f} kΩ, U_A0 = {u:.2f} V\")",
-      "outputs": [],
-      "_run": true
+      "outputs": [
+        {
+          "type": "stream",
+          "data": "  0 °C: R = 33.62 kΩ, U_A0 = 1.15 V\n 10 °C: R = 20.17 kΩ, U_A0 = 1.66 V\n 20 °C: R = 12.54 kΩ, U_A0 = 2.22 V\n 25 °C: R = 10.00 kΩ, U_A0 = 2.50 V\n 30 °C: R =  8.04 kΩ, U_A0 = 2.77 V\n 40 °C: R =  5.30 kΩ, U_A0 = 3.27 V\n 50 °C: R =  3.59 kΩ, U_A0 = 3.68 V\n"
+        }
+      ]
     }
   ]
 }

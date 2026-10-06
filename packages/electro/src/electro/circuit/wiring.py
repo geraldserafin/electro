@@ -1,12 +1,13 @@
-"""Ways of wiring pieces together, all built of the primitives."""
+"""The spiders by name, and a circuit rebuilt from its netlist."""
 
 from __future__ import annotations
 
 from collections.abc import Iterable
 from functools import reduce
+from operator import matmul
 
 from .netlist import Part, Point
-from .tree import GND, Circuit, Element, Node, Seq, Spider, Tensor
+from .tree import Circuit, Element, Node, Spider
 
 wire = Spider(1, 1)
 """One end in, one out, one point."""
@@ -18,41 +19,10 @@ cup = Spider(2, 0)
 """Two ends into nothing, one point."""
 
 
-def series(*parts: Circuit) -> Circuit:
-    return reduce(Seq, parts)
-
-
-def beside(*parts: Circuit) -> Circuit:
-    return reduce(Tensor, parts)
-
-
-def parallel(f: Circuit, g: Circuit) -> Circuit:
-    """Both between the same two points (one end each side: 1 → 1)."""
-    return f | g
-
-
-def close(f: Circuit) -> Circuit:
-    """A 1 → 1 piece with its two ends joined."""
-    return cap >> (f @ wire) >> cup
-
-
-def loop(*parts: Circuit) -> Circuit:
-    return close(series(*parts))
-
-
-def flip(f: Circuit) -> Circuit:
-    """A 1 → 1 piece the other way round, its left end on the right: bent back through a ``cap`` and a
-    ``cup``, as any transpose is in a hypergraph category."""
-    return (wire @ cap) >> (wire @ f @ wire) >> (cup @ wire)
-
-
-def at(e: Element, *points: Circuit) -> Circuit:
-    """An element with each terminal on a point, in its terminals' order: ``at(t, b, c, e)`` (a ``gnd`` it
-    does not draw, left out, on ``GND``)."""
-    points = e.kind.grounded(points, GND)
-    if len(e.kind.terminals) == 2:
-        return points[0] >> e >> points[1]
-    return e >> beside(*points)
+def placed(e: Element, points: Iterable[Circuit]) -> Circuit:
+    """An element with each end on a point, in its terminals' order: ``a >> e >> b``, or ``e >> (a @ b @ c)``."""
+    ps = tuple(points)
+    return ps[0] >> e >> ps[1] if len(e.kind.terminals) == 2 else e >> reduce(matmul, ps)
 
 
 def rebuild(parts: Iterable[Part], named: Iterable[tuple[int, Point]] = ()) -> Circuit:
@@ -64,4 +34,4 @@ def rebuild(parts: Iterable[Part], named: Iterable[tuple[int, Point]] = ()) -> C
     def point(n: int) -> Point:
         return points.setdefault(n, shown.get(n) or Node())
 
-    return beside(*(at(e, *(point(n) for n in ns)) for e, ns in parts))
+    return reduce(matmul, (placed(e, (point(n) for n in ns)) for e, ns in parts))

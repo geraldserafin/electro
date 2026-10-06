@@ -536,7 +536,7 @@
     {
       "id": "26a565b3",
       "type": "code",
-      "source": "E, R_1, R_2, R_3 = VoltageSource(\"E\"), Resistor(\"R_1\"), Resistor(\"R_2\"), Resistor(\"R_3\")\nuklad = Problem(loop(E, R_1, R_2 | R_3), {E: \"E\", R_1: \"R_1\", R_2: \"R_2\", R_3: \"R_3\"})\nsolve(uklad)(I(R_1))",
+      "source": "E, R_1, R_2, R_3 = VoltageSource(\"E\"), Resistor(\"R_1\"), Resistor(\"R_2\"), Resistor(\"R_3\")\nuklad = Problem(~(E >> R_1 >> (R_2 | R_3)), {E: \"E\", R_1: \"R_1\", R_2: \"R_2\", R_3: \"R_3\"})\nsolve(uklad)(I(R_1))",
       "outputs": [
         {
           "type": "markdown",

@@ -33,7 +33,7 @@
     {
       "id": "8dd5a0e1",
       "type": "code",
-      "source": "J = CurrentSource(\"J\")\ndwa_zrodla = Problem(beside(GND >> E >> R_1 >> A, A >> R_2 >> GND, GND >> J >> A), {E: 12, R_1: 10, R_2: 10, J: 1})\ns = superposition(dwa_zrodla, U(R_2))\nfor zrodlo, czesc in s.parts:\n    print(f\"samo {zrodlo.name}: {czesc} V\")\nprint(\"razem:\", s.total, \"V\")",
+      "source": "J = CurrentSource(\"J\")\ndwa_zrodla = Problem(((GND >> E >> R_1 >> A) @ (A >> R_2 >> GND) @ (GND >> J >> A)), {E: 12, R_1: 10, R_2: 10, J: 1})\ns = superposition(dwa_zrodla, U(R_2))\nfor zrodlo, czesc in s.parts:\n    print(f\"samo {zrodlo.name}: {czesc} V\")\nprint(\"razem:\", s.total, \"V\")",
       "outputs": [
         {
           "type": "stream",
@@ -65,7 +65,7 @@
     {
       "id": "932b5d91",
       "type": "code",
-      "source": "E, R_1, R_2, R_3 = VoltageSource(\"E\"), Resistor(\"R_1\"), Resistor(\"R_2\"), Resistor(\"R_3\")\nmniejszy, kroki = simplify(Problem(loop(E, R_1, R_2 | R_3), {E: 12, R_1: 4, R_2: 2, R_3: 3}, [I(R_1)]))\nfor k in kroki:\n    print(f\"{k.how}: {' i '.join(e.name for e in k.replaced)} → {k.by.name} = {k.amount} Ω\")\nmniejszy",
+      "source": "E, R_1, R_2, R_3 = VoltageSource(\"E\"), Resistor(\"R_1\"), Resistor(\"R_2\"), Resistor(\"R_3\")\nmniejszy, kroki = simplify(Problem(~(E >> R_1 >> (R_2 | R_3)), {E: 12, R_1: 4, R_2: 2, R_3: 3}, [I(R_1)]))\nfor k in kroki:\n    print(f\"{k.how}: {' i '.join(e.name for e in k.replaced)} → {k.by.name} = {k.amount} Ω\")\nmniejszy",
       "outputs": [
         {
           "type": "stream",

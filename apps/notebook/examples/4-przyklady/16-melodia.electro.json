@@ -308,129 +308,18 @@
             ]
           }
         ]
-      },
-      "_solve": false,
-      "_checks": {
-        "live": true,
-        "joined": [],
-        "nets": {
-          "buzz": [
-            [
-              "ARD_1",
-              8
-            ],
-            [
-              "BZ_1",
-              0
-            ]
-          ],
-          "red": [
-            [
-              "ARD_1",
-              9
-            ],
-            [
-              "R_1",
-              0
-            ]
-          ],
-          "green": [
-            [
-              "ARD_1",
-              10
-            ],
-            [
-              "R_2",
-              0
-            ]
-          ],
-          "blue": [
-            [
-              "ARD_1",
-              11
-            ],
-            [
-              "R_3",
-              0
-            ]
-          ],
-          "r": [
-            [
-              "R_1",
-              1
-            ],
-            [
-              "LED_1",
-              0
-            ]
-          ],
-          "g": [
-            [
-              "R_2",
-              1
-            ],
-            [
-              "LED_1",
-              1
-            ]
-          ],
-          "b": [
-            [
-              "R_3",
-              1
-            ],
-            [
-              "LED_1",
-              2
-            ]
-          ],
-          "a0": [
-            [
-              "ARD_1",
-              14
-            ],
-            [
-              "P_1",
-              2
-            ]
-          ],
-          "5V": [
-            [
-              "ARD_1",
-              20
-            ],
-            [
-              "P_1",
-              1
-            ]
-          ],
-          "GND": [
-            [
-              "ARD_1",
-              21
-            ],
-            [
-              "BZ_1",
-              1
-            ],
-            [
-              "LED_1",
-              3
-            ],
-            [
-              "P_1",
-              0
-            ]
-          ]
-        }
       }
     },
     {
       "id": "a1ed9c6a",
       "type": "code",
       "source": "# nuty z A4 = 440 Hz i dwunastego pierwiastka z dwóch\nnazwy = [\"A\", \"A#\", \"H\", \"C\", \"C#\", \"D\", \"D#\", \"E\", \"F\", \"F#\", \"G\", \"G#\"]\nfor polton in range(13):\n    print(f\"{nazwy[polton % 12]:<3} {440 * 2 ** (polton / 12):7.1f} Hz\")",
-      "outputs": [],
-      "_run": true
+      "outputs": [
+        {
+          "type": "stream",
+          "data": "A     440.0 Hz\nA#    466.2 Hz\nH     493.9 Hz\nC     523.3 Hz\nC#    554.4 Hz\nD     587.3 Hz\nD#    622.3 Hz\nE     659.3 Hz\nF     698.5 Hz\nF#    740.0 Hz\nG     784.0 Hz\nG#    830.6 Hz\nA     880.0 Hz\n"
+        }
+      ]
     }
   ]
 }

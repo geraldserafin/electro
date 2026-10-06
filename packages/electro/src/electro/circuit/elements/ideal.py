@@ -40,5 +40,5 @@ Ammeter = Kind("ammeter", "A", ("a", "b"), _same_potential, parameters=())
 """A wire whose current is what is read."""
 Voltmeter = Kind("voltmeter", "V", ("a", "b"), _no_current, parameters=())
 """A break whose voltage is what is read."""
-OpAmp = Kind("opamp", "OA", ("plus", "minus", "out", "gnd"), _op_amp, parameters=())
+OpAmp = Kind("opamp", "OA", ("plus", "minus", "out", "gnd"), _op_amp, parameters=(), ground=True)
 """Ideal, with negative feedback. ``gnd``: its supply's return, not drawn on a schematic."""

@@ -229,7 +229,7 @@ Wartość może być literą. Wtedy wynik jest wzorem — dobrze to sprawdza roz
 """)
     L.code("""
 E, R_1, R_2, R_3 = VoltageSource("E"), Resistor("R_1"), Resistor("R_2"), Resistor("R_3")
-uklad = Problem(loop(E, R_1, R_2 | R_3), {E: "E", R_1: "R_1", R_2: "R_2", R_3: "R_3"})
+uklad = Problem(~(E >> R_1 >> (R_2 | R_3)), {E: "E", R_1: "R_1", R_2: "R_2", R_3: "R_3"})
 solve(uklad)(I(R_1))
 """)
     L.save()

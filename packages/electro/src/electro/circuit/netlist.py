@@ -44,12 +44,14 @@ def lone_point(dom: int, cod: int, at: Point | None = None) -> Netlist:
     return Netlist(1, (), (0,) * dom, (0,) * cod, ((0, at),) if at is not None else ())
 
 
-def lone_element(e: Element, terminals: int) -> Netlist:
+def lone_element(e: Element, terminals: int, ground: Point | None = None) -> Netlist:
     """One element on points of its own. With two terminals it is 1 → 1; with any other number all its
-    ends are on the right (0 → n)."""
+    ends are on the right (0 → n). ``ground``: its last terminal on it, no end of its own."""
     ends = tuple(range(terminals))
     if terminals == 2:
         return Netlist(2, ((e, ends),), (0,), (1,))
+    if ground is not None:
+        return Netlist(terminals, ((e, ends),), (), ends[:-1], ((ends[-1], ground),))
     return Netlist(terminals, ((e, ends),), (), ends)
 
 

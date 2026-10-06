@@ -26,23 +26,24 @@ mówi ten, kto pokazuje wynik — notatnik po polsku albo po angielsku.
 
 ## Klocki
 
-Każdy obwód ma typ `m → n`: `m` końców z lewej, `n` z prawej. Element ma nazwę; jego tożsamość to ten obiekt.
+Każdy obwód ma typ `m → n`: `m` końców z lewej, `n` z prawej. Obwody buduje się tylko działaniami poniżej —
+bez funkcji pomocniczych. Element ma nazwę; jego tożsamość to ten obiekt.
 
 | zapis | znaczenie |
 |---|---|
 | `Resistor("R_1")`, `Capacitor`, `Inductor` | elementy dwukońcowe, 1 → 1 |
 | `VoltageSource`, `CurrentSource`, `SineSource`, `SquareSource` | źródła (`+` na drugim końcu; prąd pchany od pierwszego do drugiego) |
 | `Ammeter`, `Voltmeter` | idealne mierniki; odczyt to dana `I(A_1)`, `U(V_1)` |
-| `OpAmp`, `VCVS`, `VCCS`, `CCVS`, `CCCS`, `Transformer`, `Coupled` | wielokońcowe: `at(e, a, b, c…)` |
+| `OpAmp`, `VCVS`, `VCCS`, `CCVS`, `CCCS`, `Transformer`, `Coupled` | wielokońcowe, 0 → n: `T >> (a @ b @ c)` (niewyrysowany `gnd` — na masie, bez końca) |
 | `Diode`, `LED`, `Zener`, `NPN`, `PNP`, `NMOS`, `PMOS`, bramki, `Timer555`, `Motor`, `Relay`, płytki… | nieliniowe i z pamięcią: w czasie |
 | `Hole` | nieznany element: `fill` wstawia najprostszy pasujący |
 | `f >> g` | szeregowo (złożenie) |
 | `f \| g` | równolegle |
 | `f @ g` | obok siebie, bez połączenia (iloczyn monoidalny) |
 | `Node("A")`, `GND` | punkt (ten sam obiekt w dwóch miejscach = jeden punkt), masa |
-| `loop(a, b, …)`, `close(f)` | pętla |
-| `flip(f)` | odwrócony (transpozycja przez `cap` i `cup`) |
-| `at(e, a, b)`, `beside(…)` | element między punktami, kawałki obok siebie — dowolny graf (mostek) |
+| `~f` | zamknięty: jego dwa końce połączone (pętla: `~(E >> R_1 >> R_2)`) |
+| `-f` | odwrócony (transpozycja przez `cap` i `cup`) |
+| `a >> e >> b`, `f @ g` z `Node` | element między punktami, kawałki obok siebie — dowolny graf (mostek) |
 | `wire`, `cap`, `cup` | pająki: 1 → 1, 0 → 2, 2 → 0 |
 
 Wartości: `10`, `4.7`, `"4.7k"`, `"4k7"`, `"0,5 A"`, `"230∠-120"`, `"R"` (litera). Element o kilku
