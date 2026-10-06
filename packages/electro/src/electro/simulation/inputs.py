@@ -8,9 +8,9 @@ from typing import cast
 
 from ..circuit.elements import BY_NAME, MODES
 from ..circuit.tree import Element
+from ..solver.step import StepFunction
 from ..solver.symbols import Symbols
 from .errors import NoSuchInput
-from .program import Program
 from .run import Schedule
 
 Setter = Callable[[object], list[tuple[int, float]]]
@@ -19,10 +19,10 @@ Key = Element | tuple[Element, str] | str
 ``"S_1"``, ``"S_1_closed"``, ``"ARD_1.D13"``."""
 
 
-def schedule(program: Program, s: Symbols, inputs: Mapping[Key, object] | None) -> Schedule | None:
+def schedule(phi: StepFunction, s: Symbols, inputs: Mapping[Key, object] | None) -> Schedule | None:
     if not inputs:
         return None
-    parts = [(_setter(program, _name(key, s)), value) for key, value in inputs.items()]
+    parts = [(_setter(phi, _name(key, s)), value) for key, value in inputs.items()]
     return lambda now: [pair for setter, value in parts for pair in setter(value(now) if callable(value) else value)]
 
 
@@ -35,25 +35,25 @@ def _name(key: Key, s: Symbols) -> str:
     return str(key)
 
 
-def _setter(program: Program, name: str) -> Setter:
+def _setter(phi: StepFunction, name: str) -> Setter:
     label, _, pin = name.partition(".")
     if pin:
-        pin_mode = _pin(program, label, pin)
+        pin_mode = _pin(phi, label, pin)
         if pin_mode is not None:
             return pin_mode
-    for candidate in _candidates(program, name):
-        if candidate in program.inputs:
-            index = program.inputs[candidate]
+    for candidate in _candidates(phi, name):
+        if candidate in phi.inputs:
+            index = phi.inputs[candidate]
             return lambda value: [(index, float(cast(float, value)))]
-    raise NoSuchInput(name, _available(program))
+    raise NoSuchInput(name, _available(phi))
 
 
-def _pin(program: Program, label: str, pin: str) -> Setter | None:
-    modes = MODES.get(program.kinds.get(label, ""))
+def _pin(phi: StepFunction, label: str, pin: str) -> Setter | None:
+    modes = MODES.get(phi.kinds.get(label, ""))
     g, e = f"{label}_{pin}_G", f"{label}_{pin}_E"
-    if modes is None or g not in program.inputs:
+    if modes is None or g not in phi.inputs:
         return None
-    gi, ei = program.inputs[g], program.inputs[e]
+    gi, ei = phi.inputs[g], phi.inputs[e]
 
     def set_mode(mode: object) -> list[tuple[int, float]]:
         conductance, volts = modes[mode] if isinstance(mode, str) else (modes["high"][0], float(cast(float, mode)))
@@ -62,14 +62,14 @@ def _pin(program: Program, label: str, pin: str) -> Setter | None:
     return set_mode
 
 
-def _candidates(program: Program, name: str) -> list[str]:
-    kind = BY_NAME.get(program.kinds.get(name, ""))
+def _candidates(phi: StepFunction, name: str) -> list[str]:
+    kind = BY_NAME.get(phi.kinds.get(name, ""))
     return [name, *(f"{name}_{which}" for which in (kind.inputs if kind else ()))]
 
 
-def _available(program: Program) -> list[str]:
+def _available(phi: StepFunction) -> list[str]:
     out = []
-    for label, kind_name in program.kinds.items():
+    for label, kind_name in phi.kinds.items():
         kind = BY_NAME[kind_name]
         if kind_name in MODES:
             out += [f"{label}.{w[:-2]}" for w in kind.inputs if w.endswith("_G")]

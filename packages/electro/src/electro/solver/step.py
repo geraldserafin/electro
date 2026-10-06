@@ -1,6 +1,8 @@
-"""A problem compiled for running in time: the equations of one step (``Step(dt)``), their Jacobian, and
-what moves on between steps, written once as code (``solver.numeric``) — Python for ``run``, JavaScript for
-the page's engine (``to_json``). Each step is then ``solve``'s Newton on plain numbers.
+"""A problem solved at ``Step(dt)``: Φ, the step function. Every frame of a circuit in time is Φ of the frame
+before — ``frame(n + 1) = Φ(frame(n), dt)``, from rest — with ``dt``, the time, what is remembered and what
+the world sets (a switch, a pin) its parameters. Linear, Φ is a formula (``formula``); otherwise it is the
+root of the step's equations, found by Newton. Either way it is compiled once (``solver.numeric``): Python
+here, JavaScript for the page's engine (``to_json``).
 
 What is remembered is what the laws keep under ``D`` and ``Pre``; what the world sets while it runs is
 each kind's ``inputs``. Every point has a whisper of a conductance to ground: a floating one is never a
@@ -19,16 +21,15 @@ from ..circuit.elements.modules import LCD_INPUTS
 from ..circuit.time import TIME, D, Pre
 from ..circuit.tree import Net
 from ..problem.problem import Problem
-from ..solver.analysis import Step, before, is_before
-from ..solver.expressions import expr, subs, symbols_in
-from ..solver.laws import inner_names, of_ways
-from ..solver.numeric import Code, Compiled, compile_equations, python, statements
-from ..solver.relation import Relation, all_equations
-from ..solver.symbols import Symbols, symbols
-from ..solver.system import equations, parameter_values, relation
+from .analysis import DT, Step, before, is_before
 from .errors import NotSimulated, ValueNeeded
+from .expressions import expr, subs, symbols_in
+from .laws import inner_names, of_ways
+from .numeric import Code, Compiled, compile_equations, python, statements
+from .relation import Relation, all_equations
+from .symbols import Symbols, symbols
+from .system import equations, parameter_values, relation
 
-DT = sp.Symbol("dt", positive=True)
 G_NODE = 1e-12
 STEP_VOLTS, STEP_AMPS = 0.05, 1e-3
 """How far a remembered current may move in one step; a voltage, or anything else."""
@@ -45,12 +46,23 @@ terminals, or a current into one, by name."""
 
 
 @dataclass
-class Program:
-    """``equations``: a step's, its unknowns found each step; its params are ``dt``, the time at the step's
-    end, what is remembered and what is set from outside. ``states``: the param index of each remembered
-    value and the most it may move in a step (None: it jumps). ``update`` fills what is remembered after a
-    step, ``flow`` each terminal's current."""
+class Frame:
+    """The circuit at time ``t``: its unknowns ``x``, and the step's parameters ``p`` — ``dt``, ``t``, what
+    is remembered, what the world sets."""
 
+    t: float
+    x: list[float]
+    p: list[float]
+
+
+@dataclass
+class StepFunction:
+    """Φ. ``equations``: a step's, its unknowns found each step; its params are ``dt``, the time at the
+    step's end, what is remembered and what is set from outside. ``states``: the param index of each
+    remembered value and the most it may move in a step (None: it jumps). ``update`` fills what is remembered
+    after a step, ``flow`` each terminal's current."""
+
+    problem: Problem
     equations: Compiled
     initial: list[float]
     states: list[tuple[int, float | None]]
@@ -79,6 +91,32 @@ class Program:
             )
             self._compiled = (scope["update"], scope["flow"])
         return self._compiled
+
+    @property
+    def rest(self) -> Frame:
+        """At t = 0, before anything moved: every capacitor empty, every inductor still."""
+        return Frame(0.0, [0.0] * len(self.unknowns), list(self.initial))
+
+    def __call__(self, frame: Frame, dt: float) -> Frame | None:
+        """The frame ``dt`` after ``frame``; None when Newton does not get there."""
+        p = list(frame.p)
+        p[0], p[1] = dt, frame.t + dt
+        x = self.equations.newton(frame.x, p)
+        if x is None:
+            return None
+        after = [0.0] * len(self.states)
+        self.functions()[0](x, p, after)
+        for (i, _), v in zip(self.states, after):
+            p[i] = v
+        return Frame(frame.t + dt, x, p)
+
+    @property
+    def formula(self):
+        """Φ as a formula, when algebra finds one (a linear circuit): a ``Solution`` of letters — ``dt``,
+        ``t`` and what was a step before (``V_A⁻``)."""
+        from .solve import solve_step
+
+        return solve_step(self.problem)
 
     def to_json(self) -> str:
         """For the page's engine (``simulation/engine.ts``)."""
@@ -116,7 +154,7 @@ class _Input:
     value: float
 
 
-def compile_program(problem: Problem) -> Program:
+def step_function(problem: Problem) -> StepFunction:
     s = symbols(problem.circuit)
     _refuse_ways(s)
     inputs = _inputs(problem, s)
@@ -135,7 +173,8 @@ def compile_program(problem: Problem) -> Program:
     compiled = compile_equations(exprs, unknowns, params, s.potentials)
     unknowns = compiled.unknowns
     index = {u: k for k, u in enumerate(unknowns)}
-    return Program(
+    return StepFunction(
+        problem=problem,
         equations=compiled,
         initial=[0.0, 0.0, *(st.initial for st in states), *(i.value for i in inputs)],
         states=[(2 + k, st.most) for k, st in enumerate(states)],

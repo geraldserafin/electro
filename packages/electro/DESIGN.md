@@ -613,13 +613,9 @@ class Solution:
 
 
 def simulate(problem: Problem, until: Duration) -> Trace:
-    program = compile_program(problem)               # czysta: równania jednego kroku → kod
-    states = unfold(partial(step, program), initial(program), until)
+    phi = solve(problem, Step())                     # Φ: zadanie rozwiązane dla jednego kroku
+    states = unfold(phi, phi.rest, until)            # każda klatka to Φ poprzedniej
     return Trace(problem, tuple(states))
-
-
-def step(program: Program, state: State) -> State:   # czysta: nowy stan ze starego
-    ...                                              # Newton w środku: pętla lokalna, nic wspólnego
 
 
 @dataclass(frozen=True)
@@ -956,7 +952,9 @@ warstw. Kierunek zależności jest jeden: `circuit` ← `problem` ← `solver` �
   (`by_hand.py`), przez przypadki (`by_cases.py`), liczbami — równania jako kod i Newton (`numeric.py`),
   wybór drogi (`solve.py`), czarna skrzynka (`port.py`).
 - **`simulation/`**: krok w czasie to te same równania (`Step(dt)`) i ten sam Newton co w `solve`; własne
-  ma tylko to, co czas dokłada: co pamiętane między krokami i jak długi krok (`program.py`, `run.py`).
+  ma tylko długość kroku (`run.py`). Krok to `solve(zadanie, Step())` = Φ (`solver/step.py`): klatka po klatce
+  `Φ(klatka, dt)`, a parametry Φ to `dt`, czas, to, co pamiętane, i to, co ustawia świat. Liniowy obwód ma Φ
+  jako wzór z literami (`Φ.formula`), nieliniowy — jako pierwiastek równań kroku, liczony Newtonem.
 - **`methods/`**: metody podręcznikowe, po pliku na metodę.
 
 Zasady: w kodzie nie ma komentarzy, jest tylko dokumentacja (docstringi). Gdy coś trzeba objaśnić, staje
@@ -1004,7 +1002,7 @@ więc ten sam renderer z TS da się kiedyś tam wpiąć. Dziś nic pod to nie bu
 | E | Bode, przemiatanie, tolerancje (liczby), SPICE, zadania na rdzeniu — zrobione |
 | F | kursy, przykłady, prompt AI, README na nowe API; stare moduły i paczki usunięte — zrobione |
 
-**Etap B — co wyszło.** Program symulacji liczy się z równań rdzenia (`simulation/program.py`), ten sam
+**Etap B — co wyszło.** Program symulacji liczy się z równań rdzenia (dziś `solver/step.py`), ten sam
 JSON co dotąd; `live` w notatniku idzie przez netlistę jako dane (`problem/netlist.py`), którą na razie
 robi z rysunku kernel. Wszystkie testy symulacji starej biblioteki działają na rdzeniu
 (`test_simulation.py`). Ustalenia:

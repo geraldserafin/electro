@@ -11,8 +11,8 @@ import sympy as sp
 
 from ..problem.problem import Problem
 from ..problem.quantities import Quantity, Scaled
+from ..solver.step import StepFunction
 from ..solver.symbols import symbols
-from .program import Program
 
 
 @dataclass
@@ -21,7 +21,7 @@ class Trace:
     would take several times more as lists of floats, and Pyodide's memory never shrinks back)."""
 
     problem: Problem
-    program: Program
+    phi: StepFunction
     t: list[float]
     data: array
 
@@ -56,12 +56,12 @@ class Trace:
         return [k / (dt * n) for k in range(keep)], [abs(mean)] + [abs(x) * gain for x in spectrum[1:keep]]
 
     def _column(self, name: str) -> list[float]:
-        if name in self.program.unknowns:
-            return self.data[self.program.unknowns.index(name) :: len(self.program.unknowns)].tolist()
-        node = self.program.nodes.get(name[2:]) if name.startswith("V_") else None
+        if name in self.phi.unknowns:
+            return self.data[self.phi.unknowns.index(name) :: len(self.phi.unknowns)].tolist()
+        node = self.phi.nodes.get(name[2:]) if name.startswith("V_") else None
         if node is not None:
-            return self._column(self.program.unknowns[node])
-        if name.startswith("V_") and name[2:] in self.program.nodes:
+            return self._column(self.phi.unknowns[node])
+        if name.startswith("V_") and name[2:] in self.phi.nodes:
             return [0.0] * len(self.t)
         raise KeyError(name)
 

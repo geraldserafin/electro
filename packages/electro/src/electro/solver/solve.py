@@ -1,13 +1,16 @@
-"""Where a circuit settles (DC), or its phasors (AC), and the steps there. Linear: by algebra, step by
-step; elements of several ways: by cases; beyond algebra (a diode's exp): by Newton."""
+"""Where a circuit settles (DC), its phasors (AC), or its step in time (``Step``: Φ, every frame from the one
+before). Linear: by algebra, step by step; elements of several ways: by cases; beyond algebra (a diode's
+exp): by Newton."""
 
 from __future__ import annotations
+
+from typing import overload
 
 import sympy as sp
 
 from ..circuit.time import TIME, Pre
 from ..problem.problem import Key, Problem
-from .analysis import AC, DC, frequencies
+from .analysis import AC, DC, Step, frequencies
 from .by_cases import solve_by_cases
 from .by_hand import solve_by_hand
 from .errors import Contradiction, NotLinear, Undetermined
@@ -15,12 +18,20 @@ from .expressions import symbols_in
 from .numeric import compile_equations, homotopy
 from .relation import all_equations
 from .solution import Solution, SolutionStep
+from .step import StepFunction, step_function
 from .system import SOURCES, System, equations, relation
 
 
-def solve(problem: Problem, analysis: DC | AC | None = None) -> Solution:
-    """``analysis``: by default DC, or with sines in time of one frequency, their phasors at it."""
+@overload
+def solve(problem: Problem, analysis: DC | AC | None = None) -> Solution: ...
+@overload
+def solve(problem: Problem, analysis: Step) -> StepFunction: ...
+def solve(problem: Problem, analysis: DC | AC | Step | None = None) -> Solution | StepFunction:
+    """``analysis``: by default DC, or with sines in time of one frequency, their phasors at it. At
+    ``Step()``: Φ, the step function (``solver.step``)."""
     try:
+        if isinstance(analysis, Step):
+            return step_function(problem)
         return _solve(problem, analysis or _own_frequency(problem) or DC())
     except Undetermined as err:
         err.problem = problem
@@ -40,6 +51,14 @@ def _solve(problem: Problem, analysis: DC | AC) -> Solution:
     if isinstance(analysis, AC):
         raise NotLinear("a phasor of a non-linear circuit: around its working point (not yet)")
     return _by_newton(problem)
+
+
+def solve_step(problem: Problem) -> Solution:
+    """Φ as a formula: the step solved in letters — ``dt``, ``t``, what was a step before."""
+    system = equations(problem, Step())
+    if system.choices or not _is_algebraic(system):
+        raise NotLinear("a step of a non-linear circuit has no formula: Newton finds it (call the step)")
+    return _by_algebra(problem, system, Step())
 
 
 def _own_frequency(problem: Problem) -> AC | None:
@@ -62,7 +81,7 @@ def _is_algebraic(system: System) -> bool:
         return False
 
 
-def _by_algebra(problem: Problem, system: System, analysis: DC | AC) -> Solution:
+def _by_algebra(problem: Problem, system: System, analysis: DC | AC | Step) -> Solution:
     try:
         values, steps = solve_by_hand(system)
     except Contradiction as err:
@@ -71,12 +90,12 @@ def _by_algebra(problem: Problem, system: System, analysis: DC | AC) -> Solution
     return Solution(problem, values, unknown, system.symbols, steps, analysis)
 
 
-def _clashing(problem: Problem, analysis: DC | AC) -> list[Key]:
+def _clashing(problem: Problem, analysis: DC | AC | Step) -> list[Key]:
     """The given data that clash: those without which it fits."""
     return [key for key in problem.given if _fits_without(problem, key, analysis)]
 
 
-def _fits_without(problem: Problem, key: Key, analysis: DC | AC) -> bool:
+def _fits_without(problem: Problem, key: Key, analysis: DC | AC | Step) -> bool:
     rest = Problem(problem.circuit, {k: v for k, v in problem.given.items() if k is not key}, problem.find)
     try:
         solve_by_hand(equations(rest, analysis))

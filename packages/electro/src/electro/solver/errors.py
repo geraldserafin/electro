@@ -54,3 +54,20 @@ class NotLinear(ValueError):
 
 class NotOnePort(ValueError):
     """A black box here is of a piece with one free end each side (1 → 1)."""
+
+
+class NotSimulated(ValueError):
+    """``label`` has no law to step in time (the textbook's diode: one of its ways, assumed on paper), or the
+    circuit's laws are not one for each quantity."""
+
+    def __init__(self, label: str) -> None:
+        super().__init__(label)
+        self.label = label
+
+
+class ValueNeeded(ValueError):
+    """A simulation needs every value: ``label``'s is not given."""
+
+    def __init__(self, label: str) -> None:
+        super().__init__(label)
+        self.label = label

@@ -1,88 +1,76 @@
-"""A program running: steps as long as what is remembered allows, each step ``solve``'s Newton
-(``solver.numeric``). The same loop as the page's engine (``simulation/engine.ts``), so both give the same
-numbers."""
+"""Φ again and again (``solver.step``): each frame the step function of the one before. All that is the
+simulation's own is how long a step is — as long as what is remembered allows. The same loop as the page's
+engine (``simulation/engine.ts``), so both give the same numbers."""
 
 from __future__ import annotations
 
 import math
 from collections.abc import Callable
+from dataclasses import replace
 
+from ..solver.step import Frame, StepFunction
 from .errors import NoConvergence
-from .program import Program
 
 Schedule = Callable[[float], list[tuple[int, float]]]
 """What the world sets at a time: ``[(param index, value)]``."""
 
+OnFrame = Callable[[Frame], None]
 
-class Simulation:
-    """``advance_to(t)`` from where it is, ``run(t)`` from rest."""
 
-    def __init__(self, program: Program):
-        self.program = program
-        self.update, _ = program.functions()
-        self.n = len(program.unknowns)
-        self.x = [0.0] * self.n
-        self.p = list(program.initial)
-        self.t = 0.0
-        self.switched = False
-        self.step = 0.0
+def run(phi: StepFunction, until: float, dt_max: float, schedule: Schedule | None = None, on_frame=None) -> Frame:
+    """From rest to ``until``; ``on_frame`` gets every frame, at t = 0 too, after a first tiny step (the
+    circuit the instant it starts)."""
+    frame, step = _walk(phi, _set(phi.rest, schedule), min(1e-9, until), dt_max, schedule, 0.0)
+    frame = replace(frame, t=0.0)
+    if on_frame is not None:
+        on_frame(frame)
+    return _walk(phi, frame, until, dt_max, schedule, step, on_frame)[0]
 
-    def newton(self, dt: float) -> list[float] | None:
-        self.p[0], self.p[1] = dt, self.t + dt
-        return self.program.equations.newton(self.x, self.p)
 
-    def advance(self, dt: float, jump: bool = False) -> tuple[bool, float]:
-        """One step of ``dt``: (taken?, how much of its allowed move a remembered value used). ``jump``: taken
-        whatever it moved, once Newton got there."""
-        x = self.newton(dt)
-        if x is None:
-            return False, math.inf
-        after = [0.0] * len(self.program.states)
-        self.update(x, self.p, after)
-        change = max(
-            (abs(v - self.p[i]) / most for (i, most), v in zip(self.program.states, after) if most is not None),
-            default=0.0,
-        )
-        if change > 1 and not jump:
-            return False, change
-        self.x, self.t = x, self.t + dt
-        self.switched = any(most is None and v != self.p[i] for (i, most), v in zip(self.program.states, after))
-        for (i, _), v in zip(self.program.states, after):
-            self.p[i] = v
-        return True, change
+def _walk(
+    phi: StepFunction,
+    frame: Frame,
+    target: float,
+    dt_max: float,
+    schedule: Schedule | None,
+    step: float,
+    on_frame: OnFrame | None = None,
+) -> tuple[Frame, float]:
+    """Steps up to ``target``, at most ``dt_max``: shorter while what is remembered moves fast, after
+    something jumped, or when Newton did not get there; in the shortest step a value may jump for real
+    (a capacitor put across an ideal source). Returns the last frame and the step it would take next."""
+    dt_min = dt_max * 1e-9
+    step = min(step or min(dt_max, 1e-6), dt_max)
+    while frame.t < target - 1e-15:
+        h = min(step, target - frame.t)
+        frame = _set(frame, schedule)
+        after = phi(frame, h)
+        change = math.inf if after is None else _change(phi, frame, after)
+        if after is None or (change > 1 and h > dt_min):
+            if h <= dt_min:
+                raise NoConvergence(frame.t)
+            step = h / 4 if change == math.inf else h / 2
+            continue
+        switched = any(most is None and after.p[i] != frame.p[i] for i, most in phi.states)
+        frame = after
+        if on_frame is not None:
+            on_frame(frame)
+        if switched:
+            step = max(dt_min, h / 8)
+        elif change < 0.25 and h >= step * 0.999:
+            step = min(dt_max, h * 2)
+    return frame, step
 
-    def advance_to(self, target: float, dt_max: float, schedule: Schedule | None = None, on_step=None) -> None:
-        """Steps up to ``target``, at most ``dt_max``: shorter while what is remembered moves fast, after
-        something jumped, or when Newton did not get there; in the shortest step a value may jump for real
-        (a capacitor put across an ideal source)."""
-        dt_min = dt_max * 1e-9
-        self.step = min(self.step or min(dt_max, 1e-6), dt_max)
-        while self.t < target - 1e-15:
-            h = min(self.step, target - self.t)
-            self._set(schedule, self.t)
-            ok, change = self.advance(h, jump=h <= dt_min)
-            if not ok:
-                if h <= dt_min:
-                    raise NoConvergence(self.t)
-                self.step = h / 4 if change == math.inf else h / 2
-                continue
-            if on_step is not None:
-                on_step()
-            if self.switched:
-                self.step = max(dt_min, h / 8)
-            elif change < 0.25 and h >= self.step * 0.999:
-                self.step = min(dt_max, h * 2)
 
-    def run(self, t_end: float, dt_max: float, schedule: Schedule | None = None, on_step=None) -> None:
-        """From rest to ``t_end``; ``on_step`` at t = 0 too, after a first tiny step (the circuit the instant
-        it starts)."""
-        self._set(schedule, 0.0)
-        self.advance_to(min(1e-9, t_end), dt_max, schedule)
-        self.t = 0.0
-        if on_step is not None:
-            on_step()
-        self.advance_to(t_end, dt_max, schedule, on_step)
+def _change(phi: StepFunction, before: Frame, after: Frame) -> float:
+    """How much of its allowed move a remembered value used."""
+    return max((abs(after.p[i] - before.p[i]) / most for i, most in phi.states if most is not None), default=0.0)
 
-    def _set(self, schedule: Schedule | None, t: float) -> None:
-        for i, value in schedule(t) if schedule is not None else ():
-            self.p[i] = value
+
+def _set(frame: Frame, schedule: Schedule | None) -> Frame:
+    if schedule is None:
+        return frame
+    p = list(frame.p)
+    for i, value in schedule(frame.t):
+        p[i] = value
+    return replace(frame, p=p)

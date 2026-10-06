@@ -22,8 +22,7 @@ from .problem.netlist import from_netlist, to_netlist
 from .problem.problem import NoSuchParameter, NotClosed, Problem
 from .problem.quantities import Across, Current, I, P, Parameter, Potential, Power, U, V, Voltage
 from .problem.spice import NoSpice, from_spice, to_spice
-from .simulation.errors import NoConvergence, NoSuchInput, NotSimulated, ValueNeeded
-from .simulation.program import Program, compile_program
+from .simulation.errors import NoConvergence, NoSuchInput
 from .simulation.simulate import simulate
 from .simulation.trace import Trace
 from .solver.analysis import AC, DC, Step
@@ -33,13 +32,16 @@ from .solver.errors import (
     MissingData,
     NotLinear,
     NotOnePort,
+    NotSimulated,
     Undetermined,
+    ValueNeeded,
 )
 from .solver.laws import is_linear, is_source, reading, stores
 from .solver.port import blackbox, matches
 from .solver.relation import Equation, Origin, Relation, hide, join
 from .solver.solution import Solution, SolutionStep
 from .solver.solve import solve
+from .solver.step import Frame, StepFunction
 from .solver.system import relation
 
 __all__ = [
@@ -57,6 +59,7 @@ __all__ = [
     "Element",
     "ElementTwice",
     "Equation",
+    "Frame",
     "Filled",
     "GND",
     "I",
@@ -81,7 +84,6 @@ __all__ = [
     "Power",
     "Pre",
     "Problem",
-    "Program",
     "Reduction",
     "Relation",
     "Response",
@@ -89,6 +91,7 @@ __all__ = [
     "SolutionStep",
     "Spread",
     "Step",
+    "StepFunction",
     "Superposition",
     "Sweep",
     "TIME",
@@ -106,7 +109,6 @@ __all__ = [
     "blackbox",
     "cap",
     "close",
-    "compile_program",
     "cup",
     "fill",
     "flip",

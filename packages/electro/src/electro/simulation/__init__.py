@@ -1,1 +1,1 @@
-"""A circuit in time: its problem compiled to a program of plain numbers, run step by step."""
+"""A circuit in time: Φ, its step function (``solver.step``), again and again."""

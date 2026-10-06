@@ -8,8 +8,9 @@ import json
 from collections.abc import Callable
 from typing import cast
 
+import electro
 import sympy as sp
-from electro import I, Problem, U, between, compile_program, sweeps, thevenin
+from electro import I, Problem, Step, U, between, sweeps, thevenin
 from electro.problem.netlist import Netlist, from_netlist, quantity
 from electro.values import fmt, parse
 
@@ -83,9 +84,9 @@ def _said(kind: str, err: BaseException, problem, units: dict) -> dict:
 
 
 def live(problem_json: str) -> str:
-    """The play button: compiled for the page's engine (``simulation/engine.ts``): ``{"program": {...}}``."""
+    """The play button: Φ, the step function, for the page's engine (``simulation/engine.ts``): ``{"program": {...}}``."""
     return _answer(
-        lambda: {"program": json.loads(compile_program(from_netlist(json.loads(problem_json)).problem).to_json())}
+        lambda: {"program": json.loads(electro.solve(from_netlist(json.loads(problem_json)).problem, Step()).to_json())}
     )
 
 

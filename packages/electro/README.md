@@ -61,7 +61,9 @@ Czego nie da się wyznaczyć — `MissingData` (ile danych brakuje i które by w
 
 Prąd zmienny: zadanie z sinusami jednej częstotliwości liczy się samo ich wskazami; `solve(zadanie,
 AC(ω))` przy danej częstotliwości. W czasie: `simulate(zadanie, until=…, dt=…, inputs={…})` zwraca ślad:
-`slad(q)`, `slad.at(q, t)`, `slad.spectrum(q)`.
+`slad(q)`, `slad.at(q, t)`, `slad.spectrum(q)`. Symulacja to tylko krok rozwiązany raz i powtarzany:
+`phi = solve(zadanie, Step())` to funkcja kroku Φ — `phi(klatka, dt)` daje następną klatkę, od
+`phi.rest`; dla obwodu liniowego `phi.formula(V(A))` to ten krok jako wzór (`V_A⁻` — krok wcześniej).
 
 ## Metody
 
@@ -75,7 +77,7 @@ AC(ω))` przy danej częstotliwości. W czasie: `simulate(zadanie, until=…, dt
 | `respond`/`responses`, `sweep`/`sweeps`, `tolerance`/`spreads` | charakterystyka częstotliwościowa, przemiatanie wartości, rozrzut z tolerancji — każde rozwiązane raz, z literą |
 | `to_spice`, `from_spice` | netlisty SPICE w obie strony (porównane z ngspice w testach) |
 | `to_netlist`, `from_netlist` | zadanie jako dane (tak rozmawia z nim notatnik) |
-| `compile_program` | program symulacji dla silnika na stronie (ten sam JSON) |
+| `solve(…, Step())` | funkcja kroku Φ; `to_json()` dla silnika na stronie |
 
 ## Pakiet
 
@@ -85,7 +87,7 @@ AC(ω))` przy danej częstotliwości. W czasie: `simulate(zadanie, until=…, dt
 | `problem/` | zadanie: wielkości, dane, nazwy, netlista jako dane, SPICE |
 | `solver/` | równania z praw, rozwiązanie krok po kroku, przypadki; liczbami: równania jako kod i Newton |
 | `methods/` | metody nad solverem, bez nowych praw |
-| `simulation/` | krok w czasie (te same równania i Newton co `solve`): co pamiętane, jak długi krok, przebieg, wejścia |
+| `simulation/` | Φ (`solver/step.py`) powtarzane: jak długi krok, przebieg, wejścia |
 | `latex.py` | rozwiązanie, wielkości i wartości w LaTeX |
 | `values.py` | liczby z jednostkami i przedrostkami, wyrażenia bez `eval` |
 

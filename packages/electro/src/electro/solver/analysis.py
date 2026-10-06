@@ -27,9 +27,14 @@ class AC:
         object.__setattr__(self, "omega", sp.sympify(self.omega))
 
 
+DT = sp.Symbol("dt", positive=True)
+
+
 @dataclass(frozen=True)
 class Step:
-    dt: sp.Expr
+    """One step in time, ``dt`` long: what is under ``D`` the difference back over it."""
+
+    dt: sp.Expr = DT
 
 
 Analysis = DC | AC | Step
