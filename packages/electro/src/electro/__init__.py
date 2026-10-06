@@ -11,6 +11,7 @@ from .circuit.netlist import ElementTwice, JoinsNodes, Netlist
 from .circuit.time import TIME, D, Pre, rising, square, when
 from .circuit.tree import GND, BadName, Circuit, Element, Net, Node, free, is_closed, netlist
 from .circuit.wiring import at, beside, cap, close, cup, flip, loop, parallel, rebuild, series, wire
+from .methods.ac import AC, settled
 from .methods.fill import Filled, fill
 from .methods.response import Response, respond, responses
 from .methods.simplify import Reduction, simplify
@@ -25,7 +26,7 @@ from .problem.spice import NoSpice, from_spice, to_spice
 from .simulation.errors import NoConvergence, NoSuchInput
 from .simulation.simulate import simulate
 from .simulation.trace import Trace
-from .solver.analysis import AC, DC, Step
+from .solver.analysis import DC, Step
 from .solver.errors import (
     Ambiguous,
     Contradiction,
@@ -134,6 +135,7 @@ __all__ = [
     "series",
     "simplify",
     "simulate",
+    "settled",
     "solve",
     "step_function",
     "square",

@@ -9,10 +9,11 @@ import sympy as sp
 from ..circuit.tree import Element, netlist
 from ..problem.problem import Problem
 from ..problem.quantities import Quantity
-from ..solver.analysis import AC, DC
+from ..solver.analysis import Analysis
 from ..solver.errors import NotLinear
 from ..solver.laws import is_linear, is_source
 from ..solver.solve import solve
+from .ac import settled
 
 
 @dataclass(frozen=True)
@@ -24,7 +25,7 @@ class Superposition:
     total: sp.Expr
 
 
-def superposition(problem: Problem, q: Quantity, analysis: DC | AC | None = None) -> Superposition:
+def superposition(problem: Problem, q: Quantity, analysis: Analysis | None = None) -> Superposition:
     elements = [e for e, _ in netlist(problem.circuit).parts]
     nonlinear = next((e for e in elements if not is_linear(e, analysis)), None)
     if nonlinear is not None:
@@ -34,6 +35,8 @@ def superposition(problem: Problem, q: Quantity, analysis: DC | AC | None = None
     return Superposition(q, parts, sp.simplify(sp.Add(*(v for _, v in parts))))
 
 
-def _alone(problem: Problem, source: Element, sources: list[Element], q: Quantity, analysis: DC | AC | None) -> sp.Expr:
+def _alone(
+    problem: Problem, source: Element, sources: list[Element], q: Quantity, analysis: Analysis | None
+) -> sp.Expr:
     others_off = {o: 0 for o in sources if o is not source}
-    return solve(Problem(problem.circuit, {**problem.given, **others_off}), analysis)(q)
+    return solve(Problem(problem.circuit, {**problem.given, **others_off}), analysis or settled(problem))(q)

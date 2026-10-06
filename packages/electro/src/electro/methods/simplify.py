@@ -17,7 +17,7 @@ from ..circuit.tree import GND, Element, Net, Node
 from ..circuit.wiring import rebuild
 from ..problem.problem import Problem
 from ..problem.quantities import element_of, points_of
-from ..solver.analysis import AC, DC, Analysis
+from ..solver.analysis import DC, Analysis
 from ..solver.expressions import subs
 from ..solver.port import matches, port
 from ..solver.symbols import Symbols, symbols
@@ -51,7 +51,7 @@ class _Pair:
 
 
 def simplify(
-    problem: Problem, keep: Collection[Element] = (), analysis: DC | AC | None = None
+    problem: Problem, keep: Collection[Element] = (), analysis: Analysis | None = None
 ) -> tuple[Problem, tuple[Reduction, ...]]:
     """The problem on a smaller circuit that behaves alike where it is asked about, and the steps there.
     What is sought, and ``keep``, stays as it is."""

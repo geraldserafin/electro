@@ -2,7 +2,7 @@
 uses for it."""
 
 from .basic import Capacitor, CurrentSource, Inductor, Resistor, VoltageSource
-from .boards import MODES, Arduino, Pico
+from .boards import Arduino, Pico
 from .chips import OPAMP_PARTS, OpAmpModel, Timer555
 from .controlled import CCCS, CCVS, VCCS, VCVS
 from .diodes import DIODE_PARTS, LED, LED_COLORS, RGBLED, Diode, DiodeDrop, SevenSegment, Zener
@@ -98,7 +98,6 @@ __all__ = [
     "LCD1602I2C",
     "LED",
     "LED_COLORS",
-    "MODES",
     "NAND",
     "NMOS",
     "NOR",

@@ -20,7 +20,7 @@ from ..circuit.time import TIME
 from ..circuit.tree import Circuit, Element
 from ..problem.problem import Problem
 from ..problem.quantities import Quantity, Scaled
-from .analysis import AC, Analysis, Step, interpret, is_before, phasors
+from .analysis import Analysis, interpret, is_before
 from .expressions import expr, subs, symbols_in
 from .laws import is_source, ways
 from .relation import Equation, Origin, Relation, Way, all_equations
@@ -153,8 +153,7 @@ def _read(eq: Equation, analysis: Analysis, values: Mapping[sp.Symbol, sp.Expr])
 
 
 def _reading(e: sp.Expr, analysis: Analysis, values: Mapping[sp.Symbol, sp.Expr]) -> sp.Expr:
-    read = subs(interpret(e, analysis), values)
-    return phasors(read, analysis.omega) if isinstance(analysis, AC) else read
+    return analysis.timed(subs(interpret(e, analysis), values))
 
 
 def _read_way(w: Way, analysis: Analysis, values: Mapping[sp.Symbol, sp.Expr]) -> Way:
@@ -163,19 +162,8 @@ def _read_way(w: Way, analysis: Analysis, values: Mapping[sp.Symbol, sp.Expr]) -
 
 
 def _letters(appearing: set[sp.Symbol], values: Mapping[sp.Symbol, sp.Expr], analysis: Analysis) -> set[sp.Symbol]:
-    """Symbols that appear but are not to be found: letters in the data (a value given as ``R``), ω of a
-    response, time, what a step remembers."""
+    """Symbols that appear but are not to be found: letters in the data (a value given as ``R``), the frame's
+    own (its length, …), time, what a frame remembers."""
     in_data = {x for v in values.values() for x in symbols_in(expr(v))}
-    of_analysis = _of_analysis(analysis)
     remembered = {x for x in appearing if is_before(x)}
-    return in_data | of_analysis | remembered | {TIME}
-
-
-def _of_analysis(analysis: Analysis) -> set[sp.Symbol]:
-    """ω of a response, a step's length as a letter."""
-    match analysis:
-        case AC(omega):
-            return symbols_in(expr(omega))
-        case Step(dt):
-            return symbols_in(expr(dt))
-    return set()
+    return in_data | analysis.letters() | remembered | {TIME}

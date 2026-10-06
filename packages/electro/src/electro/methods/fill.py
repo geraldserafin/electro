@@ -10,10 +10,11 @@ from ..circuit.tree import Element, netlist
 from ..circuit.wiring import rebuild
 from ..problem.problem import Problem
 from ..problem.quantities import Parameter
-from ..solver.analysis import AC, DC
+from ..solver.analysis import Analysis
 from ..solver.errors import Undetermined
 from ..solver.solution import Solution
 from ..solver.solve import solve
+from .ac import settled
 
 SIMPLEST_FIRST = (Wire, Open, Resistor, VoltageSource, CurrentSource)
 
@@ -25,12 +26,12 @@ class Filled:
     solution: Solution
 
 
-def fill(problem: Problem, hole: Element, analysis: DC | AC | None = None) -> Filled:
+def fill(problem: Problem, hole: Element, analysis: Analysis | None = None) -> Filled:
     """The first of ``SIMPLEST_FIRST`` that the data do not contradict and pin down."""
     for kind in SIMPLEST_FIRST:
         filled, by = _filled_with(problem, hole, kind)
         try:
-            solution = solve(filled, analysis)
+            solution = solve(filled, analysis or settled(filled))
         except Undetermined:
             continue
         if _pinned(solution, by):

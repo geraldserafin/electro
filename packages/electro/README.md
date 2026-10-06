@@ -59,8 +59,9 @@ Wielkości: `I(e)`, `U(e)`, `P(e)`, `Parameter(e)`, `V(punkt)`, `U(a, b)`; dana 
 Czego nie da się wyznaczyć — `MissingData` (ile danych brakuje i które by wystarczyły); dane sprzeczne —
 `Contradiction` (które się wykluczają); dwa rozwiązania — `Ambiguous`.
 
-Prąd zmienny: zadanie z sinusami jednej częstotliwości liczy się samo ich wskazami; `solve(zadanie,
-AC(ω))` przy danej częstotliwości. W czasie: `simulate(zadanie, until=…, dt=…, inputs={…})` zwraca ślad:
+Prąd zmienny: `solve(zadanie, AC(ω))` — wskazy przy ω; `settled(zadanie)` to `AC` przy częstotliwości
+sinusów zadania (albo DC). AC to też klatka: klatki bez końca, każda to poprzednia obrócona o ω·dt;
+solver nie wie nic o AC ani o żadnym elemencie — zamienia tylko prawa na wzór klatki (`methods/ac.py`). W czasie: `simulate(zadanie, until=…, dt=…, inputs={…})` zwraca ślad:
 `slad(q)`, `slad.at(q, t)`, `slad.spectrum(q)`. `solve` to jedna klatka: DC to klatka nieskończenie długa (`DC()` = `Step(∞)`, wszystko ustalone),
 `solve(zadanie, Step(dt), before=poprzednia)` — klatka `dt` po poprzedniej (domyślnie od spoczynku).
 Symulacja to nic więcej niż klatki jedna po drugiej; `simulate` liczy je skompilowane raz: `phi =

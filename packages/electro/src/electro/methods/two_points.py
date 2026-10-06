@@ -10,7 +10,7 @@ import sympy as sp
 from ..circuit.elements import Resistor
 from ..circuit.tree import Net, Node
 from ..problem.problem import Problem
-from ..solver.analysis import AC, DC
+from ..solver.analysis import DC, Analysis
 from ..solver.expressions import subs
 from ..solver.port import PORT_I, PORT_U, matches, port
 from ..solver.relation import Equation, Relation
@@ -26,7 +26,7 @@ class Thevenin:
     Z: sp.Expr
 
 
-def between(problem: Problem, a: Node | Net, b: Node | Net, analysis: DC | AC | None = None) -> Relation | None:
+def between(problem: Problem, a: Node | Net, b: Node | Net, analysis: Analysis | None = None) -> Relation | None:
     """A current let in at ``a`` and out at ``b``, the data in."""
     s = symbols(problem.circuit)
     pa, pb = (next(n for n, q in s.net.named if q == x) for x in (a, b))
@@ -37,7 +37,7 @@ def between(problem: Problem, a: Node | Net, b: Node | Net, analysis: DC | AC | 
     return Relation(relation.ends, tuple(Equation(subs(eq.expr, values), eq.origin) for eq in relation.equations))
 
 
-def resistance(relation: Relation | None, analysis: DC | AC | None = None) -> sp.Expr | None:
+def resistance(relation: Relation | None, analysis: Analysis | None = None) -> sp.Expr | None:
     """The one resistor (an impedance, in AC) a black box is, if it is one."""
     return matches(relation, Resistor, analysis) if relation is not None else None
 

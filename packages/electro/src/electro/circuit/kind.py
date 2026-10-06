@@ -65,7 +65,10 @@ class Kind:
     ``parameters`` are named, ``""`` being the main one, given as the element's value. ``defaults`` is
     what a parameter is when nothing is given; ``positive`` lists those never negative (a resistance);
     ``inputs``, those the world sets while it runs (a hand on a switch, the light on a sensor, a
-    microcontroller on its pin): on paper each is a datum like any other."""
+    microcontroller on its pin): on paper each is a datum like any other. ``shows``: what a page reads of it
+    besides its currents and inner quantities — a voltage between two of its terminals, or the current into
+    one, by name. ``modes``: a board's pin's ways (``"high"``, ``"pullup"``), each its conductance to the pin's
+    source and that source's voltage, set as the pin's ``_G`` and ``_E``."""
 
     name: str
     prefix: str
@@ -75,6 +78,8 @@ class Kind:
     defaults: tuple[tuple[str, object], ...] = ()
     positive: tuple[str, ...] = ()
     inputs: tuple[str, ...] = ()
+    shows: tuple[tuple[str, tuple[str, str] | str], ...] = ()
+    modes: tuple[tuple[str, tuple[float, float]], ...] = ()
 
     def __call__(self, name: str | None = None) -> Element:
         return Element(self, name)

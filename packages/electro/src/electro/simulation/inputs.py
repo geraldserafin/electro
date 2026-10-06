@@ -6,7 +6,7 @@ from __future__ import annotations
 from collections.abc import Callable, Mapping
 from typing import cast
 
-from ..circuit.elements import BY_NAME, MODES
+from ..circuit.elements import BY_NAME
 from ..circuit.tree import Element
 from ..solver.step import StepFunction
 from ..solver.symbols import Symbols
@@ -49,7 +49,8 @@ def _setter(phi: StepFunction, name: str) -> Setter:
 
 
 def _pin(phi: StepFunction, label: str, pin: str) -> Setter | None:
-    modes = MODES.get(phi.kinds.get(label, ""))
+    kind = BY_NAME.get(phi.kinds.get(label, ""))
+    modes = dict(kind.modes) if kind is not None and kind.modes else None
     g, e = f"{label}_{pin}_G", f"{label}_{pin}_E"
     if modes is None or g not in phi.inputs:
         return None
@@ -71,7 +72,7 @@ def _available(phi: StepFunction) -> list[str]:
     out = []
     for label, kind_name in phi.kinds.items():
         kind = BY_NAME[kind_name]
-        if kind_name in MODES:
+        if kind.modes:
             out += [f"{label}.{w[:-2]}" for w in kind.inputs if w.endswith("_G")]
         else:
             out += [label] if len(kind.inputs) == 1 else [f"{label}_{w}" for w in kind.inputs]

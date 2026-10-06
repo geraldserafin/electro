@@ -31,7 +31,7 @@ def _board(pins: tuple[str, ...], supplies: dict[str, object]):
     return laws
 
 
-def _board_kind(name: str, prefix: str, pins: tuple[str, ...], supplies: dict[str, object]) -> Kind:
+def _board_kind(name: str, prefix: str, pins: tuple[str, ...], supplies: dict[str, object], modes: dict) -> Kind:
     settable = tuple(f"{pin}_{x}" for pin in pins for x in ("G", "E"))
     return Kind(
         name,
@@ -41,13 +41,12 @@ def _board_kind(name: str, prefix: str, pins: tuple[str, ...], supplies: dict[st
         parameters=settable,
         defaults=tuple((p, 0) for p in settable),
         inputs=settable,
+        modes=tuple(modes.items()),
     )
 
 
-Arduino = _board_kind("arduino", "ARD", ARDUINO_PINS, {"5V": 5})
+Arduino = _board_kind("arduino", "ARD", ARDUINO_PINS, {"5V": 5}, ARDUINO_MODES)
 """An Arduino Uno: ``D0``–``D13``, ``A0``–``A5``, its 5 V supply."""
 
-Pico = _board_kind("pico", "PICO", PICO_PINS, {"VBUS": 5, "3V3": sp.Rational(33, 10)})
+Pico = _board_kind("pico", "PICO", PICO_PINS, {"VBUS": 5, "3V3": sp.Rational(33, 10)}, PICO_MODES)
 """A Raspberry Pi Pico: ``GP0``–``GP22``, ``GP26``–``GP28``, its USB's ``VBUS`` and its regulator's ``3V3``."""
-
-MODES = {"arduino": ARDUINO_MODES, "pico": PICO_MODES}

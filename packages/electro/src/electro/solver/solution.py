@@ -9,7 +9,7 @@ import sympy as sp
 
 from ..problem.problem import Problem
 from ..problem.quantities import Current, Parameter, Power, Quantity, Voltage
-from .analysis import AC, DC, Analysis
+from .analysis import DC, Analysis
 from .errors import MissingData, Undetermined
 from .expressions import subs, symbols_in
 from .relation import Origin
@@ -52,8 +52,8 @@ class Solution:
             from ..problem.names import evaluated, naming
 
             return evaluated(q, self, *naming(self.problem.circuit))
-        if isinstance(q, Power) and isinstance(self.analysis, AC):
-            return self._average_power(q)
+        if isinstance(q, Power):
+            return sp.simplify(self.analysis.product(self(Voltage(q.of)), self(Current(q.of))))
         value = sp.simplify(self._expression(q))
         if value.free_symbols & self.unknowns:
             raise Undetermined(q)
@@ -91,11 +91,6 @@ class Solution:
     def evaluated(self, e: sp.Expr) -> sp.Expr:
         """``e``, of the circuit's variables, with what was found and what was given in."""
         return subs(subs(e, self.values), parameter_values(self.problem, self.symbols))
-
-    def _average_power(self, q: Power) -> sp.Expr:
-        """Of phasors: ½·Re(U·I*)."""
-        u, i = self(Voltage(q.of)), self(Current(q.of))
-        return sp.simplify(sp.re(sp.expand(u * sp.conjugate(i), complex=True)) / 2)
 
     def _pinning(self, x: sp.Symbol, lacking: list[sp.Expr]) -> list[Quantity]:
         """Quantities each of which, given, would pin ``x`` and with it all that is lacking."""

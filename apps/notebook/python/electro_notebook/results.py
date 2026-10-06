@@ -7,7 +7,20 @@ from __future__ import annotations
 from collections.abc import Callable, Mapping
 
 import sympy as sp
-from electro import Current, Element, Parameter, Power, Problem, Solution, Voltage, fill, is_source, reading, solve
+from electro import (
+    Current,
+    Element,
+    Parameter,
+    Power,
+    Problem,
+    Solution,
+    Voltage,
+    fill,
+    is_source,
+    reading,
+    settled,
+    solve,
+)
 from electro.values import UNKNOWN, fmt
 
 
@@ -18,7 +31,7 @@ def solved(problem: Problem, elements: Mapping[str, Element]) -> tuple[Solution,
         id, hole = holes[0]
         filled = fill(problem, hole)
         return filled.solution, {id: filled.by}
-    return solve(problem), {}
+    return solve(problem, settled(problem)), {}
 
 
 def shown(solution: Solution, q) -> sp.Expr:

@@ -8,11 +8,11 @@ from __future__ import annotations
 from collections.abc import Mapping
 
 import sympy as sp
+from electro import AC, DC
 from electro import latex as tex
 from electro.circuit.tree import Element
 from electro.problem.netlist import point_names
 from electro.problem.quantities import Quantity
-from electro.solver.analysis import AC, DC
 from electro.solver.errors import MissingData
 from electro.solver.relation import Origin
 from electro.solver.solution import Solution, SolutionStep

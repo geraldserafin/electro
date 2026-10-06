@@ -60,6 +60,7 @@ from electro import (
     Zener,
     at,
     beside,
+    settled,
     simulate,
     solve,
     step_function,
@@ -229,9 +230,10 @@ def test_square_source_has_its_frequency_and_duty():
 def test_a_sine_on_paper_is_its_phasor_and_a_square_needs_time():
     e, r = SineSource(), Resistor()
     circuit, n = net((e, "GND", "a"), (r, "a", "GND"))
-    assert solve(Problem(circuit, {e: {"": 10, "f": 50}, r: 5}))(I(r)) == 2
+    plain = Problem(circuit, {e: {"": 10, "f": 50}, r: 5})
+    assert solve(plain, settled(plain))(I(r)) == 2
     shifted = Problem(circuit, {e: {"": 10, "f": 50, "phase": 90}, r: 5})
-    assert complex(solve(shifted)(I(r))) == pytest.approx(2j)
+    assert complex(solve(shifted, settled(shifted))(I(r))) == pytest.approx(2j)
     assert max(simulate(shifted, until=0.001)(V(n["a"]))[:3]) == pytest.approx(10, rel=0.01)
     square, r = SquareSource(), Resistor()
     circuit, _ = net((square, "GND", "a"), (r, "a", "GND"))
@@ -563,3 +565,15 @@ def test_solve_is_a_simulation_of_one_frame():
     assert [float(f(V(a))) for f in frames] == pytest.approx([f.x[phi.unknowns.index("V_A")] for f in stepped])
     assert frames[-1].time == sp.Rational(3, 10**4)
     assert solve(rc)(V(a)) == 10 == pytest.approx(phi(phi.rest, math.inf).x[phi.unknowns.index("V_A")])
+
+
+def test_ac_is_the_frames_forever_under_a_sine():
+    from electro import Capacitor, Resistor, SineSource
+
+    e, r, c = SineSource("E"), Resistor("R"), Capacitor("C")
+    a = Node("A")
+    rc = Problem(GND >> e >> r >> a >> c >> GND, {e: {"": 1, "f": 1000}, r: 1000, c: "100n"})
+    phasor = abs(complex(solve(rc, settled(rc))(V(a))))
+    trace = simulate(rc, until=0.02, dt=1e-6)
+    last = [v for t, v in zip(trace.t, trace(V(a))) if t > 0.019]
+    assert max(last) == pytest.approx(phasor, rel=1e-2)

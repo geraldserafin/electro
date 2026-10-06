@@ -73,7 +73,14 @@ PassiveBuzzer = Kind("passive_buzzer", "BZ", ("a", "b"), _resistance(16), parame
 Motor = Kind("motor", "M", ("a", "b"), _motor, parameters=())
 """A small DC motor (a 130-size one, for 3–6 V)."""
 
-Servo = Kind("servo", "M", ("sig", "vcc", "gnd"), _servo, parameters=())
+Servo = Kind(
+    "servo",
+    "M",
+    ("sig", "vcc", "gnd"),
+    _servo,
+    parameters=(),
+    shows=(("U_sig", ("sig", "gnd")), ("U", ("vcc", "gnd")), ("I", "vcc")),
+)
 """A hobby servo: its angle follows the pulses on ``sig`` (the page reads them)."""
 
 Relay = Kind("relay", "K", ("a", "b", "com", "nc", "no"), _relay, parameters=())

@@ -2,8 +2,9 @@
 and Jacobian — Python here, JavaScript for the page's engine — and Newton's method on it. The same for a
 circuit at rest (``solve``) and for each step of one in time (``simulate``).
 
-Two things help Newton, neither any element's own: every exponential grows along its tangent far out, and one
-passing a tiny current at zero — a p-n junction — is approached along it, as SPICE does.
+Two things help Newton, both read off the shape of the laws, never any element's: every exponential grows
+along its tangent far out, and one that is tiny at zero but steep (as a p-n junction's, whatever has one) is
+approached along it, as SPICE does.
 """
 
 from __future__ import annotations
@@ -28,7 +29,7 @@ Kernel = Callable[[list[float], list[float], list[float], list[float]], None]
 
 EXP_LIMIT = 80.0
 JUNCTION = 1e-6
-"""An exponential passing less than this at zero is a p-n junction."""
+"""An exponential less than this at zero is approached along it."""
 RELTOL, VNTOL = 1e-6, 1e-6
 MAX_NEWTON = 60
 

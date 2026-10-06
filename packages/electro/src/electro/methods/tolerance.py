@@ -15,6 +15,7 @@ from ..circuit.tree import Element
 from ..problem.problem import Problem
 from ..problem.quantities import Quantity
 from ..solver.solve import solve
+from .ac import settled
 
 
 @dataclass(frozen=True)
@@ -43,7 +44,7 @@ def spreads(
     tolerances = _tolerances(problem, tol)
     nominal = {e: float(cast(sp.Expr, problem.given[e])) for e in tolerances}
     letters = {e: sp.Symbol(f"tol_{i}") for i, e in enumerate(nominal)}
-    solution = solve(Problem(problem.circuit, {**problem.given, **letters}))
+    solution = solve(Problem(problem.circuit, {**problem.given, **letters}), settled(problem))
     at = [sp.lambdify(list(letters.values()), solution(q), "cmath") for q in qs]
     rng = random.Random(seed)
     builds = [[v * (1 + rng.uniform(-tolerances[e], tolerances[e])) for e, v in nominal.items()] for _ in range(runs)]

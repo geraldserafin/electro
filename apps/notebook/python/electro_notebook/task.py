@@ -13,7 +13,7 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 
 import sympy as sp
-from electro import Problem, solve
+from electro import Problem, settled, solve
 from electro.latex import name
 from electro.problem.names import name_of, named, naming
 from electro.problem.quantities import Quantity
@@ -71,7 +71,7 @@ def task(
     else:
         quantity = find
         label = name_of(find, {e: k for k, e in elements.items()}, {p: k for k, p in points.items()})
-    value = complex(sp.N(shown(solve(problem), quantity)))
+    value = complex(sp.N(shown(solve(problem, settled(problem)), quantity)))
     amplitude = abs(value.imag) > 1e-12 * max(1.0, abs(value))
     number = abs(value) if amplitude else value.real
     letter = label.partition("_")[0]

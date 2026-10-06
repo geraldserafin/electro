@@ -69,9 +69,17 @@ Ultrasonic = Kind(
     parameters=("echo",),
     defaults=(("echo", 0),),
     inputs=("echo",),
+    shows=(("U", ("vcc", "gnd")), ("U_trig", ("trig", "gnd")), ("I", "vcc")),
 )
 
-LCD1602 = Kind("lcd1602", "LCD", ("vss", "vdd", "v0", *LCD_INPUTS, "a", "k"), _lcd, parameters=())
+LCD1602 = Kind(
+    "lcd1602",
+    "LCD",
+    ("vss", "vdd", "v0", *LCD_INPUTS, "a", "k"),
+    _lcd,
+    parameters=(),
+    shows=(("U", ("vdd", "vss")), *((f"U_{p}", (p, "vss")) for p in ("v0", *LCD_INPUTS)), ("I", "vdd")),
+)
 """Its 16 pins in order."""
 
 LCD1602I2C = Kind("lcd1602_i2c", "LCD", ("gnd", "vcc", "sda", "scl"), _i2c(200), parameters=())

@@ -18,7 +18,6 @@ from dataclasses import dataclass, field
 
 import sympy as sp
 
-from ..circuit.elements.modules import LCD_INPUTS
 from ..circuit.time import TIME, D, Pre
 from ..circuit.tree import Net
 from ..problem.problem import Problem
@@ -36,14 +35,6 @@ STEP_VOLTS, STEP_AMPS = 0.05, 1e-3
 """How far a remembered current may move in one step; a voltage, or anything else."""
 SINE_STEPS, EDGE_STEPS = 40, 100
 """Steps at least in a period of a sine, of a square wave."""
-
-PAGE: dict[str, dict[str, tuple[str, str] | str]] = {
-    "servo": {"U_sig": ("sig", "gnd"), "U": ("vcc", "gnd"), "I": "vcc"},
-    "ultrasonic": {"U": ("vcc", "gnd"), "U_trig": ("trig", "gnd"), "I": "vcc"},
-    "lcd1602": {"U": ("vdd", "vss"), **{f"U_{p}": (p, "vss") for p in ("v0", *LCD_INPUTS)}, "I": "vdd"},
-}
-"""What the page reads of a kind besides its currents and inner quantities: a voltage between two of its
-terminals, or a current into one, by name."""
 
 
 @dataclass
@@ -234,7 +225,7 @@ def _most(x: sp.Expr) -> float:
 
 def _observed(s: Symbols, exprs: list[sp.Expr], unknowns: list[sp.Symbol]) -> dict[str, dict[str, sp.Symbol]]:
     """What the page reads of each element, by name: ``U``, ``I`` of two terminals, ``I_<terminal>`` of more,
-    its inner quantities, and ``PAGE``'s. A voltage not yet an unknown becomes one, with its equation."""
+    its inner quantities, and what its kind ``shows``. A voltage not yet an unknown becomes one, with its equation."""
     out: dict[str, dict[str, sp.Symbol]] = {}
     for k, (label, (e, _)) in enumerate(zip(s.labels, s.net.parts)):
         t = s.terminals(k)
@@ -246,7 +237,7 @@ def _observed(s: Symbols, exprs: list[sp.Expr], unknowns: list[sp.Symbol]) -> di
         else:
             named |= {f"I_{name}": c for name, c in currents.items()}
         named |= {name: sp.Symbol(f"{name}_{label}") for name in inner_names(e.kind)}
-        for name, what in PAGE.get(e.kind.name, {}).items():
+        for name, what in e.kind.shows:
             if isinstance(what, str):
                 named[name] = currents[what]
             else:

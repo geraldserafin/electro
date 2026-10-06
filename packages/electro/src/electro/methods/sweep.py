@@ -13,8 +13,9 @@ from electro.values import parse
 
 from ..problem.problem import Key, Problem
 from ..problem.quantities import Quantity
-from ..solver.analysis import AC, DC
+from ..solver.analysis import Analysis
 from ..solver.solve import solve
+from .ac import settled
 
 
 @dataclass(frozen=True)
@@ -23,14 +24,16 @@ class Sweep:
     results: tuple[sp.Expr, ...]
 
 
-def sweep(problem: Problem, key: Key, values: Sequence[object], q: Quantity, analysis: DC | AC | None = None) -> Sweep:
+def sweep(problem: Problem, key: Key, values: Sequence[object], q: Quantity, analysis: Analysis | None = None) -> Sweep:
     return sweeps(problem, key, values, [q], analysis)[q]
 
 
 def sweeps(
-    problem: Problem, key: Key, values: Sequence[object], qs: Sequence[Quantity], analysis: DC | AC | None = None
+    problem: Problem, key: Key, values: Sequence[object], qs: Sequence[Quantity], analysis: Analysis | None = None
 ) -> dict[Quantity, Sweep]:
     letter = sp.Symbol("swept")
-    solution = solve(Problem(problem.circuit, {**problem.given, key: letter}, problem.find), analysis)
+    solution = solve(
+        Problem(problem.circuit, {**problem.given, key: letter}, problem.find), analysis or settled(problem)
+    )
     numbers = tuple(cast(sp.Expr, parse(v)) for v in values)
     return {q: Sweep(numbers, tuple(cast(sp.Expr, solution(q).subs(letter, v)) for v in numbers)) for q in qs}

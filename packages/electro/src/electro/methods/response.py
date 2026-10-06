@@ -13,8 +13,8 @@ import sympy as sp
 from ..circuit.tree import Element
 from ..problem.problem import Problem
 from ..problem.quantities import Quantity
-from ..solver.analysis import AC
 from ..solver.solve import solve
+from .ac import AC
 
 HALF_POWER_DB = 3.0103
 
