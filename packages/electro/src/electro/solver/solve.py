@@ -12,7 +12,7 @@ from .by_cases import solve_by_cases
 from .by_hand import solve_by_hand
 from .errors import Contradiction, NotLinear, Undetermined
 from .expressions import symbols_in
-from .newton import compiled, homotopy
+from .numeric import compile_equations, homotopy
 from .relation import all_equations
 from .solution import Solution, SolutionStep
 from .system import SOURCES, System, equations, relation
@@ -92,11 +92,11 @@ def _by_newton(problem: Problem) -> Solution:
     unknowns = list(raised.unknowns)
     if any(x not in {*unknowns, SOURCES} for e in exprs for x in symbols_in(e)):
         raise Undetermined("a non-linear circuit is solved with every value given")
-    f, j = compiled(exprs, unknowns, (SOURCES,))
-    found = homotopy(f, j, len(unknowns))
+    numeric = compile_equations(exprs, unknowns, [SOURCES], raised.symbols.potentials, limited=False)
+    found = homotopy(lambda x0, lam: numeric.newton(x0, [lam]), len(numeric.unknowns))
     if found is None:
         raise Undetermined("Newton did not get there")
-    values = {u: sp.Float(v) for u, v in zip(unknowns, found)}
+    values = {u: sp.Float(v) for u, v in zip(numeric.unknowns, found) if u in unknowns}
     step = SolutionStep(
         tuple(values), tuple(values.values()), tuple(eq.origin for eq in raised.equations), "numerically"
     )

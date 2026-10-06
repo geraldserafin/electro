@@ -953,8 +953,10 @@ warstw. Kierunek zależności jest jeden: `circuit` ← `problem` ← `solver` �
   (`data.py`).
 - **`solver/`**: liczenie. Relacja (`relation.py`), analizy (`analysis.py`), co prawa mówią o sobie
   (`laws.py`), nazwy zmiennych (`symbols.py`), równania zadania (`system.py`), rozwiązywanie ręczne
-  (`by_hand.py`), przez przypadki (`by_cases.py`), Newton (`newton.py`), wybór drogi (`solve.py`),
-  czarna skrzynka (`port.py`), symulacja (`simulate.py`).
+  (`by_hand.py`), przez przypadki (`by_cases.py`), liczbami — równania jako kod i Newton (`numeric.py`),
+  wybór drogi (`solve.py`), czarna skrzynka (`port.py`).
+- **`simulation/`**: krok w czasie to te same równania (`Step(dt)`) i ten sam Newton co w `solve`; własne
+  ma tylko to, co czas dokłada: co pamiętane między krokami i jak długi krok (`program.py`, `run.py`).
 - **`methods/`**: metody podręcznikowe, po pliku na metodę.
 
 Zasady: w kodzie nie ma komentarzy, jest tylko dokumentacja (docstringi). Gdy coś trzeba objaśnić, staje
@@ -1007,7 +1009,7 @@ JSON co dotąd; `live` w notatniku idzie przez netlistę jako dane (`problem/net
 robi z rysunku kernel. Wszystkie testy symulacji starej biblioteki działają na rdzeniu
 (`test_simulation.py`). Ustalenia:
 
-- Pomoc dla Newtona jest ogólna, w kompilatorze: szept przewodności do masy w każdym punkcie, `limexp`
+- Pomoc dla Newtona jest ogólna, w kompilatorze (`solver/numeric.py`, wspólny z `solve`): szept przewodności do masy w każdym punkcie, `limexp`
   dla każdej wykładniczej, a dla tej z maleńkim prądem w zerze (złącze) krok jak w SPICE.
 - Krok pilnuje tego, co pamiętane: napięcie o ≤ 0,05 V, prąd o ≤ 1 mA na krok; stan wewnętrzny tylko pod
   `Pre` (przerzutnik) skacze; sinus i fala prostokątna wyznaczają najdłuższy krok, zbocze w czasie skraca

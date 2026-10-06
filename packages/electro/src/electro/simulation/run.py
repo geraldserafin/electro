@@ -1,5 +1,6 @@
-"""A program running: steps as long as what is remembered allows, Newton's method in each. The same loop as
-the page's engine (``simulation/engine.ts``), so both give the same numbers."""
+"""A program running: steps as long as what is remembered allows, each step ``solve``'s Newton
+(``solver.numeric``). The same loop as the page's engine (``simulation/engine.ts``), so both give the same
+numbers."""
 
 from __future__ import annotations
 
@@ -7,24 +8,10 @@ import math
 from collections.abc import Callable
 
 from .errors import NoConvergence
-from .linear import solve_linear
 from .program import Program
-
-RELTOL, VNTOL = 1e-6, 1e-6
-MAX_NEWTON = 60
 
 Schedule = Callable[[float], list[tuple[int, float]]]
 """What the world sets at a time: ``[(param index, value)]``."""
-
-
-def junction_step(new: float, old: float, nvt: float, vcrit: float) -> float:
-    """SPICE's: along the exponential, never far past its bend in one go."""
-    if new > vcrit and abs(new - old) > 2 * nvt:
-        if old > 0:
-            arg = 1 + (new - old) / nvt
-            return old + nvt * math.log(arg) if arg > 0 else vcrit
-        return nvt * math.log(new / nvt)
-    return new
 
 
 class Simulation:
@@ -32,7 +19,7 @@ class Simulation:
 
     def __init__(self, program: Program):
         self.program = program
-        self.kernel, self.update, _ = program.functions()
+        self.update, _ = program.functions()
         self.n = len(program.unknowns)
         self.x = [0.0] * self.n
         self.p = list(program.initial)
@@ -41,24 +28,8 @@ class Simulation:
         self.step = 0.0
 
     def newton(self, dt: float) -> list[float] | None:
-        n, p = self.n, self.p
-        p[0], p[1] = dt, self.t + dt
-        x = list(self.x)
-        F, J = [0.0] * n, [0.0] * (n * n)
-        for iteration in range(1, MAX_NEWTON + 1):
-            J[:] = [0.0] * (n * n)
-            self.kernel(x, p, F, J)
-            dx = solve_linear(J, [-f for f in F], n)
-            if dx is None or any(math.isnan(d) for d in dx):
-                return None
-            new = [a + d for a, d in zip(x, dx)]
-            for i, nvt, vcrit in self.program.junctions:
-                new[i] = junction_step(new[i], x[i], nvt, vcrit)
-            done = all(abs(a - b) <= RELTOL * max(abs(a), abs(b)) + VNTOL for a, b in zip(new, x))
-            x = new
-            if done and iteration > 1:
-                return x
-        return None
+        self.p[0], self.p[1] = dt, self.t + dt
+        return self.program.equations.newton(self.x, self.p)
 
     def advance(self, dt: float, jump: bool = False) -> tuple[bool, float]:
         """One step of ``dt``: (taken?, how much of its allowed move a remembered value used). ``jump``: taken
