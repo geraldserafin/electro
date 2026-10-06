@@ -99,7 +99,27 @@ zmieniają (oporniki, C/dt). Silnik (`engine.System`) chodzi tylko po niezerach:
 - obwód bez `exp` to jeden krok na klatkę, bez drugiego sprawdzającego;
 - pivot, który w tej klatce wyszedł zerem (otwarty przełącznik), cofa do zwykłej eliminacji z wyborem.
 
-Pomiar (Node, ten sam wynik w każdym; październik 2026), klatek na sekundę:
+Klatka czyta zmianę trapezami (`θ = ½`: średnia nachyleń na obu końcach klatki to zmiana przez nią, błąd
+maleje jak dt²); dwie klatki po skoku (start, przełączenie, wejście ustawione przez świat) — wstecz
+(`θ = 1`, Euler), bo trapezy przez skok dzwonią: nachylenie z klatki skoku odbija się co krok ze zmienionym
+znakiem. Na RC przy tej samej liczbie klatek błąd jest ~100 razy mniejszy niż samym Eulerem.
+
+Uczciwie z ngspice — czas do tej samej dokładności (wzorzec: ngspice z krokiem 0,1 µs; czas ngspice z jego
+licznika samej analizy, nasz — silnik strony w Node, bez kompilacji; 0,1 s, sinus 5 V, 50 Hz):
+
+| obwód | dokładność | my | ngspice |
+|---|---|---|---|
+| drabinka RC × 10 | 2,5·10⁻⁶ | 1,4 ms | 4,4 ms |
+| drabinka RC × 10 | 4,5·10⁻⁷ | 2,7 ms | 10,9 ms |
+| drabinka RC × 40 | 2,5·10⁻⁸ | 4,3 ms | 10,8 ms |
+| drabinka RC × 40 | 1·10⁻⁹ | 21,9 ms | 53,6 ms |
+| dioda + RC | 2·10⁻⁴ | 0,6 ms | 0,9 ms |
+
+Dioda niżej niż ~7·10⁻⁵ nie schodzi: to nie krok, a model (ngspice liczy V_T w 300,15 K, my w 300 K).
+ngspice sam dobiera krok z oszacowania błędu; u nas krok ogranicza to, jak szybko zmienia się pamięć,
+i `dt` — kontroli błędu jeszcze nie ma.
+
+Klatek na sekundę (przed trapezami; Node, ten sam wynik w każdym):
 
 | obwód | pełna eliminacja | rzadka | ngspice |
 |---|---|---|---|

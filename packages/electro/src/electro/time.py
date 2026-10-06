@@ -16,6 +16,10 @@ TIME = sp.Symbol("t")
 DT = sp.Symbol("dt", positive=True)
 """A frame's length."""
 
+THETA = sp.Symbol("theta", positive=True)
+"""How a frame reads a change (``frame.Step``): 1 the change over the frame (backward Euler), ½ the mean of
+the slopes at its two ends (trapezoids)."""
+
 
 def when(condition: sp.Basic, then: sp.Expr | float, otherwise: sp.Expr | float) -> sp.Expr:
     """``then`` while ``condition`` holds, else ``otherwise``."""

@@ -26,13 +26,15 @@ from .element import Element
 from .engine import Machine, NoConvergence
 from .errors import NotSimulated, ValueNeeded
 from .formula import Formula, NotClosed, formula, parameter_values
-from .frame import DT, Step, before
+from .frame import DT, Step, before, interpret, slope
 from .quantities import Quantity, Scaled
-from .time import TIME
+from .time import THETA, TIME, D
 
 G_NODE = 1e-12
 STEP_VOLTS, STEP_AMPS = 0.05, 1e-3
 """How far a remembered voltage (or anything else) may move in one step; a remembered current."""
+ANY = 1e300
+"""How far a value may move in one step when it may move any way (a slope)."""
 SAMPLE_DT = 1e-5
 """A step's length in the sample frame whose numbers choose the pivots (``sparse``)."""
 SINE_STEPS, EDGE_STEPS = 40, 100
@@ -172,7 +174,7 @@ def step_function(circuit: Element, values: Mapping) -> StepFunction:
     for e in circuit.members:
         if e.relation.choices:
             raise NotSimulated(e.name or e.kind)
-    first = formula(circuit, values, Step(DT), kept=True)
+    first = formula(circuit, values, Step(DT, THETA), kept=True)
     labels = first.names.labels
     given = parameter_values(circuit, values, first.names)
     inputs = [
@@ -181,7 +183,7 @@ def step_function(circuit: Element, values: Mapping) -> StepFunction:
         for w in e.inputs
     ]
     letters = {param: letter for param, letter, _ in inputs}
-    left = formula(circuit, values, Step(DT), kept=True, letters=letters, leak=G_NODE)
+    left = formula(circuit, values, Step(DT, THETA), kept=True, letters=letters, leak=G_NODE)
     if left.system.params:
         raise ValueNeeded(min(p.name for p in left.system.params))
     exprs = [q.expr for q in left.system.equations]
@@ -189,7 +191,7 @@ def step_function(circuit: Element, values: Mapping) -> StepFunction:
     memory = _memory(left, {**given, **letters})
     clocks = _clocks([*exprs, *(v for _, v, _ in left.definitions)])
     states = memory + clocks
-    params = [DT, TIME, *(st.symbol for st in states), *(letter for _, letter, _ in inputs)]
+    params = [DT, TIME, THETA, *(st.symbol for st in states), *(letter for _, letter, _ in inputs)]
     parts = _observed(circuit, left)
     flowing = {f"{labels[e]}.{t}": c.xreplace(left.names.to) for e in circuit.members for t, c in e.I.items()}
     seen = {str(v): v for v in left.names.points.values()}
@@ -197,7 +199,7 @@ def step_function(circuit: Element, values: Mapping) -> StepFunction:
     seen = {name: left.resolve(expr(value)) for name, value in seen.items()}
     _check_square([*exprs, *seen.values()], unknowns, params, len(exprs))
     potentials = [v for v in left.names.to.values() if str(v).startswith("V_")]
-    initial = [0.0, 0.0, *(st.initial for st in states), *(value for _, _, value in inputs)]
+    initial = [0.0, 0.0, 1.0, *(st.initial for st in states), *(value for _, _, value in inputs)]
     sample = [SAMPLE_DT, 0.0, *initial[2:]]
     currents = [v for _, v, _ in left.definitions]
     compiled = compile_equations(exprs, unknowns, params, potentials, currents=currents, sample=sample)
@@ -208,8 +210,8 @@ def step_function(circuit: Element, values: Mapping) -> StepFunction:
         left=left,
         equations=compiled,
         initial=initial,
-        states=[(2 + k, st.most) for k, st in enumerate(states)],
-        inputs={letter.name: 2 + len(states) + k for k, (_, letter, _) in enumerate(inputs)},
+        states=[(3 + k, st.most) for k, st in enumerate(states)],
+        inputs={letter.name: 3 + len(states) + k for k, (_, letter, _) in enumerate(inputs)},
         update_body=statements([(f"out[{k}]", st.update) for k, st in enumerate(states)], unknowns, params),
         seen=seen,
         see_body=statements([(f"out[{k}]", v) for k, v in enumerate(seen.values())], unknowns, params),
@@ -223,12 +225,18 @@ def step_function(circuit: Element, values: Mapping) -> StepFunction:
 def _memory(left: Formula, values) -> list[_State]:
     """What is remembered, from rest: each quantity under ``D`` or ``Pre``, after a step as what is found then
     has it. An inner one only under ``Pre`` is a state that jumps (a flip-flop's); the rest move at most so far
-    a step."""
+    a step. Of each under ``D``, how fast it changed at the end of the step too, for the next to go by
+    trapezoids."""
     under_d, under_pre = left.remembered
-    return [
+    kept = [
         _State(before(x), left.resolve(subs(x, values)), 0.0, None if x not in under_d and _inner(x) else _most(x))
         for x in sorted(under_d | under_pre, key=str)
     ]
+    slopes = [
+        _State(slope(x), left.resolve(subs(interpret(D(x), Step(DT, THETA)), values)), 0.0, ANY)
+        for x in sorted(under_d, key=str)
+    ]
+    return kept + slopes
 
 
 def _inner(x: sp.Expr) -> bool:

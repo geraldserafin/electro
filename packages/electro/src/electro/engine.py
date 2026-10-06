@@ -20,6 +20,8 @@ RELTOL = 1e-6
 VNTOL = 1e-6
 MAX_NEWTON = 60
 EXP_LIMIT = 80.0
+ROUGH = 2
+"""Steps back over the step (θ = 1) after a jump, before trapezoids."""
 GUESSES = 64
 """Input combinations whose circuit is remembered as Newton's first guess (the most recent)."""
 
@@ -33,8 +35,8 @@ class NoConvergence(Exception):
 
 
 class Machine:
-    """A circuit in time. ``program``: ``initial`` (the parameters at rest: dt, t, what is remembered, what
-    the world sets), ``states`` (each remembered value's parameter and the most it may move in a step, None:
+    """A circuit in time. ``program``: ``initial`` (the parameters at rest: dt, t, how a change is read —
+    θ: 1 back over the step, ½ trapezoids —, what is remembered, what the world sets), ``states`` (each remembered value's parameter and the most it may move in a step, None:
     it jumps), ``inputs`` (name → parameter), ``junctions`` (unknown, scale, bend) and the unknowns' count
     ``n``. Its memory: the time ``t``, the unknowns ``x``, the parameters ``p``, the next step's length."""
 
@@ -52,6 +54,10 @@ class Machine:
         self.t = 0.0
         self.step = 0.0
         self.switched = False
+        # the two steps after a jump (the start, something switched, the world set something) go back over the
+        # step (θ = 1): trapezoids across a jump ring, every slope after it flipping sign, and the first step's
+        # slope is the jump's; the second's is how things then move. The rest by trapezoids
+        self.rough = ROUGH
         # Newton's first guess when the inputs change: the circuit as it last was with those inputs. A PWM pin,
         # a multiplexed display go back and forth between a few of them; from its own last state a step
         # converges in two iterations instead of fifteen (a LED turning on, walked up its exponential)
@@ -72,6 +78,7 @@ class Machine:
             if len(list(self.guesses.keys())) > GUESSES:
                 del self.guesses[list(self.guesses.keys())[0]]
             self.changed = True
+        self.rough = ROUGH
         self.p[i] = value
 
     def key(self):
@@ -81,6 +88,7 @@ class Machine:
         """The unknowns ``dt`` after now, or None: Newton did not get there."""
         self.p[0] = dt
         self.p[1] = self.t + dt
+        self.p[2] = 1.0 if self.rough > 0 else 0.5
         x0 = self.x
         if self.changed:
             x0 = self.guesses.get(self.key(), self.x)
@@ -104,10 +112,12 @@ class Machine:
         self.x = x
         self.t += dt
         self.switched = False
+        self.rough = max(0, self.rough - 1)
         for k in range(len(self.states)):
             i, most = self.states[k]
             if most is None and self.after[k] != self.p[i]:
                 self.switched = True
+                self.rough = ROUGH
             self.p[i] = self.after[k]
         return [True, change]
 
@@ -121,7 +131,9 @@ class Machine:
             h = min(self.step, target - self.t)
             if schedule is not None:
                 for pair in schedule(self.t):
-                    self.p[pair[0]] = pair[1]
+                    if self.p[pair[0]] != pair[1]:
+                        self.p[pair[0]] = pair[1]
+                        self.rough = ROUGH
             taken, change = self.advance(h, h <= dt_min)
             if not taken:
                 if h <= dt_min:

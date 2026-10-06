@@ -1,5 +1,7 @@
-"""A frame: how a law's time words become an equation of one frame. ``D`` is the difference back over the
-frame, ``Pre`` what was a frame ago; a frame is nothing but how long it is (``dt``) and what was a frame ago
+"""A frame: how a law's time words become an equation of one frame. ``D`` is the change over the frame —
+with ``theta`` ½, the slope a trapezoid gives, the mean of the slopes at its two ends being the change over
+it, so error falls as dt²; with 1, the plain difference back (backward Euler, for a frame after a jump) —
+``Pre`` what was a frame ago; a frame is nothing but how long it is (``dt``) and what was a frame ago
 (``ago``). One infinitely long has settled (``DC``); in AC frames go on forever under sines of ω, each the one
 before turned by ω·dt, infinitely short — ``D`` comes out jω, found as the limit, not told.
 """
@@ -17,9 +19,11 @@ from .time import DT, TIME, D, Pre
 
 @dataclass(frozen=True)
 class Step:
-    """A frame ``dt`` long after another (given, or rest): what was a frame ago is a letter, ``x⁻``."""
+    """A frame ``dt`` long after another (given, or rest): what was a frame ago is a letter, ``x⁻``; a
+    change read by ``theta`` (1: back over the frame; ½: trapezoids, with the slope a frame ago, ``D(x)⁻``)."""
 
     dt: sp.Expr = DT
+    theta: sp.Expr = sp.Integer(1)
 
     def ago(self, x: sp.Expr) -> sp.Expr:
         """``x`` a frame ago."""
@@ -55,6 +59,7 @@ class AC(Step):
 
     def __init__(self, omega: object) -> None:
         object.__setattr__(self, "dt", sp.Integer(0))
+        object.__setattr__(self, "theta", sp.Integer(1))
         object.__setattr__(self, "omega", sp.sympify(omega))
 
     def ago(self, x: sp.Expr) -> sp.Expr:
@@ -85,7 +90,17 @@ def interpret(law: sp.Expr, frame: Step) -> sp.Expr:
         return sp.limit(e, DT, 0) if short else e
 
     length = DT if short else frame.dt
-    return law.replace(D, lambda x: limit((x - frame.ago(x)) / length)).replace(Pre, lambda x: limit(frame.ago(x)))
+    theta = frame.theta
+
+    def change(x: sp.Expr) -> sp.Expr:
+        return limit(((x - frame.ago(x)) / length - (1 - theta) * slope(x)) / theta)
+
+    return law.replace(D, change).replace(Pre, lambda x: limit(frame.ago(x)))
+
+
+def slope(x: sp.Expr) -> sp.Symbol:
+    """How fast ``x`` changed a step ago, at the end of that step (what trapezoids remember)."""
+    return before(D(x))
 
 
 def phasors(law: sp.Expr, omega: sp.Expr) -> sp.Expr:

@@ -582,3 +582,15 @@ def test_ac_is_the_frames_forever_under_a_sine():
     trace = circuit.simulate(values, until=0.02, dt=1e-06)
     last = [v for t, v in zip(trace.t, trace(V(a))) if t > 0.019]
     assert max(last) == pytest.approx(phasor, rel=0.01)
+
+
+def test_trapezoids_error_falls_as_the_square_of_the_step():
+    e, r, c = (VoltageSource(), Resistor(), Capacitor())
+    circuit, n = net((e, "GND", "a"), (r, "a", "b"), (c, "b", "GND"))
+
+    def worst(steps):
+        trace = circuit.simulate({e: 1, r: 1000, c: "1m"}, until=5, dt=5 / steps)
+        return max(abs(v - (1 - math.exp(-t))) for t, v in zip(trace.t, trace(V(n["b"]))) if t > 0.1)
+
+    assert worst(50) < 2e-4  # backward Euler: 7e-3
+    assert worst(500) < worst(50) / 20

@@ -9,7 +9,7 @@ from typing import cast
 
 import sympy as sp
 
-from .time import DT
+from .time import DT, THETA
 
 
 @dataclass(frozen=True)
@@ -86,8 +86,10 @@ def normal(e: sp.Expr) -> sp.Expr:
     """An expression as short as it cheaply gets: over one denominator, cancelled, when a letter divides it
     (0 then when it always is; the denominator kept — cleared, its zeros would be roots that are none);
     expanded otherwise, an exponential of a sum never split into a product (e^(u−5) as e^u·e^−5: one huge,
-    one tiny). A frame's length never: x/dt is 0 in a frame infinitely long, x·dt/dt is not."""
-    if e.atoms(sp.Function) or not any(p.exp.is_negative and p.base.free_symbols - {DT} for p in e.atoms(sp.Pow)):
+    one tiny). A frame's length and how it reads a change never: x/dt is 0 in a frame infinitely long, x·dt/dt is not."""
+    if e.atoms(sp.Function) or not any(
+        p.exp.is_negative and p.base.free_symbols - {DT, THETA} for p in e.atoms(sp.Pow)
+    ):
         return sp.expand(e, power_exp=False)
     return sp.cancel(e)
 
