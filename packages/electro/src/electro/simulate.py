@@ -26,10 +26,9 @@ from .errors import NoSuchInput, NotSimulated, ValueNeeded
 from .frame import DT, Step, before, slope
 from .numeric.code import Code, Compiled, compile_equations, python, statements
 from .numeric.engine import Machine
-from .quantities import Quantity, Scaled
+from .quantities import Quantity, Scaled, given
 from .solve import references
 from .time import THETA, TIME, D, Pre
-from .values import given
 
 G_NODE = 1e-12
 """The conductance from every point to ground."""

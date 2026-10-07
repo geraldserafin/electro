@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import re
-from collections.abc import Mapping
 from fractions import Fraction
 
 import sympy as sp
@@ -58,95 +57,56 @@ UNKNOWN = Unknown()
 
 
 def parse(value, *, positive: bool = False):
-    """Turn user input into an exact sympy value, a symbol, or UNKNOWN.
-
-    Accepts numbers, sympy expressions and strings such as "4.7k", "4k7",
-    "0,5 A", "12V" or a bare identifier like "R" (a symbolic parameter).
-    """
+    """User input as an exact sympy value, a letter, or ``UNKNOWN``: numbers, sympy expressions, and text like
+    ``"4.7k"``, ``"4k7"``, ``"0,5 A"``, ``"12V"``, ``"1/3"``, ``"230∠-120"``, ``"3+4j"`` or a letter ``"R"``."""
     if value is None or value is UNKNOWN or value == "?":
         return UNKNOWN
-    if isinstance(value, sp.Basic):
-        return value
-    if isinstance(value, bool):
-        raise NotAValue(repr(value))
-    if isinstance(value, int):
-        return sp.Integer(value)
-    if isinstance(value, float):
-        return sp.Rational(repr(value))
-    if isinstance(value, Fraction):
-        return sp.Rational(value.numerator, value.denominator)
-    if isinstance(value, complex):
-        return parse(value.real) + sp.I * parse(value.imag)
     if isinstance(value, str):
-        if m := _RKM.match(value):
-            whole, prefix, frac = m.groups()
-            scale = PREFIXES["" if prefix == "R" else prefix]
-            return sp.Rational(f"{whole}.{frac}") * scale
-        if m := _FRACTION.match(value):
-            return sp.Rational(int(m.group(1)), int(m.group(2)))
-        if m := _NUMBER.match(value):
-            number, prefix = m.groups()
-            return sp.Rational(number.replace(",", ".")) * PREFIXES[prefix]
-        if m := _POLAR.match(value):  # a phasor: magnitude and angle in degrees, exact for 30°, 120°, …
-            angle = sp.pi * sp.Rational(m.group(2).replace(",", ".")) / 180
-            return sp.nsimplify(parse(m.group(1))) * (sp.cos(angle) + sp.I * sp.sin(angle))
-        if _COMPLEX.match(value):  # "3+4j", "-2j"
-            number = complex(value.replace(" ", "").replace(",", ".").replace("J", "j"))
-            return parse(number)
-        if _IDENT.match(value):
-            return sp.Symbol(value, positive=True) if positive else sp.Symbol(value)
-    raise BadValue(str(value))
+        return _text(value, positive)
+    return _number(value)
 
 
-# A circuit's values
+def _number(value):
+    match value:
+        case sp.Basic():
+            return value
+        case bool():
+            raise NotAValue(repr(value))
+        case int():
+            return sp.Integer(value)
+        case float():
+            return sp.Rational(repr(value))
+        case Fraction():
+            return sp.Rational(value.numerator, value.denominator)
+        case complex():
+            return _number(value.real) + sp.I * _number(value.imag)
+    raise NotAValue(repr(value))
 
 
-def given(circuit, values: Mapping) -> dict[sp.Symbol, sp.Expr]:
-    """Each parameter's value: as given, else its kind's default. An element's value is its main parameter;
-    several by name (``{D: {"I_S": …}}``); a real part's (``part("1N4148")``); a name shared by elements."""
-    from .element import Element
-    from .errors import NoSuchParameter
-    from .parts import Part
-
-    out: dict[sp.Symbol, sp.Expr] = {}
-    for e in circuit.members:
-        out |= {e.P[w]: sp.sympify(parse(d)) for w, d in e.defaults.items()}
-    for key, value in values.items():
-        value = _read(value)
-        if value is UNKNOWN:
-            continue
-        match key:
-            case Element() if isinstance(value, Part):
-                out |= {key.P[w]: sp.sympify(parse(x)) for w, x in value.parameters(key.kind).items()}
-            case Element() if isinstance(value, Mapping):
-                out |= {key.P[w]: sp.sympify(parse(x)) for w, x in value.items() if parse(x) is not UNKNOWN}
-            case Element():
-                out[key.P[""]] = value
-            case str():
-                if not any(x.name == key for e in circuit.members for x in e.P.values()):
-                    raise NoSuchParameter(key)
-                out[sp.Symbol(key)] = value
-    return out
+def _text(text: str, positive: bool):
+    for pattern, read in _READERS:
+        if m := pattern.match(text):
+            return read(m)
+    if _IDENT.match(text):
+        return sp.Symbol(text, positive=True) if positive else sp.Symbol(text)
+    raise BadValue(text)
 
 
-def data(values: Mapping) -> list:
-    """The data on quantities (``I(R): 2``, ``U(R_1): 2 * U(R_2)``), each an equation."""
-    from .laws import Equation, Origin
-
-    out = []
-    for key, value in values.items():
-        if not hasattr(key, "expr") or isinstance(key, sp.Basic):
-            continue
-        value = _read(value)
-        if value is not UNKNOWN:
-            rhs = value.expr if hasattr(value, "expr") and not isinstance(value, sp.Basic) else value
-            out.append(Equation(key.expr - rhs, Origin("given", key)))
-    return out
+def _decimal(text: str) -> sp.Rational:
+    return sp.Rational(text.replace(",", "."))
 
 
-def _read(value: object) -> object:
-    from .parts import Part
+def _polar(m: re.Match) -> sp.Expr:
+    """A phasor: its magnitude and its angle in degrees (exact for 30°, 120°…)."""
+    angle = sp.pi * _decimal(m[2]) / 180
+    return sp.nsimplify(parse(m[1])) * (sp.cos(angle) + sp.I * sp.sin(angle))
 
-    if isinstance(value, Mapping | Part) or (hasattr(value, "expr") and not isinstance(value, sp.Basic)):
-        return value
-    return parse(value)
+
+_READERS = [
+    (_RKM, lambda m: sp.Rational(f"{m[1]}.{m[3]}") * PREFIXES["" if m[2] == "R" else m[2]]),
+    (_FRACTION, lambda m: sp.Rational(int(m[1]), int(m[2]))),
+    (_NUMBER, lambda m: _decimal(m[1]) * PREFIXES[m[2]]),
+    (_POLAR, _polar),
+    (_COMPLEX, lambda m: _number(complex(m[0].replace(" ", "").replace(",", ".").replace("J", "j")))),
+]
+"""Each way a value may be written, and how it is read."""

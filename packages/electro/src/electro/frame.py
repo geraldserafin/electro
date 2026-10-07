@@ -1,9 +1,11 @@
-"""A frame: how a law's time words become an equation of one frame. ``D`` is the change over the frame —
-with ``theta`` ½, the slope a trapezoid gives, the mean of the slopes at its two ends being the change over
-it, so error falls as dt²; with 1, the plain difference back (backward Euler, for a frame after a jump) —
-``Pre`` what was a frame ago; a frame is nothing but how long it is (``dt``) and what was a frame ago
-(``ago``). One infinitely long has settled (``DC``); in AC frames go on forever under sines of ω, each the one
-before turned by ω·dt, infinitely short — ``D`` comes out jω, found as the limit, not told.
+"""Frames: how the time words in a law (``D``, the change; ``Pre``, the value a moment ago) become an equation
+of one frame.
+
+- ``Step(dt, θ)``: a frame ``dt`` long after another. ``x⁻`` is ``x`` a frame ago, ``D(x)⁻`` how fast it
+  changed then. θ = 1 reads a change back over the frame (backward Euler); θ = ½ by trapezoids, the mean of the
+  slopes at the frame's two ends, so the error falls as dt².
+- ``DC``: one frame, infinitely long: nothing changes any more.
+- ``AC(ω)``: sines of angular frequency ω, as phasors: ``D(x)`` is jω·x.
 """
 
 from __future__ import annotations
@@ -19,30 +21,39 @@ from .time import DT, TIME, D, Pre
 
 @dataclass(frozen=True)
 class Step:
-    """A frame ``dt`` long after another (given, or rest): what was a frame ago is a letter, ``x⁻``; a
-    change read by ``theta`` (1: back over the frame; ½: trapezoids, with the slope a frame ago, ``D(x)⁻``)."""
+    """A frame ``dt`` long; ``theta``: 1 back over the frame, ½ by trapezoids."""
 
     dt: sp.Expr = DT
     theta: sp.Expr = sp.Integer(1)
 
+    def change(self, x: sp.Expr) -> sp.Expr:
+        """``D(x)`` in this frame: ((x − x⁻)/dt − (1 − θ)·D(x)⁻)/θ."""
+        return ((x - before(x)) / self.dt - (1 - self.theta) * slope(x)) / self.theta
+
     def ago(self, x: sp.Expr) -> sp.Expr:
-        """``x`` a frame ago."""
+        """``Pre(x)`` in this frame: ``x`` a frame ago."""
         return before(x)
 
     def timed(self, law: sp.Expr) -> sp.Expr:
-        """The law, its data in, as this frame reads what changes in time: as it is."""
+        """What changes in time in the data (a sine), as this frame reads it: as it is."""
         return law
 
     def product(self, a: sp.Expr, b: sp.Expr) -> sp.Expr:
         """Two quantities multiplied (a power: a voltage and a current), as this frame reads it."""
         return a * b
 
+    def read(self, law: sp.Expr) -> sp.Expr:
+        """``law`` with its time words read in this frame."""
+        if not law.has(D, Pre):
+            return law
+        return law.replace(D, self.change).replace(Pre, self.ago)
+
     def reading(self, given: Mapping[sp.Symbol, sp.Expr]) -> Callable[[sp.Expr], sp.Expr]:
-        """A law as this frame reads it, ``given`` in: what ``Laws.map`` takes."""
-        return lambda e: self.timed((interpret(e, self) if e.has(D, Pre) else e).xreplace(given))
+        """A law read in this frame, ``given`` put in."""
+        return lambda e: self.timed(self.read(e).xreplace(given))
 
     def letters(self) -> set[sp.Symbol]:
-        """The letters the frame itself brings (its length, …): never to be found."""
+        """The letters the frame itself brings (its length…): never unknowns."""
         return {x for f in fields(self) for x in sp.sympify(getattr(self, f.name)).free_symbols}
 
 
@@ -55,9 +66,8 @@ class DC(Step):
 
 @dataclass(frozen=True, init=False)
 class AC(Step):
-    """Frames forever under sines of the angular frequency ``omega`` (a number is read as one), each the one
-    before turned by ω·dt — a phasor — infinitely short. A sine in time is its phasor, a power the average over
-    a period."""
+    """Sines of angular frequency ``omega``, read as phasors: a sine in time is its phasor, ``D`` is jω, a power
+    is the average over a period."""
 
     omega: sp.Expr
 
@@ -66,8 +76,11 @@ class AC(Step):
         object.__setattr__(self, "theta", sp.Integer(1))
         object.__setattr__(self, "omega", sp.sympify(omega))
 
+    def change(self, x: sp.Expr) -> sp.Expr:
+        return sp.I * self.omega * x
+
     def ago(self, x: sp.Expr) -> sp.Expr:
-        return x * sp.exp(-sp.I * self.omega * DT)
+        return x
 
     def timed(self, law: sp.Expr) -> sp.Expr:
         return phasors(law, self.omega)
@@ -78,45 +91,25 @@ class AC(Step):
 
 
 _BEFORE: dict[sp.Expr, sp.Symbol] = {}
-_LETTERS: set[sp.Symbol] = set()
 
 
 def before(x: sp.Expr) -> sp.Symbol:
-    """``x`` a step ago: what a step in time remembers — one letter for each ``x``."""
-    if x not in _BEFORE:
-        _BEFORE[x] = sp.Dummy(f"{x}⁻")
-        _LETTERS.add(_BEFORE[x])
-    return _BEFORE[x]
+    """``x⁻``: ``x`` a frame ago, one letter for each ``x``."""
+    return _BEFORE.setdefault(x, sp.Dummy(f"{x}⁻"))
 
 
 def is_before(x: sp.Symbol) -> bool:
-    return x in _LETTERS
-
-
-def interpret(law: sp.Expr, frame: Step) -> sp.Expr:
-    """``D`` and ``Pre`` read in ``frame``; one infinitely short in the limit, its length ``DT`` → 0."""
-    short = frame.dt == 0
-
-    def limit(e: sp.Expr) -> sp.Expr:
-        return sp.limit(e, DT, 0) if short else e
-
-    length = DT if short else frame.dt
-    theta = frame.theta
-
-    def change(x: sp.Expr) -> sp.Expr:
-        return limit(((x - frame.ago(x)) / length - (1 - theta) * slope(x)) / theta)
-
-    return law.replace(D, change).replace(Pre, lambda x: limit(frame.ago(x)))
+    return x in _BEFORE.values()
 
 
 def slope(x: sp.Expr) -> sp.Symbol:
-    """How fast ``x`` changed a step ago, at the end of that step (what trapezoids remember)."""
+    """``D(x)⁻``: how fast ``x`` changed at the end of the frame before (what trapezoids remember)."""
     return before(D(x))
 
 
 def phasors(law: sp.Expr, omega: sp.Expr) -> sp.Expr:
-    """A sine in time, sin(ω·t + φ), read as its phasor e^(jφ) (a cosine is a quarter ahead); one of another
-    frequency is not there at ω."""
+    """Each sine in time sin(ω·t + φ) as its phasor e^(jφ) (a cosine a quarter ahead); one of another
+    frequency is 0 at ω."""
 
     def phasor(e: sp.Expr) -> sp.Expr:
         arg = cast(sp.Expr, e.args[0])

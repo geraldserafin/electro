@@ -23,10 +23,9 @@ from .frame import AC, DC, Step, before, frequencies, is_before
 from .laws import Equation, Origin, Way
 from .numeric.code import compile_equations
 from .numeric.engine import homotopy
-from .quantities import Current, Power, Quantity, Scaled, Voltage
+from .quantities import Current, Power, Quantity, Scaled, Voltage, data, given
 from .structure import structure
 from .time import TIME, D, Pre
-from .values import data, given
 
 Known = dict[sp.Symbol, sp.Expr]
 
