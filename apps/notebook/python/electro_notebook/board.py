@@ -31,32 +31,33 @@ def _answer(work: Callable[[], dict]) -> str:
 
 
 def solve(problem_json: str) -> str:
-    """The run button: the problem (its elements, what its marks give, ``marks`` — each mark's id, quantity,
-    unit and whether it is given — and ``sought``, each key's quantity and unit) solved on paper. Returns
-    ``{"results": {id: {...}}, "problems": [...], "found": {key: value | null}}``: every element's value,
-    voltage, current and power, each mark's value, what each sought key came to, and what could not be found
-    or went wrong."""
+    """The run button: the problem (its elements, its ``marks`` — each mark's id, quantity, unit and whether it
+    is given — and ``sought``, each key's quantity and unit) solved on paper. Returns ``{"results": {id: {...}},
+    "problems": [...], "found": {key: value | null}}``: every element's value, voltage, current and power, each
+    mark's value, what each sought key came to, and what could not be found or went wrong."""
     data = json.loads(problem_json)
     units = {e["id"]: e.get("unit", "") for e in data["elements"]}
     try:
         net = from_drawing(data)
-        find = [quantity(q, net.elements, net.points) for _, q, _ in data.get("sought") or () if q[0] != "R"]
         solution, filled = solved(net.circuit, net.values, net.elements)
     except Exception as err:  # noqa: BLE001 — every error is said on the board
-        said = _said("error", err, units)
-        return json.dumps({"results": {}, "problems": [said], "found": {}}, ensure_ascii=False)
-    problems = []
-    try:
-        solution.answers(*net.find, *find)
-    except Exception as err:  # noqa: BLE001 — what was not found: a warning, the rest stands
-        problems.append(_said("warning", err, units))
+        return json.dumps({"results": {}, "problems": [_said("error", err, units)], "found": {}}, ensure_ascii=False)
     results = {
         id: element_result(solution, net.values, e, units.get(id, ""), filled.get(id)) for id, e in net.elements.items()
     }
-    for id, q, unit, given in data.get("marks") or ():
+    results |= _marks(solution, net, data.get("marks") or ())
+    found = {key: _found(solution, net, q, unit) for key, q, unit in data.get("sought") or ()}
+    problems = _lacking(solution, net, data.get("sought") or (), units)
+    return json.dumps({"results": results, "problems": problems, "found": found}, ensure_ascii=False)
+
+
+def _marks(solution, net: Drawing, marks) -> dict:
+    """Each mark on the drawing that was found: its value, shown as a result."""
+    out = {}
+    for id, q, unit, given in marks:
         value = number(solution, quantity(q, net.elements, net.points))
         if value is not None:
-            results[id] = {
+            out[id] = {
                 "value": fmt(value, unit),
                 "solved": not given,
                 "U": None,
@@ -64,8 +65,17 @@ def solve(problem_json: str) -> str:
                 "P": None,
                 "reversed": False,
             }
-    found = {key: _found(solution, net, q, unit) for key, q, unit in data.get("sought") or ()}
-    return json.dumps({"results": results, "problems": problems, "found": found}, ensure_ascii=False)
+    return out
+
+
+def _lacking(solution, net: Drawing, sought, units: dict) -> list[dict]:
+    """What is sought (by the drawing or by a key) and could not be found, said as a warning."""
+    find = [quantity(q, net.elements, net.points) for _, q, _ in sought if q[0] != "R"]
+    try:
+        solution.answers(*net.find, *find)
+    except Exception as err:  # noqa: BLE001 — what was not found: a warning, the rest stands
+        return [_said("warning", err, units)]
+    return []
 
 
 def _found(solution, net: Drawing, q: list, unit: str) -> str | None:

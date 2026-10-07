@@ -42,33 +42,51 @@ def number(read: Callable, q) -> sp.Expr | None:
 
 
 def element_result(solution: Solution, values: Mapping, e: Element, unit: str, filled: Element | None = None) -> dict:
-    """``values``: what was given."""
-    two = len(e.terminals) == 2
+    """What the drawing shows beside ``e``. ``values``: what was given; ``filled``: what a hole turned out to
+    be."""
     by = filled if filled is not None else e
-
-    def read(q):
-        return shown(solution, q)
-
+    flows = _flows(solution, by) if len(e.terminals) == 2 else {"U": None, "I": None, "P": None}
+    if (reads := reading(e)) is not None:
+        return _meter(flows, reads, values, e, unit)
     value = number(solution, Parameter(by)) if "" in by.parameters else None
-    u = number(read, Voltage(by)) if two else None
-    i = number(read, Current(by)) if two else None
-    p = number(read, Power(by)) if two else None
-    reads = reading(e)
-    if reads is not None:
-        shows = u if reads is Voltage else i
-        text = fmt(shows, unit) if shows is not None else "?"
-        solved = not given(values.get(reads(e)))
-        return {"value": text, "solved": solved, "U": None, "I": None, "P": None, "reversed": False}
-    if filled is not None:
-        text = notation(filled, value)
-    elif "" in e.parameters:
-        text = fmt(value, unit) if value is not None else "?"
-    else:
-        text = ""
-    sign = -1 if i is not None and i.is_real and i < 0 else 1
+    found = filled is not None or ("" in e.parameters and not given(values.get(e)) and value is not None)
+    return {"value": _value_text(e, filled, value, unit), "solved": found, **_shown_flows(flows)}
+
+
+def _flows(solution: Solution, e: Element) -> dict:
+    """Its voltage, current and power, as the board shows them (``shown``), or None where not found."""
+    return {
+        name: number(lambda q: shown(solution, q), q(e)) for name, q in (("U", Voltage), ("I", Current), ("P", Power))
+    }
+
+
+def _meter(flows: dict, reads, values: Mapping, e: Element, unit: str) -> dict:
+    """A meter shows its reading, and nothing else."""
+    shows = flows["U" if reads is Voltage else "I"]
+    text = fmt(shows, unit) if shows is not None else "?"
     return {
         "value": text,
-        "solved": filled is not None or ("" in e.parameters and not given(values.get(e)) and value is not None),
+        "solved": not given(values.get(reads(e))),
+        "U": None,
+        "I": None,
+        "P": None,
+        "reversed": False,
+    }
+
+
+def _value_text(e: Element, filled: Element | None, value, unit: str) -> str:
+    if filled is not None:
+        return notation(filled, value)
+    if "" in e.parameters:
+        return fmt(value, unit) if value is not None else "?"
+    return ""
+
+
+def _shown_flows(flows: dict) -> dict:
+    """Voltage, current and power formatted; a negative current turned round (``reversed``)."""
+    u, i, p = flows["U"], flows["I"], flows["P"]
+    sign = -1 if i is not None and i.is_real and i < 0 else 1
+    return {
         "U": fmt(sign * u, "V") if u is not None else None,
         "I": fmt(sign * i, "A") if i is not None else None,
         "P": fmt(p, "W") if p is not None and not p.has(sp.I) else None,
