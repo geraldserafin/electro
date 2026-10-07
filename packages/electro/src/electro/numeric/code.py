@@ -1,9 +1,9 @@
-"""A frame's equations as code: what fills their residuals and their Jacobian's nonzero entries — those the
-unknowns do not change apart, once a frame — printed once, Python here, JavaScript for the page, and how
-to eliminate them (``sparse``), for the engine (``engine.System``) to run on numbers. Two things help Newton: every
-exponential grows along its tangent far out, and a p-n junction's (``pn``: it says it is one) is approached
-along its bend, as SPICE does.
-"""
+"""A frame's equations as code for the engine (``engine.System``): one function fills the Jacobian's entries
+the unknowns do not change (once a frame), another the residuals and the rest; both printed as Python here and
+as JavaScript for the page. ``sparse`` chooses the order they are eliminated in.
+
+Two things help Newton: every exponential continues along its tangent far out (``limexp``), and a p-n
+junction's exponential (``pn``) is approached along its bend, as SPICE does."""
 
 from __future__ import annotations
 
@@ -22,14 +22,6 @@ from .sparse import shape
 
 Code = dict[str, str]
 """``"py"`` and ``"js"``: the same statements in each."""
-
-
-def expr(x: object) -> sp.Expr:
-    return cast(sp.Expr, sp.sympify(x))
-
-
-def symbols_in(x: object) -> set[sp.Symbol]:
-    return {s for s in expr(x).free_symbols if isinstance(s, sp.Symbol)}
 
 
 @dataclass
@@ -64,38 +56,47 @@ def compile_equations(
     limited: bool = True,
     sample: Sequence[float] | None = None,
 ) -> Compiled:
-    """``exprs`` = 0 as code. ``limited``: every exponential continued by its tangent far out (a model that
-    runs); else exactly the law. ``sample``: the parameters of a frame like those it will run (by default all
-    1), whose numbers choose the pivots."""
-    exprs, unknowns = list(exprs), list(unknowns)
-    junctions = _junctions(exprs, unknowns, limexp if limited else sp.exp)
-    place = {u: j for j, u in enumerate(unknowns)}
-    entries, values = [], []
-    for i, e in enumerate(exprs):
-        for u in sorted(symbols_in(e) & set(place), key=lambda u: place[u]):
-            d = expr(sp.diff(e, u))
-            if d != 0:
-                entries.append((i, place[u]))
-                values.append(d)
-    dynamic = [bool(symbols_in(d) & set(place)) for d in values]
-    constant = statements([(f"A[{k}]", d) for k, (d, m) in enumerate(zip(values, dynamic)) if not m], unknowns, params)
+    """``exprs`` = 0 as code. ``limited``: every exponential continued along its tangent far out; else exactly
+    the law. ``sample``: the parameters of a frame like those it will run (by default all 1); its numbers choose
+    the pivots."""
+    exprs, unknowns, junctions = _junctions(list(exprs), list(unknowns), limexp if limited else sp.exp)
+    entries = _jacobian(exprs, unknowns)
+    moves = [bool(d.free_symbols & set(unknowns)) for _, _, d in entries]
+    constant = statements([(f"A[{k}]", d) for k, (_, _, d) in enumerate(entries) if not moves[k]], unknowns, params)
+    residuals = [(f"F[{i}]", e) for i, e in enumerate(exprs)]
     moving = statements(
-        [(f"F[{i}]", e) for i, e in enumerate(exprs)]
-        + [(f"A[{k}]", d) for k, (d, m) in enumerate(zip(values, dynamic)) if m],
-        unknowns,
-        params,
+        residuals + [(f"A[{k}]", d) for k, (_, _, d) in enumerate(entries) if moves[k]], unknowns, params
     )
-    scope = python(f"def jconst(p, A):\n{constant['py']}\n\ndef jdyn(x, p, F, A):\n{moving['py']}\n")
-    A = [0.0] * len(entries)
-    p = list(sample) if sample is not None else [1.0] * len(params)
-    with _quiet():
-        scope["jconst"](p, A)
-        scope["jdyn"]([0.0] * len(unknowns), p, [0.0] * len(exprs), A)
-    plan = shape(len(unknowns), entries, A, dynamic)
-    plan["linear"] = plan["linear"] and not any(
-        f.free_symbols & set(unknowns) for e in exprs for f in e.atoms(sp.Function, sp.Piecewise)
-    )
+    numbers = _sample(constant, moving, len(unknowns), len(entries), sample or [1.0] * len(params))
+    plan = shape(len(unknowns), [(i, j) for i, j, _ in entries], numbers, moves)
+    plan["linear"] = plan["linear"] and not _switches(exprs, unknowns)
     return Compiled(unknowns, list(params), constant, moving, plan, junctions)
+
+
+def _jacobian(exprs: list[sp.Expr], unknowns: list[sp.Symbol]) -> list[tuple[int, int, sp.Expr]]:
+    """Its nonzero entries: row, column, derivative."""
+    place = {u: j for j, u in enumerate(unknowns)}
+    entries = []
+    for i, e in enumerate(exprs):
+        for u in sorted(e.free_symbols & set(place), key=lambda u: place[u]):
+            if (d := sp.diff(e, u)) != 0:
+                entries.append((i, place[u], d))
+    return entries
+
+
+def _sample(constant: Code, moving: Code, n: int, m: int, p: Sequence[float]) -> list[float]:
+    """The Jacobian's entries in a sample frame, the unknowns 0; what overflows stays very large."""
+    scope = python(f"def jconst(p, A):\n{constant['py']}\n\ndef jdyn(x, p, F, A):\n{moving['py']}\n")
+    A = [0.0] * m
+    with _quiet():
+        scope["jconst"](list(p), A)
+        scope["jdyn"]([0.0] * n, list(p), [0.0] * n, A)
+    return A
+
+
+def _switches(exprs: list[sp.Expr], unknowns: list[sp.Symbol]) -> bool:
+    """A function or a ``when`` of an unknown: Newton needs more than one step, though the Jacobian moves not."""
+    return any(f.free_symbols & set(unknowns) for e in exprs for f in e.atoms(sp.Function, sp.Piecewise))
 
 
 class _quiet:
@@ -182,23 +183,30 @@ class dlimexp(sp.Function):
         return f"dlimexp({printer._print(self.args[0])})"
 
 
-def _junctions(exprs: list[sp.Expr], unknowns: list[sp.Symbol], exp) -> list[tuple[int, float, float]]:
-    """Each p-n junction's exponential (``pn``) becomes ``exp`` of an unknown of its own, approached along it:
-    its place, the scale it moves on and where it bends (SPICE's V_crit, over n·V_T). Every other exponential
-    of what is found is ``exp`` too."""
-    out = []
+def _junctions(exprs: list[sp.Expr], unknowns: list[sp.Symbol], exp):
+    """Each p-n junction's exponential becomes ``exp`` of an unknown of its own, ``exp_k`` (one equation more:
+    ``exp_k`` = its exponent), so Newton can limit how far it moves. The equations, the unknowns, and each
+    junction's unknown, the scale it moves on and where it bends."""
+    junctions = []
     for k, a in enumerate(sorted({a for e in exprs for a in e.atoms(pn) if a.free_symbols & set(unknowns)}, key=str)):
         z = sp.Symbol(f"exp_{k}")
-        x, i_s, nvt = a.args
-        exprs[:] = [e.xreplace({a: exp(z)}) for e in exprs]
-        exprs.append(z - x)
-        unknowns.append(z)
-        bend = math.log(float(nvt) / (math.sqrt(2) * float(i_s))) if i_s.is_number and nvt.is_number else 0
-        if bend > 0:
-            out.append((len(unknowns) - 1, 1.0, bend))
+        exprs = [e.xreplace({a: exp(z)}) for e in exprs] + [z - a.args[0]]
+        unknowns = [*unknowns, z]
+        if (bend := _bend(a)) > 0:
+            junctions.append((len(unknowns) - 1, 1.0, bend))
+    return _exponentials(exprs, unknowns, exp), unknowns, junctions
+
+
+def _bend(a: pn) -> float:
+    """Where a junction's exponential bends, in its exponent (SPICE's V_crit over n·V_T): ln(n·V_T / (√2·I))."""
+    _, i, nvt = a.args
+    return math.log(float(nvt) / (math.sqrt(2) * float(i))) if i.is_number and nvt.is_number else 0.0
+
+
+def _exponentials(exprs: list[sp.Expr], unknowns: list[sp.Symbol], exp) -> list[sp.Expr]:
+    """Every other exponential of an unknown as ``exp`` too."""
     found = set(unknowns)
-    exprs[:] = [
+    return [
         e.replace(lambda a: isinstance(a, sp.exp) and bool(a.free_symbols & found), lambda a: exp(a.args[0]))
         for e in exprs
     ]
-    return out
