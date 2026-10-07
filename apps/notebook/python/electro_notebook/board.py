@@ -13,7 +13,7 @@ from electro import Element, I, U, step_function
 from electro.circuit.names import names
 from electro.values import parse
 
-from . import plots
+from . import plots, readings
 from .drawing import Drawing, from_drawing, quantity
 from .errors import NoSweepRange, error
 from .issues import issue
@@ -96,21 +96,22 @@ def live(problem_json: str) -> str:
 
 
 def program(circuit: Element, values: Mapping) -> dict:
-    """Φ as the page's engine runs it, and where in what it reads the page finds each point (``nodes``), each
-    element's quantities (``parts``), its kind (``kinds``) and the current into each of its terminals
-    (``flows``)."""
-    n = names(circuit)
-    flowing = {f"{n.labels[e]}.{t}": c for e in circuit.members for t, c in e.I.items()}
-    phi = step_function(circuit, values, flowing)
-    place = {name: k for k, name in enumerate(phi.seen)}
+    """Φ as the page's engine runs it, reading what ``readings`` reads and the current into each terminal; and
+    where in that the page finds each point (``nodes``), each element's quantities (``parts``), its kind
+    (``kinds``) and its terminals' currents (``flows``)."""
+    labels = names(circuit).labels
+    flowing = {f"{labels[e]}.{t}": c for e in circuit.members for t, c in e.I.items()}
+    seen = {**readings.reads(circuit), **flowing}
+    place = {name: k for k, name in enumerate(seen)}
     return {
-        **json.loads(phi.to_json()),
-        "nodes": {str(v)[2:]: place[str(v)] for v in n.points.values()},
+        **json.loads(step_function(circuit, values).to_json(seen)),
+        "nodes": {str(v)[2:]: place[str(v)] for v in names(circuit).points.values()},
         "parts": {
-            label: {name: place[called] for name, called in named.items()} for label, named in phi.observed.items()
+            label: {name: place[called] for name, (called, _) in named.items()}
+            for label, named in readings.by_element(circuit).items()
         },
-        "kinds": {n.labels[e]: e.kind for e in circuit.members},
-        "flows": {n.labels[e]: [place[f"{n.labels[e]}.{t}"] for t in e.terminals] for e in circuit.members},
+        "kinds": {labels[e]: e.kind for e in circuit.members},
+        "flows": {labels[e]: [place[f"{labels[e]}.{t}"] for t in e.terminals] for e in circuit.members},
     }
 
 

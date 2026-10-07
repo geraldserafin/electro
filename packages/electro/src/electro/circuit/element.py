@@ -163,7 +163,7 @@ class Element:
     """A kind of element says, as class attributes, ``terminals``, ``parameters`` (``""`` its main one, given
     as its value), ``defaults``, ``positive`` (never negative: a resistance), ``inputs`` (set by the world while
     it runs: a hand on a switch), ``shows`` (what a page reads of it besides its currents: a voltage between
-    two terminals, or a current into one, by name), ``modes`` (a board pin's ways), ``ground`` (its last
+    two terminals, or a current into one, by name), ``ground`` (its last
     terminal, not drawn, on ground: one end fewer), ``kind`` and ``prefix`` (its name and its label's
     letters); and ``laws``. An element of two terminals is 1 → 1, of more 0 → n."""
 
@@ -175,7 +175,6 @@ class Element:
     positive: tuple[str, ...] = ()
     inputs: tuple[str, ...] = ()
     shows: tuple[tuple[str, tuple[str, str] | str], ...] = ()
-    modes: Mapping[str, tuple[float, float]] = {}
     ground = False
 
     name: str | None
@@ -213,6 +212,10 @@ class Element:
             ends = ((), tuple(End(self.V[t], -self.I[t]) for t in (ts[:-1] if self.ground else ts)))
         self.rel = Rel(*ends, laws)
         self.members = (self,)
+
+    def setting(self, which: str, value: object) -> dict[str, float]:
+        """What the world sets, setting ``which`` to ``value``: its inputs by name (a hand on a switch: one)."""
+        return {which: float(value)}  # type: ignore[arg-type]
 
     def _inner(self, name: str) -> sp.Symbol:
         return self.inner.setdefault(name, sp.Dummy(name))

@@ -201,7 +201,7 @@ def test_the_program_in_javascript_is_the_same_program():
     data = json.loads(phi.to_json())
     assert "limexp(" in data["moving"] and "F[" in data["moving"] and "A[" in data["moving"]
     assert not data["shape"]["linear"] and data["shape"]["n"] == len(data["unknowns"])
-    assert data["junctions"] and phi.observed["LED_1"] == {"U": "U_LED_1", "I": "I_LED_1"}
+    assert data["junctions"]
 
 
 def _sine_rc(f):
@@ -386,8 +386,11 @@ def test_lcd_senses_its_inputs_and_lights_its_backlight():
     bus[2], bus[10] = ("vcc", "vcc")
     circuit, _ = net((e, "GND", "vcc"), (r, "vcc", "a"), (lcd, "GND", "vcc", "GND", *bus, "a", "GND"))
     trace = circuit.simulate({e: 5, r: 100}, until=0.0001)
-    assert trace.at("U_LCD_1_e", 0.0001) == trace.at("U_LCD_1_d7", 0.0001) == pytest.approx(5)
-    assert trace.at("U_LCD_1_rs", 0.0001) == pytest.approx(0)
+
+    def pin(name):
+        return trace.at(lcd.V[name] - lcd.V["vss"], 0.0001)
+
+    assert pin("e") == pin("d7") == pytest.approx(5) and pin("rs") == pytest.approx(0)
     assert trace.at(I(lcd, "a"), 0.0001) == pytest.approx(0.02, abs=0.003)
     assert trace.at(I(lcd, "vdd"), 0.0001) == pytest.approx(0.001)
 
@@ -447,7 +450,7 @@ def test_counter_counts_rising_edges_and_resets():
             *((r, f"Q{k}", "GND") for k, r in enumerate(loads)),
         )
         trace = circuit.simulate({**given, er: reset, **dict.fromkeys(loads, "10k")}, until=0.0055)
-        assert round(trace("count_U_1")[-1]) == count
+        assert round(trace(counter.inner["count"])[-1]) == count
     assert [round(trace.at(V(n[f"Q{k}"]), 0.0055)) for k in range(4)] == [0, 0, 0, 0]
 
 
@@ -528,13 +531,13 @@ def test_a_simulation_is_its_step_function_again_and_again():
     phi = step_function(circuit, values)
     after = reduce(lambda frame, _: phi(frame, 1e-05), range(500), phi.rest)
     assert after.t == pytest.approx(0.005)
-    assert phi.read(after)["V_A"] == pytest.approx(10 * (1 - math.exp(-5)), rel=0.01)
-    first = phi.read(phi(phi.rest, 1e-05))["V_A"]
+    assert phi.value(after, V(a)) == pytest.approx(10 * (1 - math.exp(-5)), rel=0.01)
+    first = phi.value(phi(phi.rest, 1e-05), V(a))
     assert first == pytest.approx(10000 * 1e-05 / (1000 * 1e-05 + 1), rel=1e-06)
     d = Diode("D")
     with_diode = step_function(GND >> VoltageSource("E") >> Resistor("R") >> a >> d >> GND, {"E": 5, "R": 1000})
     settled = reduce(lambda frame, _: with_diode(frame, 0.001), range(3), with_diode.rest)
-    assert 0.5 < with_diode.read(settled)["V_A"] < 0.8
+    assert 0.5 < with_diode.value(settled, V(a)) < 0.8
 
 
 def test_solve_is_a_simulation_of_one_frame():
@@ -552,9 +555,9 @@ def test_solve_is_a_simulation_of_one_frame():
         [],
     )
     stepped = reduce(lambda done, _: [*done, phi(done[-1], 0.0001)], range(3), [phi.rest])[1:]
-    assert [float(f(V(a))) for f in frames] == pytest.approx([phi.read(f)["V_A"] for f in stepped])
+    assert [float(f(V(a))) for f in frames] == pytest.approx([phi.value(f, V(a)) for f in stepped])
     assert frames[-1].time == sp.Rational(3, 10**4)
-    assert circuit.final(values)(V(a)) == 10 == pytest.approx(phi.read(phi(phi.rest, math.inf))["V_A"])
+    assert circuit.final(values)(V(a)) == 10 == pytest.approx(phi.value(phi(phi.rest, math.inf), V(a)))
 
 
 def test_ac_is_the_frames_forever_under_a_sine():

@@ -87,7 +87,7 @@ def schematic(what: Element | Drawing, values: Mapping | None = None, solution: 
 def plot(trace: Trace, *qs: str | Quantity) -> Shown:
     """A run's quantities in time, each a quantity or a name (by default its named points' potentials, else
     its capacitors' and inductors' voltages)."""
-    circuit = trace.phi.circuit
+    circuit = trace.phi.c.circuit
     if qs:  # by name, anything it reads: a pin's current too ("I_Q_1_c")
         series = {q if isinstance(q, str) else _name(q, circuit): trace(q) for q in qs}
     else:

@@ -84,8 +84,6 @@ class Way:
 
 
 Known = dict[sp.Symbol, sp.Expr]
-Alone = Callable[[sp.Expr, sp.Symbol], sp.Expr | None]
-"""``x`` from ``e`` = 0, or None: not alone there."""
 
 
 @dataclass(frozen=True)
@@ -135,8 +133,8 @@ class Laws:
                     e = e.xreplace({x: v})
         return sp.expand(e, power_exp=False)
 
-    def complete(self, found: Mapping[sp.Symbol, sp.Expr]) -> Known:
-        """Every variable from what was found: each that went, the last first."""
+    def complete(self, found: Mapping[sp.Symbol, sp.Expr] = {}) -> Known:  # noqa: B006
+        """Every variable that went, from what was found: the last first."""
         out = dict(found)
         for s in reversed(self.log):
             for x, value in zip(s.found, s.values):
@@ -144,37 +142,96 @@ class Laws:
                 out[x] = normal(v) if v.free_symbols else v
         return out
 
-    def eliminate(self, xs: Collection[sp.Symbol], alone: Alone, keep: Collection[sp.Symbol] = ()) -> Laws:
-        """While an equation gives one of ``xs`` alone, it goes: put in everywhere (a way's equations and
-        what it needs too), logged. Never one of ``keep``, nor one under a function (``exp``, a time word):
-        what is tangled stays. The equations go fewest of ``xs`` first, again while any goes."""
-        laws = dict(enumerate(self.equations))
-        choices, log = self.choices, list(self.log)
-        xs, keep = set(xs), set(keep)
-        tangled = {x for q in laws.values() for f in q.expr.atoms(sp.Function) for x in symbols_in(f)}
-        progress = True
-        while progress:
-            progress = False
-            for k in sorted(laws, key=lambda k: len(symbols_in(laws[k].expr) & xs)):
-                q = laws.get(k)
-                if q is None:
-                    continue
-                for x in sorted(symbols_in(q.expr) & xs - tangled - keep, key=_joining_first):
-                    value = alone(q.expr, x)
-                    if value is None:
-                        continue
-                    del laws[k]
-                    xs.discard(x)
-                    put = lambda e, x=x, value=value: e.xreplace({x: value}) if e.has(x) else e  # noqa: E731
-                    for j, p in laws.items():
-                        if p.expr.has(x):
-                            laws[j] = Equation(normal(put(p.expr)), p.origin)
-                    choices = Laws((), choices).map(put).choices
-                    log.append(SolutionStep((x,), (value,), (q.origin,), equations=(q.expr,)))
-                    tangled.update(y for f in value.atoms(sp.Function) for y in symbols_in(f))
-                    progress = True
-                    break
-        return Laws(tuple(q for q in laws.values() if q.expr != 0), choices, tuple(log))
+    def found(self) -> Known:
+        """What the log found, as it found it."""
+        return {x: v for s in self.log for x, v in zip(s.found, s.values)}
+
+    def put(self, values: Mapping[sp.Symbol, sp.Expr], step: SolutionStep) -> Laws:
+        """``values`` put in everywhere (the equations, the ways and what they need), and ``step`` logged."""
+
+        def put(e: sp.Expr) -> sp.Expr:
+            return normal(e.xreplace(values)) if any(e.has(x) for x in values) else e
+
+        laws = Laws(self.equations, self.choices).map(put)
+        return Laws(tuple(q for q in laws.equations if q.expr != 0), laws.choices, (*self.log, step))
+
+    def take(self, q: Equation, x: sp.Symbol, value: sp.Expr) -> Laws:
+        """``x`` = ``value``, as ``q`` says: ``q`` used up, ``x`` gone everywhere."""
+        rest = Laws(tuple(p for p in self.equations if p is not q), self.choices, self.log)
+        return rest.put({x: value}, SolutionStep((x,), (value,), (q.origin,), equations=(q.expr,)))
+
+    def eliminate(self, xs: Collection[sp.Symbol], rule: Rule, keep: Collection[sp.Symbol] = ()) -> Laws:
+        """Every one of ``xs`` (but ``keep``) that an equation gives alone by ``rule``, gone: ``many (alone
+        …)``, the one way it goes."""
+        (out,) = many(alone(set(xs) - set(keep), rule))(self)
+        return out
+
+
+# Solving as parsing. A ``Solve`` takes what is left (``Laws``: its equations are a parser's input) to every
+# way it can go on — a list: an element of several ways, several roots. A way that cannot go on ends in a
+# ``"rejected"`` step and stays in the list, so the tries are steps (the log is shared through the search:
+# ``ListT (Writer Log)``). The combinators are a parser's: ``then`` (*>), ``each`` (<|>, every way), ``many``,
+# ``alone`` (``satisfy``: one equation gives one variable).
+
+Solve = Callable[[Laws], list[Laws]]
+Step = Callable[[Laws], list[Laws] | None]
+"""One step, or None: nothing to take."""
+Rule = Callable[[sp.Expr, sp.Symbol], list[sp.Expr] | None]
+"""The values ``x`` has by ``e`` = 0 ([]: none, a contradiction), or None: not alone there."""
+
+
+def failed(laws: Laws) -> bool:
+    return bool(laws.log) and laws.log[-1].how == "rejected"
+
+
+def rejected(laws: Laws, because: Origin) -> Laws:
+    return Laws(laws.equations, laws.choices, (*laws.log, SolutionStep((), (), (because,), "rejected")))
+
+
+def then(*solves: Solve) -> Solve:
+    """Each in turn, on every way the one before left."""
+
+    def run(laws: Laws) -> list[Laws]:
+        out = [laws]
+        for solve in solves:
+            out = [m for k in out for m in ([k] if failed(k) else solve(k))]
+        return out
+
+    return run
+
+
+def each(*solves: Solve) -> Solve:
+    """Every way any of them goes."""
+    return lambda laws: [m for solve in solves for m in solve(laws)]
+
+
+def many(step: Step) -> Solve:
+    """``step`` again and again, while it takes something."""
+
+    def run(laws: Laws) -> list[Laws]:
+        took = None if failed(laws) else step(laws)
+        return [laws] if took is None else [m for k in took for m in run(k)]
+
+    return run
+
+
+def alone(xs: set[sp.Symbol], rule: Rule) -> Step:
+    """One equation that gives one of ``xs`` alone by ``rule`` (the fewest of ``xs`` first; what only joins
+    first; never one under a function — ``exp``, a time word: what is tangled stays): it goes. Several values
+    wait for the rest; none is a contradiction."""
+
+    def step(laws: Laws) -> list[Laws] | None:
+        tangled = {x for q in laws.equations for f in q.expr.atoms(sp.Function) for x in symbols_in(f)}
+        for q in sorted(laws.equations, key=lambda q: len(symbols_in(q.expr) & xs)):
+            for x in sorted(symbols_in(q.expr) & xs - tangled, key=_joining_first):
+                values = rule(q.expr, x)
+                if values == []:
+                    return [rejected(laws, q.origin)]
+                if values is not None and len(values) == 1:
+                    return [laws.take(q, x, values[0])]
+        return None
+
+    return step
 
 
 JOINING: set[sp.Symbol] = set()
@@ -185,17 +242,17 @@ def _joining_first(x: sp.Symbol) -> tuple[bool, str]:
     return x not in JOINING, str(x)
 
 
-def linear(held: Collection[sp.Symbol], steady: Callable[[sp.Expr], bool]) -> Alone:
+def linear(held: Collection[sp.Symbol], steady: Callable[[sp.Expr], bool]) -> Rule:
     """``x`` alone in an equation of degree one in it whose factor holds none of ``held``, is ``steady``
     (never 0 as the circuit runs) and is not 0: how joining hides a variable."""
 
-    def alone(e: sp.Expr, x: sp.Symbol) -> sp.Expr | None:
+    def rule(e: sp.Expr, x: sp.Symbol) -> list[sp.Expr] | None:
         a = sp.diff(e, x)
         if a.has(x) or symbols_in(a) & set(held) or not steady(a) or sp.expand(a) == 0:
             return None
-        return normal(-(e - a * x) / a)
+        return [normal(-(e - a * x) / a)]
 
-    return alone
+    return rule
 
 
 def ways(laws: Sequence[sp.Expr] | Cases) -> tuple[Case, ...]:

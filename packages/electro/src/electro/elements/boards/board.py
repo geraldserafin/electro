@@ -7,6 +7,8 @@ from ...circuit.element import Element
 class Board(Element):
     pins: tuple[str, ...] = ()
     supplies: dict[str, object] = {}
+    modes: dict[str, tuple[float, float]] = {}
+    """A pin's ways: its conductance and the source behind it."""
 
     def __init_subclass__(cls, **kwargs) -> None:
         super().__init_subclass__(**kwargs)
@@ -14,6 +16,11 @@ class Board(Element):
         cls.terminals = (*cls.pins, *cls.supplies, "GND")
         cls.parameters = cls.inputs = settable
         cls.defaults = dict.fromkeys(settable, 0)
+
+    def setting(self, which: str, value: object) -> dict[str, float]:
+        """A pin set to one of its ways (``"high"``, ``"pullup"``…), or driven at so many volts."""
+        g, e = self.modes[value] if isinstance(value, str) else (self.modes["high"][0], float(value))  # type: ignore[arg-type]
+        return {f"{which}_G": g, f"{which}_E": e}
 
     def laws(self, t, p):
         driven = [t.I[pin] - p[f"{pin}_G"] * (t.across(pin, "GND") - p[f"{pin}_E"]) for pin in self.pins]

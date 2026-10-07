@@ -1,26 +1,48 @@
-"""A frame of a closed circuit, its values in: its formula (``formula``) solved — by hand, one unknown at a
-time from an equation that gives it alone (``Laws.eliminate`` again, its log the steps), the rest together;
-elements of several ways by cases (each combination of their ways, as the list monad's ``sequence``, assumed
-and checked); beyond algebra (an ``exp``) by Newton — and every quantity back through the log. The final frame is the one the circuit comes to: one frame infinitely long
-(DC), or, with sines of one frequency, turning at it (AC)."""
+"""A frame of a closed circuit, solved. Solving is parsing: what is left (``Laws``) is the input, a step takes
+one equation and gives one unknown, and the ways are a list (``algebra``'s combinators):
+
+- ``ways``: every combination of the ways of the elements of several (``sequence``: the textbook's diode on,
+  or off), each assumed;
+- ``many (alone one_root)``: one unknown at a time, from an equation with it alone left — the log the steps;
+- ``together``: what is left, at once;
+- ``hold``: what each assumed way needs holds, and every equation left with nothing in it.
+
+No way left is a contradiction; several, more than one answer; one with unknowns left, missing data.
+Beyond algebra (an ``exp``) Newton finds the frame, its sources raised from nothing. The final frame is the
+one the circuit comes to: one frame infinitely long (DC), or, with sines of one frequency, turning at it
+(AC)."""
 
 from __future__ import annotations
 
-import itertools
-from collections.abc import Callable, Mapping, Sequence
+import graphlib
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
 from typing import ClassVar
 
 import sympy as sp
 
-from ..circuit.algebra import Equation, Known, Laws, Origin, SolutionStep, Way, expr, subs, symbols_in
+from ..circuit.algebra import (
+    Known,
+    Laws,
+    Origin,
+    SolutionStep,
+    Solve,
+    Way,
+    alone,
+    expr,
+    failed,
+    many,
+    rejected,
+    symbols_in,
+    then,
+)
 from ..circuit.element import Element
 from ..circuit.names import Names
 from ..circuit.quantities import Current, Power, Quantity, Scaled, Voltage
 from ..circuit.time import TIME
 from ..errors import Ambiguous, Contradiction, MissingData, NotLinear, Undetermined
-from ..frame.formula import Formula, formula
-from ..frame.reading import AC, DC, Step, frequencies
+from ..frame.formula import Closed, Formula, close, conditions, formula, parameter_values, scaled
+from ..frame.reading import AC, DC, Step, before, frequencies
 from ..numeric.code import compile_equations
 from ..numeric.engine import homotopy
 
@@ -91,71 +113,133 @@ def final(circuit: Element, values: Mapping, frame: Step | None = None) -> Solut
 
 def settled(circuit: Element, values: Mapping) -> Step:
     """How the circuit settles: with sines in time of one frequency, turning at it (``AC``); else DC."""
-    found = {w for e in formula(circuit, values, DC()).laws.expressions() for w in frequencies(e)}
+    c = close(circuit)
+    found = {
+        w
+        for e in c.laws.map(lambda e: e.xreplace(parameter_values(circuit, values, c.names))).expressions()
+        for w in frequencies(e)
+    }
     return AC(found.pop()) if len(found) == 1 else DC()
 
 
 def frame_after(circuit: Element, values: Mapping, frame: Step, before: Solution | None = None) -> Solution:
     """One frame of ``circuit``, ``frame`` long, after ``before`` (by default from rest)."""
     try:
-        return _frame(circuit, values, frame, before)
+        return _frame(close(circuit), values, frame, before)
     except Undetermined as err:
         err.circuit, err.values, err.frame = circuit, values, frame
         raise
 
 
-def _frame(circuit: Element, values: Mapping, frame: Step, before: Solution | None) -> Solution:
-    left = formula(circuit, values, frame, before)
+def _frame(c: Closed, values: Mapping, frame: Step, after: Solution | None) -> Solution:
+    time = (after.time if after is not None else sp.Integer(0)) + frame.dt if frame.dt not in (0, sp.oo) else sp.oo
+    under_d, under_pre = c.remembered
+    given = parameter_values(c.circuit, values, c.names)
+    given |= {before(x): after.evaluated(x) if after is not None else sp.Integer(0) for x in under_d | under_pre}
+    given |= {TIME: time} if time != sp.oo else {}
+    left = formula(c, frame, given, tuple(conditions(values, c.names)))
     if any(e.has(TIME) for e in left.laws.expressions()):
         raise Undetermined("its data change in time: simulate it")
-    if left.laws.choices:
-        found, steps = _by_cases(left)
-    elif _is_algebraic(left):
-        found, steps = by_hand(left, left.laws)
+    if _is_algebraic(left):
+        found, steps = solved(left)
     elif frame.dt == 0:
         raise NotLinear("a non-linear circuit in frames infinitely short: around its working point (not yet)")
     else:
-        left = formula(circuit, values, frame, before, sources=SOURCES)
+        left = formula(c, frame, scaled(given, c.circuit, c.names, SOURCES))
         found, steps = _by_newton(left)
     unknown = frozenset(left.unknowns) - set(found)
     every = left.laws.complete(found)
     unknown |= {x for x, v in every.items() if symbols_in(v) & unknown}
-    traced = _traced(steps, left, every, unknown)
-    return Solution(circuit, every, unknown, left.names, left.values, dict(values), traced, frame, left.time)
+    shown = _shown(left, every, unknown)
+    checks = len(steps) - next((k for k, st in enumerate(reversed(steps)) if st.how != "checked"), len(steps))
+    steps = (*steps[:checks], *shown, *steps[checks:])
+    return Solution(c.circuit, every, unknown, left.names, left.given, dict(values), steps, frame, time)
 
 
-def by_hand(left: Formula, laws: Laws) -> tuple[Known, tuple[SolutionStep, ...]]:
-    """One unknown at a time, from an equation with it alone left (one value for it: a resistance from its
-    power has two, and waits for the rest); the rest together. An equation with none left must hold, or the
-    data contradict each other."""
+def solved(left: Formula) -> tuple[Known, tuple[SolutionStep, ...]]:
+    """The one way the frame goes, as by hand: what it found and the steps (the tries before it too)."""
+    outcomes = by_hand(left)(Laws(left.laws.equations, left.laws.choices))
+    fitting = [o for o in outcomes if not failed(o)]
+    if not fitting:
+        raise (
+            Undetermined("no way of its elements fits")
+            if left.laws.choices
+            else Contradiction("no solution: the data contradict each other")
+        )
+    if len(fitting) > 1:
+        if left.laws.choices:
+            raise Undetermined("more than one way fits")
+        raise Ambiguous([{x: v for x, v in o.found().items() if x in left.params} for o in fitting])
+    first = outcomes.index(fitting[0])
+    tries = tuple(s for o in outcomes[:first] for s in o.log)
+    return fitting[0].found(), (*tries, *fitting[0].log)
+
+
+def by_hand(left: Formula) -> Solve:
     unknowns = set(left.unknowns)
 
-    def alone(e: sp.Expr, x: sp.Symbol) -> sp.Expr | None:
+    def one_root(e: sp.Expr, x: sp.Symbol) -> list[sp.Expr] | None:
         if symbols_in(e) & unknowns != {x}:
             return None
-        roots = [r for r in sp.solve(e, x) if _fits(x, r, left)]
-        if not roots:
-            raise Contradiction("no solution: the data contradict each other")
-        return sp.simplify(roots[0]) if len(roots) == 1 else None
+        return [sp.simplify(r) for r in sp.solve(e, x) if _fits(x, r, left)]
 
-    done = Laws(laws.equations).eliminate(unknowns, alone)
-    found = {x: v for s in done.log for x, v in zip(s.found, s.values)}
-    rest = [q for q in done.equations if symbols_in(q.expr) & unknowns]
-    if any(sp.simplify(q.expr) != 0 for q in done.equations if q not in rest):
-        raise Contradiction("no solution: the data contradict each other")
-    if not rest:
-        return found, done.log
-    exprs = [q.expr for q in rest]
-    xs = sorted({x for e in exprs for x in symbols_in(e)} & unknowns, key=str)
-    options = [f for f in sp.solve(exprs, xs, dict=True) if all(_fits(x, v, left) for x, v in f.items())]
-    if not options:
-        raise Contradiction("no solution: the data contradict each other")
-    if len(options) > 1:
-        raise Ambiguous([{x: sp.simplify(v) for x, v in f.items() if x in left.params} for f in options])
-    together = {x: sp.simplify(v) for x, v in options[0].items()}
-    origins = tuple(q.origin for q in rest)
-    step = SolutionStep(tuple(together), tuple(together.values()), origins, "together", tuple(exprs))
-    return {**found, **together}, (*done.log, step)
+    return then(ways, many(alone(unknowns, one_root)), together(left), hold(unknowns))
+
+
+def ways(laws: Laws) -> list[Laws]:
+    """Every combination of the elements' ways, each assumed: its equations hold now, and it stays the one
+    way of its element, what it needs to be checked."""
+    out = [Laws(laws.equations, (), laws.log)]
+    for choice in laws.choices:
+        out = [_assumed(k, w) for k in out for w in choice]
+    return out
+
+
+def _assumed(laws: Laws, way: Way) -> Laws:
+    step = SolutionStep((), (), (Origin("assumed", way.element, case=way.name),), "assumed")
+    return Laws((*laws.equations, *way.equations), (*laws.choices, (way,)), (*laws.log, step))
+
+
+def together(left: Formula) -> Solve:
+    """What is left, at once: one way for each solution."""
+
+    def solve(laws: Laws) -> list[Laws]:
+        rest = [q for q in laws.equations if symbols_in(q.expr) & set(left.unknowns)]
+        if not rest:
+            return [laws]
+        exprs = [q.expr for q in rest]
+        xs = sorted({x for e in exprs for x in symbols_in(e)} & set(left.unknowns), key=str)
+        options = [f for f in sp.solve(exprs, xs, dict=True) if all(_fits(x, v, left) for x, v in f.items())]
+        if not options:
+            return [rejected(laws, rest[0].origin)]
+        step = lambda f: SolutionStep(
+            tuple(f), tuple(f.values()), tuple(q.origin for q in rest), "together", tuple(exprs)
+        )  # noqa: E731
+        return [laws.put(f, step(f)) for f in ({x: sp.simplify(v) for x, v in o.items()} for o in options)]
+
+    return solve
+
+
+def hold(unknowns: set[sp.Symbol]) -> Solve:
+    """Every equation left with no unknown in it holds, and what each assumed way needs (≥ 0)."""
+
+    def check(laws: Laws) -> list[Laws]:
+        for q in laws.equations:
+            if not symbols_in(q.expr) & unknowns and sp.simplify(q.expr) != 0:
+                return [rejected(laws, q.origin)]
+        checked = []
+        for (way,) in laws.choices:
+            needs = [sp.simplify(h) for h in way.holds]
+            if any(symbols_in(v) & unknowns for v in needs):
+                return [rejected(laws, Origin("holds", way.element, case=way.name))]
+            if any(not v.is_number for v in needs):
+                raise Undetermined("which way each element is depends on values not given")
+            if any(float(v) < -1e-12 for v in needs):
+                return [rejected(laws, Origin("holds", way.element, case=way.name))]
+            checked.append(SolutionStep((), (), (Origin("holds", way.element, case=way.name),), "checked"))
+        return [Laws(laws.equations, laws.choices, (*laws.log, *checked))]
+
+    return check
 
 
 def _fits(x: sp.Symbol, value: object, left: Formula) -> bool:
@@ -166,11 +250,9 @@ def _fits(x: sp.Symbol, value: object, left: Formula) -> bool:
 
 def _is_algebraic(left: Formula) -> bool:
     """Polynomial in its unknowns, over a common denominator (an unknown resistance times a current too)."""
-    if not left.unknowns:
-        return True
     try:
         for q in left.laws.equations:
-            sp.Poly(sp.numer(sp.together(q.expr)), *left.unknowns)
+            sp.Poly(sp.numer(sp.together(q.expr)), *left.unknowns) if left.unknowns else None
         return True
     except sp.PolynomialError:
         return False
@@ -192,65 +274,19 @@ def _by_newton(left: Formula):
     return values, (SolutionStep(tuple(values), tuple(values.values()), origins, "numerically"),)
 
 
-def _by_cases(left: Formula):
-    """Elements of several ways (a textbook diode), solved as by hand: assume a way for each, solve, check that
-    what each way needs holds; if it does not, the next assumption. The tries are the steps."""
-    tried: list[SolutionStep] = []
-    fitting = []
-    for combination in itertools.product(*left.laws.choices):
-        assumed = [_said("assumed", w) for w in combination]
-        assuming = Laws(left.laws.equations + tuple(q for w in combination for q in w.equations))
-        try:
-            values, steps = by_hand(left, assuming)
-        except Undetermined:
-            tried += [*assumed, _said("rejected", combination[0])]
-            continue
-        checks = [(w, sp.simplify(subs(h, values))) for w in combination for h in w.holds]
-        if any(symbols_in(v) & set(left.unknowns) for _, v in checks):
-            continue
-        if any(not v.is_number for _, v in checks):
-            raise Undetermined("which way each element is depends on values not given")
-        broken = next((w for w, v in checks if float(v) < -1e-12), None)
-        if broken is not None:
-            tried += [*assumed, *steps, _said("rejected", broken)]
-            continue
-        fitting.append((values, (*tried, *assumed, *steps, *(_said("checked", w) for w in combination))))
-    if not fitting:
-        raise Undetermined("no way of its elements fits")
-    if len(fitting) > 1:
-        raise Undetermined("more than one way fits")
-    return fitting[0]
-
-
-def _said(how: str, way: Way) -> SolutionStep:
-    what = "assumed" if how == "assumed" else "holds"
-    return SolutionStep((), (), (Origin(what, way.element, case=way.name),), how)
-
-
-def _traced(found: Sequence[SolutionStep], left: Formula, values: Known, unknown) -> tuple[SolutionStep, ...]:
-    """The steps as the solving left them: what was found of what was left, then each quantity that went on
-    the way a book names (an element's current, a point's potential — never a joining one), its value now
-    known, each once all it is worked out from is."""
-    shown: set[sp.Symbol] = set()
-    waiting = []
+def _shown(left: Formula, every: Known, unknown) -> tuple[SolutionStep, ...]:
+    """Each quantity that went on the way and that a book names (an element's current, a point's potential —
+    not a terminal's, not what a wire made one), its value now known; each after those its equation holds
+    (a topological order)."""
     points = set(left.names.points.values())
+    named = {}
     for s in left.laws.log:
-        (x,), q = s.found, Equation(s.equations[0], s.because[0])
-        value = values.get(x)
+        (x,) = s.found
         terminal = x.name.startswith("V_") and x not in points
-        named = not isinstance(x, sp.Dummy) and q.origin.what != "wire" and not terminal
-        if named and x not in shown and value is not None and not symbols_in(value) & unknown:
-            shown.add(x)
-            waiting.append((x, value, q))
-    known = {x for step in found for x in step.found}
-    eliminated = []
-    while waiting:
-        ready = next(
-            (w for w in waiting if not {y for y in symbols_in(w[2].expr) - {w[0]} if y in shown} - known), waiting[0]
-        )
-        waiting.remove(ready)
-        x, value, q = ready
-        known.add(x)
-        eliminated.append(SolutionStep((x,), (value,), (q.origin,), equations=(q.expr,)))
-    checks = next((k for k, st in enumerate(reversed(found)) if st.how != "checked"), len(found))
-    return (*found[: len(found) - checks], *eliminated, *found[len(found) - checks :])
+        value = every.get(x)
+        if isinstance(x, sp.Dummy) or s.because[0].what == "wire" or terminal or x in named:
+            continue
+        if value is not None and not symbols_in(value) & unknown:
+            named[x] = SolutionStep((x,), (value,), s.because, equations=s.equations)
+    after = {x: symbols_in(s.equations[0]) & set(named) - {x} for x, s in named.items()}
+    return tuple(named[x] for x in graphlib.TopologicalSorter(after).static_order())
