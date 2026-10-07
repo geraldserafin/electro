@@ -1,12 +1,11 @@
-"""A circuit in time, a coalgebra: Φ takes a frame to the next (``phi(frame, dt)``), and a run is Φ unfolded
-from rest (``simulate``). ``Machine`` is the same unfolding compiled to numbers, with a memory of its own.
+"""A circuit in time. ``step_function`` compiles the circuit's laws at a step of ``dt`` once (Φ); ``phi(frame,
+dt)`` gives the next frame, and ``simulate`` runs frame after frame from rest (the engine's ``Machine``).
 
-Φ is the frame formula at a step of ``dt`` with letters for what it learns only as it runs: the step's
-length, the time, how a change is read (θ), what was a step before (``memory``: each letter and what it is
-after a step) and what the world sets (an element's ``inputs``, set as ``Element.setting`` says). Every
-named point has a whisper of a conductance to ground: a floating one is never a singular matrix. What is read
-of a frame is any quantity, worked out from what was found (``at``); compiled, for the page (``to_json``).
-"""
+Φ has letters for what it learns only while it runs: the step's length ``dt``, the time, how a change is read
+(θ), what was a step before (``memory``: each letter and its value after a step) and what is set from
+outside (an element's ``inputs``). Every point has a tiny conductance to ground, so a floating point never
+makes the equations singular. Any quantity can be read of a frame (``at``); the page gets what it reads
+compiled (``to_json``)."""
 
 from __future__ import annotations
 
@@ -30,20 +29,21 @@ from .numeric.engine import Machine
 from .quantities import Quantity, Scaled
 from .solve import references
 from .time import THETA, TIME, D, Pre
-from .values import given as given_values
+from .values import given
 
 G_NODE = 1e-12
+"""The conductance from every point to ground."""
 SAMPLE_DT = 1e-5
-"""A step's length in the sample frame whose numbers choose the pivots (``sparse``)."""
+"""The step of the sample frame whose numbers choose the pivots (``sparse``)."""
 PERIOD_STEPS = 40
-"""Steps at least in a period of anything in time in the data (a sine, a square wave)."""
+"""The fewest steps in a period of a sine or a square wave in the data."""
 STEP = Step(DT, THETA)
 
 
 @dataclass(frozen=True)
 class Kept:
-    """A letter Φ remembers: what it is after a step, at rest, and whether it jumps (a flip-flop's state, a
-    switch in time) rather than moves."""
+    """A letter Φ remembers: its value after a step, at rest, whether it jumps (a flip-flop's state, a switch in
+    time) and whether it moves under ``D`` (what a step's error is read from)."""
 
     letter: sp.Symbol
     after: sp.Expr
@@ -54,7 +54,7 @@ class Kept:
 
 @dataclass
 class Frame:
-    """The circuit at time ``t``: its unknowns ``x``, and its letters' values ``p``."""
+    """The circuit at time ``t``: its unknowns ``x`` and its letters' values ``p``."""
 
     t: float
     x: list[float]
@@ -62,25 +62,24 @@ class Frame:
 
 
 Key = Element | tuple[Element, str] | str
-"""An element (its one input), an element and its input's or pin's name, or as text: ``"S_1"``,
-``"S_1_closed"``, ``"ARD_1.D13"``."""
+"""What an input is named by: an element (its only input), an element and the input's or pin's name, or as
+text: ``"S_1"``, ``"S_1_closed"``, ``"ARD_1.D13"``."""
 
 
 @dataclass
 class StepFunction:
-    """Φ: the closed ``circuit``'s ``laws`` at a step of ``dt``, ``given`` its values and its letters (``dt``,
-    the time, θ, what is ``kept`` — those under ``D`` first, ``moving`` of them — and what the world sets,
-    ``inputs``: each one's place), compiled (``code``)."""
+    """Φ: the ``circuit``'s ``equations`` at a step of ``dt``, compiled (``code``) over its ``letters``: ``dt``,
+    the time, θ, what is ``kept`` and the ``inputs`` (each its letter's place). ``given``: the parameters' values
+    and the inputs' letters; ``worked``: unknowns worked out after the frame (``_simple``)."""
 
     circuit: Circuit
     laws: Laws
     given: dict[sp.Symbol, sp.Expr]
     equations: list[sp.Expr]
-    after_frame: list[tuple[sp.Symbol, sp.Expr]]
+    worked: list[tuple[sp.Symbol, sp.Expr]]
     code: Compiled
     letters: list[sp.Symbol]
     kept: list[Kept]
-    moving: int
     inputs: dict[str, int]
     initial: list[float]
     after: Code
@@ -101,12 +100,12 @@ class StepFunction:
         self._update(x, p, out)
 
     def program(self) -> dict:
-        """What the engine's ``Machine`` runs, but its code."""
+        """What the engine's ``Machine`` runs, besides the code."""
         return {
             "n": len(self.unknowns),
             "initial": self.initial,
             "states": [3 + k for k in range(len(self.kept))],
-            "changing": list(range(self.moving)),
+            "changing": [k for k, st in enumerate(self.kept) if st.moving],
             "jumps": [k for k, st in enumerate(self.kept) if st.jumps],
             "longest": _longest(self.equations),
             "inputs": self.inputs,
@@ -135,9 +134,9 @@ class StepFunction:
         return Frame(frame.t + dt, x, p)
 
     def at(self, q: Quantity | Scaled | sp.Expr) -> sp.Expr:
-        """``q`` — a quantity, or an expression in its elements' own variables — in the unknowns and letters."""
+        """``q`` (a quantity, or an expression in the elements' own variables) in the unknowns and letters."""
         e = q.expr if isinstance(q, Quantity | Scaled) else q
-        return _worked(e.xreplace(dict(self.laws.at)).xreplace(self.given), self.after_frame)
+        return _put(e.xreplace(dict(self.laws.at)).xreplace(self.given), self.worked)
 
     def value(self, frame: Frame, q: Quantity | Scaled | sp.Expr) -> float:
         """``q`` in ``frame``."""
@@ -145,162 +144,177 @@ class StepFunction:
         return float(self.at(q).xreplace(known))
 
     def to_json(self, reads: Mapping[str, sp.Expr] | None = None) -> str:
-        """For the page's engine (``simulation/engine.ts``); ``reads``: what it reads of a frame, by name, in
-        the elements' own variables (``see`` works them out)."""
+        """For the page's engine (``simulation/engine.ts``). ``reads``: what the page reads of a frame, by name,
+        in the elements' own variables."""
         reads = reads or {}
         see = statements(
             [(f"out[{k}]", self.at(e)) for k, e in enumerate(reads.values())], self.code.unknowns, self.letters
         )
-        return json.dumps(
-            {
-                **self.program(),
-                "unknowns": self.unknowns,
-                "params": self.params,
-                "constant": self.code.constant["js"],
-                "moving": self.code.moving["js"],
-                "shape": self.code.shape,
-                "update": self.after["js"],
-                "seen": list(reads),
-                "see": see["js"],
-            }
-        )
+        code = {"constant": self.code.constant["js"], "moving": self.code.moving["js"], "shape": self.code.shape}
+        names = {"unknowns": self.unknowns, "params": self.params, "seen": list(reads)}
+        return json.dumps({**self.program(), **code, **names, "update": self.after["js"], "see": see["js"]})
 
     def setter(self, key: Key) -> Callable[[object], list[tuple[int, float]]]:
-        """What setting ``key`` sets (as its element's ``setting`` says): each letter's place, and its value."""
-        labels = globals()["labels"](self.circuit)
-        by_label = {label: e for e, label in labels.items()}
-        named = {f"{labels[e]}_{w}": (e, w) for e in labels for w in e.inputs}
-        label, _, pin = key.partition(".") if isinstance(key, str) else ("", "", "")
-        match key:
-            case Element() if len(key.inputs) == 1:
-                e, which = key, key.inputs[0]
-            case (Element() as e, str(which)):
-                pass
-            case str() if pin and label in by_label:
-                e, which = by_label[label], pin
-            case str() if key in by_label and len(by_label[key].inputs) == 1:
-                e, which = by_label[key], by_label[key].inputs[0]
-            case str() if key in named:
-                e, which = named[key]
-            case _:
-                raise NoSuchInput(str(key), sorted(named))
+        """What setting ``key`` sets, as its element's ``setting`` says: each letter's place and value."""
+        e, which = self._input(key)
+        label = labels(self.circuit)[e]
 
         def setting(value: object) -> list[tuple[int, float]]:
-            letters = {f"{labels[e]}_{w}": v for w, v in e.setting(which, value).items()}
+            letters = {f"{label}_{w}": v for w, v in e.setting(which, value).items()}
             if not set(letters) <= set(self.inputs):
-                raise NoSuchInput(str(key), sorted(named))
+                raise NoSuchInput(str(key), sorted(self.inputs))
             return [(self.inputs[w], v) for w, v in letters.items()]
 
         return setting
 
+    def _input(self, key: Key) -> tuple[Element, str]:
+        """The element and the input (or pin) ``key`` names."""
+        named = {label: e for e, label in labels(self.circuit).items()}
+        by_letter = {f"{label}_{w}": (e, w) for label, e in named.items() for w in e.inputs}
+        label, _, pin = key.partition(".") if isinstance(key, str) else ("", "", "")
+        match key:
+            case Element() if len(key.inputs) == 1:
+                return key, key.inputs[0]
+            case (Element() as e, str(which)):
+                return e, which
+            case str() if pin and label in named:
+                return named[label], pin
+            case str() if key in named and len(named[key].inputs) == 1:
+                return named[key], named[key].inputs[0]
+            case str() if key in by_letter:
+                return by_letter[key]
+        raise NoSuchInput(str(key), sorted(by_letter))
+
 
 def step_function(circuit: Circuit, values: Mapping) -> StepFunction:
-    """Φ: the circuit's laws at a step of ``dt``, what was a step before, the time and what the world sets
-    letters, compiled."""
+    """Φ: the circuit's laws at a step of ``dt``, compiled once."""
     laws = circuit.closed(leak=G_NODE)
     if laws.ways:
         raise NotSimulated(laws.ways[0][0].element.name or laws.ways[0][0].element.kind)
-    known = given_values(circuit, values)
-    label = labels(circuit)
-    world = {e.P[w]: sp.Symbol(f"{label[e]}_{w}") for e in circuit.members for w in e.inputs}
-    given = {**known, **world}
-    read = STEP.reading(given)
-    exprs = [read(q.expr) for q in laws.equations]
-    exprs += [
-        q.expr for q in references(exprs, {x for p in points(circuit) for x in sp.sympify(p.potential).free_symbols})
-    ]
-    params = {x: e for e in circuit.members for x in e.P.values()}
-    if missing := sorted({x for e in exprs for x in e.free_symbols if x in params}, key=str):
-        raise ValueNeeded(label[params[missing[0]]])
-    kept = memory(laws, given, read, {x for e in circuit.members for x in e.inner.values()})
-    letters = [DT, TIME, THETA, *(k.letter for k in kept), *world.values()]
-    unknowns = sorted({x for e in exprs for x in e.free_symbols} - set(letters), key=str)
-    _check_square(exprs, unknowns, letters)
-    potentials = {x for p in points(circuit) for x in sp.sympify(p.potential).free_symbols}
-    exprs, after_frame = _simple(exprs, set(unknowns) - potentials)
-    unknowns = [x for x in unknowns if x not in dict(after_frame)]
-    kept = [Kept(k.letter, _worked(k.after, after_frame), k.rest, k.jumps, k.moving) for k in kept]
-    initial = [0.0, 0.0, 1.0, *(k.rest for k in kept), *(float(known[p]) for p in world)]
-    code = compile_equations(exprs, unknowns, letters, sample=[SAMPLE_DT, 0.0, *initial[2:]])
+    known = given(circuit, values)
+    inputs = _inputs(circuit)
+    letters_in = {**known, **inputs}
+    read = STEP.reading(letters_in)
+    equations = _equations(laws, read, circuit)
+    _all_given(equations, circuit)
+    kept = memory(laws, letters_in, read, {x for e in circuit.members for x in e.inner.values()})
+    letters = [DT, TIME, THETA, *(k.letter for k in kept), *inputs.values()]
+    unknowns = _unknowns(equations, letters)
+    equations, worked = _simple(equations, set(unknowns) - _potentials(circuit))
+    unknowns = [x for x in unknowns if x not in dict(worked)]
+    kept = [Kept(k.letter, _put(k.after, worked), k.rest, k.jumps, k.moving) for k in kept]
+    initial = [0.0, 0.0, 1.0, *(k.rest for k in kept), *(float(known[p]) for p in inputs)]
+    code = compile_equations(equations, unknowns, letters, sample=[SAMPLE_DT, 0.0, *initial[2:]])
     after = statements([(f"out[{k}]", st.after) for k, st in enumerate(kept)], code.unknowns, letters)
-    inputs = {letter.name: 3 + len(kept) + k for k, letter in enumerate(world.values())}
-    under_d = sum(1 for k in kept if k.moving)
-    return StepFunction(circuit, laws, given, exprs, after_frame, code, letters, kept, under_d, inputs, initial, after)
+    places = {letter.name: 3 + len(kept) + k for k, letter in enumerate(inputs.values())}
+    return StepFunction(circuit, laws, letters_in, equations, worked, code, letters, kept, places, initial, after)
 
 
-def _simple(exprs: list[sp.Expr], may_go: set[sp.Symbol]) -> tuple[list[sp.Expr], list[tuple[sp.Symbol, sp.Expr]]]:
-    """Each unknown of ``may_go`` an equation gives alone, by a number (an element's current by its law), worked
-    out after the frame instead of found in it — the removal of simple equations equation-based simulators make
-    before they run (the points' potentials stay: worked out from one another, a ladder of them is a polynomial
-    in 1/dt of its length)."""
-    exprs, out = list(exprs), []
-    for e in list(exprs):
-        if e not in exprs:
-            continue
-        switched = {x for f in e.atoms(sp.Function, sp.Piecewise) for x in f.free_symbols}
-        for x in sorted(e.free_symbols & may_go - switched, key=str):
-            a = sp.diff(e, x)
-            if a.is_number and a != 0:
-                value = sp.expand(x - e / a)
-                exprs = [f.xreplace({x: value}) for f in exprs if f is not e]
-                out.append((x, value))
-                may_go.discard(x)
-                break
-    return exprs, out
+def _inputs(circuit: Circuit) -> dict[sp.Symbol, sp.Symbol]:
+    """Each parameter set from outside (``inputs``), and the letter it is in Φ: ``S_1_closed``."""
+    label = labels(circuit)
+    return {e.P[w]: sp.Symbol(f"{label[e]}_{w}") for e in circuit.members for w in e.inputs}
 
 
-def _worked(e: sp.Expr, after_frame: list[tuple[sp.Symbol, sp.Expr]]) -> sp.Expr:
-    """``e`` in what the frame finds: each unknown worked out after it by its value, in order."""
-    for x, v in after_frame:
+def _potentials(circuit: Circuit) -> set[sp.Symbol]:
+    return {x for p in points(circuit) for x in sp.sympify(p.potential).free_symbols}
+
+
+def _equations(laws: Laws, read: Callable, circuit: Circuit) -> list[sp.Expr]:
+    """The laws at a step, and a reference potential where nothing fixes how high a piece's stand."""
+    said = [read(q.expr) for q in laws.equations]
+    return said + [q.expr for q in references(said, _potentials(circuit))]
+
+
+def _all_given(equations: list[sp.Expr], circuit: Circuit) -> None:
+    """A simulation needs every parameter's value."""
+    params = {x: e for e in circuit.members for x in e.P.values()}
+    missing = sorted({x for e in equations for x in e.free_symbols if x in params}, key=str)
+    if missing:
+        raise ValueNeeded(labels(circuit)[params[missing[0]]])
+
+
+def _unknowns(equations: list[sp.Expr], letters: list[sp.Symbol]) -> list[sp.Symbol]:
+    """What a step finds: every symbol but the letters; as many as there are equations."""
+    unknowns = sorted({x for e in equations for x in e.free_symbols} - set(letters), key=str)
+    if len(equations) != len(unknowns):
+        raise NotSimulated(f"{len(equations)} laws, {len(unknowns)} unknowns")
+    return unknowns
+
+
+def _simple(equations: list[sp.Expr], may_go: set[sp.Symbol]) -> tuple[list[sp.Expr], list[tuple[sp.Symbol, sp.Expr]]]:
+    """Each unknown of ``may_go`` an equation gives directly, by a number factor (an element's current by its
+    law), worked out after the frame instead of found in it — the removal of simple equations simulators make
+    before they run. Points' potentials stay: worked out from one another, a ladder of them would be a
+    polynomial in 1/dt of its length."""
+    equations, worked = list(equations), []
+    for e in list(equations):
+        if e in equations and (x := _given_directly(e, may_go)) is not None:
+            value = sp.expand(x - e / sp.diff(e, x))
+            equations = [f.xreplace({x: value}) for f in equations if f is not e]
+            worked.append((x, value))
+            may_go.discard(x)
+    return equations, worked
+
+
+def _given_directly(e: sp.Expr, may_go: set[sp.Symbol]) -> sp.Symbol | None:
+    """An unknown of ``may_go`` that ``e`` gives with a number factor, outside any function or ``when``."""
+    switched = {x for f in e.atoms(sp.Function, sp.Piecewise) for x in f.free_symbols}
+    for x in sorted(e.free_symbols & may_go - switched, key=str):
+        factor = sp.diff(e, x)
+        if factor.is_number and factor != 0:
+            return x
+    return None
+
+
+def _put(e: sp.Expr, worked: list[tuple[sp.Symbol, sp.Expr]]) -> sp.Expr:
+    """``e`` with each unknown worked out after the frame put in, in order."""
+    for x, v in worked:
         if e.has(x):
             e = e.xreplace({x: v})
     return e
 
 
-def memory(laws: Laws, given: Mapping, read, inner: set[sp.Symbol]) -> list[Kept]:
-    """What is remembered, from rest: each quantity under ``D`` (first) or ``Pre``, as what is found has it
-    (an element's inner one only under ``Pre`` jumps: a flip-flop's state); of each under ``D`` how fast it changed at
-    the step's end, for the next to go by trapezoids; and each switch in time in the data."""
+def memory(laws: Laws, given: Mapping, read: Callable, inner: set[sp.Symbol]) -> list[Kept]:
+    """What Φ remembers, from rest: each quantity under ``D`` (first) or ``Pre`` (an element's inner one only
+    under ``Pre`` jumps: a flip-flop's state); for each under ``D``, how fast it changed at the end of the step
+    (trapezoids read it); and each switch in time in the data."""
     said = laws.expressions()
     under_d = sorted({a.args[0] for e in said for a in e.atoms(D)}, key=str)
     under_pre = sorted({a.args[0] for e in said for a in e.atoms(Pre)} - set(under_d), key=str)
     kept = [Kept(before(x), x.xreplace(given), moving=True) for x in under_d]
     kept += [Kept(before(x), x.xreplace(given), jumps=x in inner) for x in under_pre]
     kept += [Kept(slope(x), read(D(x))) for x in under_d]
-    exprs = [read(e) for e in said]
-    edges = sorted({p for e in exprs for p in e.atoms(sp.Piecewise) if p.free_symbols == {TIME}}, key=str)
-    return kept + [Kept(sp.Symbol(f"edge{k}"), p, float(p.subs(TIME, 0)), True) for k, p in enumerate(edges)]
+    return kept + _switches(said, read)
 
 
-def _longest(exprs: list[sp.Expr]) -> float | None:
-    """The longest a step may be: ``PERIOD_STEPS`` in a period of each sine and square wave in time."""
-    timed = [a for e in exprs for a in e.atoms(sp.sin, sp.cos, sp.Mod) if TIME in a.free_symbols]
-    periods = [
-        abs(float(a.args[1] / sp.diff(a.args[0], TIME)))
-        if isinstance(a, sp.Mod)
-        else 2 * math.pi / abs(float(sp.diff(a.args[0], TIME)))
-        for a in timed
-    ]
+def _switches(said: list[sp.Expr], read: Callable) -> list[Kept]:
+    """Each ``when`` of time alone in the data (a square wave's edge): remembered, so a step that crosses it
+    starts the next short."""
+    edges = sorted({p for e in said for p in read(e).atoms(sp.Piecewise) if p.free_symbols == {TIME}}, key=str)
+    return [Kept(sp.Symbol(f"edge{k}"), p, float(p.subs(TIME, 0)), True) for k, p in enumerate(edges)]
+
+
+def _longest(equations: list[sp.Expr]) -> float | None:
+    """The longest a step may be: ``PERIOD_STEPS`` in the period of each sine and square wave in time."""
+    timed = [a for e in equations for a in e.atoms(sp.sin, sp.cos, sp.Mod) if TIME in a.free_symbols]
+    periods = [_period(a) for a in timed]
     return min(periods) / PERIOD_STEPS if periods else None
 
 
-def _check_square(exprs: list[sp.Expr], unknowns: list[sp.Symbol], letters: list[sp.Symbol]) -> None:
-    """Every symbol a letter or found, and as many laws as unknowns."""
-    stray = sorted({x for e in exprs for x in e.free_symbols} - set(unknowns) - set(letters), key=str)
-    if stray:
-        raise ValueNeeded(stray[0].name)
-    if len(exprs) != len(unknowns):
-        raise NotSimulated(f"{len(exprs)} laws, {len(unknowns)} unknowns")
+def _period(a: sp.Expr) -> float:
+    rate = abs(float(sp.diff(a.args[0], TIME)))
+    return abs(float(a.args[1])) / rate if isinstance(a, sp.Mod) else 2 * math.pi / rate
 
 
-# Unfolded
+# Running it
 
 Schedule = Callable[[float], list[tuple[int, float]]]
-"""What the world sets at a time: ``[(letter's place, value)]``."""
+"""What is set from outside at a time: ``[(letter's place, value)]``."""
 
 
 def schedule(phi: StepFunction, inputs: Mapping[Key, object] | None) -> Schedule | None:
-    """``inputs`` — each a value or a function of time — as what the world sets at a time."""
+    """``inputs`` (each a value, or a function of time) as what is set at a time."""
     if not inputs:
         return None
     setters = [(phi.setter(key), value) for key, value in inputs.items()]
@@ -310,36 +324,29 @@ def schedule(phi: StepFunction, inputs: Mapping[Key, object] | None) -> Schedule
 Runner = Callable[[StepFunction, float, float, "Schedule | None"], "tuple[list[float], array, array] | None"]
 
 RUNNER: Runner | None = None
-"""What runs the frames instead of the engine here, when something faster is at hand (the page's engine, the
-same printed as JavaScript): the times, the unknowns and the letters of every frame; None: nothing is."""
+"""Runs the frames instead of the engine here when something faster is at hand (the page's engine, the same
+printed as JavaScript): the times, unknowns and letters of every frame; None when it cannot."""
 
 
 def simulate(
-    circuit: Element, values: Mapping, until: float, dt: float | None = None, inputs: Mapping[Key, object] | None = None
+    circuit: Circuit, values: Mapping, until: float, dt: float | None = None, inputs: Mapping[Key, object] | None = None
 ) -> Trace:
     """``until`` seconds from rest. ``dt``: the longest step (by default ``until``/500; steps shrink by
-    themselves to keep their error small). ``inputs``: what the world sets, each a value or a function of time."""
+    themselves to keep their error small). ``inputs``: what is set from outside, each a value or a function of
+    time."""
     phi = step_function(circuit, values)
     when = schedule(phi, inputs)
     dt_max = dt or until / 500
     if RUNNER is not None and (ran := RUNNER(phi, until, dt_max, when)) is not None:
         return Trace(phi, *ran)
-    times: list[float] = []
-    rows, params = array("d"), array("d")
-
-    def record(machine: Machine) -> None:
-        times.append(machine.t)
-        rows.extend(machine.x)
-        params.extend(machine.p)
-
-    phi.machine().run(until, dt_max, when, record)
-    return Trace(phi, times, rows, params)
+    trace = Trace(phi, [], array("d"), array("d"))
+    phi.machine().run(until, dt_max, when, trace.record)
+    return trace
 
 
 @dataclass
 class Trace:
-    """What happened in a run: the time of each frame, its unknowns (``data``) and its letters (``params``) —
-    8 bytes a number (Pyodide's memory never shrinks back)."""
+    """A run: the time of each frame, its unknowns (``data``) and its letters (``params``), 8 bytes a number."""
 
     phi: StepFunction
     t: list[float]
@@ -347,12 +354,16 @@ class Trace:
     params: array
 
     reads: ClassVar[Callable[[str, StepFunction], sp.Expr] | None] = None
-    """How a name not an unknown's nor a letter's is read (``"I_Q_1_c"``), when something reads names (the
-    notebook): as an expression in the elements' own variables."""
+    """How a name is read (``"I_Q_1_c"``), when something reads names (the notebook): as an expression in the
+    elements' own variables."""
+
+    def record(self, machine: Machine) -> None:
+        self.t.append(machine.t)
+        self.data.extend(machine.x)
+        self.params.extend(machine.p)
 
     def __call__(self, q: Quantity | Scaled | sp.Expr | str) -> list[float]:
-        """``q`` at each frame: a quantity, an expression in the elements' own variables, or a name (as
-        ``Trace.reads`` reads it)."""
+        """``q`` at each frame: a quantity, an expression in the elements' own variables, or a name."""
         if isinstance(q, str):
             if Trace.reads is None:
                 raise KeyError(q)
@@ -364,9 +375,9 @@ class Trace:
         return [float(f(*row)) for row in zip(*columns)] if xs else [float(e)] * len(self.t)
 
     def at(self, q: Quantity | Scaled | sp.Expr | str, t: float) -> float:
-        """``q`` at ``t``: between two frames, on the line between them."""
-        k = bisect.bisect_right(self.t, t) - 1
+        """``q`` at time ``t``: between two frames, on the line between them."""
         ys = self(q)
+        k = bisect.bisect_right(self.t, t) - 1
         if k < 0 or k + 1 >= len(self.t) or self.t[k] == t:
             return ys[min(max(k, 0), len(ys) - 1)]
         f = (t - self.t[k]) / (self.t[k + 1] - self.t[k])
