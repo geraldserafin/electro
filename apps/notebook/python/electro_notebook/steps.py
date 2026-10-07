@@ -43,6 +43,20 @@ BY_ANALYSIS = {
 def steps(solution: Solution, find: Sequence[Quantity] = (), units: Mapping[str, str] | None = None) -> dict:
     """``find``: what is sought; ``units``: each element's value's, by its label."""
     units = units or {}
+    answer, missing = _answer_or_missing(solution, find, units)
+    return {
+        "type": "Steps",
+        "data": _data(solution, units),
+        "assumed": [],
+        "steps": _shown(solution, units),
+        "answer": answer,
+        "missing": missing,
+    }
+
+
+def _shown(solution: Solution, units: Mapping[str, str]) -> list[dict]:
+    """The steps a book shows, in its names: one unknown from one equation as a chain, several together as
+    their equations and results. A datum is no step."""
     known: dict[sp.Symbol, sp.Expr] = {}
     shown = []
     n = names(solution.circuit)
@@ -50,26 +64,24 @@ def steps(solution: Solution, find: Sequence[Quantity] = (), units: Mapping[str,
         if step.how == "alone" and step.equations and step.because[0].what != "given":
             shown.append(_formula(step, known, solution, units))
         elif step.how == "together":
-            results = [_equals(x, v, units) for x, v in zip(step.found, step.values)]
-            shown.append(
-                {"type": "SystemStep", "equations": [f"{tex.expr(e)} = 0" for e in step.equations], "results": results}
-            )
+            shown.append(_system(step, units))
         known |= dict(zip(step.found, step.values))
-    answer, missing = None, None
+    return shown
+
+
+def _system(step: SolutionStep, units: Mapping[str, str]) -> dict:
+    results = [_equals(x, v, units) for x, v in zip(step.found, step.values)]
+    return {"type": "SystemStep", "equations": [f"{tex.expr(e)} = 0" for e in step.equations], "results": results}
+
+
+def _answer_or_missing(solution: Solution, find: Sequence[Quantity], units: Mapping[str, str]):
+    """What is sought, found; or what is missing to find it (all that is unknown, when nothing is sought)."""
+    if not find:
+        return None, _missing(solution) if solution.unknowns else None
     try:
-        answer = _answer(solution, find, units) if find else None
+        return _answer(solution, find, units), None
     except MissingData as err:
-        missing = {**(issue(err, units) or {}), "type": "Underdetermined"}
-    if solution.unknowns and not find:
-        missing = _missing(solution)
-    return {
-        "type": "Steps",
-        "data": _data(solution, units),
-        "assumed": [],
-        "steps": shown,
-        "answer": answer,
-        "missing": missing,
-    }
+        return None, {**(issue(err, units) or {}), "type": "Underdetermined"}
 
 
 def _renamed(step: SolutionStep, n) -> SolutionStep:

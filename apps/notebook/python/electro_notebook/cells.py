@@ -154,10 +154,25 @@ def reset() -> None:
 
 def run(code: str, problems_json: str = "{}", units_json: str = "{}") -> str:
     """Run one cell, the schematic cells' problems (``problem.ts``'s data, by name) as variables; returns a
-    JSON list of outputs."""
+    JSON list of outputs: what it printed, what it showed, its last value, its warnings."""
     units.update(json.loads(units_json))
     outputs: list[dict] = []
-    problems = {name: from_drawing(data) for name, data in json.loads(problems_json).items()}
+    _bind({name: from_drawing(data) for name, data in json.loads(problems_json).items()}, outputs)
+    stdout = io.StringIO()
+    with contextlib.redirect_stdout(stdout), warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always")
+        warnings.simplefilter("ignore", DeprecationWarning)  # the libraries' own (sympy's), not the reader's
+        try:
+            if (value := _execute(code)) is not None:
+                outputs.append(to_output(value))
+        except Exception as err:  # noqa: BLE001 — every error is shown to the user
+            outputs.append(error(err))
+    printed = [{"type": "stream", "data": stdout.getvalue()}] if stdout.getvalue() else []
+    return json.dumps(printed + outputs + [warning(w.message) for w in caught], ensure_ascii=False)
+
+
+def _bind(problems: dict[str, Drawing], outputs: list[dict]) -> None:
+    """The cell's names: each schematic (``"Układ 1"`` is ``układ1``), ``schemat(name)``, and ``display``."""
 
     def schemat(name: str) -> Drawing:
         if name not in problems:
@@ -165,29 +180,16 @@ def run(code: str, problems_json: str = "{}", units_json: str = "{}") -> str:
         return problems[name]
 
     namespace["schemat"] = schemat
-    for name, problem in problems.items():  # "Układ 1" is układ1 in code
-        namespace[variable(name)] = problem
+    namespace.update({variable(name): problem for name, problem in problems.items()})
     namespace["display"] = lambda *objects: outputs.extend(to_output(o) for o in objects)
-    stdout = io.StringIO()
-    with contextlib.redirect_stdout(stdout), warnings.catch_warnings(record=True) as caught:
-        warnings.simplefilter("always")
-        warnings.simplefilter("ignore", DeprecationWarning)  # the libraries' own (sympy's), not the reader's
-        try:
-            tree = ast.parse(code, CELL)
-            last = tree.body.pop() if tree.body and isinstance(tree.body[-1], ast.Expr) else None
-            assert last is None or isinstance(last, ast.Expr)
-            exec(compile(tree, CELL, "exec"), namespace)
-            if last is not None:
-                value = eval(compile(ast.Expression(last.value), CELL, "eval"), namespace)
-                if value is not None:
-                    outputs.append(to_output(value))
-        except Exception as err:  # noqa: BLE001 — every error is shown to the user
-            outputs.append(error(err))
-    printed = stdout.getvalue()
-    if printed:
-        outputs.insert(0, {"type": "stream", "data": printed})
-    outputs += [warning(w.message) for w in caught]
-    return json.dumps(outputs, ensure_ascii=False)
+
+
+def _execute(code: str) -> object:
+    """``code`` run as Jupyter runs a cell: the value of its last line when that is an expression."""
+    tree = ast.parse(code, CELL)
+    last = tree.body.pop() if tree.body and isinstance(tree.body[-1], ast.Expr) else None
+    exec(compile(tree, CELL, "exec"), namespace)
+    return None if last is None else eval(compile(ast.Expression(last.value), CELL, "eval"), namespace)
 
 
 reset()

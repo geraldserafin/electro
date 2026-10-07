@@ -18,31 +18,34 @@ from .names import NoSuchQuantity, names
 
 def issue(err: BaseException, units: Mapping[str, str] | None = None) -> dict | None:
     """``err`` as data, or None when it is not one of electro's. ``units``: each element's value's."""
-    units = units or {}
     circuit = getattr(err, "circuit", None)
-    if circuit is not None:
-        n = names(circuit)
-        match err:
-            case MissingData():
-                return {
-                    "type": "MissingData",
-                    "targets": [tex.quantity(q, n) for q in err.targets],
-                    "needed": err.needed,
-                    "options": [[tex.quantity(q, n)] for q in pinning(err)],
-                }
-            case Contradiction():
-                return _clash(err, n, units)
-            case Ambiguous():
-                return {
-                    "type": "Ambiguous",
-                    "options": [[_equals(x, v, units.get(x.name, "")) for x, v in o.items()] for o in err.options],
-                }
+    if circuit is not None and (said := _of_solving(err, names(circuit), units or {})) is not None:
+        return said
     if isinstance(err, NoSuchQuantity):
         return {"type": "NoSuchQuantity", "name": err.name, "available": [tex.name(n) for n in err.available]}
     fields = {k: _field(k, v) for k, v in vars(err).items() if _plain(v)}
     module = type(err).__module__
     if (module == "electro" or module.startswith("electro.")) and fields:
         return {"type": type(err).__name__, **fields}
+    return None
+
+
+def _of_solving(err: BaseException, n, units: Mapping[str, str]) -> dict | None:
+    """What solving says instead of an answer: data missing, data that clash, more than one answer."""
+    match err:
+        case MissingData():
+            targets = [tex.quantity(q, n) for q in err.targets]
+            return {
+                "type": "MissingData",
+                "targets": targets,
+                "needed": err.needed,
+                "options": [[tex.quantity(q, n)] for q in pinning(err)],
+            }
+        case Contradiction():
+            return _clash(err, n, units)
+        case Ambiguous():
+            options = [[_equals(x, v, units.get(x.name, "")) for x, v in o.items()] for o in err.options]
+            return {"type": "Ambiguous", "options": options}
     return None
 
 
