@@ -5,7 +5,7 @@ import sympy as sp
 
 from ...element import Element
 from ...time import D
-from ..physics import V_T
+from ..physics import junction
 
 
 class Bipolar(Element):
@@ -24,9 +24,9 @@ class Bipolar(Element):
     def laws(self, t, p):
         s = self.polarity
         ube, ubc = s * t.across("b", "e"), s * t.across("b", "c")
-        forward, reverse = sp.exp(ube / V_T) - 1, sp.exp(ubc / V_T) - 1
-        cbe, cbc = p["CJE"] * D(ube), p["CJC"] * D(ubc)
         i_s = p["IS"]
+        forward, reverse = junction(ube, i_s) / i_s, junction(ubc, i_s) / i_s
+        cbe, cbc = p["CJE"] * D(ube), p["CJC"] * D(ubc)
         collector = i_s * (forward - reverse) - i_s / p["BR"] * reverse - cbc
         base = i_s / p["BF"] * forward + i_s / p["BR"] * reverse + cbe + cbc
         return [t.I["c"] - s * collector, t.I["b"] - s * base]

@@ -22,6 +22,7 @@ import sympy as sp
 
 from .circuit import Circuit, Laws, labels, points
 from .element import Element
+from .elements.physics import pn
 from .errors import NoSuchInput, NotSimulated, ValueNeeded
 from .frame import DT, Step, before, slope
 from .numeric.code import Code, Compiled, compile_equations, python, statements
@@ -75,6 +76,7 @@ class StepFunction:
     laws: Laws
     given: dict[sp.Symbol, sp.Expr]
     equations: list[sp.Expr]
+    after_frame: list[tuple[sp.Symbol, sp.Expr]]
     code: Compiled
     letters: list[sp.Symbol]
     kept: list[Kept]
@@ -135,7 +137,7 @@ class StepFunction:
     def at(self, q: Quantity | Scaled | sp.Expr) -> sp.Expr:
         """``q`` — a quantity, or an expression in its elements' own variables — in the unknowns and letters."""
         e = q.expr if isinstance(q, Quantity | Scaled) else q
-        return e.xreplace(dict(self.laws.at)).xreplace(self.given)
+        return _worked(e.xreplace(dict(self.laws.at)).xreplace(self.given), self.after_frame)
 
     def value(self, frame: Frame, q: Quantity | Scaled | sp.Expr) -> float:
         """``q`` in ``frame``."""
@@ -214,15 +216,45 @@ def step_function(circuit: Circuit, values: Mapping) -> StepFunction:
     letters = [DT, TIME, THETA, *(k.letter for k in kept), *world.values()]
     unknowns = sorted({x for e in exprs for x in e.free_symbols} - set(letters), key=str)
     _check_square(exprs, unknowns, letters)
+    potentials = {x for p in points(circuit) for x in sp.sympify(p.potential).free_symbols}
+    exprs, after_frame = _simple(exprs, set(unknowns) - potentials)
+    unknowns = [x for x in unknowns if x not in dict(after_frame)]
+    kept = [Kept(k.letter, _worked(k.after, after_frame), k.rest, k.jumps, k.moving) for k in kept]
     initial = [0.0, 0.0, 1.0, *(k.rest for k in kept), *(float(known[p]) for p in world)]
-    potentials = [x for p in points(circuit) for x in sp.sympify(p.potential).free_symbols]
-    code = compile_equations(
-        exprs, unknowns, letters, potentials, currents=exprs, sample=[SAMPLE_DT, 0.0, *initial[2:]]
-    )
+    code = compile_equations(exprs, unknowns, letters, sample=[SAMPLE_DT, 0.0, *initial[2:]])
     after = statements([(f"out[{k}]", st.after) for k, st in enumerate(kept)], code.unknowns, letters)
     inputs = {letter.name: 3 + len(kept) + k for k, letter in enumerate(world.values())}
     under_d = sum(1 for k in kept if k.moving)
-    return StepFunction(circuit, laws, given, exprs, code, letters, kept, under_d, inputs, initial, after)
+    return StepFunction(circuit, laws, given, exprs, after_frame, code, letters, kept, under_d, inputs, initial, after)
+
+
+def _simple(exprs: list[sp.Expr], may_go: set[sp.Symbol]) -> tuple[list[sp.Expr], list[tuple[sp.Symbol, sp.Expr]]]:
+    """Each unknown of ``may_go`` an equation gives alone, by a number (an element's current by its law), worked
+    out after the frame instead of found in it — the removal of simple equations equation-based simulators make
+    before they run (the points' potentials stay: worked out from one another, a ladder of them is a polynomial
+    in 1/dt of its length)."""
+    exprs, out = list(exprs), []
+    for e in list(exprs):
+        if e not in exprs:
+            continue
+        switched = {x for f in e.atoms(sp.Function, sp.Piecewise) for x in f.free_symbols}
+        for x in sorted(e.free_symbols & may_go - switched, key=str):
+            a = sp.diff(e, x)
+            if a.is_number and a != 0:
+                value = sp.expand(x - e / a)
+                exprs = [f.xreplace({x: value}) for f in exprs if f is not e]
+                out.append((x, value))
+                may_go.discard(x)
+                break
+    return exprs, out
+
+
+def _worked(e: sp.Expr, after_frame: list[tuple[sp.Symbol, sp.Expr]]) -> sp.Expr:
+    """``e`` in what the frame finds: each unknown worked out after it by its value, in order."""
+    for x, v in after_frame:
+        if e.has(x):
+            e = e.xreplace({x: v})
+    return e
 
 
 def memory(laws: Laws, given: Mapping, read, inner: set[sp.Symbol]) -> list[Kept]:
@@ -325,7 +357,7 @@ class Trace:
             if Trace.reads is None:
                 raise KeyError(q)
             q = Trace.reads(q, self.phi)
-        e = self.phi.at(q)
+        e = self.phi.at(q).replace(lambda a: isinstance(a, pn), lambda a: sp.exp(a.args[0]))
         xs = sorted(e.free_symbols, key=str)
         f = sp.lambdify(xs, e, "math")
         columns = [self._column(x) for x in xs]

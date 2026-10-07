@@ -1,8 +1,8 @@
 """A frame's equations as code: what fills their residuals and their Jacobian's nonzero entries — those the
 unknowns do not change apart, once a frame — printed once, Python here, JavaScript for the page, and how
-to eliminate them (``sparse``), for the engine (``engine.System``) to run on numbers. Two things help Newton, both read
-off the shape of the laws, never any element's: every exponential grows along its tangent far out, and one
-that is tiny at zero but steep (as a p-n junction's, whatever has one) is approached along it, as SPICE does.
+to eliminate them (``sparse``), for the engine (``engine.System``) to run on numbers. Two things help Newton: every
+exponential grows along its tangent far out, and a p-n junction's (``pn``: it says it is one) is approached
+along its bend, as SPICE does.
 """
 
 from __future__ import annotations
@@ -16,6 +16,7 @@ import sympy as sp
 from sympy.printing.jscode import JavascriptCodePrinter
 from sympy.printing.pycode import PythonCodePrinter
 
+from ..elements.physics import pn
 from .engine import System, limited_exp, limited_exp_slope, newton
 from .sparse import shape
 
@@ -27,16 +28,8 @@ def expr(x: object) -> sp.Expr:
     return cast(sp.Expr, sp.sympify(x))
 
 
-def subs(x: sp.Expr, values) -> sp.Expr:
-    return cast(sp.Expr, x.subs(list(values.items())))
-
-
 def symbols_in(x: object) -> set[sp.Symbol]:
     return {s for s in expr(x).free_symbols if isinstance(s, sp.Symbol)}
-
-
-JUNCTION = 1e-6
-"""An exponential less than this at zero is approached along it."""
 
 
 @dataclass
@@ -68,17 +61,14 @@ def compile_equations(
     exprs: Sequence[sp.Expr],
     unknowns: Sequence[sp.Symbol],
     params: Sequence[sp.Symbol],
-    potentials: Sequence[sp.Expr],
     limited: bool = True,
-    currents: Sequence[sp.Expr] = (),
     sample: Sequence[float] | None = None,
 ) -> Compiled:
-    """``exprs`` = 0 as code; ``potentials``: the points', to tell a junction's scale; ``currents``: what
-    the laws say flows (a junction's own current, before any equation was scaled). ``limited``: every
-    exponential continued by its tangent far out (a model that runs); else exactly the law. ``sample``: the
-    parameters of a frame like those it will run (by default all 1), whose numbers choose the pivots."""
+    """``exprs`` = 0 as code. ``limited``: every exponential continued by its tangent far out (a model that
+    runs); else exactly the law. ``sample``: the parameters of a frame like those it will run (by default all
+    1), whose numbers choose the pivots."""
     exprs, unknowns = list(exprs), list(unknowns)
-    junctions = _junctions(exprs, unknowns, potentials, limexp if limited else sp.exp, currents)
+    junctions = _junctions(exprs, unknowns, limexp if limited else sp.exp)
     place = {u: j for j, u in enumerate(unknowns)}
     entries, values = [], []
     for i, e in enumerate(exprs):
@@ -155,7 +145,12 @@ def statements(targets: Sequence[tuple[str, sp.Expr]], xs: Sequence[sp.Symbol], 
 
 def _renamed(e: sp.Expr, xs: Sequence[sp.Symbol], ps: Sequence[sp.Symbol]) -> sp.Expr:
     rename = {s: sp.Symbol(f"x{i}") for i, s in enumerate(xs)} | {s: sp.Symbol(f"p{i}") for i, s in enumerate(ps)}
-    return sp.sympify(e).xreplace(rename)
+    return plain(sp.sympify(e)).xreplace(rename)
+
+
+def plain(e: sp.Expr) -> sp.Expr:
+    """A junction's exponential as any other: what is read of a frame needs no Newton."""
+    return e.replace(lambda a: isinstance(a, pn), lambda a: limexp(a.args[0]))
 
 
 def _loads(reduced: Sequence[sp.Expr], common: Sequence[tuple[sp.Symbol, sp.Expr]]) -> list[tuple[str, str]]:
@@ -187,42 +182,23 @@ class dlimexp(sp.Function):
         return f"dlimexp({printer._print(self.args[0])})"
 
 
-def _junctions(exprs: list[sp.Expr], unknowns: list[sp.Symbol], potentials: Sequence[sp.Expr], exp, currents=()):
-    """Each exponential of what is found becomes ``exp`` of an unknown of its own; one of a junction is
-    approached along it (its index, the scale it moves on, and where it bends)."""
-    found = sorted({a for e in exprs for a in e.atoms(sp.exp) if symbols_in(a) & set(unknowns)}, key=str)
+def _junctions(exprs: list[sp.Expr], unknowns: list[sp.Symbol], exp) -> list[tuple[int, float, float]]:
+    """Each p-n junction's exponential (``pn``) becomes ``exp`` of an unknown of its own, approached along it:
+    its place, the scale it moves on and where it bends (SPICE's V_crit, over n·V_T). Every other exponential
+    of what is found is ``exp`` too."""
     out = []
-    for k, a in enumerate(found):
-        z, mark = sp.Symbol(f"exp_{k}"), sp.Dummy("e")
-        marked = [e.xreplace({a: mark}) for e in exprs]
-        arg = expr(a.args[0])
-        own = [c.xreplace({a: mark}) for c in currents if c.has(a)]
-        bend = _bend(arg, own or marked, mark, unknowns, potentials, smallest=bool(own))
-        exprs[:] = [e.xreplace({mark: exp(z)}) for e in marked]
-        exprs.append(z - arg)
+    for k, a in enumerate(sorted({a for e in exprs for a in e.atoms(pn) if a.free_symbols & set(unknowns)}, key=str)):
+        z = sp.Symbol(f"exp_{k}")
+        x, i_s, nvt = a.args
+        exprs[:] = [e.xreplace({a: exp(z)}) for e in exprs]
+        exprs.append(z - x)
         unknowns.append(z)
-        if bend is not None:
+        bend = math.log(float(nvt) / (math.sqrt(2) * float(i_s))) if i_s.is_number and nvt.is_number else 0
+        if bend > 0:
             out.append((len(unknowns) - 1, 1.0, bend))
-    return out
-
-
-def _bend(
-    arg: sp.Expr, exprs: Sequence[sp.Expr], mark: sp.Symbol, unknowns, potentials: Sequence[sp.Expr], smallest=False
-):
-    """Where a junction's exponential bends, in its own argument (SPICE's V_crit, over n·V_T); None: not a
-    junction. ``smallest``: ``exprs`` say what flows, the junction's own current the least of them."""
-    at_zero = dict.fromkeys(unknowns, 0)
-    scale = [abs(subs(sp.diff(e, mark), at_zero)) for e in exprs if e.has(mark)]
-    numbers = [float(c) for c in scale if c.is_number and c.is_real and c.is_finite]
-    zero = subs(arg, at_zero)
-    if not numbers or not (zero.is_number and zero.is_real and zero.is_finite):
-        return None
-    c = min(x for x in numbers if x) if smallest and any(numbers) else max(numbers)
-    if c == 0 or c * math.exp(min(float(zero), 700)) >= JUNCTION:
-        return None
-    slopes = [
-        abs(float(d)) for p in potentials if isinstance(p, sp.Symbol) and (d := sp.diff(arg, p)).is_number and d.is_real
+    found = set(unknowns)
+    exprs[:] = [
+        e.replace(lambda a: isinstance(a, sp.exp) and bool(a.free_symbols & found), lambda a: exp(a.args[0]))
+        for e in exprs
     ]
-    nvt = 1 / max((x for x in slopes if x), default=1.0)
-    bend = math.log(nvt / (math.sqrt(2) * c))
-    return bend if bend > 0 else None
+    return out

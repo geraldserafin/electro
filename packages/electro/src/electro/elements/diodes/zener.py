@@ -1,7 +1,7 @@
 import sympy as sp
 
 from ...element import Element
-from ..physics import V_T, junction
+from ..physics import V_T, junction, pn
 
 I_S, I_ZT = sp.Rational(1, 10**14), sp.Rational(5, 1000)
 
@@ -15,5 +15,5 @@ class Zener(Element):
 
     def laws(self, t, p):
         u = t.across("a", "b")
-        breakdown = I_ZT * (sp.exp((-u - p[""]) / V_T) - sp.exp(-p[""] / V_T))
+        breakdown = I_ZT * (pn((-u - p[""]) / V_T, I_ZT, V_T) - sp.exp(-p[""] / V_T))
         return [t.I["a"] - (junction(u, I_S) - breakdown)]

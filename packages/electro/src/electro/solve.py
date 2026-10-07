@@ -234,7 +234,7 @@ def _numerically(exprs: list[sp.Expr], xs: tuple[sp.Symbol, ...]) -> Known:
     lam = sp.Dummy("λ")
     zero = dict.fromkeys(xs, 0)
     shifted = [e - (1 - lam) * e.xreplace(zero) for e in exprs]
-    code = compile_equations(shifted, list(xs), [lam], list(xs), limited=False, currents=exprs)
+    code = compile_equations(shifted, list(xs), [lam], limited=False)
     x = homotopy(lambda x0, at: code.newton(x0, [at]), len(code.unknowns))
     if x is None:
         raise Undetermined("Newton did not get there")
