@@ -131,7 +131,7 @@ def given(circuit, values: Mapping) -> dict[sp.Symbol, sp.Expr]:
 
 def data(values: Mapping) -> list:
     """The data on quantities (``I(R): 2``, ``U(R_1): 2 * U(R_2)``), each an equation."""
-    from .element import Equation, Origin
+    from .laws import Equation, Origin
 
     out = []
     for key, value in values.items():

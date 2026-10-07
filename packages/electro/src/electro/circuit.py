@@ -1,32 +1,31 @@
-"""A circuit is a drawing: elements, and the points their terminals are on, and its free ends — the
-morphisms of the free hypergraph category (cospans of hypergraphs). Joining only says which points are one:
+"""A circuit is a drawing: elements, the points their terminals are on, and its free ends. Joining circuits
+only says which points are the same:
 
-- ``f >> g``: ``f``'s right ends are ``g``'s left ends — their points made one (a pushout);
+- ``f >> g``: ``f``'s right ends are ``g``'s left ends;
 - ``f @ g``: side by side;
-- ``f | g``, ``~f``, ``-f``: ``>>`` and ``@`` with points (``Spider``: one point, any ends).
+- ``f | g``, ``~f``, ``-f``: made of ``>>`` and ``@`` with ``Spider``s (one point, any number of ends).
 
-Nothing is solved by joining. What a circuit means comes out only when it is asked: its laws (``closed``: each
-element's on the potentials of its points, Kirchhoff at every point), then a frame of them (``solve``,
-``simulate``)."""
+Nothing is solved while joining. A closed circuit's laws (``closed``) are each element's laws on the potentials
+of its points, and Kirchhoff at every point; ``solve`` and ``simulate`` work them out."""
 
 from __future__ import annotations
 
 import re
 from collections import Counter
-from collections.abc import Mapping
-from dataclasses import dataclass
+from collections.abc import Iterator, Mapping
 from typing import TYPE_CHECKING
 
 import sympy as sp
 
 from .errors import BadName, ElementTwice, JoinsNodes, NotClosed, WrongEnds
+from .laws import Equation, Laws, Origin
 
 if TYPE_CHECKING:
-    from .element import Element, Equation, Way
+    from .element import Element
 
 
 class Point:
-    """Where ends meet. Its potential: one variable for all that touch it."""
+    """Where terminals meet; ``potential``: one variable for all of them."""
 
     def __init__(self, potential: sp.Expr | None = None) -> None:
         self.potential = potential if potential is not None else sp.Dummy("v")
@@ -39,34 +38,39 @@ Parts = tuple[tuple["Element", tuple[Point, ...]], ...]
 
 
 class Circuit:
-    """Elements on points (``parts``: each element and the points of its drawn terminals, in order), with
-    ``left`` and ``right`` ends: the points the rest joins it at."""
-
-    parts: Parts
-    left: tuple[Point, ...]
-    right: tuple[Point, ...]
+    """``parts``: each element and the points of its drawn terminals, in order; ``left`` and ``right``: the
+    points other circuits join it at."""
 
     def __init__(self, parts: Parts = (), left: tuple[Point, ...] = (), right: tuple[Point, ...] = ()) -> None:
-        self.parts, self.left, self.right = parts, left, right
         elements = [e for e, _ in parts]
         if len({id(e) for e in elements}) != len(elements):
             raise ElementTwice(next(e for e in elements if elements.count(e) > 1).name or "an element")
+        self.parts, self.left, self.right = parts, left, right
 
     @property
     def members(self) -> tuple[Element, ...]:
         return tuple(e for e, _ in self.parts)
 
-    def piece(self) -> Circuit:
-        """As it is used: an element is one object, in one place; points with no element on them (a spider,
-        what is made of them) are fresh wherever they are used."""
-        if self.parts:
-            return self
-        fresh: dict[Point, Point] = {}
+    def ends(self) -> Iterator[tuple[Element, str, Point]]:
+        """Every element's every drawn terminal, and the point it is on."""
+        for e, at in self.parts:
+            yield from ((e, t, p) for t, p in zip(e.drawn, at))
+
+    def renamed(self, to: Mapping[Point, Point]) -> Circuit:
+        """The same circuit, each point replaced as ``to`` says."""
 
         def new(p: Point) -> Point:
-            return p if isinstance(p, Node) else fresh.setdefault(p, Point())
+            return to.get(p, p)
 
-        return Circuit((), tuple(map(new, self.left)), tuple(map(new, self.right)))
+        parts = tuple((e, tuple(map(new, at))) for e, at in self.parts)
+        return Circuit(parts, tuple(map(new, self.left)), tuple(map(new, self.right)))
+
+    def piece(self) -> Circuit:
+        """The circuit where it is used. An element is in one place only; points with no element on them (a
+        spider, what is made of spiders) are new wherever they are used."""
+        if self.parts:
+            return self
+        return self.renamed({p: Point() for p in (*self.left, *self.right) if not isinstance(p, Node)})
 
     # Joining
 
@@ -74,23 +78,8 @@ class Circuit:
         a, b = self.piece(), other.piece()
         if len(a.right) != len(b.left):
             raise WrongEnds(len(a.right), len(b.left))
-        one: dict[Point, Point] = {}
-
-        def find(p: Point) -> Point:
-            while p in one:
-                p = one[p]
-            return p
-
-        for x, y in zip(a.right, b.left):
-            x, y = find(x), find(y)
-            if x == y:
-                continue
-            if isinstance(x, Node) and isinstance(y, Node):
-                raise JoinsNodes(x, y)
-            x, y = (y, x) if isinstance(y, Node) else (x, y)
-            one[y] = x
-        parts = tuple((e, tuple(map(find, ps))) for e, ps in a.parts + b.parts)
-        return Circuit(parts, tuple(map(find, a.left)), tuple(map(find, b.right)))
+        both = Circuit(a.parts + b.parts, a.left, b.right)
+        return both.renamed(_same(zip(a.right, b.left)))
 
     def __matmul__(self, other: Circuit) -> Circuit:
         a, b = self.piece(), other.piece()
@@ -108,41 +97,79 @@ class Circuit:
 
     @property
     def free(self) -> tuple[int, int]:
-        """How many of its ends, left and right, are not on a named point: still to be joined."""
+        """How many of its ends, left and right, are not on a named point."""
         return sum(not isinstance(p, Node) for p in self.left), sum(not isinstance(p, Node) for p in self.right)
 
     # What it means
 
     def closed(self, leak: float = 0.0) -> Laws:
-        """A closed circuit's laws: each element's on the potentials of its points, Kirchhoff at every point
-        (``leak``: a whisper of a conductance from each to ground)."""
+        """A closed circuit's laws; ``leak``: a tiny conductance from every point to ground."""
         if self.free != (0, 0):
             raise NotClosed(*self.free)
-        return _laws(self, leak)
+        return self.laws_except((), leak)
+
+    def laws_except(self, ends: tuple[Point, ...], leak: float = 0.0) -> Laws:
+        """Each element's laws on the potentials of its points, and Kirchhoff at every point except ``ends``
+        (where current comes in from outside)."""
+        at = {e.V[t]: p.potential for e, t, p in self.ends() if e.V[t] != p.potential}
+        own = Laws(
+            tuple(q for e in self.members for q in e.equations), tuple(e.ways for e in self.members if e.ways), at
+        )
+        own = own.map(lambda x: x.xreplace(at))
+        return Laws(own.equations + self._kirchhoff(leak, ends), own.ways, at)
+
+    def _kirchhoff(self, leak: float, ends: tuple[Point, ...]) -> tuple[Equation, ...]:
+        """At every point but ground and ``ends``: what flows into the elements there adds up to nothing."""
+        into: dict[Point, list[sp.Expr]] = {}
+        for e, t, p in self.ends():
+            into.setdefault(p, []).append(e.I[t])
+        return tuple(
+            Equation(sp.Add(*currents) + leak * p.potential, Origin("kcl", p))
+            for p, currents in into.items()
+            if p.potential != 0 and p not in ends
+        )
 
     def __str__(self) -> str:
-        """A 1 → 1 piece as a book writes it, ``U = I·(R_1 + R_2)``: its laws seen at its ends (its voltage
-        ``U``, the first end against the second; its current ``I``, in at the first), all else hidden."""
+        """A 1 → 1 piece's law at its ends, as a book writes it: ``U = I·(R_1 + R_2)``."""
         from .solve import law
 
         return law(self)
 
     def final(self, values: Mapping | None = None, frame=None):
-        """Where the circuit comes to: one frame infinitely long — or, with sines of one frequency, turning at
-        it — from rest, its values in."""
+        """Where the circuit settles: DC, or AC with sines of one frequency."""
         from .solve import final
 
         return final(self, values or {}, frame)
 
     def simulate(self, values: Mapping | None = None, until: float = 1.0, dt: float | None = None, inputs=None):
-        """Frame after frame from rest for ``until`` seconds."""
+        """Frame after frame from rest, for ``until`` seconds."""
         from .simulate import simulate
 
         return simulate(self, values or {}, until, dt, inputs)
 
 
+def _same(pairs) -> dict[Point, Point]:
+    """For each point, the one it becomes when every pair is made one point; a named point stays."""
+    one: dict[Point, Point] = {}
+
+    def find(p: Point) -> Point:
+        while p in one:
+            p = one[p]
+        return p
+
+    for x, y in pairs:
+        x, y = find(x), find(y)
+        if x == y:
+            continue
+        if isinstance(x, Node) and isinstance(y, Node):
+            raise JoinsNodes(x, y)
+        keep, drop = (y, x) if isinstance(y, Node) else (x, y)
+        one[drop] = keep
+    return {p: find(p) for p in one}
+
+
 class Node(Point, Circuit):
-    """A named point (1 → 1): the same object wherever it is used is one point; ``label`` only shows."""
+    """A named point (1 → 1): the same object wherever it is used is the same point; ``label`` is only shown."""
 
     def __init__(self, label: str | None = None, potential: sp.Expr | None = None) -> None:
         if label is not None and not re.fullmatch(r"\w+", label):
@@ -156,7 +183,7 @@ class Node(Point, Circuit):
 
 
 class Net(Node):
-    """A point every ``Net`` of that name is: ``GND`` (potential 0), ``VCC``."""
+    """A point every ``Net`` of the same name is: ``GND`` (potential 0), ``VCC``."""
 
     def __init__(self, name: str) -> None:
         super().__init__(name, sp.Integer(0) if name == "GND" else sp.Symbol(f"V_{name}"))
@@ -172,7 +199,7 @@ class Net(Node):
 
 
 class Spider(Circuit):
-    """``dom`` ends in on the left and ``cod`` out on the right, all on one point."""
+    """``dom`` ends on the left and ``cod`` on the right, all on one point."""
 
     def __init__(self, dom: int, cod: int) -> None:
         p = Point()
@@ -194,81 +221,25 @@ cup = Spider(2, 0)
 swap = Swap()
 
 
-# Its laws
-
-
-@dataclass(frozen=True)
-class Laws:
-    """A closed circuit's laws: ``equations``; ``ways``, each element of several its ways (one of each holds);
-    ``at``: each element's terminal potential as its point's."""
-
-    equations: tuple[Equation, ...]
-    ways: tuple[tuple[Way, ...], ...]
-    at: Mapping[sp.Symbol, sp.Expr]
-
-    def map(self, f) -> Laws:
-        """Every expression through ``f`` (a frame's reading, values put in)."""
-        from .element import Equation, Way
-
-        def eq(q: Equation) -> Equation:
-            return Equation(f(q.expr), q.origin)
-
-        ways = tuple(
-            tuple(Way(w.element, w.name, tuple(map(eq, w.equations)), tuple(map(f, w.holds))) for w in c)
-            for c in self.ways
-        )
-        return Laws(tuple(map(eq, self.equations)), ways, self.at)
-
-    def expressions(self) -> list[sp.Expr]:
-        out = [q.expr for q in self.equations]
-        return out + [e for c in self.ways for w in c for e in (*(q.expr for q in w.equations), *w.holds)]
-
-
-def _laws(c: Circuit, leak: float, ends: tuple[Point, ...] = ()) -> Laws:
-    """``c``'s laws; Kirchhoff at every point but ``ends`` (there current comes in from outside)."""
-    from .element import Equation, Origin
-
-    at = {e.V[t]: p.potential for e, ps in c.parts for t, p in zip(e.drawn, ps) if e.V[t] != p.potential}
-
-    def put(x: sp.Expr) -> sp.Expr:
-        return x.xreplace(at)
-
-    laws = Laws(tuple(q for e in c.members for q in e.equations), tuple(e.ways for e in c.members if e.ways), at)
-    laws = laws.map(put)
-    into: dict[Point, list[sp.Expr]] = {}
-    for e, ps in c.parts:
-        for t, p in zip(e.drawn, ps):
-            into.setdefault(p, []).append(e.I[t])
-    kcl = tuple(
-        Equation(sp.Add(*currents) + leak * p.potential, Origin("kcl", p))
-        for p, currents in into.items()
-        if p.potential != 0 and p not in ends
-    )
-    return Laws(laws.equations + kcl, laws.ways, at)
-
-
 def labels(c: Circuit) -> dict[Element, str]:
-    """Each element's label: its name when no other has it; the others numbered by their prefix in order
-    (``R_1``, ``R_2``), past the names taken (``R1`` takes ``R_1`` too)."""
-    named = [e.name for e in c.members]
-    unique = {x for x in named if x and named.count(x) == 1}
+    """Each element's label: its name when no other element has it; else its prefix and a number in order
+    (``R_1``, ``R_2``), skipping names already taken (``R1`` takes ``R_1`` too)."""
+    names = [e.name for e in c.members]
+    unique = {x for x in names if x and names.count(x) == 1}
     taken = {x.replace("_", "") for x in unique}
     counters: Counter[str] = Counter()
-    out = {}
-    for e in c.members:
-        if e.name in unique:
-            out[e] = e.name
-            continue
+
+    def numbered(prefix: str) -> str:
         while True:
-            counters[e.prefix] += 1
-            label = f"{e.prefix}_{counters[e.prefix]}"
+            counters[prefix] += 1
+            label = f"{prefix}_{counters[prefix]}"
             if label.replace("_", "") not in taken:
                 taken.add(label.replace("_", ""))
-                out[e] = label
-                break
-    return out
+                return label
+
+    return {e: e.name if e.name in unique else numbered(e.prefix) for e in c.members}
 
 
 def points(c: Circuit) -> list[Point]:
     """Its points, in the order they are first met."""
-    return list(dict.fromkeys(p for _, ps in c.parts for p in ps))
+    return list(dict.fromkeys(p for _, _, p in c.ends()))
