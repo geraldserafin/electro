@@ -20,12 +20,13 @@ from operator import matmul
 
 import sympy as sp
 from electro import GND, Element, Net, Node, Part
-from electro.circuit.names import names
-from electro.circuit.quantities import Across, Current, Parameter, Potential, Power, Quantity, Scaled, Sum, Voltage
+from electro.circuit import points as points_of
 from electro.elements import BY_KIND
+from electro.quantities import Across, Current, Parameter, Potential, Power, Quantity, Scaled, Sum, Voltage
 from electro.values import UNKNOWN
 
 from .kinds import reading
+from .names import names
 from .text import to_text
 
 GROUND_NAMES = ("GND", "0")
@@ -156,31 +157,23 @@ def to_drawing(circuit: Element, values: Mapping | None = None, find=()) -> dict
 
 
 def wiring(circuit: Element) -> dict[Element, list[str]]:
-    """Each element's terminals' points, by name: what ``>>`` glued, the same point (``GND`` ground, a named
-    point its name, the others ``n1``, ``n2``…)."""
-    parent: dict = {}
-
-    def find(x):
-        while parent.get(x, x) != x:
-            x = parent[x]
-        return x
-
-    for a, b in circuit.rel.wires:
-        parent[find(a)] = find(b)
+    """Each element's terminals' points, by name (``GND`` ground, a named point its name, the others ``n1``,
+    ``n2``…)."""
     n = names(circuit)
-    called = {find(p.potential): str(v)[2:] for p, v in n.points.items()} | {find(sp.Integer(0)): "GND"}
+    called = {p: str(v)[2:] for p, v in n.points.items()} | {
+        p: p.label for p in points_of(circuit) if isinstance(p, Net)
+    }
     taken, auto = set(called.values()), 0
     out = {}
-    for e in circuit.members:
+    for e, ps in circuit.parts:
         ends = []
-        for t in e.terminals:
-            root = find(e.V[t])
-            while root not in called:
+        for p in ps:
+            while p not in called:
                 auto += 1
                 if f"n{auto}" not in taken:
-                    called[root] = f"n{auto}"
-            ends.append(called[root])
-        out[e] = ends
+                    called[p] = f"n{auto}"
+            ends.append(called[p])
+        out[e] = [*ends, "GND"] if e.ground else ends
     return out
 
 

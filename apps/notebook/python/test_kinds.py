@@ -1,8 +1,7 @@
 """What a kind is, read off its laws alone."""
 
 from electro import Current, Voltage
-from electro.frame.formula import is_source
-from electro_notebook.kinds import reading, stores
+from electro_notebook.kinds import is_source, reading, stores
 
 
 def test_what_a_kind_is_follows_from_its_laws():

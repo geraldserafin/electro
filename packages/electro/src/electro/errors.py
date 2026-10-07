@@ -78,7 +78,10 @@ class Ambiguous(Undetermined):
 
 class MissingData(Undetermined):
     """``targets``: what is sought and could not be found; ``needed`` data more; ``found``: what is sought and
-    could be found."""
+    could be found; ``solution``, ``lacking``: where, and what of the targets is still free."""
+
+    solution: object = None
+    lacking: tuple = ()
 
     def __init__(self, needed: int, found: Mapping, targets: Sequence = ()) -> None:
         super().__init__(f"{needed} more datum needed")

@@ -10,7 +10,6 @@ from typing import cast
 
 import sympy as sp
 from electro import Element, I, U, step_function
-from electro.circuit.names import names
 from electro.values import parse
 
 from . import plots, readings
@@ -18,6 +17,7 @@ from .drawing import Drawing, from_drawing, quantity
 from .errors import NoSweepRange, error
 from .issues import issue
 from .methods import resistance, swept
+from .names import names
 from .results import amplitude, element_result, number, solved
 from .text import fmt
 

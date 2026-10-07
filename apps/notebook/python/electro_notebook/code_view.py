@@ -6,7 +6,7 @@ from __future__ import annotations
 import json
 import re
 
-from electro import Element
+from electro import Circuit
 
 from .drawing import to_drawing
 from .errors import CELL, NoCircuitInCode, error
@@ -32,11 +32,11 @@ def from_code(source: str, name: str) -> str:
     try:
         exec(compile(source, CELL, "exec"), scope)
         found = scope.get(var)
-        if not isinstance(found, Element):
+        if not isinstance(found, Circuit):
             made = [
                 v
                 for k, v in scope.items()
-                if k not in prelude and isinstance(v, Element) and v.members and v.free == (0, 0)
+                if k not in prelude and isinstance(v, Circuit) and v.members and v.free == (0, 0)
             ]
             if not made:
                 raise NoCircuitInCode(variable=var)

@@ -8,7 +8,7 @@ import sympy as sp
 
 from .drawing import from_drawing
 from .errors import error
-from .names import expression, named
+from .names import expression, named, names
 from .results import amplitude, shown, solved
 
 
@@ -25,7 +25,7 @@ def task_values(problem_json: str, steps_json: str) -> str:
     for step in json.loads(steps_json):
         try:
             e = expression(step["value"])
-            value = e.subs({s: shown(solution, named(s.name, solution.names)) for s in e.free_symbols})
+            value = e.subs({s: shown(solution, named(s.name, names(solution.circuit))) for s in e.free_symbols})
             values[step["id"]] = {"value": amplitude(sp.N(value))}
         except Exception as err:  # noqa: BLE001 — said by the step that has it
             values[step["id"]] = {"error": error(err)}

@@ -8,14 +8,14 @@ from __future__ import annotations
 from collections.abc import Mapping, Sequence
 
 import sympy as sp
-from electro import AC, DC, Element, Node, Solution, SolutionStep
-from electro.circuit.algebra import Origin
-from electro.circuit.quantities import Quantity
+from electro import AC, DC, Element, Origin, Solution, SolutionStep
 from electro.errors import MissingData
+from electro.quantities import Quantity
 from electro.values import parse
 
 from . import latex as tex
 from .issues import issue
+from .names import names
 
 REASONS = {
     "resistor": "OhmsLaw",
@@ -45,7 +45,8 @@ def steps(solution: Solution, find: Sequence[Quantity] = (), units: Mapping[str,
     units = units or {}
     known: dict[sp.Symbol, sp.Expr] = {}
     shown = []
-    for step in solution.steps:
+    n = names(solution.circuit)
+    for step in (_renamed(s, n) for s in solution.steps):
         if step.how == "alone" and step.equations and step.because[0].what != "given":
             shown.append(_formula(step, known, solution, units))
         elif step.how == "together":
@@ -71,6 +72,17 @@ def steps(solution: Solution, find: Sequence[Quantity] = (), units: Mapping[str,
     }
 
 
+def _renamed(step: SolutionStep, n) -> SolutionStep:
+    """A step in the book's names."""
+    return SolutionStep(
+        tuple(n.rename(x) for x in step.found),
+        tuple(n.rename(v) for v in step.values),
+        step.because,
+        step.how,
+        tuple(n.rename(e) for e in step.equations),
+    )
+
+
 def _formula(step: SolutionStep, known: Mapping[sp.Symbol, sp.Expr], solution: Solution, units) -> dict:
     """``x = formula = the formula's numbers = value``, each written once."""
     (x,), (value,), (equation,) = step.found, step.values, step.equations
@@ -89,13 +101,13 @@ def _formula(step: SolutionStep, known: Mapping[sp.Symbol, sp.Expr], solution: S
 
 
 def reason(origin: Origin, solution: Solution) -> dict:
-    n = solution.names
+    n = names(solution.circuit)
     match origin:
         case Origin("law", Element() as e) if e in n.labels:
             name = BY_ANALYSIS.get((e.kind, type(solution.frame))) or REASONS.get(e.kind, "DeviceModel")
             return {"type": name, "label": tex.name(n.labels[e])}
-        case Origin("kcl", Node() as p):
-            point = n.points.get(p)
+        case Origin("kcl", p):
+            point = n.to.get(p.potential)
             return {"type": "KirchhoffCurrent", "node": tex.name(str(point)[2:] if point is not None else "GND")}
     return {"type": "Given"}
 
@@ -112,7 +124,7 @@ def _equals(x: sp.Symbol, v: sp.Expr, units: Mapping[str, str]) -> str:
 
 
 def _data(solution: Solution, units: Mapping[str, str]) -> list[str]:
-    n = solution.names
+    n = names(solution.circuit)
     out = []
     for key, given in solution.given.items():
         value = parse(given) if isinstance(given, str | int | float) else given
@@ -125,7 +137,7 @@ def _data(solution: Solution, units: Mapping[str, str]) -> list[str]:
 
 
 def _answer(solution: Solution, find: Sequence[Quantity], units: Mapping[str, str]) -> list[str]:
-    n = solution.names
+    n = names(solution.circuit)
     return [f"{tex.quantity(q, n)} = {tex.value(v, tex.unit(q, units, n))}" for q, v in solution.answers(*find).items()]
 
 

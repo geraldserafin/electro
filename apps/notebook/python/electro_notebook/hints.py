@@ -4,9 +4,7 @@ which of the data clash."""
 from __future__ import annotations
 
 import sympy as sp
-from electro import Contradiction, Current, MissingData, Parameter, Undetermined, Voltage
-from electro.circuit.algebra import subs, symbols_in
-from electro.solve.final import frame_after
+from electro import Contradiction, Current, MissingData, Parameter, Voltage
 
 
 def pinning(err: MissingData) -> list:
@@ -26,19 +24,11 @@ def pinning(err: MissingData) -> list:
             if x not in v.free_symbols:
                 continue
             roots = sp.solve(v - sp.Dummy("k"), x)
-            if len(roots) == 1 and not symbols_in(subs(lacking, {x: roots[0]})) & s.unknowns:
+            if len(roots) == 1 and not lacking.subs(x, roots[0]).free_symbols & s.unknowns:
                 out.append(q)
     return out
 
 
 def clashing(err: Contradiction) -> dict:
-    """The data that clash, as given: those without any one of which it fits."""
-    out = {}
-    for key, value in err.values.items():
-        rest = {k: v for k, v in err.values.items() if k is not key}
-        try:
-            frame_after(err.circuit, rest, err.frame)
-        except Undetermined:
-            continue
-        out[key] = value
-    return out
+    """The data that clash, as given: those among the equations that cannot all hold."""
+    return {key: err.values[key] for key in err.data if key in err.values}

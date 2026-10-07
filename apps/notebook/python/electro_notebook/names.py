@@ -1,15 +1,64 @@
-"""Quantities by the names one writes: ``I_R_1``, ``U_R_1``, ``P_R_1`` (an element's current, voltage, power),
-``V_A`` (a point's potential), ``R_1`` (an element's value); expressions of them (``U_E_1 / I_E_1``), read
-without ``eval``: only names, numbers, + − · / ** and a few functions (sympify would run any Python)."""
+"""Names as a book gives them: an element's label (``R_1``), its current, voltage, power and value (``I_R_1``,
+``U_R_1``, ``P_R_1``, ``R_1``), a point's potential (``V_A``) — what the library's variables are called when
+shown (``names``); and quantities by those names, expressions of them too (``U_E_1 / I_E_1``), read without
+``eval``: only names, numbers, + − · / ** and a few functions (sympify would run any Python)."""
 
 from __future__ import annotations
 
 import ast
+from collections import Counter
+from collections.abc import Mapping
+from dataclasses import dataclass
 from typing import cast
 
 import sympy as sp
-from electro.circuit.quantities import Current, Parameter, Potential, Power, Quantity, Voltage
+from electro import Circuit, Element, Node
+from electro.circuit import labels as labelled
+from electro.circuit import points as points_of
+from electro.quantities import Current, Parameter, Potential, Power, Quantity, Scaled, Voltage
 from electro.values import parse
+
+
+@dataclass(frozen=True)
+class Names:
+    """A circuit's elements by their labels, its named points' potentials by name (``V_A``; ``V_n3`` for one
+    with no name of its own), and each of its variables by the name a book gives it (``to``)."""
+
+    labels: Mapping[Element, str]
+    points: Mapping[Node, sp.Symbol]
+    to: Mapping[sp.Symbol, sp.Symbol]
+
+    def rename(self, e: sp.Expr) -> sp.Expr:
+        return sp.sympify(e).xreplace(dict(self.to))
+
+    def of(self, q: Quantity | Scaled) -> sp.Expr:
+        """A quantity in the book's names."""
+        if isinstance(q, Power):
+            return self.of(Voltage(q.of)) * self.of(Current(q.of))
+        return self.rename(q.expr)
+
+
+def names(circuit: Circuit) -> Names:
+    labels = labelled(circuit)
+    to: dict[sp.Symbol, sp.Symbol] = {}
+    for e in circuit.members:
+        label, two = labels[e], len(e.terminals) == 2
+        to |= {v: sp.Symbol(f"V_{label}_{t}") for t, v in e.V.items() if isinstance(v, sp.Symbol)}
+        to |= {x: sp.Symbol(f"I_{label}" if two else f"I_{label}_{t}") for t, x in e.I.items() if x.is_Symbol}
+        base = e.name or label
+        to |= {x: sp.Symbol(f"{w}_{base}" if w else base) for w, x in e.P.items() if isinstance(x, sp.Dummy)}
+        to |= {x: sp.Symbol(f"{name}_{label}") for name, x in e.inner.items()}
+    for e, ps in circuit.parts:
+        for t, p in zip(e.drawn, ps):
+            if p.potential.is_Symbol and p.potential not in to:
+                to[p.potential] = sp.Symbol(f"V_{labels[e]}_{t}")
+    every = [p for p in points_of(circuit) if isinstance(p, Node) and isinstance(p.potential, sp.Dummy)]
+    alike = Counter(p.label for p in every)
+    points = {}
+    for k, p in enumerate(every, 1):
+        points[p] = sp.Symbol(f"V_{p.label}" if p.label and alike[p.label] == 1 else f"V_n{k}")
+        to[p.potential] = points[p]
+    return Names(labels, points, to)
 
 
 class BadExpression(ValueError):
@@ -46,8 +95,8 @@ def named(name: str, names) -> Quantity:
 
 def evaluated(text: str, solution) -> sp.Expr:
     """``text`` with each name's value in ``solution``."""
-    e = expression(text)
-    return e.subs({s: solution(named(s.name, solution.names)) for s in e.free_symbols if isinstance(s, sp.Symbol)})
+    e, n = expression(text), names(solution.circuit)
+    return e.subs({s: solution(named(s.name, n)) for s in e.free_symbols if isinstance(s, sp.Symbol)})
 
 
 _FUNCTIONS = {"sqrt": sp.sqrt, "abs": sp.Abs, "exp": sp.exp, "log": sp.log, "sin": sp.sin, "cos": sp.cos,

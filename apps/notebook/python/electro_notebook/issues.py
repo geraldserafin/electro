@@ -7,14 +7,13 @@ from collections.abc import Mapping
 
 import sympy as sp
 from electro import Element
-from electro.circuit.names import names
-from electro.circuit.quantities import Quantity
 from electro.errors import Ambiguous, Contradiction, MissingData
+from electro.quantities import Quantity
 from electro.values import parse
 
 from . import latex as tex
 from .hints import clashing, pinning
-from .names import NoSuchQuantity
+from .names import NoSuchQuantity, names
 
 
 def issue(err: BaseException, units: Mapping[str, str] | None = None) -> dict | None:

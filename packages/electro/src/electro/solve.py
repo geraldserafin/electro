@@ -66,7 +66,7 @@ class Solution:
         if lacking:
             needed = {x for v in lacking.values() for x in v.free_symbols} & self.unknowns
             err = MissingData(len(needed), {q: v for q, v in values.items() if q not in lacking}, list(lacking))
-            err.circuit = self.circuit
+            err.circuit, err.solution, err.lacking = self.circuit, self, tuple(lacking.values())
             raise err
         return values
 

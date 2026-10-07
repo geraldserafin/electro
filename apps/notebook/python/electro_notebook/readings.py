@@ -9,7 +9,8 @@ from functools import cache
 
 import sympy as sp
 from electro import Element
-from electro.circuit.names import names
+
+from .names import names
 
 
 def by_element(circuit: Element) -> dict[str, dict[str, tuple[str, sp.Expr]]]:
@@ -41,4 +42,4 @@ def reads(circuit: Element) -> dict[str, sp.Expr]:
 
 def read(name: str, phi) -> sp.Expr:
     """``Trace.reads``: a name as its value."""
-    return reads(phi.c.circuit)[name]
+    return reads(phi.circuit)[name]

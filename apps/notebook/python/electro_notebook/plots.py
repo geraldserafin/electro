@@ -7,7 +7,7 @@ import re
 from collections.abc import Mapping
 
 from electro import Element, Net, Node, U, V
-from electro.circuit.quantities import Quantity
+from electro.quantities import Quantity
 
 from .errors import NoInput, NoOutput
 from .kinds import stores

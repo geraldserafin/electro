@@ -16,16 +16,15 @@ import warnings
 from collections.abc import Mapping
 
 import sympy as sp
-from electro import Element, Node, Solution, Trace
-from electro.circuit.names import names
-from electro.circuit.quantities import Current, Parameter, Power, Quantity, Voltage
+from electro import Circuit, Element, Node, Solution, Trace
+from electro.quantities import Current, Parameter, Power, Quantity, Voltage
 
 from . import plots
 from . import task as tasks
 from .code_view import PRELUDE, variable
 from .drawing import Drawing, from_drawing, to_drawing
 from .errors import CELL, NoSuchSchematic, error, issue, warning
-from .names import named
+from .names import named, names
 from .results import element_result
 from .steps import steps as steps_data
 
@@ -87,7 +86,7 @@ def schematic(what: Element | Drawing, values: Mapping | None = None, solution: 
 def plot(trace: Trace, *qs: str | Quantity) -> Shown:
     """A run's quantities in time, each a quantity or a name (by default its named points' potentials, else
     its capacitors' and inductors' voltages)."""
-    circuit = trace.phi.c.circuit
+    circuit = trace.phi.circuit
     if qs:  # by name, anything it reads: a pin's current too ("I_Q_1_c")
         series = {q if isinstance(q, str) else _name(q, circuit): trace(q) for q in qs}
     else:
@@ -120,7 +119,7 @@ def task(circuit: Element, values: Mapping, find: str | Quantity, prompt: str = 
 
 
 def to_output(obj: object) -> dict:
-    if isinstance(obj, Element | Drawing):
+    if isinstance(obj, Circuit | Drawing):
         obj = schematic(obj)
     if isinstance(obj, Solution):
         obj = steps(obj)

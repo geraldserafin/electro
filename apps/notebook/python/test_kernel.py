@@ -29,7 +29,7 @@ def test_rich_outputs():
     assert drawn["results"]["R_2"]["value"] == "14 Ω" and drawn["results"]["R_2"]["solved"]
     [shown] = run("steps(sol, Parameter(R_2))")
     assert shown["type"] == "solution" and shown["data"]["answer"] == [r"R_{2} = 14\,\mathrm{\Omega}"]
-    assert {"type": "OhmsLaw", "label": "R_{2}"} in [s["reason"] for s in shown["data"]["steps"]]
+    assert {"type": "OhmsLaw", "label": "R_{2}"} in [s.get("reason") for s in shown["data"]["steps"]]
     out = run("print('hej')\ndisplay(c)\nsol")
     assert [o["type"] for o in out] == ["stream", "schematic", "solution"]
     trace = run('plot((~(E >> R_1 >> (C := Capacitor("C")))).simulate({E: 5, R_1: 1000, C: 1e-6}, until=0.005), "U_C")')
