@@ -12,30 +12,34 @@ from electro.values import UNKNOWN, parse
 
 
 def to_text(value) -> str | None:
-    """Inverse of ``parse`` for storage (e.g. JSON): exact, and readable where possible."""
+    """The inverse of ``parse``, for storing (JSON): exact, and readable where it can be."""
     if value is None or value is UNKNOWN:
         return None
     value = parse(value) if isinstance(value, str) else sp.sympify(value, strict=True)
     if isinstance(value, sp.Symbol):
         return value.name
     if isinstance(value, sp.Rational) and not isinstance(value, sp.Integer):
-        q = value.q
-        while q % 2 == 0:
-            q //= 2
-        while q % 5 == 0:
-            q //= 5
-        if q == 1:  # a terminating decimal: 0.5, 0.0047 — below a thousandth with its prefix (100n, 4.7µ)
-            small = [(f, p) for f, p in _ENG if f < sp.Rational(1, 1000)]
-            factor, prefix = (
-                next(((f, p) for f, p in small if abs(value) >= f), (1, ""))
-                if abs(value) < sp.Rational(1, 1000)
-                else (1, "")
-            )
-            ratio = cast(sp.Rational, value / factor)
-            scaled = Decimal(int(ratio.p)) / Decimal(int(ratio.q))
-            return f"{scaled.normalize():f}{prefix}"
-        return f"{value.p}/{value.q}"
+        return _decimal(value) if _terminates(value) else f"{value.p}/{value.q}"
     return str(value)
+
+
+def _terminates(value: sp.Rational) -> bool:
+    """Whether its decimal ends (0.5, 0.0047): its denominator has no factors but 2 and 5."""
+    q = value.q
+    for f in (2, 5):
+        while q % f == 0:
+            q //= f
+    return q == 1
+
+
+def _decimal(value: sp.Rational) -> str:
+    """A decimal; below a thousandth, with its prefix (100n, 4.7µ)."""
+    small = [(f, p) for f, p in _ENG if f < sp.Rational(1, 1000)]
+    factor, prefix = (
+        next(((f, p) for f, p in small if abs(value) >= f), (1, "")) if abs(value) < sp.Rational(1, 1000) else (1, "")
+    )
+    ratio = cast(sp.Rational, value / factor)
+    return f"{(Decimal(int(ratio.p)) / Decimal(int(ratio.q))).normalize():f}{prefix}"
 
 
 _ENG = [
