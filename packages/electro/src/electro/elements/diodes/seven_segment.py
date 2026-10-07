@@ -1,4 +1,4 @@
-from ...circuit.element import Element
+from ...element import Element
 from .light import led
 
 SEGMENTS = ("a", "b", "c", "d", "e", "f", "g", "dp")

@@ -1,5 +1,5 @@
-from ...circuit.element import Element
-from ...circuit.time import Pre, when
+from ...element import Element
+from ...time import Pre, when
 from ..physics import high
 from .logic import HALF, clocked, output
 

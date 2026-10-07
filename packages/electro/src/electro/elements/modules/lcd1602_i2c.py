@@ -1,4 +1,4 @@
-from ...circuit.element import Element
+from ...element import Element
 from .module import i2c
 
 

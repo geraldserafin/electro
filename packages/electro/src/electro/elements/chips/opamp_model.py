@@ -1,8 +1,8 @@
 import sympy as sp
 
-from ...circuit.element import Element
-from ...circuit.time import D
+from ...element import Element
 from ...parts import OPAMP_PARTS
+from ...time import D
 
 R_OUT = 75
 

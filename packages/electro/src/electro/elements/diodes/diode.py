@@ -1,6 +1,6 @@
 import sympy as sp
 
-from ...circuit.element import Element
+from ...element import Element
 from ..physics import junction
 
 

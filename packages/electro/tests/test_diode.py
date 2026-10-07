@@ -20,7 +20,7 @@ def test_a_diode_forward_its_drop_as_shockley_and_ohm_have_it():
     drop = _bisect(lambda u: (5 - u) / 1000 - i_s * (math.exp(u / vt) - 1), 0, 1)
     assert float(s(U(d))) == pytest.approx(drop, abs=1e-09)
     assert float(s(I(d))) == pytest.approx((5 - drop) / 1000, rel=1e-09)
-    assert s.steps[0].how == "numerically"
+    assert any(step.how == "numerically" for step in s.steps)
 
 
 def test_a_diode_backwards_lets_through_only_its_saturation_current():

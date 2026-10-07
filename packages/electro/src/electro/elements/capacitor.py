@@ -1,5 +1,5 @@
-from ..circuit.element import Element
-from ..circuit.time import D
+from ..element import Element
+from ..time import D
 
 
 class Capacitor(Element):

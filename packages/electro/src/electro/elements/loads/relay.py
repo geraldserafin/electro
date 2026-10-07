@@ -1,7 +1,7 @@
 import sympy as sp
 
-from ...circuit.element import Element
-from ...circuit.time import D, Pre, when
+from ...element import Element
+from ...time import D, Pre, when
 
 R, L, R_LOSS = 70, sp.Rational(2, 100), 10_000
 PULL, DROP = sp.Rational(5, 100), sp.Rational(15, 1000)

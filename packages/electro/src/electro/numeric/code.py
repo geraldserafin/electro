@@ -16,12 +16,23 @@ import sympy as sp
 from sympy.printing.jscode import JavascriptCodePrinter
 from sympy.printing.pycode import PythonCodePrinter
 
-from ..circuit.algebra import expr, subs, symbols_in
 from .engine import System, limited_exp, limited_exp_slope, newton
 from .sparse import shape
 
 Code = dict[str, str]
 """``"py"`` and ``"js"``: the same statements in each."""
+
+
+def expr(x: object) -> sp.Expr:
+    return cast(sp.Expr, sp.sympify(x))
+
+
+def subs(x: sp.Expr, values) -> sp.Expr:
+    return cast(sp.Expr, x.subs(list(values.items())))
+
+
+def symbols_in(x: object) -> set[sp.Symbol]:
+    return {s for s in expr(x).free_symbols if isinstance(s, sp.Symbol)}
 
 
 JUNCTION = 1e-6
@@ -90,7 +101,11 @@ def compile_equations(
     with _quiet():
         scope["jconst"](p, A)
         scope["jdyn"]([0.0] * len(unknowns), p, [0.0] * len(exprs), A)
-    return Compiled(unknowns, list(params), constant, moving, shape(len(unknowns), entries, A, dynamic), junctions)
+    plan = shape(len(unknowns), entries, A, dynamic)
+    plan["linear"] = plan["linear"] and not any(
+        f.free_symbols & set(unknowns) for e in exprs for f in e.atoms(sp.Function, sp.Piecewise)
+    )
+    return Compiled(unknowns, list(params), constant, moving, plan, junctions)
 
 
 class _quiet:

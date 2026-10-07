@@ -1,6 +1,6 @@
 import sympy as sp
 
-from ...circuit.element import Element
+from ...element import Element
 from ..physics import V_T, junction
 
 I_S, I_ZT = sp.Rational(1, 10**14), sp.Rational(5, 1000)

@@ -1,6 +1,6 @@
 import sympy as sp
 
-from ...circuit.element import Element
+from ...element import Element
 from .light import led
 
 FORWARD = {"r": 2, "g": 3, "b": sp.Rational(31, 10)}

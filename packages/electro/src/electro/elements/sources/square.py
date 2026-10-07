@@ -1,7 +1,7 @@
 import sympy as sp
 
-from ...circuit.element import Element
-from ...circuit.time import TIME, when
+from ...element import Element
+from ...time import TIME, when
 
 
 class SquareSource(Element):

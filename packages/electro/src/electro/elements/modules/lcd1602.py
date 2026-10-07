@@ -1,4 +1,4 @@
-from ...circuit.element import Element
+from ...element import Element
 from ..diodes.light import led
 from .module import inputs, load
 

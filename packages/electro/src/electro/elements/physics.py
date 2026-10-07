@@ -2,7 +2,7 @@
 
 import sympy as sp
 
-from ..circuit.time import when
+from ..time import when
 
 V_T = sp.Rational(25852, 1000000)
 """The thermal voltage at 300 K."""

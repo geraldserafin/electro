@@ -1,7 +1,7 @@
 import sympy as sp
 
-from ...circuit.element import Element
-from ...circuit.time import Pre, when
+from ...element import Element
+from ...time import Pre, when
 
 R_OUT, R_DIS, DROP = 10, 10, sp.Rational(17, 10)
 

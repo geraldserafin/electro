@@ -1,6 +1,6 @@
 import sympy as sp
 
-from ...circuit.element import Element
+from ...element import Element
 
 END = sp.Rational(1, 1000)
 """Its track never ends in a short circuit (ohms)."""

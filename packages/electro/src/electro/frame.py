@@ -14,8 +14,7 @@ from typing import cast
 
 import sympy as sp
 
-from ..circuit.algebra import symbols_in
-from ..circuit.time import DT, TIME, D, Pre
+from .time import DT, TIME, D, Pre
 
 
 @dataclass(frozen=True)
@@ -44,7 +43,7 @@ class Step:
 
     def letters(self) -> set[sp.Symbol]:
         """The letters the frame itself brings (its length, …): never to be found."""
-        return {x for f in fields(self) for x in symbols_in(getattr(self, f.name))}
+        return {x for f in fields(self) for x in sp.sympify(getattr(self, f.name)).free_symbols}
 
 
 @dataclass(frozen=True)
@@ -78,13 +77,20 @@ class AC(Step):
         return sp.re(sp.expand(a * sp.conjugate(b), complex=True)) / 2
 
 
+_BEFORE: dict[sp.Expr, sp.Symbol] = {}
+_LETTERS: set[sp.Symbol] = set()
+
+
 def before(x: sp.Expr) -> sp.Symbol:
-    """``x`` a step ago: what a step in time remembers."""
-    return sp.Symbol(f"{x}⁻")
+    """``x`` a step ago: what a step in time remembers — one letter for each ``x``."""
+    if x not in _BEFORE:
+        _BEFORE[x] = sp.Dummy(f"{x}⁻")
+        _LETTERS.add(_BEFORE[x])
+    return _BEFORE[x]
 
 
 def is_before(x: sp.Symbol) -> bool:
-    return x.name.endswith("⁻")
+    return x in _LETTERS
 
 
 def interpret(law: sp.Expr, frame: Step) -> sp.Expr:

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import re
+from collections.abc import Mapping
 from fractions import Fraction
 
 import sympy as sp
@@ -95,3 +96,57 @@ def parse(value, *, positive: bool = False):
         if _IDENT.match(value):
             return sp.Symbol(value, positive=True) if positive else sp.Symbol(value)
     raise BadValue(str(value))
+
+
+# A circuit's values
+
+
+def given(circuit, values: Mapping) -> dict[sp.Symbol, sp.Expr]:
+    """Each parameter's value: as given, else its kind's default. An element's value is its main parameter;
+    several by name (``{D: {"I_S": …}}``); a real part's (``part("1N4148")``); a name shared by elements."""
+    from .element import Element
+    from .errors import NoSuchParameter
+    from .parts import Part
+
+    out: dict[sp.Symbol, sp.Expr] = {}
+    for e in circuit.members:
+        out |= {e.P[w]: sp.sympify(parse(d)) for w, d in e.defaults.items()}
+    for key, value in values.items():
+        value = _read(value)
+        if value is UNKNOWN:
+            continue
+        match key:
+            case Element() if isinstance(value, Part):
+                out |= {key.P[w]: sp.sympify(parse(x)) for w, x in value.parameters(key.kind).items()}
+            case Element() if isinstance(value, Mapping):
+                out |= {key.P[w]: sp.sympify(parse(x)) for w, x in value.items() if parse(x) is not UNKNOWN}
+            case Element():
+                out[key.P[""]] = value
+            case str():
+                if not any(x.name == key for e in circuit.members for x in e.P.values()):
+                    raise NoSuchParameter(key)
+                out[sp.Symbol(key)] = value
+    return out
+
+
+def data(values: Mapping) -> list:
+    """The data on quantities (``I(R): 2``, ``U(R_1): 2 * U(R_2)``), each an equation."""
+    from .element import Equation, Origin
+
+    out = []
+    for key, value in values.items():
+        if not hasattr(key, "expr") or isinstance(key, sp.Basic):
+            continue
+        value = _read(value)
+        if value is not UNKNOWN:
+            rhs = value.expr if hasattr(value, "expr") and not isinstance(value, sp.Basic) else value
+            out.append(Equation(key.expr - rhs, Origin("given", key)))
+    return out
+
+
+def _read(value: object) -> object:
+    from .parts import Part
+
+    if isinstance(value, Mapping | Part) or (hasattr(value, "expr") and not isinstance(value, sp.Basic)):
+        return value
+    return parse(value)

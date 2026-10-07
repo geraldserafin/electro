@@ -1,7 +1,7 @@
 import sympy as sp
 
-from ...circuit.element import Element
-from ...circuit.time import when
+from ...element import Element
+from ...time import when
 
 
 class Switch(Element):

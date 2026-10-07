@@ -1,7 +1,7 @@
 """A microcontroller board: the supplies it puts out, and each I/O pin a source behind a conductance, both set
 by the chip while it runs (an emulated one: ``<pin>_G``, ``<pin>_E``). On paper a pin takes nothing."""
 
-from ...circuit.element import Element
+from ...element import Element
 
 
 class Board(Element):
