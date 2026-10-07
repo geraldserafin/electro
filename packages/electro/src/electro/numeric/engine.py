@@ -164,33 +164,29 @@ class Machine:
         return [True, err]
 
     def advance_to(self, target, dt_max, schedule=None, on_frame=None):
-        """Steps up to ``target``, at most ``dt_max``, each as long as its error allows; shorter after
-        something jumped, or when Newton did not get there; in the shortest step a value may jump for real (a
-        capacitor put across an ideal source)."""
+        """Steps up to ``target`` (``walk``), at most ``dt_max``; shorter after something jumped; in the shortest
+        step a value may jump for real (a capacitor put across an ideal source)."""
         if self.longest is not None:
             dt_max = min(dt_max, self.longest)
-        dt_min = dt_max * 1e-9
-        self.step = min(self.step if self.step > 0 else min(dt_max, 1e-6), dt_max)
-        while self.t < target - 1e-15:
-            h = min(self.step, target - self.t)
+        machine = self
+
+        def attempt(t, h, last):
             if schedule is not None:
-                for pair in schedule(self.t):
-                    if self.p[pair[0]] != pair[1]:
-                        self.p[pair[0]] = pair[1]
-                        self.rough = ROUGH
-            taken, err = self.advance(h, h <= dt_min)
-            if not taken:
-                if h <= dt_min:
-                    raise NoConvergence(self.t)
-                self.step = h / 4 if err == math.inf else h * max(0.1, 0.9 * math.exp(-math.log(err) / 3))
-                continue
+                for pair in schedule(t):
+                    if machine.p[pair[0]] != pair[1]:
+                        machine.p[pair[0]] = pair[1]
+                        machine.rough = ROUGH
+            done = machine.advance(h, last)
+            if not done[0]:
+                return [done[1], dt_max]
             if on_frame is not None:
-                on_frame(self)
-            if self.switched:
-                self.step = max(dt_min, h / 8)
-            elif h >= self.step * 0.999:
-                grow = 2.0 if err < 0.1 else 0.9 * math.exp(-math.log(err) / 3)
-                self.step = min(dt_max, h * min(2.0, grow))
+                on_frame(machine)
+            return [min(done[1], 1.0), max(dt_max * 1e-9, h / 8) if machine.switched else dt_max]
+
+        h = walk(self.t, target, self.step if self.step > 0 else min(dt_max, 1e-6), dt_max, attempt)
+        if h is None:
+            raise NoConvergence(self.t)
+        self.step = h
 
     def run(self, until, dt_max, schedule=None, on_frame=None):
         """From rest to ``until``; ``on_frame`` gets every frame, at t = 0 too, after a first tiny step (the
@@ -361,24 +357,45 @@ def newton(system, x0, p, junctions):
     return None
 
 
-def homotopy(find, n):
-    """A root at λ = 1 of what ``find(x0, λ)`` finds near ``x0``, the sources raised from λ = 0, where
-    everything is zero. Each raise starts where the last ended; a raise Newton does not finish is halved."""
-    x = find([0.0 for _ in range(n)], 0.0)
-    lam = 0.0
-    raise_by = 0.25
-    while x is not None and lam < 1:
-        to = min(1.0, lam + raise_by)
-        found = find(x, to)
-        if found is None:
-            raise_by = raise_by / 2
-            if raise_by < 1e-6:
+def walk(at, to, h, longest, attempt):
+    """Continuation: from ``at`` to ``to`` — in time, or raising the sources — each step from where the last
+    ended. ``attempt(at, h, last)`` takes a step: its error against what it may be (1: at it; inf: Newton did
+    not get there), and the longest the next may be. A step over is taken again shorter; the next is as long
+    as keeps the error under. ``last``: the shortest a step may be, taken whatever its error. The next step's
+    length; None: not even the shortest got there."""
+    shortest = longest * 1e-9
+    h = min(h, longest)
+    while at < to - 1e-15:
+        step = min(h, to - at)
+        done = attempt(at, step, step <= shortest)
+        err = done[0]
+        if err > 1:
+            if step <= shortest:
                 return None
+            h = step / 4 if err == math.inf else step * max(0.1, 0.9 * math.exp(-math.log(err) / 3))
             continue
-        x = found
-        lam = to
-        raise_by = min(1.0, raise_by * 2)
-    return x
+        at += step
+        if step >= h * 0.999:
+            h = step * (2.0 if err < 0.1 else min(2.0, 0.9 * math.exp(-math.log(err) / 3)))
+        h = min(h, done[1], longest)
+    return h
+
+
+def homotopy(find, n):
+    """A root at λ = 1 of what ``find(x0, λ)`` finds near ``x0``, walked from λ = 0, where everything is
+    zero."""
+    x = [find([0.0 for _ in range(n)], 0.0)]
+
+    def attempt(lam, h, last):
+        found = find(x[0], lam + h)
+        if found is None:
+            return [math.inf, 1.0]
+        x[0] = found
+        return [0.0, 1.0]
+
+    if x[0] is None or walk(0.0, 1.0, 0.25, 1.0, attempt) is None:
+        return None
+    return x[0]
 
 
 def junction_step(to, old, nvt, vcrit):
