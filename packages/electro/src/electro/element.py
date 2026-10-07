@@ -13,7 +13,7 @@ from dataclasses import dataclass
 
 import sympy as sp
 
-from .circuit import Circuit, Point, _laws
+from .circuit import Circuit, Point
 from .errors import BadName
 
 
@@ -157,30 +157,3 @@ class Element(Circuit):
 
     def __repr__(self) -> str:
         return f"{type(self).__name__}({self.name!r})" if self.name else type(self).__name__ + "()"
-
-
-def said(c: Circuit) -> str:
-    """A 1 → 1 piece's laws seen at its ends: ``U = …`` (or ``I = …``), all else hidden."""
-    if len(c.left) != 1 or len(c.right) != 1 or any(e.ways for e in c.members):
-        return "; ".join(f"{q.expr} = 0" for q in _laws(c, 0.0, c.left + c.right).equations)
-    U, I = sp.symbols("U I")
-    (a,), (b,) = c.left, c.right
-    laws = _laws(c, 0.0, (a, b))
-    into = sp.Add(*(e.I[t] for e, ps in c.parts for t, p in zip(e.drawn, ps) if p == a))
-    eqs = [q.expr for q in laws.equations] + [U - (a.potential - b.potential), I - into]
-    params = {x for e in c.members for x in e.P.values()}
-    inside = sorted({x for e in eqs for x in e.free_symbols if isinstance(x, sp.Dummy)} - params, key=str)
-    for x in (U, I):
-        try:
-            found = sp.solve(eqs, [*inside, x], dict=True)
-        except NotImplementedError:  # under a time word: said as it is, below
-            continue
-        if len(found) == 1 and x in found[0]:
-            return f"{x} = {sp.factor(found[0][x])}"
-    plain = [e for e in eqs if not e.atoms(sp.Function)]
-    by = sp.solve(plain, [x for x in inside if any(e.has(x) for e in plain)], dict=True)
-    if len(by) == 1:
-        left = {sp.factor(sp.expand(e.xreplace(by[0]))) for e in eqs} - {0}
-        if not {x for e in left for x in e.free_symbols if isinstance(x, sp.Dummy)}:
-            return "; ".join(f"{e} = 0" for e in left)
-    return "; ".join(f"{e} = 0" for e in eqs)

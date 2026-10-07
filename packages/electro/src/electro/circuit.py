@@ -123,9 +123,9 @@ class Circuit:
     def __str__(self) -> str:
         """A 1 → 1 piece as a book writes it, ``U = I·(R_1 + R_2)``: its laws seen at its ends (its voltage
         ``U``, the first end against the second; its current ``I``, in at the first), all else hidden."""
-        from .element import said
+        from .solve import law
 
-        return said(self)
+        return law(self)
 
     def final(self, values: Mapping | None = None, frame=None):
         """Where the circuit comes to: one frame infinitely long — or, with sines of one frequency, turning at

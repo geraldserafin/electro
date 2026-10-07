@@ -20,7 +20,7 @@ from typing import ClassVar
 
 import sympy as sp
 
-from .circuit import Circuit, Laws, points
+from .circuit import Circuit, Laws, _laws, points
 from .element import Equation, Origin, SolutionStep, Way
 from .errors import Ambiguous, Contradiction, MissingData, NotLinear, Undetermined
 from .frame import AC, DC, Step, before, frequencies, is_before
@@ -287,3 +287,41 @@ def references(said: Sequence[sp.Expr], potentials: set[sp.Symbol]) -> list[Equa
 
 
 __all__ = ["Laws", "Solution", "final", "frame_after", "settled"]
+
+
+# A piece's law at its ends
+
+
+def law(c: Circuit) -> str:
+    """A 1 → 1 piece as a book writes it, ``U = I·(R_1 + R_2)``: its law at its ends, all inside it hidden."""
+    U, I = sp.symbols("U I")
+    if len(c.left) != 1 or len(c.right) != 1:
+        return "; ".join(f"{q.expr} = 0" for q in _laws(c, 0.0, c.left + c.right).equations)
+    said = _at_ends(c, U, I)
+    params = {p for e in c.members for p in e.P.values()}
+    for x, by in ((U, I), (I, U)):
+        value = _solved(said, params | {by}).get(x)
+        if value is not None and value.free_symbols <= params | {by}:
+            return f"{x} = {sp.factor(value)}"
+    timeless = [q for q in said if not q.expr.has(D, Pre)]
+    found = _solved(timeless, params | {U, I})
+    return "; ".join(f"{e} = 0" for e in {sp.factor(q.expr.xreplace(found)) for q in said} - {0})
+
+
+def _at_ends(c: Circuit, U: sp.Symbol, I: sp.Symbol) -> list[Equation]:
+    """The piece's laws, and what it is at its ends: ``U`` across them, ``I`` in at the first."""
+    (a,), (b,) = c.left, c.right
+    into = sp.Add(*(e.I[t] for e, ps in c.parts for t, p in zip(e.drawn, ps) if p == a))
+    end = Origin("end", None)
+    laws = _laws(c, 0.0, (a, b)).equations
+    return [*laws, Equation(U - (a.potential - b.potential), end), Equation(I - into, end)]
+
+
+def _solved(said: list[Equation], letters: set[sp.Symbol]) -> Known:
+    """What ``said`` gives, in ``letters``; nothing when it cannot be worked out so."""
+    unknowns = {s for q in said for s in q.expr.free_symbols} - letters
+    try:
+        worlds, _ = _solve(said, unknowns, lambda x, v: True, DC(), {})
+    except (Undetermined, NotLinear):
+        return {}
+    return worlds[0][0]
