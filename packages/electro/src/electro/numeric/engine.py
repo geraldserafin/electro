@@ -11,7 +11,9 @@ values stand still. A step over the tolerance is taken again shorter; the next i
 
 A frame's equations are a ``System``: a sparse Jacobian, eliminated in an order ``sparse`` chose once. Its
 entries the unknowns do not change (a resistor's, a capacitor's C/dt) are eliminated first and kept while they
-stay the same, so Newton eliminates only what a diode's exponential touches; a linear circuit is one step.
+stay the same, so Newton eliminates only what a diode's exponential touches; a linear circuit is one step. The
+switches' rows come last, a small block factored as it is found (``Block``): closed or open, a switch puts its
+entries elsewhere.
 
 Written for the printing: no imports but ``math``; ``+`` and ``*`` on numbers only; nothing empty tested as
 false.
@@ -152,7 +154,8 @@ class Machine:
     def put(self, i, value):
         if self.p[i] == value:
             return
-        self.guesses.leave(self.p, self.x)
+        if not self.system.linear:  # (a linear circuit's Newton gets there in one step from anywhere)
+            self.guesses.leave(self.p, self.x)
         self.jump()
         self.p[i] = value
 
@@ -161,7 +164,8 @@ class Machine:
         self.p[0] = dt
         self.p[1] = self.t + dt
         self.p[2] = 1.0 if self.rough > 0 else 0.5
-        return newton(self.system, self.guesses.start(self.p, self.x), self.p, self.junctions)
+        x0 = self.x if self.system.linear else self.guesses.start(self.p, self.x)
+        return newton(self.system, x0, self.p, self.junctions)
 
     def advance(self, dt, last):
         """Try a step of ``dt``: [taken, its error against the tolerance]. ``last``: the shortest step, taken
@@ -256,6 +260,8 @@ class System:
         self.prow = shape["prow"]
         self.pcol = shape["pcol"]
         self.k1 = shape["k1"]
+        self.k2 = shape["k2"]
+        self.block = Block(shape["brow"], shape["bcol"], shape["bplace"])
         self.low = shape["low"]
         self.low_row = shape["low_row"]
         self.low_at = shape["low_at"]
@@ -309,10 +315,10 @@ class System:
             self.fresh = True
         for pos in self.trail:
             W[pos] = A[pos] + D[pos]
-        for k in range(self.k1, self.n):
+        for k in range(self.k1, self.k2):
             if not self.pivot(k, False):
                 return False
-        return True
+        return self.block.factor(W)
 
     def pivot(self, k, first):
         """The ``k``-th pivot's column eliminated below it; in the first part, what falls on entries that
@@ -338,11 +344,12 @@ class System:
 
     def solve(self):
         W, b, x = self.W, self.F, self.dx
-        for k in range(self.n):
+        for k in range(self.k2):
             v = b[self.prow[k]]
             for q in range(self.low_at[k], self.low_at[k + 1]):
                 b[self.low_row[q]] -= W[self.low[q]] * v
-        for k in range(self.n - 1, -1, -1):
+        self.block.solve(b, x)
+        for k in range(self.k2 - 1, -1, -1):
             s = b[self.prow[k]]
             for q in range(self.up_at[k], self.up_at[k + 1]):
                 s -= W[self.up[q]] * x[self.up_col[q]]
@@ -442,6 +449,129 @@ def junction_step(to, old, nvt, vcrit):
             return old + nvt * math.log(arg) if arg > 0 else vcrit
         return nvt * math.log(to / nvt)
     return to
+
+
+class Block:
+    """The switches' rows (``rows``), eliminated last: by the columns no pivot took (``cols``), as the elimination
+    left them (``places`` in ``W``, row by row; −1: nothing there), a small matrix factored with its pivots chosen
+    as it is — each row scaled to its largest entry, so laws in volts and in amperes pivot alike, then LU with
+    partial pivoting. Its factors are kept as their nonzeros only: an open switch's row is one entry."""
+
+    def __init__(self, rows, cols, places):
+        n = len(rows)
+        self.n = n
+        self.rows = rows
+        self.cols = cols
+        self.places = places
+        self.a = [0.0 for _ in range(n * n)]
+        self.was = [0.0 for _ in range(n * n)]  # what it was factored from
+        self.factored = False
+        self.scale = [1.0 for _ in range(n)]
+        self.swap = [0 for _ in range(n)]
+        self.b = [0.0 for _ in range(n)]
+        self.low = []  # L's nonzeros: row, column, multiplier, one after another
+        self.up = []  # U's off the diagonal: row, column, entry
+        self.diag = [1.0 for _ in range(n)]
+
+    def factor(self, W):
+        """Its factors from ``W`` (those it has, if it is as it was: a step's length changes little near the
+        switches); False: singular."""
+        n, a, was = self.n, self.a, self.was
+        same = self.factored
+        for q in range(n * n):
+            v = W[self.places[q]] if self.places[q] >= 0 else 0.0
+            if v != was[q]:
+                same = False
+                was[q] = v
+        if same:
+            return True
+        for q in range(n * n):
+            a[q] = was[q]
+        self.scale_rows()
+        self.factored = False
+        for col in range(n):
+            if not self.eliminate(col):
+                return False
+        self.keep_nonzeros()
+        self.factored = True
+        return True
+
+    def scale_rows(self):
+        n, a = self.n, self.a
+        for i in range(n):
+            big = 0.0
+            for j in range(n):
+                big = max(big, abs(a[i * n + j]))
+            self.scale[i] = big if big != 0 else 1.0
+            for j in range(n):
+                a[i * n + j] /= self.scale[i]
+
+    def eliminate(self, col):
+        """Column ``col`` under the diagonal: its largest entry the pivot (that row swapped up, the multipliers
+        going with it), the rows below less their multiple of it."""
+        n, a = self.n, self.a
+        pivot = col
+        for r in range(col + 1, n):
+            if abs(a[r * n + col]) > abs(a[pivot * n + col]):
+                pivot = r
+        if abs(a[pivot * n + col]) < 1e-300:
+            return False
+        self.swap[col] = pivot
+        if pivot != col:
+            for j in range(n):
+                t = a[col * n + j]
+                a[col * n + j] = a[pivot * n + j]
+                a[pivot * n + j] = t
+        inv = 1.0 / a[col * n + col]
+        for r in range(col + 1, n):
+            f = a[r * n + col] * inv
+            a[r * n + col] = f
+            if f != 0:
+                for j in range(col + 1, n):
+                    a[r * n + j] -= f * a[col * n + j]
+        return True
+
+    def keep_nonzeros(self):
+        n, a = self.n, self.a
+        self.low = []
+        self.up = []
+        for col in range(n):
+            for r in range(col + 1, n):
+                if a[r * n + col] != 0:
+                    self.low.append(r)
+                    self.low.append(col)
+                    self.low.append(a[r * n + col])
+        for i in range(n - 1, -1, -1):
+            self.diag[i] = a[i * n + i]
+            for j in range(i + 1, n):
+                if a[i * n + j] != 0:
+                    self.up.append(i)
+                    self.up.append(j)
+                    self.up.append(a[i * n + j])
+
+    def solve(self, F, x):
+        """Its columns' unknowns into ``x``, from its rows' right-hand sides in ``F`` as the elimination left them."""
+        n, b = self.n, self.b
+        for i in range(n):
+            b[i] = F[self.rows[i]] / self.scale[i]
+        for col in range(n):  # the rows as they were swapped, then L, then U (from the last row up)
+            p = self.swap[col]
+            if p != col:
+                t = b[col]
+                b[col] = b[p]
+                b[p] = t
+        low, up = self.low, self.up
+        for q in range(0, len(low), 3):
+            b[low[q]] -= low[q + 2] * b[low[q + 1]]
+        q = 0
+        for i in range(n - 1, -1, -1):
+            s = b[i]
+            while q < len(up) and up[q] == i:
+                s -= up[q + 2] * b[up[q + 1]]
+                q += 3
+            b[i] = s / self.diag[i]
+        for i in range(n):
+            x[self.cols[i]] = b[i]
 
 
 def solve_linear(A, b, n):

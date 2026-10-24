@@ -68,7 +68,7 @@ def compile_equations(
         residuals + [(f"A[{k}]", d) for k, (_, _, d) in enumerate(entries) if moves[k]], unknowns, params
     )
     numbers = _sample(constant, moving, len(unknowns), len(entries), sample or [1.0] * len(params))
-    plan = shape(len(unknowns), [(i, j) for i, j, _ in entries], numbers, moves)
+    plan = shape(len(unknowns), [(i, j) for i, j, _ in entries], numbers, moves, _switched(exprs, unknowns))
     plan["linear"] = plan["linear"] and not _switches(exprs, unknowns)
     return Compiled(unknowns, list(params), constant, moving, plan, junctions)
 
@@ -95,8 +95,24 @@ def _sample(constant: Code, moving: Code, n: int, m: int, p: Sequence[float]) ->
 
 
 def _switches(exprs: list[sp.Expr], unknowns: list[sp.Symbol]) -> bool:
-    """A function or a ``when`` of an unknown: Newton needs more than one step, though the Jacobian moves not."""
-    return any(f.free_symbols & set(unknowns) for e in exprs for f in e.atoms(sp.Function, sp.Piecewise))
+    """A function of an unknown, or a ``when`` that chooses by one (a comparator, a gate): Newton needs more than
+    one step, though the Jacobian moves not. A ``when`` that chooses by a parameter (a switch, a button) is a
+    linear law either way."""
+    xs = set(unknowns)
+    functions = any(f.free_symbols & xs for e in exprs for f in e.atoms(sp.Function) if not isinstance(f, sp.Piecewise))
+    choices = any(c.free_symbols & xs for e in exprs for w in e.atoms(sp.Piecewise) for _, c in w.args)
+    return functions or choices
+
+
+def _switched(exprs: list[sp.Expr], unknowns: list[sp.Symbol]) -> list[int]:
+    """The rows whose law a ``when`` chooses by parameters (a switch's, a button's): which unknowns are in it
+    depends on how it is set (``sparse`` leaves them last)."""
+    xs = set(unknowns)
+
+    def by_parameter(w: sp.Piecewise) -> bool:
+        return bool(w.free_symbols & xs) and not any(c.free_symbols & xs for _, c in w.args)
+
+    return [i for i, e in enumerate(exprs) if any(by_parameter(w) for w in e.atoms(sp.Piecewise))]
 
 
 class _quiet:

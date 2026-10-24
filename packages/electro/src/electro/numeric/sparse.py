@@ -4,7 +4,12 @@ engine (``engine.System``) only follows it, never touching an entry that stays z
 Each pivot is the entry that makes the fewest new nonzeros (Markowitz, as SPICE does), among those not much
 smaller than the largest left in their column (in a sample frame's numbers: a pivot near zero is none). First
 come pivots whose row and column the unknowns never change: that part of the elimination is the same in every
-Newton step, so the engine does it once while those entries stay the same."""
+Newton step, so the engine does it once while those entries stay the same.
+
+A switch's law (``when`` a parameter says so: no voltage across it, else no current through it) has its entries in
+one place or another as it is set, and a pivot chosen on either is nothing in the other. Its rows come last: the
+rest is eliminated the same whichever way the switches are, and what is left — a small block, those rows by the
+columns no pivot took — the engine factors as it finds it (``block``)."""
 
 from __future__ import annotations
 
@@ -21,8 +26,11 @@ class Elimination:
     """A sample Jacobian as it is eliminated: each entry's value, whether the unknowns change it, and its place
     in the engine's array ``A`` (new entries go after the given ones)."""
 
-    def __init__(self, n: int, entries: Sequence[Cell], sample: Sequence[float], dynamic: Sequence[bool]) -> None:
+    def __init__(
+        self, n: int, entries: Sequence[Cell], sample: Sequence[float], dynamic: Sequence[bool], last: frozenset[int]
+    ) -> None:
         self.n, self.m = n, len(entries)
+        self.last = last  # rows no pivot is taken in (a switch's)
         self.value: dict[Cell, float] = {}
         self.moving: dict[Cell, bool] = {}
         self.place: dict[Cell, int] = {}
@@ -54,7 +62,7 @@ class Elimination:
             rows = self.below(c)
             top = max((abs(self.value[i, c]) for i in rows), default=0.0)
             for r in rows:
-                if top > 0 and abs(self.value[r, c]) < THRESHOLD * top:
+                if r in self.last or (top > 0 and abs(self.value[r, c]) < THRESHOLD * top):
                     continue
                 fixed = self.fixed(r, c)
                 cost = (len(self.right(r)) - 1) * (len(rows) - 1)
@@ -89,18 +97,30 @@ class Elimination:
             self.in_col[j].add(i)
 
 
-def shape(n: int, entries: Sequence[Cell], sample: Sequence[float], dynamic: Sequence[bool]) -> dict:
+def shape(
+    n: int, entries: Sequence[Cell], sample: Sequence[float], dynamic: Sequence[bool], switched: Sequence[int] = ()
+) -> dict:
     """The elimination as the engine reads it. ``entries``: each nonzero's (row, column), in ``A``'s order;
-    ``sample``: their values in a sample frame; ``dynamic``: which the unknowns change."""
-    a = Elimination(n, entries, sample, dynamic)
+    ``sample``: their values in a sample frame; ``dynamic``: which the unknowns change; ``switched``: the rows of
+    switches' laws, left to the block (unless the rest cannot be eliminated without them)."""
+    try:
+        return _plan(n, entries, sample, dynamic, frozenset(switched))
+    except ValueError:
+        if not switched:
+            raise
+        return _plan(n, entries, sample, dynamic, frozenset())
+
+
+def _plan(n: int, entries: Sequence[Cell], sample: Sequence[float], dynamic: Sequence[bool], last: frozenset) -> dict:
+    a = Elimination(n, entries, sample, dynamic, last)
     order, steps, k1 = [], [], n
-    for _ in range(n):
+    for _ in range(n - len(last)):
         r, c, fixed = a.pivot(fixed_first=k1 == n)
         if k1 == n and not fixed:
             k1 = len(order)
         order.append((r, c))
         steps.append(a.eliminate(r, c))
-    return _for_engine(a, order, steps, k1, entries, dynamic)
+    return _for_engine(a, order, steps, min(k1, len(order)), entries, dynamic)
 
 
 def _for_engine(a: Elimination, order: list[Cell], steps: list, k1: int, entries: Sequence[Cell], dynamic) -> dict:
@@ -112,7 +132,9 @@ def _for_engine(a: Elimination, order: list[Cell], steps: list, k1: int, entries
     def trailing(i: int, j: int) -> bool:
         return i not in head_rows and j not in head_cols
 
-    out: dict = {"n": a.n, "m": a.m, "k1": k1, "linear": not any(dynamic)}
+    out: dict = {"n": a.n, "m": a.m, "k1": k1, "k2": len(order), "linear": not any(dynamic)}
+    brow, bcol = sorted(a.rows), sorted(a.cols)
+    out |= {"brow": brow, "bcol": bcol, "bplace": [a.place.get((i, j), -1) for i in brow for j in bcol]}
     out |= {"rows": [i for i, _ in entries], "cols": [j for _, j in entries]}
     out |= {"constant": [k for k, d in enumerate(dynamic) if not d]}
     out |= {"pivots": [a.place[cell] for cell in order], "prow": [r for r, _ in order], "pcol": [c for _, c in order]}
