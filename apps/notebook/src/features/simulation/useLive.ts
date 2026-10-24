@@ -167,10 +167,12 @@ export function useLive(schematic: SchematicData) {
       serialText.current = (serialText.current + f.serial).slice(-4000);
       setSerial(serialText.current);
     }
-    if (statusRef.current === "running" && !mutedRef.current)
+    if (statusRef.current === "running" && !mutedRef.current) {
       // time running slower lowers the tone as much
       for (const s of f.sounds)
         sound.current.set(s.id, s.frequency === null ? null : s.frequency * speedRef.current, s.volume);
+      for (const a of f.audio) sound.current.play(a.id, a.samples, a.rate, speedRef.current);
+    }
   }, []);
 
   const upload = useCallback(async (id: string) => {
@@ -253,7 +255,7 @@ export function useLive(schematic: SchematicData) {
           }
         };
         const { kinds } = compiled.program;
-        setHasSound(Object.values(kinds).some((k) => k === "buzzer" || k === "passive_buzzer"));
+        setHasSound(Object.values(kinds).some((k) => k === "buzzer" || k === "passive_buzzer" || k === "speaker"));
         serialText.current = "";
         setSerial("");
         setSketches({});

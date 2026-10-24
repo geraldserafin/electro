@@ -58,8 +58,7 @@ describe("buzzer", () => {
       last = t;
     }
     const { frequency, volume } = heard(b, 0.25);
-    expect(frequency).toBeGreaterThan(430);
-    expect(frequency).toBeLessThan(450);
+    expect(frequency).toBeCloseTo(440, 3); // (not the edges in the span counted: 436 or 440 in a quarter second)
     expect(volume).toBe(1);
   });
 

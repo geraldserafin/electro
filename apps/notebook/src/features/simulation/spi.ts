@@ -3,11 +3,13 @@
 // (i2c.ts). A device knows by the chip's own pins wired to its CS and D/C whether a byte is its own
 // and whether it is a command: it asks the chip (Chip.level) as the byte comes.
 
+import { Mcp4822 } from "./dac";
 import type { Board, Session } from "./session";
 import { Ili9341 } from "./tft";
 
 export interface SpiDevice {
-  transmit(byte: number): void;
+  /** A frame of ``bits`` (8 unless the SPI is set to more: a 16-bit word whole). */
+  transmit(value: number, bits?: number): void;
   /** Bytes one after another, nothing between them (a DMA's burst): as many transmit()s. */
   transmitMany(memory: DataView, offset: number, count: number, size: number, mask: number): void;
 }
@@ -21,8 +23,8 @@ export class Spi {
     readonly tx: readonly string[],
   ) {}
 
-  transmit(byte: number) {
-    for (const d of this.devices) d.transmit(byte);
+  transmit(value: number, bits = 8) {
+    for (const d of this.devices) d.transmit(value, bits);
   }
 
   transmitMany(memory: DataView, offset: number, count: number, size: number, mask: number) {
@@ -38,6 +40,9 @@ export interface SpiChip {
 
 export const hasSpi = (chip: object): chip is SpiChip => "spi" in chip && "level" in chip;
 
+// electro's MCP4822's pins, in order
+const DAC = { vdd: 0, cs: 1, sck: 2, sdi: 3, gnd: 7 };
+
 // electro.devices.ILI9341's pins, in order
 const VCC = 0,
   GND = 1,
@@ -49,10 +54,10 @@ const VCC = 0,
   LED = 7;
 
 /**
- * Hands each SPI of ``board``'s chip the displays on it: those whose SCK and MOSI are wired to pins the
- * chip has that SPI's on; their CS, RESET and D/C are read from the chip's pins they are wired to (not
- * wired to one: CS held low, RESET high). ``kept``: the displays made so far, by id — reused, so a
- * display keeps what it showed across a new program.
+ * Hands each SPI of ``board``'s chip the displays and DACs on it: those whose SCK and MOSI (SDI) are wired to
+ * pins the chip has that SPI's on; their CS, RESET and D/C are read from the chip's pins they are wired to (not
+ * wired to one: CS held low, RESET high). ``kept``: the displays made so far, by id — reused, so a display
+ * keeps what it showed across a new program. A DAC's outputs are set in the circuit when its words come.
  */
 export function spiDevicesOn(s: Session, board: Board, kept: Map<string, Ili9341>) {
   const chip = board.chip;
@@ -61,7 +66,27 @@ export function spiDevicesOn(s: Session, board: Board, kept: Map<string, Ili9341
   const pinOf = new Map<string, string>(); // node → the chip's pin on it
   for (const [pin, node] of Object.entries(board.pins)) if (node && !pinOf.has(node)) pinOf.set(node, pin);
   for (const spi of chip.spi) spi.devices = [];
+  const spiOf = (sck: string | null, mosi: string | null) =>
+    chip.spi.find((p) => sck && mosi && p.sck.includes(sck) && p.tx.includes(mosi));
   for (const [id, kind] of Object.entries(program.kinds)) {
+    if (kind === "mcp4822") {
+      const at = (i: number) => pins[id]?.[i] ?? null;
+      const on = (i: number) => pinOf.get(at(i) ?? "") ?? null;
+      const spi = spiOf(on(DAC.sck), on(DAC.sdi));
+      if (!spi) continue;
+      const cs = on(DAC.cs) ? chip.level(on(DAC.cs)!) : null;
+      const dac = new Mcp4822();
+      dac.wire({
+        selected: () => (cs ? !cs() : true),
+        powered: () => s.sim.node(at(DAC.vdd) ?? "") - s.sim.node(at(DAC.gnd) ?? ""),
+        set: (channel, volts) => {
+          const input = `${id}_${channel ? "B" : "A"}`;
+          s.schedule(s.clock(board), () => s.sim.setInput(input, volts));
+        },
+      });
+      spi.devices.push(dac);
+      continue;
+    }
     if (kind !== "ili9341") continue;
     const at = (i: number) => pins[id]?.[i] ?? null;
     const on = (i: number) => {
@@ -70,7 +95,7 @@ export function spiDevicesOn(s: Session, board: Board, kept: Map<string, Ili9341
     };
     const sck = on(SCK),
       mosi = on(MOSI);
-    const spi = chip.spi.find((p) => sck && mosi && p.sck.includes(sck) && p.tx.includes(mosi));
+    const spi = spiOf(sck, mosi);
     if (!spi) continue;
     const volts = (i: number) => s.sim.node(at(i) ?? "") - s.sim.node(at(GND) ?? "");
     const [cs, reset, dc] = [on(CS), on(RESET), on(DC)].map((pin) => (pin ? chip.level(pin) : null));

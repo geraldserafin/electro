@@ -30,6 +30,7 @@ from .loads.motor import Motor
 from .loads.passive_buzzer import PassiveBuzzer
 from .loads.relay import Relay
 from .loads.servo import Servo
+from .loads.speaker import Speaker
 from .logic.and_gate import AND
 from .logic.counter import Counter
 from .logic.dff import DFlipFlop
@@ -46,6 +47,7 @@ from .modules.ds1307 import DS1307
 from .modules.ili9341 import ILI9341
 from .modules.lcd1602 import LCD1602
 from .modules.lcd1602_i2c import LCD1602I2C
+from .modules.mcp4822 import MCP4822
 from .modules.ssd1306 import SSD1306
 from .modules.ultrasonic import Ultrasonic
 from .resistor import Resistor
@@ -94,6 +96,7 @@ ALL = (
     PassiveBuzzer,
     Relay,
     Servo,
+    Speaker,
     AND,
     Counter,
     DFlipFlop,
@@ -109,6 +112,7 @@ ALL = (
     ILI9341,
     LCD1602,
     LCD1602I2C,
+    MCP4822,
     SSD1306,
     Ultrasonic,
     Resistor,
@@ -156,6 +160,7 @@ __all__ = [
     "JKFlipFlop",
     "LCD1602",
     "LCD1602I2C",
+    "MCP4822",
     "LED",
     "Lamp",
     "Motor",
@@ -181,6 +186,7 @@ __all__ = [
     "Resistor",
     "SSD1306",
     "Servo",
+    "Speaker",
     "SevenSegment",
     "SineSource",
     "SquareSource",

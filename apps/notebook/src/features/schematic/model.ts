@@ -82,11 +82,13 @@ export const KINDS = [
   { kind: "motor", prefix: "M", group: "peripherals", live: true },
   { kind: "buzzer", prefix: "BZ", group: "peripherals" },
   { kind: "passive_buzzer", prefix: "BZ", group: "peripherals" },
+  { kind: "speaker", prefix: "LS", group: "peripherals" },
   { kind: "servo", prefix: "M", group: "peripherals" },
   { kind: "lcd1602", prefix: "LCD", group: "peripherals", live: true },
   { kind: "lcd1602_i2c", prefix: "LCD", group: "peripherals" },
   { kind: "ssd1306", prefix: "OLED", group: "peripherals" },
   { kind: "ili9341", prefix: "TFT", group: "peripherals" },
+  { kind: "mcp4822", prefix: "DAC", group: "peripherals" },
   { kind: "ds1307", prefix: "RTC", group: "peripherals" },
 ] as const satisfies readonly KindInfo[];
 

@@ -18,6 +18,7 @@ from electro import (
     LCD1602I2C,
     LED,
     LED_COLORS,
+    MCP4822,
     NMOS,
     NPN,
     OPAMP_PARTS,
@@ -47,6 +48,7 @@ from electro import (
     Servo,
     SevenSegment,
     SineSource,
+    Speaker,
     SquareSource,
     Step,
     Switch,
@@ -432,6 +434,20 @@ def test_ili9341_loads_the_3v3_rail_and_its_backlight_pin():
     lit = circuit.simulate(values, until=0.0001, inputs={(pico, "GP22"): "high"})
     assert lit.at(V(n["bl"]), 0.0001) == pytest.approx(3.3 * 1000 / 1040, rel=0.001)
     assert lit.at(I(tft, "vcc"), 0.0001) == pytest.approx(3.3 / 150, rel=0.001)
+
+
+def test_mcp4822_puts_what_it_was_sent_on_its_outputs_into_a_powered_speaker():
+    pico, dac, speaker = (Pico(), MCP4822(), Speaker())
+    wired = {"GP10": "sck", "GP11": "sdi", "GP13": "cs"}
+    pins = [wired.get(p, f"free_{p}") for p in Pico.terminals[:-3]]
+    circuit, n = net(
+        (pico, *pins, "vbus", "v33", "GND"),
+        (dac, "v33", "cs", "sck", "sdi", "GND", "out", "free_b", "GND"),
+        (speaker, "out", "GND"),
+    )
+    played = circuit.simulate({}, until=0.0001, inputs={(dac, "A"): 1.5})
+    assert played.at(V(n["out"]), 0.0001) == pytest.approx(1.5 * 10000 / 10001)
+    assert played.at(I(speaker), 0.0001) == pytest.approx(1.5 / 10001)
 
 
 def _clock():

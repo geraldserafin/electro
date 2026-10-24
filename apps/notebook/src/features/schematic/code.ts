@@ -142,7 +142,7 @@ const CONSTRUCTORS: Record<string, string> = {
   lcd1602_i2c: "LCD1602I2C",
 };
 /** Kinds electro names in capitals: `npn` → `NPN`. */
-const CAPITALS = /^(led|npn|pnp|nmos|pmos|vcvs|vccs|ccvs|cccs|ds1307|ili9341|lcd1602|ssd1306)$/;
+const CAPITALS = /^(led|npn|pnp|nmos|pmos|vcvs|vccs|ccvs|cccs|ds1307|ili9341|lcd1602|mcp4822|ssd1306)$/;
 const KEYWORDS = new Set(
   "False None True and as assert async await break class continue def del elif else except finally for from global if import in is lambda nonlocal not or pass raise return try while with yield".split(
     " ",

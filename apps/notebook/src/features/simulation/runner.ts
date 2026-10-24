@@ -1,5 +1,5 @@
 // A circuit running in time, with everything the page makes of it: the Arduinos' chips (session.ts),
-// the LEDs' glow, the buzzers, servos, LCDs, HC-SR04s, I²C modules and SPI displays (peripherals.ts,
+// the LEDs' glow, the buzzers and speakers, servos, LCDs, HC-SR04s, I²C modules and SPI devices (peripherals.ts,
 // lcd.ts, i2c.ts, spi.ts), the scope's samples. No React and no DOM: it runs in a worker (sim.worker.ts), off the
 // page's thread, and hands over what the board shows as plain data (frame()).
 
@@ -11,11 +11,16 @@ import { si } from "./format";
 import { Backpack, type Device, modulesOn, Oled, pixelPath } from "./i2c";
 import { type Lcd, lcd, watch as read, type Screen, screen } from "./lcd";
 import {
+  AUDIO_RATE,
   type Buzzing,
   buzzing,
+  type Hearing,
+  hear,
   heard,
+  hearing,
   listen,
   ping,
+  played,
   type Servoing,
   type Sonar,
   servoing,
@@ -66,6 +71,7 @@ export interface Frame {
   results: Record<string, ElementResult>; // readings next to the elements
   currents: Record<string, number[]>; // each element's terminals' currents (into it), their mean since the last frame
   sounds: { id: string; frequency: number | null; volume: number }[]; // each buzzer, in the circuit's time
+  audio: { id: string; rate: number; samples: Float32Array }[]; // what each speaker played since the last frame
   traces: ScopeTrace[]; // the scope's, then the meter's
   serial: string; // what the chips wrote since the last frame
 }
@@ -104,6 +110,7 @@ export class Runner {
   private lamps: { id: string; u: number; i: number }[]; // each bulb: its voltage's and current's index in x
   private motors: { id: string; w: number; angle: number }[]; // each motor: its speed's index, how far it turned
   private relays: { id: string; on: number }[];
+  private speakers: Hearing[];
   private energy = new Map<string, number>(); // each bulb's, since the last frame (its glow: the mean power)
   // the I²C modules, by id: kept across a new sketch (the display keeps what it showed, as a real one does)
   private modules = new Map<string, Device>();
@@ -157,13 +164,14 @@ export class Runner {
     );
     this.motors = having("motor").flatMap(([id, q]) => (q?.w !== undefined ? [{ id, w: q.w, angle: 0 }] : []));
     this.relays = having("relay").flatMap(([id, q]) => (q?.on !== undefined ? [{ id, on: q.on }] : []));
+    this.speakers = having("speaker").flatMap(([id, q]) => (q?.U !== undefined ? [hearing(id, q.U, 0)] : []));
     this.carried = new Float64Array(this.session.sim.flowing.length);
     this.sonars = having("ultrasonic").flatMap(([id, q]) => (q?.U_trig !== undefined ? [sonar(id, q.U_trig)] : []));
     this.setParts(parts);
   }
 
   get hasSound() {
-    return this.buzzers.length > 0;
+    return this.buzzers.length > 0 || this.speakers.length > 0;
   }
 
   /** The drawing's elements as they are now (a switch flipped, a slider moved) and the buttons held down. */
@@ -231,6 +239,7 @@ export class Runner {
         g.charge.set(key, (g.charge.get(key) ?? 0) + Math.max(0, x[i]) * dt);
       }
       for (const b of this.buzzers) listen(b, x[b.u], dt);
+      for (const h of this.speakers) hear(h, x[h.u], g.last, t);
       for (const l of this.lamps) this.energy.set(l.id, (this.energy.get(l.id) ?? 0) + Math.abs(x[l.u] * x[l.i]) * dt);
       for (const m of this.motors) m.angle = (m.angle + x[m.w] * dt * SPIN * (180 / Math.PI)) % 360;
       if (this.carried.length) {
@@ -304,6 +313,14 @@ export class Runner {
       (looks[b.id] ??= {}).sound = frequency === null ? 0 : 1;
       sounds.push({ id: b.id, frequency, volume });
     }
+    const audio: Frame["audio"] = [];
+    for (const h of this.speakers) {
+      const samples = played(h);
+      let loud = 0;
+      for (const v of samples) loud = Math.max(loud, Math.abs(v));
+      (looks[h.id] ??= {}).sound = loud > 0.01 ? 1 : 0;
+      audio.push({ id: h.id, rate: AUDIO_RATE, samples });
+    }
     for (const m of this.servos) (looks[m.id] ??= {}).angle = turn(m, sim.t);
     for (const l of this.lamps) {
       const power =
@@ -373,6 +390,7 @@ export class Runner {
       results,
       currents,
       sounds,
+      audio,
       serial,
       traces: [...this.shown.scope, ...this.shown.probe].map(trace),
     };
