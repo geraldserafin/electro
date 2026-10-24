@@ -65,6 +65,9 @@ export class Pico implements Chip {
   private cdc: USBCDC;
   private decoder = new TextDecoder();
   private jits: [BlockJit, BlockJit];
+  // the clock is ticked once a slice of QUANTUM cycles: within one, the core's cycles since its start say the time
+  private sliceStart = 0;
+  private nanosPerCycle = 0;
 
   constructor(image: Uint8Array) {
     const mcu = this.mcu;
@@ -98,14 +101,17 @@ export class Pico implements Chip {
     ];
     mcu.spi.forEach((port, n) => {
       // (at once: nothing drives MISO back)
-      port.sink = (value) => this.spi[n].transmit(value);
+      port.sink = (value) => this.spi[n].transmit(value, port.dataBits);
       port.sinkMany = (memory, offset, count, size, mask) =>
         this.spi[n].transmitMany(memory, offset, count, size, mask);
     });
   }
 
+  /** The time (s since reset) — within a slice, as far as the core running now has got (a pin's change, a word to a
+   *  DAC: to the cycle, not to the slice). */
   get time(): number {
-    return this.mcu.clock.nanos / 1e9;
+    const core = this.mcu.core[this.mcu.currentCore];
+    return (this.mcu.clock.nanos + Math.max(0, core.cycles - this.sliceStart) * this.nanosPerCycle) / 1e9;
   }
 
   /** The clock the cores run at now, in Hz: the firmware's, times the pace. */
@@ -145,8 +151,9 @@ export class Pico implements Chip {
       [core0, core1] = mcu.core,
       [jit0, jit1] = this.jits;
     const end = time * 1e9;
-    const nanosPerCycle = 1e9 / (mcu.clkSys * this.pace);
+    const nanosPerCycle = (this.nanosPerCycle = 1e9 / (mcu.clkSys * this.pace));
     while (clock.nanos < end) {
+      this.sliceStart = core0.cycles;
       if (core0.waiting && core1.waiting) {
         const alarm = clock.nanosToNextAlarm; // (0: none set)
         clock.tick(alarm > 0 ? Math.min(alarm, end - clock.nanos) : end - clock.nanos);
@@ -168,6 +175,7 @@ export class Pico implements Chip {
       if (mcu.pioActiveSmCount) mcu.stepPios(cycles);
       clock.tick(cycles * nanosPerCycle);
     }
+    this.sliceStart = core0.cycles;
   }
 
   /**

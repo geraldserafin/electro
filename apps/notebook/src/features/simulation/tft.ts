@@ -55,16 +55,32 @@ export class Ili9341 {
     this.wiring = wiring;
   }
 
-  transmit(byte: number) {
+  /** A frame: a byte, or (the SPI set to 16 bits: a colour sent whole) two, the high one first. */
+  transmit(value: number, bits = 8) {
     if (!this.listening()) return;
+    if (bits > 8) {
+      this.take(value >> 8);
+      this.take(value & 0xff);
+    } else this.take(value);
+  }
+
+  private take(byte: number) {
     if (!this.wiring!.data()) this.begin(byte);
     else if (this.command === 0x2c || this.command === 0x3c) this.write(byte);
     else this.parameter(byte);
   }
 
-  /** Bytes one after another (the pins as they are: nothing runs between them), as many transmit()s. */
+  /** Frames one after another (the pins as they are: nothing runs between them), as many transmit()s. */
   transmitMany(memory: DataView, offset: number, count: number, size: number, mask: number) {
     if (!this.listening()) return;
+    if (mask > 0xff) {
+      for (let i = 0; i < count; i++) {
+        const v = (size === 2 ? memory.getUint16(offset + 2 * i, true) : memory.getUint8(offset + i)) & mask;
+        this.take(v >> 8);
+        this.take(v & 0xff);
+      }
+      return;
+    }
     const byte = (i: number) =>
       (size === 2 ? memory.getUint16(offset + 2 * i, true) : memory.getUint8(offset + i)) & mask;
     if (!this.wiring!.data()) for (let i = 0; i < count; i++) this.begin(byte(i));
