@@ -281,7 +281,63 @@ def _algebra(exprs: list[sp.Expr], xs: list[sp.Symbol]) -> list[Known]:
         return [{x: v.xreplace(back) for x, v in o.items()} for o in _algebra([e.xreplace(hidden) for e in exprs], xs)]
     if not _linear(exprs, xs):
         return sp.solve(exprs, xs, dict=True)
-    return [{x: v for x, v in zip(xs, found) if v != x} for found in sp.linsolve(exprs, xs)]
+    return [{x: v for x, v in zip(xs, found) if v != x} for found in _linsolve(exprs, xs)]
+
+
+ROUNDING = 1e-9
+"""How far a law with decimal numbers may miss, against the size of its terms, and still hold."""
+
+
+def _linsolve(exprs: list[sp.Expr], xs: list[sp.Symbol]):
+    """``sp.linsolve``; but a block with more laws than unknowns (one of them following from the others) and
+    decimal numbers in it can come out a hair inconsistent — at resonance ωL and 1/(ωC) cancel only to within
+    rounding. Then as many of its laws as it has unknowns, independent, solved, and the rest checked to within
+    rounding."""
+    found = sp.linsolve(exprs, xs)
+    if found or len(exprs) <= len(xs) or not any(e.has(sp.Float) for e in exprs):
+        return found
+    rows = _independent(exprs, xs)
+    if rows is None:
+        return found
+    square = sp.linsolve([exprs[i] for i in rows], xs)
+    for solution in square:
+        at = dict(zip(xs, solution))
+        if not all(_holds(e, at) for i, e in enumerate(exprs) if i not in rows):
+            return found
+    return square
+
+
+def _independent(exprs: list[sp.Expr], xs: list[sp.Symbol]) -> list[int] | None:
+    """As many laws as there are unknowns, independent (to within rounding), by their numbers; None when they
+    have letters in them, or are not enough."""
+    A, _ = sp.linear_eq_to_matrix(exprs, xs)
+    if A.free_symbols:
+        return None
+    basis: list[list[complex]] = []
+    rows = []
+    for i in range(A.rows):
+        row = _reduced([complex(v) for v in A.row(i)], basis)
+        if max(map(abs, row)) > ROUNDING * max(abs(complex(v)) for v in A.row(i)):
+            basis.append(row)
+            rows.append(i)
+        if len(rows) == len(xs):
+            return rows
+    return None
+
+
+def _reduced(row: list[complex], basis: list[list[complex]]) -> list[complex]:
+    """``row`` less its part along the rows before (each eliminated at its largest entry)."""
+    for b in basis:
+        k = max(range(len(b)), key=lambda j: abs(b[j]))
+        f = row[k] / b[k]
+        row = [r - f * v for r, v in zip(row, b)]
+    return row
+
+
+def _holds(e: sp.Expr, at: Mapping) -> bool:
+    """A law with the unknowns ``at`` put in: nothing left but rounding, against the size of its terms."""
+    terms = [complex(t.xreplace(at)) for t in sp.Add.make_args(sp.expand(e))]
+    return abs(sum(terms)) <= ROUNDING * max([abs(t) for t in terms] + [1e-300])
 
 
 def _linear(exprs: list[sp.Expr], xs: list[sp.Symbol]) -> bool:

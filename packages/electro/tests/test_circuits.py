@@ -11,6 +11,7 @@ from electro import (
     Element,
     ElementTwice,
     I,
+    Inductor,
     JoinsNodes,
     Node,
     NoSuchParameter,
@@ -117,3 +118,21 @@ def test_a_new_element_is_one_law_and_nothing_else():
     e, g = (VoltageSource("E"), Conductance("G"))
     circuit, values = (GND >> e >> g >> GND, {e: 10, g: "0.5"})
     assert circuit.final(values)(I(g)) == 5 and circuit.final(values, AC(sp.Integer(1)))(I(g)) == 5
+
+
+def test_rlc_at_resonance_in_decimals_is_its_resistor_alone():
+    """ωL and 1/(ωC) cancel only to within rounding: the block with a law to spare must not come out inconsistent."""
+    e, r, l, c = VoltageSource("E"), Resistor("R"), Inductor("L"), Capacitor("C")
+    rlc = ~(e >> r >> l >> c)
+    w0 = 1 / math.sqrt(0.01 * 1e-6)
+    assert complex(rlc.final({e: 1, r: 10, l: 0.01, c: 1e-6}, AC(w0))(I(r))) == pytest.approx(0.1)
+
+
+def test_a_law_to_spare_that_misses_by_rounding_still_holds():
+    from electro.solve import _linsolve
+
+    x, y = sp.symbols("x y")
+    third = sp.Float(1) / 3
+    found = _linsolve([x - third, y - 2 * third, x + y - sp.Float(1.0000000000000002)], [x, y])
+    assert [tuple(map(float, s)) for s in found] == [pytest.approx((1 / 3, 2 / 3))]
+    assert not _linsolve([x - third, y - 2 * third, x + y - 1.1], [x, y])
