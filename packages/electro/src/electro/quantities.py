@@ -12,13 +12,38 @@ import sympy as sp
 
 from .circuit import GND, Circuit, Node
 from .element import Element
-from .errors import NoSuchParameter
+from .errors import NoSuchParameter, NotAPoint
 from .laws import Equation, Origin
 from .parts import Part
 from .values import UNKNOWN, parse
 
 
-class _Quantity:
+class _Added:
+    """Quantities add up: ``I(r1) - I(r2)``, ``-1 * I(r2) + 1 * I(r3)`` is a ``Sum``."""
+
+    def __add__(self, other: object) -> Sum:
+        return Sum((*_terms(self), *_terms(other)))
+
+    def __sub__(self, other: object) -> Sum:
+        return Sum((*_terms(self), *(Scaled(-t.factor, t.of) for t in _terms(other))))
+
+    def __neg__(self) -> Sum:
+        return Sum(tuple(Scaled(-t.factor, t.of) for t in _terms(self)))
+
+
+def _terms(q: object) -> tuple[Scaled, ...]:
+    """A quantity as terms of a sum, each a quantity times its number."""
+    match q:
+        case Sum(terms):
+            return terms
+        case Scaled():
+            return (q,)
+        case _Quantity():
+            return (Scaled(sp.Integer(1), cast("Quantity", q)),)
+    raise TypeError(f"only quantities add up with quantities, not {q!r}")
+
+
+class _Quantity(_Added):
     def __rmul__(self, k: object) -> Scaled:
         """``2 * U(r2)``: for a datum between quantities (U₁ = 2·U₂)."""
         return Scaled(cast(sp.Expr, sp.sympify(k)), cast("Quantity", self))
@@ -97,6 +122,10 @@ class Power(_Quantity):
     def expr(self) -> sp.Expr:
         return Voltage(self.of).expr * Current(self.of).expr
 
+    def value_in(self, solution) -> sp.Expr:
+        """In a solution: its voltage times its current, as its frame multiplies them."""
+        return solution.frame.product(solution.of(Voltage(self.of)), solution.of(Current(self.of)))
+
 
 @dataclass(frozen=True)
 class Sum(_Quantity):
@@ -110,7 +139,7 @@ class Sum(_Quantity):
 
 
 @dataclass(frozen=True)
-class Scaled:
+class Scaled(_Added):
     factor: sp.Expr
     of: Quantity
 
@@ -136,6 +165,8 @@ def P(e: Element) -> Power:
 
 
 def V(p: Node) -> Potential:
+    if not isinstance(p, Node):
+        raise NotAPoint(p)
     return Potential(p)
 
 

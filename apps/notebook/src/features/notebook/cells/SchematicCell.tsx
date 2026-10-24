@@ -56,6 +56,7 @@ import {
   split,
 } from "./layout";
 
+import { Outputs } from "./Outputs";
 import { DataTab, FoundTab } from "./Problem";
 import { Problems } from "./Problems";
 
@@ -409,7 +410,7 @@ export function SchematicCell({
 
   const load = () => {
     if (source !== null && writtenFor.current === cell.schematic) return;
-    const code = writeCode(cell.schematic, library, cell.name);
+    const code = writeCode(cell.schematic, library, cell.name, cell.show);
     writtenFor.current = cell.schematic;
     setSource(code);
     setGenerated(code);
@@ -427,7 +428,7 @@ export function SchematicCell({
     setError(null);
     writtenFor.current = back.schematic;
     setGenerated(source); // applied: the code in the editor is what the drawing is now
-    update(changed(back.schematic));
+    update({ ...changed(back.schematic), show: back.show });
     return back.schematic;
   };
 
@@ -780,12 +781,19 @@ export function SchematicCell({
             ),
           },
         ]),
-    ...(cell.found
+    // what its code showed (what prints under it); a note run before that: what was sought, found
+    ...(cell.outputs || cell.found
       ? [
           {
             id: "results",
             label: t("results.label"),
-            body: <FoundTab schematic={cell.schematic} found={cell.found} stale={!!cell.stale} />,
+            body: cell.outputs ? (
+              <div className={cn("p-3 transition-opacity duration-150", cell.stale && "opacity-45")}>
+                <Outputs outputs={cell.outputs} />
+              </div>
+            ) : (
+              <FoundTab schematic={cell.schematic} found={cell.found ?? {}} stale={!!cell.stale} />
+            ),
           },
         ]
       : []),
@@ -795,6 +803,11 @@ export function SchematicCell({
             {
               id: kind,
               label: t(`schematic.plot.${kind}`),
+              // put away: out of the cell, and so off the PDF
+              onClose: () => {
+                if (plotError?.kind === kind) setPlotError(null);
+                update({ [kind]: undefined });
+              },
               body:
                 plotError?.kind === kind ? (
                   <FailureBox failure={plotError.failure} kind="error" className="m-2.5" />

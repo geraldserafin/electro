@@ -1,6 +1,6 @@
 import json
 
-from electro_notebook import kernel
+from electro_notebook import cells, kernel
 
 
 def run(code, **problems):
@@ -103,11 +103,15 @@ def test_sweep_and_spread_of_a_drawing():
 
 def test_code_view_read_back():
     # as the page writes it (schematic/code.ts), a value edited
-    source = (
-        'E_1 = VoltageSource("E_1")\nR_1 = Resistor("R_1")\nuklad = ~(E_1 >> R_1)\nuklad_values = {E_1: 12, R_1: 6}'
-    )
+    source = 'E_1 = VoltageSource("E_1")\nR_1 = Resistor("R_1")\nuklad = ~(E_1 >> R_1)\nuklad.final({E_1: 12, R_1: 6})'
     elements = json.loads(kernel.from_code(source, "uklad"))["netlist"]["elements"]
     assert [(e["id"], e["value"]) for e in elements] == [("E_1", "12"), ("R_1", "6")]
+    # its values in a variable (as the page wrote them before); the solving line is not run: data that clash
+    # do not stop the drawing
+    older = source.replace("uklad.final({E_1: 12, R_1: 6})", "uklad_values = {E_1: 12, R_1: 6}")
+    assert json.loads(kernel.from_code(older, "uklad"))["netlist"]["elements"] == elements
+    clashing = source.replace("})", ", I(R_1): 5, I(E_1): 1})")
+    assert "netlist" in json.loads(kernel.from_code(clashing, "uklad"))
     # no variable called like the schematic: the last circuit the code defines
     assert "netlist" in json.loads(kernel.from_code('a = Resistor("R")\nb = ~(VoltageSource("E") >> a)', "x"))
 
@@ -147,3 +151,16 @@ def test_the_ais_solve_tool_on_a_drawing():
     divider["given"] = [[["I", "R_1"], "0.5"]]  # a mark's datum: E from it
     got = json.loads(kernel.task_values(json.dumps(divider), json.dumps([{"id": "e", "value": "U_E_1"}])))
     assert got["values"]["e"] == {"value": 15.0}
+
+
+def test_a_schematics_code_shows_what_its_last_lines_say():
+    head = 'E_1 = VoltageSource("E_1")\nR_1 = Resistor("R_1")\nuklad = ~(E_1 >> R_1)\n'
+    show = json.loads(kernel.from_code(head + "steps(uklad.final({E_1: 12, R_1: 6}, find=[I(R_1)]))", "uklad"))["show"]
+    assert show == "steps(__final__)"
+    assert json.loads(kernel.from_code(head + "uklad.final({E_1: 12})", "uklad"))["show"] is None
+    final = head + "uklad.final({E_1: 12, R_1: 6}, find=[I(R_1)])"
+    [answers] = json.loads(kernel.run(final, apart=True))
+    assert answers["data"]["steps"] == [] and answers["data"]["answer"] == ["I_{R_{1}} = 2\\,\\mathrm{A}"]
+    assert "uklad" not in cells.namespace  # (run apart: the cells' names untouched)
+    [shown] = json.loads(kernel.run(final.replace("uklad.final", "steps(uklad.final") + ")", apart=True))
+    assert shown["data"]["steps"]

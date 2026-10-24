@@ -1,6 +1,7 @@
 """What the page asks of a circuit beyond one frame, each a few lines over ``final``: its frequency response,
 a value swept, the spread over builds, the simplest element where a hole is, the resistance between two
-points. Each solves once with a letter where a number will go, then only numbers."""
+points and the Thévenin resistance an element sees (both also as quantities to seek: ``Resistance``,
+``Thevenin``). Each solves once with a letter where a number will go, then only numbers."""
 
 from __future__ import annotations
 
@@ -14,15 +15,15 @@ from typing import cast
 import sympy as sp
 from electro import (
     AC,
+    Across,
+    Circuit,
     CurrentSource,
     Element,
-    Net,
-    Node,
     Open,
     Parameter,
+    Point,
     Resistor,
     Solution,
-    U,
     Undetermined,
     VoltageSource,
     Wire,
@@ -147,17 +148,57 @@ def fill(circuit: Element, values: Mapping, hole: Element, frame=None) -> Filled
     raise Undetermined("no simple element fits where the hole is")
 
 
-def resistance(circuit: Element, values: Mapping, a: Node | Net, b: Node | Net, frame=None) -> sp.Expr | None:
+def resistance(circuit: Circuit, values: Mapping, a: Point, b: Point, frame=None) -> sp.Expr | None:
     """What the circuit is between ``a`` and ``b`` (an impedance, in AC): how much the voltage there rises per
     ampere let in at ``a`` and out at ``b``."""
     test = CurrentSource("I_test")
     taken = sp.Symbol("I_test")
+    probed = circuit @ Circuit(((test, (b, a)),))
     try:
-        u = (circuit @ (b >> test >> a)).final({**values, test: taken}, frame)(U(a, b))
+        u = probed.final({**values, test: taken}, frame)(Across(a, b))
     except Undetermined:
         return None
     z = sp.simplify(sp.diff(u, taken))
     return z if not z.has(taken) else None
+
+
+def thevenin(circuit: Circuit, values: Mapping, element: Element, frame=None) -> sp.Expr | None:
+    """The Thévenin resistance ``element`` sees: the rest of the circuit between its two terminals."""
+    a, b = dict(circuit.parts)[element]
+    rest = Circuit(tuple(p for p in circuit.parts if p[0] is not element), circuit.left, circuit.right)
+    return resistance(rest, _without(values, element), a, b, frame)
+
+
+def _without(values: Mapping, element: Element) -> dict:
+    """The values not of ``element``: neither its value nor data on its quantities."""
+    return {k: v for k, v in values.items() if k is not element and getattr(k, "of", None) is not element}
+
+
+@dataclass(frozen=True)
+class Resistance:
+    """The resistance between two points, sought like any quantity (``final(values, find=[...])``)."""
+
+    a: Point
+    b: Point
+
+    def value_in(self, solution: Solution) -> sp.Expr:
+        return _found(resistance(solution.circuit, solution.given, self.a, self.b, solution.frame))
+
+
+@dataclass(frozen=True)
+class Thevenin:
+    """The Thévenin resistance an element sees, sought like any quantity."""
+
+    of: Element
+
+    def value_in(self, solution: Solution) -> sp.Expr:
+        return _found(thevenin(solution.circuit, solution.given, self.of, solution.frame))
+
+
+def _found(z: sp.Expr | None) -> sp.Expr:
+    if z is None:
+        raise Undetermined("the resistance there depends on more than the circuit's parts")
+    return z
 
 
 def amplitude(v) -> float:

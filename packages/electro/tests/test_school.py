@@ -22,6 +22,7 @@ from electro import (
     I,
     MissingData,
     Node,
+    NotAPoint,
     OpAmp,
     P,
     Parameter,
@@ -331,3 +332,21 @@ def test_phasor_strings():
     e, r = (VoltageSource("E"), Resistor("R"))
     s = (~(e >> r)).final({e: "10∠90", r: 1}, AC(sp.Integer(1)))
     assert s(I(r)) == 10 * sp.I
+
+
+def test_a_potential_with_nothing_to_stand_on_is_missing_data_not_an_answer():
+    e, r1, r2, t = VoltageSource("E"), Resistor("R_1"), Resistor("R_2"), Node("T")
+    loop = ~(e >> r1 >> t >> r2)
+    with pytest.raises(MissingData):
+        loop.final({r1: 4, r2: 2, V(t): 12})(Parameter(e))
+    assert (~(e >> r1 >> t >> r2 >> GND)).final({r1: 4, r2: 2, V(t): 12})(Parameter(e)) == 36
+    with pytest.raises(NotAPoint):
+        V(e)
+
+
+def test_quantities_add_up_to_be_sought_or_given():
+    e, r1, r2 = VoltageSource("E"), Resistor("R_1"), Resistor("R_2")
+    c = GND >> e >> Node() >> (r1 | r2) >> GND
+    s = c.final({e: 12, r1: 4, r2: 6}, find=[-1 * I(r1) + 1 * I(r2), I(r1) - I(r2), -I(r1)])
+    assert list(s.answers().values()) == [-1, 1, -3]
+    assert c.final({e: 12, r1: 4, I(r1) + I(r2): 5})(Parameter(r2)) == 6

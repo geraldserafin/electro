@@ -11,6 +11,7 @@ from electro import (
     Ammeter,
     BadName,
     Capacitor,
+    CurrentSource,
     Hole,
     I,
     Inductor,
@@ -25,7 +26,8 @@ from electro import (
     Wire,
 )
 from electro_notebook.drawing import from_drawing, to_drawing
-from electro_notebook.methods import fill, resistance, responses, spreads, swept
+from electro_notebook.methods import Resistance, Thevenin, fill, resistance, responses, spreads, swept
+from electro_notebook.steps import steps
 
 RUN = "__import__('os').system('echo pwned')"
 
@@ -142,3 +144,38 @@ def test_a_drawing_names_nothing_but_names(name):
     if not name[0].isdigit():
         with pytest.raises(BadName):
             from_drawing({"elements": [{"id": "R_1", "kind": "resistor", "nodes": ["GND", name]}]})
+
+
+def test_several_things_are_sought_at_once_the_thevenin_resistance_too():
+    e, r1, r2, rl, a = VoltageSource("E"), Resistor("R_1"), Resistor("R_2"), Resistor("R_L"), Node("A")
+    c = GND >> e >> r1 >> a >> (r2 | rl) >> GND
+    s = c.final({e: 12, r1: 4, r2: 4, rl: 10}, find=[I(rl), Thevenin(rl), Resistance(a, GND)])
+    assert list(s.answers().values()) == [sp.Rational(1, 2), 2, sp.Rational(5, 3)]
+
+
+def test_steps_solve_a_bridge_by_its_nodes_not_by_every_equation_at_once():
+    e, (r1, r2, r3, r4, r5) = VoltageSource("E"), [Resistor(f"R_{i}") for i in range(1, 6)]
+    n1, n2, n3, n4 = map(Node, ["n1", "n2", "n3", "n4"])
+    c = (n1 >> e >> n2 >> r1 >> n3 >> r4 >> n1 >> r3 >> n4 >> r2 >> n2) @ (n3 >> r5 >> n4)
+    shown = steps(c.final({e: 220, r1: 5, r2: 20, r3: 5, r4: 10, r5: 10}, find=[I(r5)]))["steps"]
+    [system] = [s for s in shown if s["type"] == "SystemStep"]
+    assert system["nodes"] == ["n3", "n4"] and len(system["equations"]) == 4
+    assert [s["reason"]["type"] for s in shown[-6:-1]] == ["OhmsLaw"] * 5
+
+
+def test_steps_join_resistors_in_series_and_parallel_when_one_source_drives_them():
+    e, (r1, r2, r3, r4) = VoltageSource("E"), [Resistor(f"R_{i}") for i in range(1, 5)]
+    c = GND >> e >> r1 >> Node() >> ((r2 >> r3) | r4) >> GND
+    shown = steps(c.final({e: 20, r1: 2, r2: 3, r3: 5, r4: 8}, find=[I(r4)]))
+    chains = [s["chain"] for s in shown["steps"]]
+    assert [s["reason"]["type"] for s in shown["steps"][:3]] == ["Series", "Parallel", "Series"]
+    assert chains[3] == r"I = \frac{E}{R_{z}} = \frac{20}{6} = 3.333\,\mathrm{A}"
+    assert chains[-1].startswith(r"I_{R_{4}} = \frac{U_{234}}{R_{4}}") and shown["answer"] == [
+        r"I_{R_{4}} = 1.667\,\mathrm{A}"
+    ]
+
+
+def test_a_current_source_gives_the_voltage_across_the_whole_first():
+    j, r1, r2 = CurrentSource("J"), Resistor("R_1"), Resistor("R_2")
+    shown = steps((GND >> j >> Node() >> (r1 | r2) >> GND).final({j: 2, r1: 6, r2: 3}))
+    assert shown["steps"][1]["chain"] == r"U = J \cdot R_{z} = 2 \cdot 2 = 4\,\mathrm{V}"

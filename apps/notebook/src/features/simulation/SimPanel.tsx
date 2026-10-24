@@ -35,8 +35,8 @@ const SlidersIcon = () => <Icon d="M5 6h9M18 6h1M5 12h3M12 12h7M5 18h11M20 18h-1
 
 type Tab = string; // "chart" | "controls" | "console", or one of ``more``
 
-/** A tab of the cell's own: its name, its icon, what it shows. */
-export type PanelTab = { id: string; label: string; icon?: ReactNode; body: ReactNode };
+/** A tab of the cell's own: its name, its icon, what it shows; ``onClose``: it can be put away. */
+export type PanelTab = { id: string; label: string; icon?: ReactNode; body: ReactNode; onClose?: () => void };
 
 const Fold = ({ open }: { open: boolean }) => <Icon d={open ? "M6 9l6 6 6-6" : "M6 15l6-6 6 6"} />;
 
@@ -86,7 +86,7 @@ export function SimPanel({
     onTab?.(next);
     onOpen?.(true);
   };
-  const tabs: { id: Tab; label: string; icon?: ReactNode }[] = [
+  const tabs: { id: Tab; label: string; icon?: ReactNode; onClose?: () => void }[] = [
     ...(running
       ? [
           { id: "chart", label: t("panel.chart"), icon: <ChartIcon /> },
@@ -110,22 +110,39 @@ export function SimPanel({
       {/* like the code editor's: one thin bar, the tabs on the left, the controls on the right */}
       <header className="flex items-center h-9 flex-none border-b border-line bg-board pr-1">
         <div role="tablist" aria-label={t("panel.label")} className="flex self-stretch">
-          {tabs.map(({ id, label, icon }) => (
-            <button
+          {tabs.map(({ id, label, icon, onClose }) => (
+            <span
               key={id}
-              role="tab"
-              aria-selected={shown === id}
-              onClick={() => setTab(id)}
               className={cn(
-                "inline-flex items-center gap-1.5 px-3 border-r border-line text-[13px] whitespace-nowrap",
+                "inline-flex items-center border-r border-line",
                 shown === id ? "bg-code-bg text-fg shadow-[inset_0_2px_0_var(--accent)]" : "text-muted hover:text-fg",
               )}
             >
-              {icon} {label}
-              {id === "console" && live.serial && shown !== "console" && (
-                <span className="size-1.5 rounded-full bg-accent" />
+              <button
+                role="tab"
+                aria-selected={shown === id}
+                onClick={() => setTab(id)}
+                className={cn(
+                  "inline-flex items-center gap-1.5 self-stretch text-[13px] whitespace-nowrap",
+                  onClose ? "pl-3 pr-1" : "px-3",
+                )}
+              >
+                {icon} {label}
+                {id === "console" && live.serial && shown !== "console" && (
+                  <span className="size-1.5 rounded-full bg-accent" />
+                )}
+              </button>
+              {onClose && (
+                <button
+                  className="grid place-items-center size-5 mr-1.5 rounded text-muted hover:bg-hover hover:text-fg"
+                  title={t("panel.close")}
+                  aria-label={t("panel.close")}
+                  onClick={onClose}
+                >
+                  ×
+                </button>
               )}
-            </button>
+            </span>
           ))}
         </div>
         <span className="flex-1" />

@@ -2,6 +2,7 @@
 
 import { type Progress, report } from "@/features/downloads/store";
 import { bodeSvg, histogramSvg, traceSvg } from "@/features/plots/svg";
+import { writeCode } from "@/features/schematic/code";
 import { drawingFromCode } from "@/features/schematic/fromCode";
 import { library, libraryFor } from "@/features/schematic/library";
 import { isComponent, key, pins } from "@/features/schematic/model";
@@ -59,9 +60,22 @@ class Kernel {
     source: string,
     name: string,
     old: SchematicData,
-  ): Promise<{ schematic: SchematicData } | { error: Failure }> {
+  ): Promise<{ schematic: SchematicData; show: string | null } | { error: Failure }> {
     const back = JSON.parse((await this.call("fromCode", { source, name })) as string);
-    return "error" in back ? back : drawingFromCode(back, old, library);
+    if ("error" in back) return back;
+    const drawn = drawingFromCode(back, old, library);
+    return "error" in drawn ? drawn : { ...drawn, show: back.show ?? null };
+  }
+
+  /** What a schematic's code shows (its circuit, values and ``show``), run apart from the cells' names. */
+  async shows(
+    cell: { name: string; schematic: SchematicData; show?: string | null },
+    schematics: Record<string, SchematicData>,
+    standard: SymbolStandard = "iec",
+  ): Promise<Output[]> {
+    const code = writeCode(cell.schematic, library, cell.name, cell.show);
+    const text = (await this.call("run", { code, ...given(schematics, library), apart: true })) as string;
+    return shown(JSON.parse(text), libraryFor(standard));
   }
 
   /** A schematic cell's run button: every element's values, each mark's, what is sought (``sought.ts``),

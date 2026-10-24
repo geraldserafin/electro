@@ -9,6 +9,7 @@ export const pl = {
     assumedHint: "(najprostszy element zgodny z danymi):",
     solution: "Rozwiązanie:",
     system: "Układ równań:",
+    nodal: "I prawo Kirchhoffa w węzłach {{nodes}}, prądy z prawa Ohma:",
     hence: "Stąd:",
     answer: "Odpowiedź:",
     missing: "Brakuje danych:",
@@ -29,6 +30,8 @@ export const pl = {
     ControlledSource: "źródło sterowane: wzmocnienie razy wielkość sterująca ({{label}})",
     UnknownElement: "nieznany element: U = Z·I − E ({{label}})",
     KirchhoffCurrent: "I prawo Kirchhoffa (węzeł {{node}})",
+    Series: "połączenie szeregowe ({{label}})",
+    Parallel: "połączenie równoległe ({{label}})",
   },
   issue: {
     missing_one: "Nie da się wyznaczyć {{targets}} — brakuje {{count}} danej.",
@@ -37,6 +40,8 @@ export const pl = {
     missing_other: "Nie da się wyznaczyć {{targets}} — brakuje {{count}} danych.",
     missingSeveral: "Nie da się wyznaczyć {{targets}} — brakuje kilku danych.",
     anyOf: "Wystarczy podać jedną z: {{options}}.",
+    floating:
+      "Obwód nie ma masy (GND), więc {{given}} nie ma odniesienia — dodaj GND w punkcie, względem którego liczysz potencjał.",
     forExample: "Wystarczy podać np.: {{options}}.",
     conflict: "Sprzeczne dane: {{conditions}} — tego nie da się uzyskać przy {{values}}. Zmień jedną z tych wartości.",
     conflictValues: "Sprzeczne dane: elementy {{values}} wykluczają się. Zmień jedną z tych wartości.",
@@ -84,6 +89,7 @@ export const en: typeof pl = {
     assumedHint: "(the simplest element that fits the data):",
     solution: "Solution:",
     system: "System of equations:",
+    nodal: "Kirchhoff's current law at nodes {{nodes}}, the currents by Ohm's law:",
     hence: "Hence:",
     answer: "Answer:",
     missing: "Missing data:",
@@ -104,6 +110,8 @@ export const en: typeof pl = {
     ControlledSource: "controlled source: the gain times the control quantity ({{label}})",
     UnknownElement: "unknown element: U = Z·I − E ({{label}})",
     KirchhoffCurrent: "Kirchhoff's current law (node {{node}})",
+    Series: "in series ({{label}})",
+    Parallel: "in parallel ({{label}})",
   },
   issue: {
     missing_one: "{{targets}} cannot be determined — {{count}} more given is missing.",
@@ -112,6 +120,8 @@ export const en: typeof pl = {
     missing_other: "{{targets}} cannot be determined — {{count}} more givens are missing.",
     missingSeveral: "{{targets}} cannot be determined — several more givens are missing.",
     anyOf: "Any one of these would do: {{options}}.",
+    floating:
+      "The circuit has no ground (GND), so {{given}} stands on nothing — add GND at the point the potential is measured from.",
     forExample: "For example: {{options}}.",
     conflict: "Contradictory data: {{conditions}} cannot hold with {{values}}. Change one of these values.",
     conflictValues: "Contradictory data: the elements {{values}} exclude each other. Change one of these values.",

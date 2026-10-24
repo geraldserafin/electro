@@ -66,6 +66,20 @@ it("keeps the drawing when only values change", () => {
   expect(back.schematic.elements.find((e) => e.id === "R_1")?.value).toBe("150");
 });
 
+it("keeps the drawing when the code writes a resistor the other way round, its points named anew", () => {
+  const old = cases.bridge.schematic;
+  const elements = elementsOf(old, library).elements.map((e) => ({
+    ...e,
+    nodes: (e.kind === "resistor" ? [...e.nodes].reverse() : e.nodes).map((n) => (n === "GND" ? n : `x_${n}`)),
+  }));
+  const back = drawingFromCode({ netlist: { elements } }, old, library);
+  if (!("schematic" in back)) throw new Error(JSON.stringify(back));
+  expect(back.schematic.elements.map((e) => e.at)).toEqual(old.elements.map((e) => e.at));
+  const source = elements.find((e) => e.kind === "voltage_source")!;
+  const turned = elements.map((e) => (e === source ? { ...e, nodes: [...e.nodes].reverse() } : e));
+  expect("error" in drawingFromCode({ netlist: { elements: turned } }, old, library)).toBe(true);
+});
+
 it("a new element with no layout: only values can change in code", () => {
   const old = cases.bridge.schematic;
   const grown = [...elementsOf(old, library).elements, { id: "R9", kind: "resistor", nodes: ["GND", "GND"] }];

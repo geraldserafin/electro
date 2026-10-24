@@ -7,8 +7,9 @@ from collections.abc import Mapping
 
 import sympy as sp
 from electro import Element
+from electro.circuit import points as points_of
 from electro.errors import Ambiguous, Contradiction, MissingData
-from electro.quantities import Quantity
+from electro.quantities import Across, Potential, Quantity
 from electro.values import parse
 
 from . import latex as tex
@@ -30,6 +31,15 @@ def issue(err: BaseException, units: Mapping[str, str] | None = None) -> dict | 
     return None
 
 
+def _floating(err: MissingData, n) -> list[str]:
+    """The points given a potential in a circuit with no ground: their potential stands on nothing."""
+    solution = getattr(err, "solution", None)
+    if solution is None or any(p.potential == 0 for p in points_of(solution.circuit)):
+        return []
+    given = [q for q in solution.given if isinstance(q, Potential | Across)]
+    return [tex.quantity(q, n) for q in given]
+
+
 def _of_solving(err: BaseException, n, units: Mapping[str, str]) -> dict | None:
     """What solving says instead of an answer: data missing, data that clash, more than one answer."""
     match err:
@@ -40,6 +50,7 @@ def _of_solving(err: BaseException, n, units: Mapping[str, str]) -> dict | None:
                 "targets": targets,
                 "needed": err.needed,
                 "options": [[tex.quantity(q, n)] for q in pinning(err)],
+                **({"floating": floating} if (floating := _floating(err, n)) else {}),
             }
         case Contradiction():
             return _clash(err, n, units)

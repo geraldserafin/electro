@@ -2,7 +2,7 @@
 problem as a variable named after it, and helpers that show things.
 
 The value of a cell's last expression is shown, and whatever it gives ``display``: a circuit or a schematic
-as a drawing (``schematic``), a solution as its worked steps (``steps``), plots (``plot``, ``bode``,
+as a drawing (``schematic``), a solution as its answers (``steps``: its worked steps), plots (``plot``, ``bode``,
 ``spread``), a task to answer (``task``), an error caught on purpose, math, else its text. All as data: the
 page draws and says them (``Output`` in ``shared/model/types.ts``)."""
 
@@ -13,7 +13,7 @@ import contextlib
 import io
 import json
 import warnings
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 
 import sympy as sp
 from electro import Circuit, Element, Node, Solution, Trace
@@ -66,9 +66,16 @@ def _name(q: Quantity, circuit: Element) -> str:
     return str(n.of(q))
 
 
-def steps(solution: Solution, *find: Quantity) -> Shown:
-    """A solution's worked steps: the data, each step and why it holds, the answer to ``find``."""
-    return Shown({"type": "solution", "data": steps_data(solution, find, _units_of(solution.circuit))})
+def steps(solution: Solution, *sought: Quantity, find: Sequence[Quantity] = ()) -> Shown:
+    """A solution's worked steps: the data, each step and why it holds, the answer to what is sought (given
+    one by one or as ``find=[…]``, as to ``final``; by default what the solution was asked to find)."""
+    return Shown({"type": "solution", "data": steps_data(solution, (*sought, *find), _units_of(solution.circuit))})
+
+
+def answers(solution: Solution) -> Shown:
+    """A solution as its last line shows it: only the answers to what it was asked to find."""
+    data = steps_data(solution, solution.find, _units_of(solution.circuit))
+    return Shown({"type": "solution", "data": {**data, "data": [], "steps": []}})
 
 
 def schematic(what: Element | Drawing, values: Mapping | None = None, solution: Solution | None = None) -> Shown:
@@ -122,7 +129,7 @@ def to_output(obj: object) -> dict:
     if isinstance(obj, Circuit | Drawing):
         obj = schematic(obj)
     if isinstance(obj, Solution):
-        obj = steps(obj)
+        obj = answers(obj)
     if hasattr(obj, "_output_"):
         return obj._output_()  # pyright: ignore[reportAttributeAccessIssue]
     if isinstance(obj, BaseException):  # an error caught and shown on purpose: display(e)
@@ -152,18 +159,20 @@ def reset() -> None:
     namespace.update(HELPERS)
 
 
-def run(code: str, problems_json: str = "{}", units_json: str = "{}") -> str:
+def run(code: str, problems_json: str = "{}", units_json: str = "{}", apart: bool = False) -> str:
     """Run one cell, the schematic cells' problems (``problem.ts``'s data, by name) as variables; returns a
-    JSON list of outputs: what it printed, what it showed, its last value, its warnings."""
+    JSON list of outputs: what it printed, what it showed, its last value, its warnings. ``apart``: in a copy
+    of the namespace, so what it defines stays its own (a schematic's code)."""
     units.update(json.loads(units_json))
     outputs: list[dict] = []
-    _bind({name: from_drawing(data) for name, data in json.loads(problems_json).items()}, outputs)
+    scope = dict(namespace) if apart else namespace
+    _bind({name: from_drawing(data) for name, data in json.loads(problems_json).items()}, outputs, scope)
     stdout = io.StringIO()
     with contextlib.redirect_stdout(stdout), warnings.catch_warnings(record=True) as caught:
         warnings.simplefilter("always")
         warnings.simplefilter("ignore", DeprecationWarning)  # the libraries' own (sympy's), not the reader's
         try:
-            if (value := _execute(code)) is not None:
+            if (value := _execute(code, scope)) is not None:
                 outputs.append(to_output(value))
         except Exception as err:  # noqa: BLE001 — every error is shown to the user
             outputs.append(error(err))
@@ -171,7 +180,7 @@ def run(code: str, problems_json: str = "{}", units_json: str = "{}") -> str:
     return json.dumps(printed + outputs + [warning(w.message) for w in caught], ensure_ascii=False)
 
 
-def _bind(problems: dict[str, Drawing], outputs: list[dict]) -> None:
+def _bind(problems: dict[str, Drawing], outputs: list[dict], scope: dict) -> None:
     """The cell's names: each schematic (``"Układ 1"`` is ``układ1``), ``schemat(name)``, and ``display``."""
 
     def schemat(name: str) -> Drawing:
@@ -179,17 +188,17 @@ def _bind(problems: dict[str, Drawing], outputs: list[dict]) -> None:
             raise NoSuchSchematic(name=name, available=list(problems))
         return problems[name]
 
-    namespace["schemat"] = schemat
-    namespace.update({variable(name): problem for name, problem in problems.items()})
-    namespace["display"] = lambda *objects: outputs.extend(to_output(o) for o in objects)
+    scope["schemat"] = schemat
+    scope.update({variable(name): problem for name, problem in problems.items()})
+    scope["display"] = lambda *objects: outputs.extend(to_output(o) for o in objects)
 
 
-def _execute(code: str) -> object:
+def _execute(code: str, scope: dict) -> object:
     """``code`` run as Jupyter runs a cell: the value of its last line when that is an expression."""
     tree = ast.parse(code, CELL)
     last = tree.body.pop() if tree.body and isinstance(tree.body[-1], ast.Expr) else None
-    exec(compile(tree, CELL, "exec"), namespace)
-    return None if last is None else eval(compile(ast.Expression(last.value), CELL, "eval"), namespace)
+    exec(compile(tree, CELL, "exec"), scope)
+    return None if last is None else eval(compile(ast.Expression(last.value), CELL, "eval"), scope)
 
 
 reset()

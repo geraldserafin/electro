@@ -45,7 +45,10 @@ export function sayer(t: TFunction<"solution">, lang: string) {
     switch (i.type) {
       case "MissingData":
       case "Underdetermined":
-        return missing(i.targets, i.needed, i.options);
+        return [
+          missing(i.targets, i.needed, i.options),
+          ...(i.floating?.length ? [t("issue.floating", { given: maths(i.floating) })] : []),
+        ].join(" ");
       case "ConflictingData": {
         const conditions = maths(i.conditions),
           values = maths(i.values);
@@ -107,8 +110,9 @@ export function sayer(t: TFunction<"solution">, lang: string) {
     if (s.assumed.length) out.push(`**${t("steps.assumed")}** ${t("steps.assumedHint")} ${maths(s.assumed)}`);
     const lines = s.steps.map((step, i) => {
       if (step.type === "FormulaStep") return `${i + 1}. ${math(step.chain)} — ${reason(step.reason)}`;
-      const rows = step.equations.map((e) => e.replace(/ = 0$/, " &= 0")).join(String.raw` \\ `);
-      return `${i + 1}. ${t("steps.system")}\n\n   $$\\begin{aligned} ${rows} \\end{aligned}$$\n\n   ${t("steps.hence")} ${maths(step.results)}`;
+      const rows = step.equations.map((e) => e.replace(" = ", " &= ")).join(String.raw` \\ `);
+      const intro = step.nodes?.length ? t("steps.nodal", { nodes: maths(step.nodes) }) : t("steps.system");
+      return `${i + 1}. ${intro}\n\n   $$\\begin{aligned} ${rows} \\end{aligned}$$\n\n   ${t("steps.hence")} ${maths(step.results)}`;
     });
     if (lines.length) out.push(`**${t("steps.solution")}**\n\n${lines.join("\n")}`);
     if (s.answer) out.push(`**${t("steps.answer")}** ${maths(s.answer)}`);

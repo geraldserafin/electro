@@ -23,6 +23,17 @@ class JoinsNodes(ValueError):
     """``>>`` would make two different named points one: say it with the same ``Node`` instead."""
 
 
+class NotAPoint(TypeError):
+    """``V(x)`` of what is no point: ``V`` is a point's potential (``V(A)``); an element's voltage is ``U(E)``,
+    its value ``Parameter(E)``."""
+
+    def __init__(self, what: object) -> None:
+        super().__init__(
+            f"V({what!r}): V is a point's potential; an element's voltage is U(...), its value Parameter(...)"
+        )
+        self.what = what
+
+
 class WrongEnds(ValueError):
     """``>>`` of pieces whose ends do not meet: ``left`` ends into ``right``."""
 

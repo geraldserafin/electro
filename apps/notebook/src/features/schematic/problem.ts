@@ -70,8 +70,9 @@ export function problemOf(sch: SchematicData, lib: SymbolLibrary): ProblemData &
 }
 
 /** A key of what is sought (``sought.ts``) as electro reads it: its quantity — or, for the resistance
- *  between two points, ``["R", a, b]`` — and its unit. */
-type Sought = [string, Quantity | ["R", string, string], string];
+ *  between two points, ``["R", a, b]``, the Thévenin resistance an element sees, ``["Rth", id]`` — and its
+ *  unit. */
+type Sought = [string, Quantity | ["R", string, string] | ["Rth", string], string];
 
 /** The drawing as the run button solves it: its problem, each mark's quantity (id, quantity, unit,
  *  given) and what is sought. */
@@ -92,6 +93,7 @@ export function solveData(sch: SchematicData, lib: SymbolLibrary) {
       return p && q ? [[key, ["R", p, q], "Ω"]] : [];
     }
     if (!e) return [];
+    if (what === "Rth") return [[key, ["Rth", a], "Ω"]];
     if (what === "mark") return markOf.has(a) ? [[key, markOf.get(a)!, unitOf(e)]] : [];
     if (what === "value" && READS[e.kind]) return [[key, [READS[e.kind], a], kindInfo(e.kind)?.unit ?? ""]];
     if (what === "value") return [[key, ["value", a], kindInfo(e.kind)?.unit ?? ""]];

@@ -12,7 +12,7 @@ from __future__ import annotations
 
 import itertools
 from collections.abc import Callable, Mapping, Sequence
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from typing import ClassVar
 
 import sympy as sp
@@ -23,7 +23,7 @@ from .frame import AC, DC, Step, before, frequencies, is_before
 from .laws import Equation, Origin, Way
 from .numeric.code import compile_equations
 from .numeric.engine import homotopy
-from .quantities import Current, Power, Quantity, Scaled, Voltage, data, given
+from .quantities import Quantity, Scaled, data, given
 from .structure import structure
 from .time import TIME, D, Pre
 
@@ -47,7 +47,8 @@ class SolutionStep:
 class Solution:
     """A frame worked out: what it found (``values``), the unknowns no equation was left for (``unknowns``),
     the parameters' values (``data``), the values as given (``given``), the steps, the frame and when it ends
-    (``time``; ∞ when settled). ``at``: each element terminal's potential as its point's."""
+    (``time``; ∞ when settled), what is sought (``find``). ``at``: each element terminal's potential as its
+    point's."""
 
     circuit: Circuit
     values: Known
@@ -58,6 +59,7 @@ class Solution:
     steps: tuple[SolutionStep, ...] = ()
     frame: Step = field(default_factory=DC)
     time: sp.Expr = sp.oo
+    find: tuple = ()
 
     by_name: ClassVar[Callable[[str, Solution], sp.Expr] | None] = None
     """How a quantity written as text (``"U_R_1 / I_R_1"``) is read, when something reads text (the notebook)."""
@@ -69,17 +71,20 @@ class Solution:
         return self.answers(q)[q]
 
     def answers(self, *qs: Quantity | Scaled) -> dict:
-        """The value of each of ``qs``; ``MissingData`` when some are not pinned down."""
-        values = {q: sp.simplify(self.of(q)) for q in qs}
+        """The value of each of ``qs`` (by default what is sought); ``MissingData`` when some are not pinned
+        down."""
+        values = {q: sp.simplify(self.of(q)) for q in qs or self.find}
         lacking = {q: v for q, v in values.items() if v.free_symbols & self.unknowns}
         if lacking:
             raise self._missing(values, lacking)
         return values
 
     def of(self, q: Quantity | Scaled) -> sp.Expr:
-        """``q`` with what was found put in: a value, or an expression in what was not found."""
-        if isinstance(q, Power):
-            return self.frame.product(self.of(Voltage(q.of)), self.of(Current(q.of)))
+        """``q`` with what was found put in: a value, or an expression in what was not found. A quantity that
+        is no expression of the frame's unknowns (a power in AC, a resistance seen somewhere) says its value
+        itself (``value_in``)."""
+        if hasattr(q, "value_in"):
+            return q.value_in(self)
         return self.evaluated(q.expr)
 
     def evaluated(self, e: sp.Expr) -> sp.Expr:
@@ -94,9 +99,10 @@ class Solution:
         return err
 
 
-def final(circuit: Circuit, values: Mapping, frame: Step | None = None) -> Solution:
-    """Where the circuit settles: DC by default; AC when its sources are sines of one frequency."""
-    return frame_after(circuit, values, frame or settled(circuit, values))
+def final(circuit: Circuit, values: Mapping, frame: Step | None = None, find: Sequence = ()) -> Solution:
+    """Where the circuit settles: DC by default; AC when its sources are sines of one frequency. ``find``: what
+    is sought (``Solution.answers``)."""
+    return replace(frame_after(circuit, values, frame or settled(circuit, values)), find=tuple(find))
 
 
 def settled(circuit: Circuit, values: Mapping) -> Step:
@@ -208,7 +214,7 @@ class Problem:
                 raise Contradiction("no solution: the data contradict each other", _clash(eqs, self.values))
         if len(worlds) > 1:
             raise Ambiguous([{x: v for x, v in found.items() if not x.is_Dummy} for found, _ in worlds])
-        return worlds, set(s.free)
+        return worlds, _left(worlds[0][0], set(s.free), self.unknowns)
 
     def block(self, eqs: list[Equation], xs: tuple[sp.Symbol, ...], world: World) -> list[World]:
         """One block, given what was found: every way its unknowns may be."""
@@ -237,6 +243,13 @@ class Problem:
     def fits(self, x: sp.Symbol, v: sp.Expr) -> bool:
         """Not a negative value of what is never negative: a resistance of −34 Ω is no circuit."""
         return x not in self.positive or not (v.is_number and v.is_real and float(v) < 0)
+
+
+def _left(found: Known, free: set[sp.Symbol], unknowns: frozenset[sp.Symbol]) -> set[sp.Symbol]:
+    """The unknowns not pinned down: those no equation was left for, and those what was found is written in
+    (solving a block short of data, any of its unknowns may be the one left free)."""
+    written_in = {x for v in found.values() for x in sp.sympify(v).free_symbols} & unknowns
+    return (free - set(found)) | written_in
 
 
 def _mark(how: str, way: Way) -> SolutionStep:

@@ -4,6 +4,7 @@ import { describe, expect, it } from "vitest";
 import type { SchematicData } from "@/shared/model/types";
 import golden from "./fixtures/netlists.json";
 import { library } from "./library";
+import { rotatedGroup } from "./model";
 import { connected, netlist, type Quantity, quantities } from "./netlist";
 
 type Case = { schematic: SchematicData; netlist: unknown[]; quantities: Record<string, Record<string, number>> };
@@ -141,4 +142,22 @@ describe("a drawing as the circuit it shows", () => {
       ["X", "GND"],
     ]);
   });
+});
+
+describe("a whole drawing turned as one", () => {
+  for (const [name, c] of Object.entries(cases)) {
+    it(`${name}: stays the same circuit`, () => {
+      const all = c.schematic.elements.map((e) => e.id);
+      const wires = c.schematic.wires.map((_, i) => i);
+      const turned = rotatedGroup(c.schematic, library, all, wires, 1);
+      const nodes = (s: SchematicData) => netlist(s, library).elements.map((e) => [e.id, e.nodes.length]);
+      expect(nodes(turned)).toEqual(nodes(c.schematic));
+      expect(netlist(turned, library).elements.map((e) => e.nodes.includes("GND"))).toEqual(
+        netlist(c.schematic, library).elements.map((e) => e.nodes.includes("GND")),
+      );
+      let back = turned;
+      for (let k = 0; k < 3; k++) back = rotatedGroup(back, library, all, wires, 1);
+      expect(back).toMatchObject(c.schematic); // (a rotation left out comes back 0)
+    });
+  }
 });

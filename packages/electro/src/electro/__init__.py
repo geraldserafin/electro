@@ -17,6 +17,7 @@ from .errors import (
     MissingData,
     NoSuchInput,
     NoSuchParameter,
+    NotAPoint,
     NotClosed,
     NotLinear,
     NotSimulated,

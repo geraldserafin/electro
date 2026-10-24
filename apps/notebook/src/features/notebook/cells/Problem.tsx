@@ -10,7 +10,7 @@ const field =
   "h-8 px-2 rounded-md border border-transparent bg-hover text-[14px] tabular-nums focus:bg-paper focus:outline-2 focus:outline-accent-soft";
 const row = "grid grid-cols-[4.5rem_minmax(0,9rem)_2rem] items-center gap-2";
 
-const KINDS = ["U", "I", "P", "value", "mark", "R"] as const;
+const KINDS = ["U", "I", "P", "value", "mark", "R", "Rth"] as const;
 type Kind = (typeof KINDS)[number];
 
 /** The data: an input per element (empty: unknown), then what is sought, more added from the lists. */

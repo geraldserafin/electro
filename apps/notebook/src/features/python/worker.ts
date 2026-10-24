@@ -11,7 +11,7 @@ const PYODIDE = "https://cdn.jsdelivr.net/pyodide/v314.0.7/full/";
 
 type Request =
   | { id: number; type: "init"; bundleUrl: string }
-  | { id: number; type: "run"; code: string; problems: string; units: string }
+  | { id: number; type: "run"; code: string; problems: string; units: string; apart?: boolean }
   | { id: number; type: "fromCode"; source: string; name: string }
   | { id: number; type: "solve"; problem: string }
   | { id: number; type: "live"; problem: string }
@@ -22,7 +22,7 @@ type Request =
   | { id: number; type: "reset" };
 
 interface Kernel {
-  run(code: string, problems: string, units: string): string;
+  run(code: string, problems: string, units: string, apart?: boolean): string;
   from_code(source: string, name: string): string;
   solve(problem: string): string;
   live(problem: string): string;
@@ -82,7 +82,7 @@ self.onmessage = async (event: MessageEvent<Request>) => {
     const k = await kernel;
     const result =
       request.type === "run"
-        ? k.run(request.code, request.problems, request.units)
+        ? k.run(request.code, request.problems, request.units, request.apart ?? false)
         : request.type === "fromCode"
           ? k.from_code(request.source, request.name)
           : request.type === "solve"

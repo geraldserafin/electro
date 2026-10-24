@@ -62,7 +62,7 @@ class Drawing:
         return self.elements[id]
 
     def final(self, frame=None):
-        return self.circuit.final(self.values, frame)
+        return self.circuit.final(self.values, frame, self.find)
 
     def simulate(self, until: float = 1.0, dt: float | None = None, inputs=None):
         return self.circuit.simulate(self.values, until, dt, inputs)

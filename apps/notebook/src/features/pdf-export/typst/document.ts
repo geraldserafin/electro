@@ -1,7 +1,7 @@
 // A note as a Typst document: main.typ (the cells, in order), config.typ (the settings and the
 // formulas) and the drawings as SVG files. electro.typ (the theme) gives the pieces their look.
 
-import { givenBy, named, nameOf, sought, unitOf } from "@/features/schematic";
+import { named, sought } from "@/features/schematic";
 import { sayIn } from "@/features/solution";
 import type { Failure } from "@/shared/model/issues";
 import type { Notebook, Output } from "@/shared/model/types";
@@ -100,18 +100,11 @@ export function toTypst(
     } else {
       const svg = drawingOf(cell.id);
       if (svg) parts.push(image(svg, true));
-      // the problem as set: its data, what is sought (the drawing names things only)
+      // asked for, what its code showed at the last run (a note run before that: what was sought, found)
       const sch = cell.schematic;
-      const given = sch.elements
-        .filter((e) => givenBy(e) && e.value?.trim())
-        .map((e) => `${tex(nameOf(e))} = ${quantity(e.value!.trim(), unitOf(e))}`);
-      const asked = sought(sch).map((k) => `${tex(named(sch, k) ?? k)} = ?`);
-      const [givenWord, soughtWord] = lang.startsWith("pl") ? ["Dane", "Szukane"] : ["Given", "Sought"];
-      if (given.length) parts.push(md(`**${givenWord}:** ${given.map((g) => `$${g}$`).join(", ")}`));
-      if (asked.length) parts.push(md(`**${soughtWord}:** ${asked.map((a) => `$${a}$`).join(", ")}`));
-      // …and, asked for, what a run found it to be
       const found = cell.found;
-      if (pdf.results && found && !cell.stale) {
+      if (pdf.results && cell.outputs && !cell.stale) parts.push(...cell.outputs.map(output));
+      else if (pdf.results && found && !cell.stale) {
         const lines = sought(sch).flatMap((k) =>
           found[k] ? [`$${tex(named(sch, k) ?? k)} = ${quantity(...split(found[k]!))}$`] : [],
         );

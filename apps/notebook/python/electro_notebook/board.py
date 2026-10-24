@@ -16,7 +16,7 @@ from . import plots, readings
 from .drawing import Drawing, from_drawing, quantity
 from .errors import NoSweepRange, error
 from .issues import issue
-from .methods import resistance, swept
+from .methods import Resistance, Thevenin, swept
 from .names import names
 from .results import amplitude, element_result, number, solved
 from .text import fmt
@@ -70,7 +70,7 @@ def _marks(solution, net: Drawing, marks) -> dict:
 
 def _lacking(solution, net: Drawing, sought, units: dict) -> list[dict]:
     """What is sought (by the drawing or by a key) and could not be found, said as a warning."""
-    find = [quantity(q, net.elements, net.points) for _, q, _ in sought if q[0] != "R"]
+    find = [quantity(q, net.elements, net.points) for _, q, _ in sought if q[0] not in ("R", "Rth")]
     try:
         solution.answers(*net.find, *find)
     except Exception as err:  # noqa: BLE001 — what was not found: a warning, the rest stands
@@ -79,15 +79,20 @@ def _lacking(solution, net: Drawing, sought, units: dict) -> list[dict]:
 
 
 def _found(solution, net: Drawing, q: list, unit: str) -> str | None:
-    """A sought key's value: a quantity's, or ``["R", a, b]`` the resistance between two points."""
-    if q[0] == "R":
-        try:
-            z = resistance(net.circuit, net.values, net.points[q[1]], net.points[q[2]], solution.frame)
-        except Exception:  # noqa: BLE001 — not two points of it: none
-            return None
-        return fmt(z, unit) if z is not None and z.is_number else None
-    value = number(solution, quantity(q, net.elements, net.points))
+    """A sought key's value, or None when it was not found."""
+    value = number(solution, _sought(q, net))
     return None if value is None else fmt(value, unit)
+
+
+def _sought(q: list, net: Drawing):
+    """A sought key's quantity: ``["R", a, b]`` the resistance between two points, ``["Rth", id]`` the
+    Thévenin resistance an element sees, else one of ``drawing.quantity``."""
+    match q:
+        case ["R", a, b]:
+            return Resistance(net.points[a], net.points[b])
+        case ["Rth", id]:
+            return Thevenin(net.elements[id])
+    return quantity(q, net.elements, net.points)
 
 
 def _said(kind: str, err: BaseException, units: dict) -> dict:

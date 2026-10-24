@@ -39,6 +39,7 @@ export const pl = {
     resize: "Przeciągnij, żeby zmienić wysokość panelu",
     fold: "Zwiń panel",
     unfold: "Rozwiń panel",
+    close: "Schowaj",
   },
   code: {
     tabs: "Co edytować",
@@ -125,6 +126,7 @@ export const en: typeof pl = {
     resize: "Drag to change the panel's height",
     fold: "Fold the panel",
     unfold: "Unfold the panel",
+    close: "Put away",
   },
   code: {
     tabs: "What to edit",

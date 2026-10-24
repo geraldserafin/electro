@@ -9,6 +9,7 @@ import sympy as sp
 from electro.quantities import Current, Parameter, Potential, Power, Quantity, Scaled, Voltage
 from sympy.printing.latex import LatexPrinter
 
+from .methods import Resistance, Thevenin
 from .names import Names
 from .text import fmt
 
@@ -53,6 +54,10 @@ def quantity(q: Quantity | Scaled, n: Names) -> str:
             return name(f"{'U' if isinstance(q, Voltage) else 'P'}_{n.labels[of]}")
         case Current(of, None):
             return name(f"I_{n.labels[of]}")
+        case Thevenin(of):
+            return rf"R_{{\mathrm{{th}},\,{name(n.labels[of])}}}"
+        case Resistance(a, b):
+            return rf"R_{{{_point(a, n)}{_point(b, n)}}}"
     e = n.of(q)
     return name(e.name) if isinstance(e, sp.Symbol) else expr(e)
 
@@ -65,7 +70,14 @@ def unit(q: Quantity | Scaled, units: Mapping[str, str], n: Names) -> str:
             return units.get(n.labels[of], "")
         case Scaled(_, x):
             return unit(x, units, n)
+        case Resistance() | Thevenin():
+            return "Ω"
     return UNITS.get(type(q), "A" if "I_" in str(n.of(q)) else "V")
+
+
+def _point(p, n: Names) -> str:
+    """A point by its name: ``A`` of ``V_A``."""
+    return name(n.rename(p.potential).name.removeprefix("V_")) if p.potential != 0 else r"\mathrm{GND}"
 
 
 def _unit(text: str) -> str:

@@ -135,11 +135,11 @@ class Circuit:
 
         return law(self)
 
-    def final(self, values: Mapping | None = None, frame=None):
-        """Where the circuit settles: DC, or AC with sines of one frequency."""
+    def final(self, values: Mapping | None = None, frame=None, find=()):
+        """Where the circuit settles: DC, or AC with sines of one frequency; ``find``: what is sought."""
         from .solve import final
 
-        return final(self, values or {}, frame)
+        return final(self, values or {}, frame, find)
 
     def simulate(self, values: Mapping | None = None, until: float = 1.0, dt: float | None = None, inputs=None):
         """Frame after frame from rest, for ``until`` seconds."""

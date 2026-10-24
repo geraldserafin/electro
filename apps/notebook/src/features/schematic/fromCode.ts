@@ -3,13 +3,14 @@
 // the new values (its own layout kept).
 import type { Failure } from "@/shared/model/issues";
 import type { SchematicData, SymbolLibrary } from "@/shared/model/types";
-import { shapeOf } from "./code";
+import { SYMMETRIC, shapeOf } from "./code";
 import { CannotLayOut, layout } from "./layout";
 import { waveText } from "./model";
 import { elementsOf, type NetlistElement } from "./problem";
 
 export interface FromCode {
   netlist: { elements: NetlistElement[] };
+  show?: string | null; // what the code shows after the circuit (code.ts: ``FINAL``)
 }
 
 const READINGS: Record<string, string> = { potentiometer: "position", photoresistor: "lux", thermistor: "temperature" };
@@ -26,20 +27,18 @@ export function textOf(e: NetlistElement): string | null {
   return reading && p[reading] !== undefined ? String(p[reading]) : null;
 }
 
-/** The same circuit: the same elements, of the same kinds, on the same points (names aside). */
+/** The same circuit: the same elements, of the same kinds, on the same points — whatever the points are
+ *  called, and either way round for an element the same both ways (a resistor). Each point is known by what
+ *  is on it: each element's id and which of its ends. */
 function same(a: NetlistElement[], b: NetlistElement[]): boolean {
-  if (a.length !== b.length) return false;
-  const byId = new Map(b.map((e) => [e.id, e]));
-  const rename = new Map<string, string>();
-  return a.every((e) => {
-    const other = byId.get(e.id);
-    if (!other || other.kind !== e.kind || other.nodes.length !== e.nodes.length) return false;
-    return e.nodes.every((n, i) => {
-      const m = other.nodes[i];
-      if (!rename.has(n)) rename.set(n, m);
-      return rename.get(n) === m;
-    });
-  });
+  const kinds = (x: NetlistElement[]) => JSON.stringify(x.map((e) => [e.id, e.kind]).sort());
+  const points = (x: NetlistElement[]) => {
+    const on = new Map<string, string[]>();
+    for (const e of x)
+      e.nodes.forEach((n, i) => on.set(n, [...(on.get(n) ?? []), `${e.id}:${SYMMETRIC.has(e.kind) ? "*" : i}`]));
+    return JSON.stringify([...on.values()].map((ends) => ends.sort().join(" ")).sort());
+  };
+  return kinds(a) === kinds(b) && points(a) === points(b);
 }
 
 export function drawingFromCode(

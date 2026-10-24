@@ -54,6 +54,7 @@ import {
   pins,
   reversed,
   rotatedAbout,
+  rotatedGroup,
   same,
   simplify,
   updateElement,
@@ -307,6 +308,10 @@ export function SchematicEditor({
    */
   /** A quarter turn, clockwise (or back, ``-1``). */
   const rotateSelected = (dir: 1 | -1 = 1) => {
+    if (selection?.type === "group") {
+      commit(rotatedGroup(value, library, selection.ids, selection.wires, dir));
+      return;
+    }
     if (!selectedElement) return;
     // a mark: the other way round (an arrow along a wire, between two points, a loop's: turned, it says nothing)
     if (isMark(selectedElement.kind)) {

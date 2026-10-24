@@ -74,12 +74,16 @@ class Element(Circuit):
     def __init__(self, name: str | None = None) -> None:
         if name is not None and not name.isidentifier():
             raise BadName(name)
+
         self.name = name
         self.V, self.I, self.P = self._potentials(), self._currents(), self._parameters()
         self.inner: dict[str, sp.Symbol] = {}
+
         cases = self._cases()
+
         self.equations = self._equations(cases[0]) if len(cases) == 1 else ()
         self.ways = tuple(self._way(c) for c in cases) if len(cases) > 1 else ()
+
         Circuit.__init__(self, *self._drawing())
 
     @property

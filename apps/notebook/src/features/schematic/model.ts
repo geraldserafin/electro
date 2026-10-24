@@ -619,6 +619,43 @@ export function rotatedAbout(e: ElementData, lib: SymbolLibrary, rotation: numbe
   return [e.at[0] + Math.round(bx - ax), e.at[1] + Math.round(by - ay)];
 }
 
+/** Elements ``ids`` and wires ``wires`` turned a quarter (clockwise, or back: ``-1``) about their middle on
+ *  the grid, as one: what joins them stays joined. */
+export function rotatedGroup(
+  sch: SchematicData,
+  lib: SymbolLibrary,
+  ids: string[],
+  wires: number[],
+  dir: 1 | -1,
+): SchematicData {
+  const turned = sch.elements.filter((e) => ids.includes(e.id));
+  const pts = [
+    ...turned.flatMap((e) => [e.at, ...pins(e, lib), ...(e.between ?? [])]),
+    ...wires.flatMap((i) => sch.wires[i]?.points ?? []),
+  ];
+  if (!pts.length) return sch;
+  const mid = (i: 0 | 1) => Math.round((Math.min(...pts.map((p) => p[i])) + Math.max(...pts.map((p) => p[i]))) / 2);
+  const [cx, cy] = [mid(0), mid(1)];
+  const turn = ([x, y]: Point): Point => {
+    const [dx, dy] = rotate([x - cx, y - cy], 90 * dir);
+    return [cx + dx, cy + dy];
+  };
+  return {
+    ...sch,
+    elements: sch.elements.map((e) =>
+      ids.includes(e.id)
+        ? {
+            ...e,
+            at: turn(e.at),
+            rotation: ((e.rotation ?? 0) + 360 + 90 * dir) % 360,
+            ...(e.between ? { between: e.between.map(turn) } : {}),
+          }
+        : e,
+    ),
+    wires: sch.wires.map((w, i) => (wires.includes(i) ? { ...w, points: w.points.map(turn) } : w)),
+  };
+}
+
 /** The L-shaped path from a to b (horizontal first). */
 export function elbow(a: Point, b: Point): Point[] {
   return a[0] === b[0] || a[1] === b[1] ? [a, b] : [a, [b[0], a[1]], b];

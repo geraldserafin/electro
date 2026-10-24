@@ -18,7 +18,9 @@ type Labelled =
   | "IdealOpAmp"
   | "ControlledSource"
   | "UnknownElement"
-  | "DeviceModel";
+  | "DeviceModel"
+  | "Series"
+  | "Parallel";
 
 export type Reason = { type: "Given" } | { type: Labelled; label: Tex } | { type: "KirchhoffCurrent"; node: Tex };
 
@@ -29,11 +31,17 @@ export interface FormulaStep {
 }
 export interface SystemStep {
   type: "SystemStep";
-  equations: Tex[];
+  equations: Tex[]; // each "left = right"
   results: Tex[];
+  nodes?: Tex[]; // the nodes of those that are Kirchhoff's (the nodal method)
 }
 
-export type Diagnosis = { targets: Tex[]; needed: number | null; options: Tex[][] };
+export type Diagnosis = {
+  targets: Tex[];
+  needed: number | null;
+  options: Tex[][];
+  floating?: Tex[]; // potentials given in a circuit with no ground: they stand on nothing
+};
 
 export interface Steps {
   type: "Steps";

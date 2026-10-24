@@ -5,6 +5,7 @@
 //   "U:R_5", "I:R_5", "P:R_5"  its voltage, current, power   "value:R_5"  its value
 //   "mark:U1"                   what a mark (an arrow, a loop's current, a point's potential) is
 //   "R:A:B"                     the resistance between points A and B (terminals, labels), as seen from there
+//   "Rth:R_5"                   the Thévenin resistance R_5 sees: the rest of the circuit between its ends
 import type { ElementData, SchematicData, SymbolLibrary } from "@/shared/model/types";
 import { hasValue, isComponent, isMark, kindInfo, pins } from "./model";
 
@@ -45,6 +46,7 @@ export function named(sch: SchematicData, key: string): string | null {
   }
   const e = of(a);
   if (!e) return null;
+  if (what === "Rth") return `R_th,${e.id}`;
   if (what === "value" || what === "mark") return nameOf(e);
   return `${what}_${e.id.replace(/_/g, "")}`;
 }

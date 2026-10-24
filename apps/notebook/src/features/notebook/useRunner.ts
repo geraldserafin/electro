@@ -13,6 +13,8 @@ export function useRunner(latest: RefObject<Notebook>, update: (id: string, patc
       latest.current.cells.flatMap((c) => (c.type === "schematic" ? [[c.name, c.schematic] as const] : [])),
     );
 
+  const symbols = () => (latest.current.settings.symbols === "ieee" ? "ieee" : "iec");
+
   const busy = async (id: string, work: () => Promise<void>) => {
     setRunning((r) => new Set(r).add(id));
     try {
@@ -32,11 +34,7 @@ export function useRunner(latest: RefObject<Notebook>, update: (id: string, patc
     if (cell?.type !== "code") return Promise.resolve();
     return busy(id, async () => {
       try {
-        const outputs = await kernel.run(
-          cell.source,
-          schematics(),
-          latest.current.settings.symbols === "ieee" ? "ieee" : "iec",
-        );
+        const outputs = await kernel.run(cell.source, schematics(), symbols());
         update(id, { outputs, execution: ++executions.current });
       } catch (error) {
         update(id, { outputs: [{ type: "error", data: String(error) }] });
@@ -50,8 +48,11 @@ export function useRunner(latest: RefObject<Notebook>, update: (id: string, patc
     if (cell?.type !== "schematic") return Promise.resolve();
     return busy(id, async () => {
       try {
-        const { results, problems, found } = await kernel.solve(schematic ?? cell.schematic);
-        update(id, { results, problems, found, stale: false });
+        const drawn = { ...cell, schematic: schematic ?? cell.schematic };
+        const { results, problems, found } = await kernel.solve(drawn.schematic);
+        // what its code shows: what prints under it
+        const outputs = await kernel.shows(drawn, schematics(), symbols());
+        update(id, { results, problems, found, outputs, stale: false });
       } catch (error) {
         update(id, { results: {}, problems: [{ kind: "error", text: String(error) }], stale: false });
       }

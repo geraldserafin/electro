@@ -112,6 +112,8 @@ export type Cell =
       schematic: SchematicData;
       results?: Record<string, ElementResult>; // from the last run
       found?: Record<string, string | null>; // what was sought, what it came to (null: not found)
+      show?: string | null; // what its code shows after the circuit, its final call "__final__" (none: that call)
+      outputs?: Output[]; // what its code showed at the last run (what prints under it)
       problems?: Problem[]; // why the last run could not find everything
       stale?: boolean; // the drawing changed since the last run
       frequency?: Plot; // the last Bode plot (∿)
