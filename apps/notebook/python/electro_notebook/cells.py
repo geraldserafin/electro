@@ -3,8 +3,8 @@ problem as a variable named after it, and helpers that show things.
 
 The value of a cell's last expression is shown, and whatever it gives ``display``: a circuit or a schematic
 as a drawing (``schematic``), a solution as its answers (``steps``: its worked steps), plots (``plot``, ``bode``,
-``spread``), a task to answer (``task``), an error caught on purpose, math, else its text. All as data: the
-page draws and says them (``Output`` in ``shared/model/types.ts``)."""
+``spread``), a task to answer (``task``), an error caught on purpose, math, else its text; matplotlib's figures
+as pictures (``figures``). All as data: the page draws and says them (``Output`` in ``shared/model/types.ts``)."""
 
 from __future__ import annotations
 
@@ -12,6 +12,7 @@ import ast
 import contextlib
 import io
 import json
+import os
 import warnings
 from collections.abc import Mapping, Sequence
 
@@ -19,7 +20,7 @@ import sympy as sp
 from electro import Circuit, Element, Node, Solution, Trace
 from electro.quantities import Current, Parameter, Power, Quantity, Voltage
 
-from . import plots
+from . import figures, plots
 from . import task as tasks
 from .code_view import PRELUDE, variable
 from .drawing import Drawing, from_drawing, to_drawing
@@ -27,6 +28,8 @@ from .errors import CELL, NoSuchSchematic, error, issue, warning
 from .names import named, names
 from .results import element_result
 from .steps import steps as steps_data
+
+os.environ.setdefault("MPLBACKEND", "module://electro_notebook.matplotlib_backend")
 
 namespace: dict = {}
 units: dict[str, str] = {}
@@ -168,14 +171,18 @@ def run(code: str, problems_json: str = "{}", units_json: str = "{}", apart: boo
     scope = dict(namespace) if apart else namespace
     _bind({name: from_drawing(data) for name, data in json.loads(problems_json).items()}, outputs, scope)
     stdout = io.StringIO()
+    figures.outputs = outputs
     with contextlib.redirect_stdout(stdout), warnings.catch_warnings(record=True) as caught:
         warnings.simplefilter("always")
         warnings.simplefilter("ignore", DeprecationWarning)  # the libraries' own (sympy's), not the reader's
         try:
-            if (value := _execute(code, scope)) is not None:
+            value = _execute(code, scope)
+            if value is not None and not figures.of_matplotlib(value):  # (a figure: shown as the others are)
                 outputs.append(to_output(value))
         except Exception as err:  # noqa: BLE001 — every error is shown to the user
             outputs.append(error(err))
+        figures.take()  # what is drawn and not shown yet
+    figures.outputs = None
     printed = [{"type": "stream", "data": stdout.getvalue()}] if stdout.getvalue() else []
     return json.dumps(printed + outputs + [warning(w.message) for w in caught], ensure_ascii=False)
 

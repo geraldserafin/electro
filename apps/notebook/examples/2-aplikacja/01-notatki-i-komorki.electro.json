@@ -49,10 +49,15 @@
     {
       "id": "7e2c890b",
       "type": "markdown",
-      "source": "## Schemat\n\nSchemat ma **nazwę** (na pasku nad nim) — i pod tą nazwą jest zmienną w kodzie. Ten nazywa się\n`przyklad`:"
+      "source": "## Biblioteki\n\nPoza `electro` są pod ręką pakiety naukowe Pythona: **numpy**, **scipy**, **matplotlib**, **pandas**, **sympy**\ni inne, które Pyodide (Python w przeglądarce) ma gotowe. Wystarczy je zaimportować — pobierają się przy\npierwszym `import`, za pierwszym razem chwilę to trwa. Wykres z matplotlib pojawia się pod komórką:\n\n```python\nimport numpy as np\nimport matplotlib.pyplot as plt\n\nt = np.linspace(0, 0.04, 400)\nplt.plot(t * 1000, 230 * np.sqrt(2) * np.sin(2 * np.pi * 50 * t))\nplt.xlabel(\"t [ms]\")\nplt.ylabel(\"u [V]\")\n```\n\nCzego nie ma w Pyodide, a jest w PyPI jako czysty Python, doinstalujesz linią `%pip install` na początku\nkomórki — na przykład `%pip install pint` (jednostki fizyczne). Instalacja trwa do przeładowania strony; po\nnim komórka z `%pip` przy **Uruchom wszystko** zainstaluje pakiet znowu."
     },
     {
       "id": "9c5b6a60",
+      "type": "markdown",
+      "source": "## Schemat\n\nSchemat ma **nazwę** (na pasku nad nim) — i pod tą nazwą jest zmienną w kodzie. Ten nazywa się\n`przyklad`:"
+    },
+    {
+      "id": "94f595fd",
       "type": "schematic",
       "name": "przyklad",
       "schematic": {
@@ -151,7 +156,7 @@
       }
     },
     {
-      "id": "94f595fd",
+      "id": "26e66b74",
       "type": "code",
       "source": "wynik = przyklad.simulate(until=0.01)\nprint(\"prąd diody:\", round(wynik.at(\"I_LED_1\", 0.01) * 1000, 1), \"mA\")",
       "outputs": [
@@ -162,7 +167,7 @@
       ]
     },
     {
-      "id": "26e66b74",
+      "id": "f450f2ee",
       "type": "markdown",
       "source": "## Spis treści i PDF\n\nIkona w lewym górnym rogu otwiera **spis treści**: nagłówki i schematy notatki. Przeciągając nagłówek,\nprzenosisz całą sekcję pod nim. Menu **⋯** w prawym górnym rogu ma **Eksport do PDF** (⌘P / Ctrl+P):\nnotatka składa się w porządny dokument — z motywem do wyboru, schematami i wzorami. Tam też jest wybór\nsymboli: europejskie (IEC — opornik to prostokąt) albo amerykańskie (IEEE — zygzak)."
     }

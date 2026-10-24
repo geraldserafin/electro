@@ -53,10 +53,11 @@ type PyList = { toJs(): [number, number][]; destroy?(): void };
 };
 
 let kernel: Promise<Kernel> | null = null;
+let pyodide: PyodideAPI | null = null;
 
 async function start(bundleUrl: string): Promise<Kernel> {
   const { loadPyodide } = await import(/* @vite-ignore */ `${PYODIDE}pyodide.mjs`);
-  const py: PyodideAPI = await loadPyodide({ indexURL: PYODIDE });
+  const py: PyodideAPI = (pyodide = await loadPyodide({ indexURL: PYODIDE }));
   await py.loadPackage(["sympy"]);
   // no-cache: after the Python sources change, a reload must not get the old bundle
   const bundle: Record<string, string> = await (await fetch(bundleUrl, { cache: "no-cache" })).json();
@@ -67,6 +68,41 @@ async function start(bundleUrl: string): Promise<Kernel> {
   }
   py.runPython("import sys; sys.path.insert(0, '/home/pyodide/lib')");
   return py.pyimport("electro_notebook.kernel") as unknown as Kernel;
+}
+
+// a cell's packages before it runs: what it imports that Pyodide has built (numpy, scipy, matplotlib, pandas…),
+// and what its `%pip install …` lines name, from PyPI (micropip: pure Python wheels, or Pyodide's own)
+const PIP = /^[ \t]*[%!]pip[ \t]+install[ \t]+(.*)$/gm;
+const quiet = { messageCallback: () => {} };
+
+async function packages(py: PyodideAPI, code: string): Promise<{ code: string; outputs: object[] }> {
+  const wanted = [...code.matchAll(PIP)]
+    .flatMap((m) => m[1].trim().split(/\s+/))
+    .filter((a) => a && !a.startsWith("-"));
+  const rest = code.replace(PIP, ""); // (the line stays, empty: the errors' line numbers stay right)
+  const outputs: object[] = [];
+  if (wanted.length) {
+    try {
+      await py.loadPackage("micropip", quiet);
+      await py.pyimport("micropip").install(wanted);
+      outputs.push({ type: "stream", data: `Successfully installed ${wanted.join(" ")}\n` });
+    } catch (error) {
+      const lines = String(error).trim().split("\n");
+      outputs.push({ type: "error", data: `pip install ${wanted.join(" ")}: ${lines[lines.length - 1]}` });
+    }
+  }
+  try {
+    await py.loadPackagesFromImports(rest, quiet);
+  } catch {
+    // (not to be had: its import says so, as the cell runs)
+  }
+  return { code: rest, outputs };
+}
+
+async function run(k: Kernel, request: Extract<Request, { type: "run" }>): Promise<string> {
+  const { code, outputs } = await packages(pyodide!, request.code);
+  const result = k.run(code, request.problems, request.units, request.apart ?? false);
+  return outputs.length ? JSON.stringify([...outputs, ...JSON.parse(result)]) : result;
 }
 
 self.onmessage = async (event: MessageEvent<Request>) => {
@@ -82,7 +118,7 @@ self.onmessage = async (event: MessageEvent<Request>) => {
     const k = await kernel;
     const result =
       request.type === "run"
-        ? k.run(request.code, request.problems, request.units, request.apart ?? false)
+        ? await run(k, request)
         : request.type === "fromCode"
           ? k.from_code(request.source, request.name)
           : request.type === "solve"

@@ -68,6 +68,27 @@ moc = napiecie * prad
 round(moc, 3)
 """)
     L.md("""
+## Biblioteki
+
+Poza `electro` są pod ręką pakiety naukowe Pythona: **numpy**, **scipy**, **matplotlib**, **pandas**, **sympy**
+i inne, które Pyodide (Python w przeglądarce) ma gotowe. Wystarczy je zaimportować — pobierają się przy
+pierwszym `import`, za pierwszym razem chwilę to trwa. Wykres z matplotlib pojawia się pod komórką:
+
+```python
+import numpy as np
+import matplotlib.pyplot as plt
+
+t = np.linspace(0, 0.04, 400)
+plt.plot(t * 1000, 230 * np.sqrt(2) * np.sin(2 * np.pi * 50 * t))
+plt.xlabel("t [ms]")
+plt.ylabel("u [V]")
+```
+
+Czego nie ma w Pyodide, a jest w PyPI jako czysty Python, doinstalujesz linią `%pip install` na początku
+komórki — na przykład `%pip install pint` (jednostki fizyczne). Instalacja trwa do przeładowania strony; po
+nim komórka z `%pip` przy **Uruchom wszystko** zainstaluje pakiet znowu.
+""")
+    L.md("""
 ## Schemat
 
 Schemat ma **nazwę** (na pasku nad nim) — i pod tą nazwą jest zmienną w kodzie. Ten nazywa się
