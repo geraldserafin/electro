@@ -2,7 +2,7 @@
 
 from pathlib import Path
 
-from lib import PI, A, Drawing, Lesson, course, sketch
+from lib import PI, PICO, A, Drawing, Lesson, course, sketch
 
 C = "4-przyklady"
 FIXTURES = Path(__file__).parents[2] / "src/features/simulation/fixtures"
@@ -14,7 +14,8 @@ def intro():
         "Przykłady",
         "Ponad dwadzieścia projektów do uruchomienia i rozebrania na części: prawdziwy Doom na Raspberry Pi Pico, "
         "Tetris, wąż, Pong i Flappy Bird, gra w życie i fraktal Mandelbrota, Simon, theremin, radar, "
-        "oscyloskop, mostek H do silnika i analogowe klasyki — multiwibrator i wzmacniacz tranzystorowy.",
+        "oscyloskop, syntezator z sekwencerem i syntezator wavetable z prawdziwym dźwiękiem, mostek H do silnika i analogowe klasyki — multiwibrator i wzmacniacz "
+        "tranzystorowy.",
     )
 
 
@@ -258,8 +259,8 @@ for y in range(12, -13, -2):
 # ------------------------------------------------------------------ Arduino games on an OLED
 
 
-def oled_game(name, title, text, sketch_name, keys: dict, extra=None):
-    """An Uno, an OLED on I²C, buttons to ground (pin → key), a passive buzzer on D8."""
+def oled_game(name, title, text, sketch_name, keys: dict, extra=None, keys_y=-6):
+    """An Uno, an OLED on I²C, buttons to ground (pin → key; standing at ``keys_y``), a passive buzzer on D8."""
     L = Lesson(C, name, title)
     L.md(text)
     d = Drawing()
@@ -267,7 +268,7 @@ def oled_game(name, title, text, sketch_name, keys: dict, extra=None):
     o = oled(d, (22, -14))
     d.add("BZ_1", "passive_buzzer", (22, 4), 0)
     for k, key in enumerate(keys.values()):
-        d.add(f"B_{k + 1}", "button", (15 - 3 * k, -6), 90, None, key)
+        d.add(f"B_{k + 1}", "button", (15 - 3 * k, keys_y), 90, None, key)
     nets = {
         "sda": [A("A4"), o["SDA"]],
         "scl": [A("A5"), o["SCL"]],
@@ -878,6 +879,402 @@ plot(p, "V_we", "V_wy")
     L.save()
 
 
+def synth():
+    def voices(d, nets):
+        for k, pin in ((2, "D9"), (3, "D10")):
+            d.add(f"BZ_{k}", "passive_buzzer", (22, 4 + 4 * (k - 1)), 0)
+            nets[f"buzz{k}"] = [A(pin), (f"BZ_{k}", 0)]
+            nets["GND"].append((f"BZ_{k}", 1))
+        d.add("P_1", "potentiometer", (8, 14), 0, "10k", "0.43")
+        d.add("P_2", "potentiometer", (16, 14), 0, "10k", "0.7")
+        nets["a0"] = [A("A0"), ("P_1", 2)]
+        nets["a1"] = [A("A1"), ("P_2", 2)]
+        nets["5V"] += [("P_1", 1), ("P_2", 1)]
+        nets["GND"] += [("P_1", 0), ("P_2", 0)]
+
+    L = oled_game(
+        "22-syntezator",
+        "Syntezator z sekwencerem",
+        """
+# Syntezator z sekwencerem
+
+Mały *groovebox*: trzy głosy — **bas** ($BZ_1$, D8), **melodia** ($BZ_2$, D9) i **perkusja** ($BZ_3$, D10)
+— i sekwencer na 16 kroków, jak w automatach perkusyjnych z lat 80. Na OLED-zie każda ścieżka to rząd
+kratek: im wyższy słupek, tym wyższa nuta; pasek u góry pokazuje grany krok. Uruchom ⚡ — gra od razu:
+a-moll, F-dur, G-dur.
+
+**Jak grać:** kliknij schemat. **←/→** — kratka, **↑/↓** — nuta o półton (na perkusji: stopa → werbel →
+hi-hat), **spacja** — nuta wł./wył., **T** — następna ścieżka, **Enter** — start/stop. $P_1$ to tempo
+(60–200 BPM), $P_2$ — długość nut: od krótkich *staccato* do granych przez cały krok *legato*.
+
+**Skąd dźwięk?** `tone()` gra tylko jeden dźwięk naraz, więc szkic liczy go sam: przerwanie Timer1
+przychodzi 20 000 razy na sekundę i każdemu głosowi dodaje do 16-bitowego licznika fazy jego przyrost.
+Najwyższy bit licznika to fala prostokątna na pinie — tak działa synteza **DDS** (*direct digital
+synthesis*), ta sama co w generatorach funkcyjnych. Częstotliwość to przyrost razy 20 000 / 65 536, więc
+przyrost około 1442 daje 440 Hz. Perkusja to inne sztuczki: stopa to ton opadający ze 150 do 40 Hz, a werbel i
+hi-hat — szum z rejestru przesuwnego ze sprzężeniem (LFSR), który co próbkę wypluwa pseudolosowy bit.
+
+Sekwencer też chodzi w przerwaniu: co `stepLength` próbek przechodzi do następnego kroku. Dlatego rytm
+się nie rozjeżdża, choć odświeżenie ekranu zajmuje pętli ponad 20 ms. Dioda **L** na płytce miga na
+każdą ćwierćnutę.
+""",
+        "synth.ino",
+        {
+            "D2": "ArrowLeft",
+            "D3": "ArrowRight",
+            "D4": "ArrowUp",
+            "D5": "ArrowDown",
+            "D6": "Space",
+            "D7": "t",
+            "D12": "Enter",
+        },
+        voices,
+        keys_y=-10,
+    )
+    L.code("""
+# przyrost licznika fazy dla nuty: f · 2^16 / częstotliwość próbkowania
+PROBKI = 20_000
+nazwy = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "H"]
+for midi in (45, 57, 69, 72, 76, 81):
+    f = 440 * 2 ** ((midi - 69) / 12)
+    przyrost = round(f * 2**16 / PROBKI)
+    print(f"{nazwy[midi % 12]}{midi // 12 - 1:<3} {f:7.1f} Hz  przyrost {przyrost:5}  gra {przyrost * PROBKI / 2**16:7.1f} Hz")
+""")
+    L.code("""
+# jeden krok to szesnastka: przy 120 BPM ćwierćnuta trwa pół sekundy, krok — 125 ms
+for bpm in (60, 120, 200):
+    krok = PROBKI * 60 // bpm // 4
+    print(f"{bpm:3} BPM: krok {krok} próbek = {krok / PROBKI * 1000:.0f} ms")
+""")
+    L.save()
+
+
+# ------------------------------------------------------------------ Pico: a wavetable synthesizer
+
+PIANO = {  # pin → (its label: the note, its key on the computer's keyboard, as a DAW has them)
+    "GP0": ("C", "a"),
+    "GP1": ("Cis", "w"),
+    "GP2": ("D", "s"),
+    "GP3": ("Dis", "e"),
+    "GP4": ("E", "d"),
+    "GP5": ("F", "f"),
+    "GP6": ("Fis", "t"),
+    "GP7": ("G", "g"),
+    "GP8": ("Gis", "y"),
+    "GP9": ("A", "h"),
+    "GP12": ("B", "u"),
+    "GP14": ("H", "j"),
+    "GP15": ("C2", "k"),
+}
+OCTAVE = {"GP16": ("OKT_DOL", "z"), "GP22": ("OKT_GORA", "x")}
+LADDER = [  # the buttons on one analog pin: each its key, the resistor above its tap (the first: none)
+    ("ArrowLeft", None),
+    ("ArrowRight", "680"),
+    ("ArrowUp", "1k"),
+    ("ArrowDown", "1.2k"),
+    ("-", "1.8k"),
+    ("=", "3.3k"),
+    ("Space", "6.8k"),
+]
+LADDER_TOP = "4.7k"
+
+
+def keyboard(d: Drawing, x0: int, y0: int, closed, rows=2, cols=2):
+    """A matrix of switches (as on paper: those in ``closed`` held, by (row, column)): row r a wire at y0 + 5r
+    (W<r> on the left), column c a wire down at x0 + 6c + 4 (K<c> below); the switch at (r, c) from its row down,
+    across to its column."""
+    for r in range(rows):
+        y = y0 + 5 * r
+        d.stub((x0, y), (-1, 0), 3, f"W{r}")
+        for c in range(cols):
+            x, n = x0 + 6 * c, r * cols + c
+            d.add(f"S_{n + 1}", "switch", (x, y), 90, None, "closed" if (r, c) in closed else "open")
+            if c:
+                d.wire((x - 6, y), (x, y))
+            d.wire((x, y + 4), (x + 4, y + 4))
+    for c in range(cols):
+        x = x0 + 6 * c + 4
+        for r in range(rows - 1):
+            d.wire((x, y0 + 5 * r + 4), (x, y0 + 5 * r + 9))
+        d.stub((x, y0 + 5 * (rows - 1) + 4), (0, 1), 2, f"K{c}")
+
+
+def ladder(d: Drawing, x0: int, y0: int, keys=True, pressed=None):
+    """The buttons on one pin: from 3V3 through LADDER_TOP to the tap PRZYCISKI, down a chain of resistors, each
+    button from a tap to ground (``keys``: buttons with their keys; else switches, ``pressed`` closed)."""
+    d.label("3V3", (x0, y0 - 6))
+    d.add("R_G", "resistor", (x0, y0 - 6), 90, LADDER_TOP)
+    d.stub((x0, y0 - 2), (1, 0), 3, "PRZYCISKI")
+    d.wire((x0, y0 - 2), (x0, y0))
+    for k, (key, r) in enumerate(LADDER):
+        y = y0 + 6 * k
+        if r:
+            d.add(f"R_L{k}", "resistor", (x0, y - 4), 90, r)
+        if keys:
+            d.add(f"B_N{k}", "button", (x0, y), 0, None, key)
+        else:
+            d.add(f"S_{k + 1}", "switch", (x0, y), 0, None, "closed" if k == pressed else "open")
+        d.ground((x0 + 4, y))
+        if k < len(LADDER) - 1:
+            d.wire((x0, y), (x0, y + 2))
+
+
+def synth_board():
+    d = Drawing()
+    d.add("PICO_1", "pico", (0, 0), 0, None, sketch("wavetable.pico.ino"))
+    t = tft(d)
+    nets = tft_nets(t)
+    del nets["bl"]
+    d.label("3V3", d.pin("TFT_1", 7))  # (the backlight always on)
+    for pin, (name, _) in {**PIANO, **OCTAVE}.items():
+        at = d.pin("PICO_1", PICO[pin])
+        d.stub(at, (-1, 0) if at[0] == d.pin("PICO_1", 0)[0] else (1, 0), 3, name)
+    for pin, name in {"GP10": "SCK", "GP11": "SDI", "GP13": "CS"}.items():
+        d.stub(d.pin("PICO_1", PICO[pin]), (-1, 0), 3, name)
+    for pin, name in {"GP26": "ODCIECIE", "GP27": "REZONANS", "GP28": "PRZYCISKI"}.items():
+        d.stub(d.pin("PICO_1", PICO[pin]), (1, 0), 3, name)
+    d.label("3V3", d.pin("PICO_1", PICO["3V3"]))
+    d.ground(d.pin("PICO_1", PICO["GND"]))
+    d.connect({**nets, "3V3": [PI("3V3"), t["3V3"]], "GND": [PI("GND"), t["GND"]]})
+    # the piano: a button a key, from its label down to ground
+    for k, (name, key) in enumerate([*PIANO.values(), *OCTAVE.values()]):
+        x = -8 + 4 * k
+        d.add(f"B_{k + 1}", "button", (x, 34), 90, None, key)
+        d.stub((x, 34), (0, -1), 2, name)
+        d.ground((x, 38))
+    # the potentiometers, above
+    for k, (name, at) in enumerate((("ODCIECIE", "0.75"), ("REZONANS", "0.3"))):
+        x = 14 + 6 * k
+        d.add(f"P_{k + 1}", "potentiometer", (x, -8), 0, "10k", at)
+        d.stub((x + 2, -10), (0, -1), 2, name)
+        d.ground((x, -8))
+        d.label("3V3", (x + 4, -8))
+    ladder(d, 44, -4)
+    # the DAC, its filter and the speaker, below the display
+    d.add("DAC_1", "mcp4822", (14, 22), 0)
+    for k, name in enumerate(("3V3", "CS", "SCK", "SDI")):
+        d.stub((14, 22 + k), (-1, 0), 3, name)
+    d.wire((14, 26), (12, 26))
+    d.wire((12, 26), (12, 27))
+    d.wire((14, 27), (12, 27))
+    d.wire((12, 27), (12, 29))
+    d.ground((12, 29))
+    d.add("t_DAC_1", "terminal", (22, 23), 0)
+    d.add("R_1", "resistor", (22, 22), 0, "2.2k")
+    d.wire((26, 22), (28, 22))
+    d.add("C_1", "capacitor", (28, 22), 90, "10n")
+    d.ground((28, 26))
+    d.wire((28, 22), (30, 22))
+    d.add("LS_1", "speaker", (30, 22), 0)
+    d.wire((34, 22), (34, 26))
+    d.ground((34, 26))
+    d.label("AUDIO", (28, 22))
+    return d
+
+
+def filter_board():
+    """The DAC's filter alone: a sine in, R_1 and C_1, the speaker's 10 kΩ."""
+    d = Drawing()
+    d.add("E_1", "sine_source", (0, 4), 270, "1", "1k")
+    d.wire((0, 0), (2, 0))
+    d.add("R_1", "resistor", (2, 0), 0, "2.2k")
+    d.wire((6, 0), (8, 0))
+    d.add("C_1", "capacitor", (8, 0), 90, "10n")
+    d.wire((8, 0), (12, 0))
+    d.add("LS_1", "speaker", (12, 0), 90)
+    for x in (0, 8, 12):
+        d.ground((x, 4))
+    d.label("we", (0, 0))
+    d.label("wy", (8, 0))
+    return d
+
+
+def ghost_board():
+    """A 2×2 matrix as it is scanned: W1 pulled to ground, the columns up to 3.3 V; S_1, S_2, S_3 held."""
+    d = Drawing()
+    keyboard(d, 0, 0, closed={(0, 0), (0, 1), (1, 0)})
+    d.ground((-3, 5))
+    for k, x in enumerate((4, 10)):
+        d.add(f"R_{k + 1}", "resistor", (x, 11), 90, "50k")
+        d.label("3V3", (x, 15))
+    d.add("E_1", "voltage_source", (16, 19), 270, "3.3")
+    d.label("3V3", (16, 15))
+    d.ground((16, 19))
+    return d
+
+
+def ladder_board():
+    """The buttons on one pin, ↑ held."""
+    d = Drawing()
+    ladder(d, 0, 6, keys=False, pressed=2)
+    d.add("E_1", "voltage_source", (-10, 4), 270, "3.3")
+    d.label("3V3", (-10, 0))
+    d.ground((-10, 4))
+    return d
+
+
+def wavetable():
+    L = Lesson(C, "23-syntezator-wavetable", "Syntezator wavetable")
+    L.md(WAVETABLE_TEXT)
+    L.drawing("syntezator", synth_board())
+    L.md(TABLES_TEXT)
+    L.code("""
+fs = 25_000  # próbek na sekundę
+for poziom in range(6):
+    harmoniczne = 128 >> poziom
+    print(f"poziom {poziom}: {harmoniczne:3} harmonicznych — dla nut do {fs / 2 / harmoniczne:5.0f} Hz")
+
+# licznik fazy: 32 bity na okres, co próbkę o tyle w górę
+for nuta, f in (("A2", 110), ("A4", 440), ("A6", 1760)):
+    print(f"{nuta}: przyrost {round(f * 2**32 / fs):>10}")
+""")
+    L.md(DAC_TEXT)
+    L.drawing("filtr", filter_board())
+    L.code("""
+import math
+from electro.values import parse
+
+R, C = (float(parse(filtr.values[filtr[e]])) for e in ("R_1", "C_1"))
+print(f"częstotliwość graniczna filtru: {1 / (2 * math.pi * R * C):.0f} Hz")
+bode(filtr.circuit, filtr.values, "V_wy")
+""")
+    L.md(GHOST_TEXT)
+    L.drawing("duch", ghost_board(), solve=True)
+    L.md(LADDER_TEXT)
+    L.drawing("drabinka", ladder_board(), solve=True)
+    L.code("""
+# napięcie na GP28 dla każdego przycisku: ten sam układ, wciśnięty po kolei każdy
+przyciski = ["←", "→", "↑", "↓", "−", "+", "arpeggio"]
+wezel = drabinka.points["PRZYCISKI"]
+for k, nazwa in enumerate(przyciski):
+    dane = dict(drabinka.values)
+    for j in range(len(przyciski)):
+        dane[drabinka[f"S_{j + 1}"]] = {"closed": int(j == k)}
+    u = float(drabinka.circuit.final(dane)(V(wezel)))
+    print(f"{nazwa:>9}: {u:4.2f} V, analogRead = {round(u / 3.3 * 4095):4}")
+""")
+    L.md(SVF_TEXT)
+    L.code("""
+import math
+
+# ten sam filtr, co w szkicu (render), na liczbach zmiennoprzecinkowych
+fs, odciecie, rezonans = 25_000, 2000, 0.3
+g = math.tan(math.pi * odciecie / fs)
+k = 2 - 1.97 * rezonans
+a1 = 1 / (1 + g * (g + k))
+a2, a3 = g * a1, g * g * a1
+
+
+def wzmocnienie(f, probek=4000):
+    \"\"\"Sinus o częstotliwości f przez filtr: jak duży wychodzi (dolnoprzepustowe wyjście v2).\"\"\"
+    ic1 = ic2 = szczyt = 0.0
+    for i in range(probek):
+        v3 = math.sin(2 * math.pi * f * i / fs) - ic2
+        v1 = a1 * ic1 + a2 * v3
+        v2 = ic2 + a2 * ic1 + a3 * v3
+        ic1, ic2 = 2 * v1 - ic1, 2 * v2 - ic2
+        if i > probek // 2:
+            szczyt = max(szczyt, abs(v2))
+    return szczyt
+
+
+for f in (250, 500, 1000, 2000, 4000, 8000):
+    print(f"{f:5} Hz: {20 * math.log10(wzmocnienie(f)):6.1f} dB")
+""")
+    L.save()
+
+
+WAVETABLE_TEXT = """
+# Syntezator wavetable
+
+Syntezator programowy w duchu Serum czy Vitala, na Raspberry Pi Pico: **dwa oscylatory z tablicami fal** po
+16 kształtów, przez które przechodzi się płynnie; **unison** — do pięciu rozstrojonych kopii każdej nuty (gęsty,
+„chóralny” dźwięk); suboscylator i szum; **filtr rezonansowy** dolno-, pasmowo- albo górnoprzepustowy; dwie
+**obwiednie ADSR** (głośność i filtr), **LFO**, arpeggiator, przester i echo — sześć głosów naraz. Na ekranie TFT
+strony jak w prawdziwym syntezatorze: kształty tablicy w 3D, charakterystyka filtru, obwiednie, LFO, oscyloskop.
+
+Dźwięk jest prawdziwy: rdzeń 1 liczy **25 000 próbek na sekundę** i wysyła je po SPI do przetwornika
+cyfrowo-analogowego **MCP4822**; jego napięcie idzie przez filtr $R_1 C_1$ do **głośnika aktywnego** $LS_1$, a co
+jest na głośniku, to słychać. Rdzeń 0 czyta klawisze i rysuje ekran. W stopce widać, ile z czasu rdzenia 1
+zajmuje liczenie dźwięku (CPU).
+
+**Jak grać:** uruchom ⚡ — gra demo (arpeggio: a-moll, F-dur, C-dur, G-dur). Kliknij schemat i graj na klawiaturze
+komputera jak w programach muzycznych: **A S D F G H J K** to białe klawisze od C do C, **W E T Y U** — czarne;
+**Z / X** — oktawa niżej / wyżej. Nawigacja: **← →** strony (OSC A, OSC B, FILTR, ENV, LFO, GLOBAL), **↑ ↓**
+parametr, **− / =** jego wartość (przytrzymane przyspieszają), **spacja** — arpeggio. Suwaki $P_1$ i $P_2$ to
+odcięcie i rezonans filtru. Na stronie GLOBAL pierwszy parametr to preset: Supersaw, Wokal Pad, Bas PWM, Sweep
+Lead, Organy.
+
+W notatce są cztery układy: **syntezator** (cały), **filtr** (wyjście audio osobno), **duch** (czemu klawisze nie
+są w matrycy) i **drabinka** (siedem przycisków na jednym pinie).
+"""
+
+TABLES_TEXT = """
+## Tablica fal
+
+Kształt to jeden okres fali, 256 próbek, złożony z harmonicznych (synteza addytywna): piła to suma
+$\\sin(hx)/h$, prostokąt — same nieparzyste, trójkąt — nieparzyste z $1/h^2$. Tablica **Analog** przechodzi od
+sinusa przez trójkąt i piłę do prostokąta, **PWM** to coraz węższy prostokąt, **Wokal** — piła przez dwa
+formanty, które wędrują a → e → i → o → u, **Sweep** — okno harmonicznych przesuwane w górę, **Organy** —
+dochodzące po kolei rejestry piszczałek. *Pozycja* wybiera dwa sąsiednie kształty i miesza je.
+
+Oscylator to licznik fazy (DDS, jak w groovebox-ie z Arduino): co próbkę rośnie o
+$\\Delta = f \\cdot 2^{32} / f_s$, a jego 8 najwyższych bitów to numer próbki w okresie.
+
+**Aliasing.** Próbkując 25 000 razy na sekundę, nie da się zagrać niczego powyżej 12,5 kHz (połowa:
+*częstotliwość Nyquista*) — wyższa harmoniczna „odbija się” w dół jako fałszywy, nieharmoniczny ton. Dlatego
+każdy kształt jest zapisany sześć razy, z coraz mniejszą liczbą harmonicznych, a nuta bierze najbogatszą wersję,
+której harmoniczne mieszczą się poniżej 12,5 kHz:
+"""
+
+DAC_TEXT = """
+## Od liczb do napięcia
+
+MCP4822 dostaje 16-bitowe słowo: kanał, wzmocnienie, włączenie i 12 bitów kodu, a na wyjściu daje
+$U = \\frac{\\text{kod}}{4096} \\cdot 2{,}048\\ \\text{V}$. Między próbkami napięcie stoi — to schodki, a schodki
+co 40 µs mają w widmie kopie dźwięku wokół 25 kHz, 50 kHz… Wygładza je filtr dolnoprzepustowy $R_1 C_1$. Ten sam
+filtr osobno — z sinusem na wejściu i głośnikiem (10 kΩ) jako obciążeniem:
+"""
+
+GHOST_TEXT = """
+Na stronie FILTR syntezator rysuje ten filtr przerywaną linią obok swojego. Zmień $C_1$ na głównym schemacie na
+100 nF i posłuchaj — dźwięk ściemnieje, bo granica spadnie dziesięć razy.
+
+## Dlaczego każdy klawisz ma swój pin
+
+Szesnaście klawiszy w matrycy 4×4 zajęłoby tylko osiem pinów: program ściąga do masy jeden wiersz naraz i czyta
+kolumny podciągnięte do 3,3 V. Ale gdy trzy wciśnięte klawisze tworzą literę L, prąd płynie naokoło przez
+trzeci i „zapala” czwarty róg prostokąta (*ghosting*). Tu skanowany jest wiersz W1 (do masy), wciśnięte są
+$S_1$, $S_2$ i $S_3$ — a $S_4$ nie:
+"""
+
+LADDER_TEXT = """
+Kolumna K1 ma 0 V, więc program uznałby $S_4$ za wciśnięty — w klawiaturze muzycznej akord C–E–G dostałby
+dodatkowe D#. Pomogłaby dioda przy każdym klawiszu (prąd nie przejdzie wstecz przez $S_2$), ale szesnaście diod to
+szesnaście elementów nieliniowych, które symulator musi liczyć co próbkę. Ten syntezator ma więc każdy klawisz na
+osobnym pinie: 15 pinów, za to dowolne akordy.
+
+## Siedem przycisków na jednym pinie
+
+Na nawigację pinów już zabrakło. Przyciski ←, →, ↑, ↓, −, + i arpeggio wiszą na jednym wejściu analogowym (GP28)
+przez **drabinkę rezystorów**: $R_G$ podciąga je do 3,3 V, a każdy przycisk zwiera do masy inny węzeł łańcucha —
+każdy daje więc inny dzielnik napięcia. Tu wciśnięty jest ↑:
+"""
+
+SVF_TEXT = """
+Program zna te napięcia (liczy je z tych samych rezystorów) i bierze najbliższe zmierzonemu. Dwa przyciski
+naraz dają napięcie tego, który jest wyżej w drabince — przy nawigacji to nie szkodzi.
+
+## Filtr w programie
+
+Filtr syntezatora to **SVF** (*state variable filter*): cyfrowy odpowiednik dwóch integratorów — dwóch
+kondensatorów — w pętli. Liczony jest metodą trapezów, tą samą, którą symulator liczy kondensatory w obwodach;
+dlatego jest stabilny przy każdym odcięciu (prostszy wzór, „z podręcznika”, przy wysokich odcięciach wpada w
+oscylacje). Współczynniki zależą od $g = \\operatorname{tg}(\\pi f_c / f_s)$ i tłumienia $k$ (im mniejsze, tym
+silniejszy rezonans); co próbkę jest kilka mnożeń. Ten sam rachunek w Pythonie, odcięcie 2 kHz:
+"""
+
+
 if __name__ == "__main__":
     import sys
 
@@ -905,6 +1302,8 @@ if __name__ == "__main__":
         hbridge,
         astable,
         amplifier,
+        synth,
+        wavetable,
     ):
         if not only or example.__name__ in only:
             example()

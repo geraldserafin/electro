@@ -250,6 +250,7 @@ BODIES = {
     "passive_buzzer": (1, 3, -1, 0),
     "pico": (1, 7, -2, 16),
     "ili9341": (1, 21, -3, 12),
+    "mcp4822": (1, 7, -1, 6),
 }
 BEND = 4  # a bend costs as much as this many squares of wire
 

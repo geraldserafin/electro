@@ -1,0 +1,3302 @@
+{
+  "format": "electro-notebook",
+  "version": 2,
+  "id": "ee742212f5fd31ec",
+  "title": "Syntezator wavetable",
+  "created": "2026-10-01T00:00:00Z",
+  "modified": "2026-10-01T00:00:00Z",
+  "settings": {
+    "codeInPdf": true
+  },
+  "cells": [
+    {
+      "id": "acc9361b",
+      "type": "markdown",
+      "source": "# Syntezator wavetable\n\nSyntezator programowy w duchu Serum czy Vitala, na Raspberry Pi Pico: **dwa oscylatory z tablicami fal** po\n16 kształtów, przez które przechodzi się płynnie; **unison** — do pięciu rozstrojonych kopii każdej nuty (gęsty,\n„chóralny” dźwięk); suboscylator i szum; **filtr rezonansowy** dolno-, pasmowo- albo górnoprzepustowy; dwie\n**obwiednie ADSR** (głośność i filtr), **LFO**, arpeggiator, przester i echo — sześć głosów naraz. Na ekranie TFT\nstrony jak w prawdziwym syntezatorze: kształty tablicy w 3D, charakterystyka filtru, obwiednie, LFO, oscyloskop.\n\nDźwięk jest prawdziwy: rdzeń 1 liczy **25 000 próbek na sekundę** i wysyła je po SPI do przetwornika\ncyfrowo-analogowego **MCP4822**; jego napięcie idzie przez filtr $R_1 C_1$ do **głośnika aktywnego** $LS_1$, a co\njest na głośniku, to słychać. Rdzeń 0 czyta klawisze i rysuje ekran. W stopce widać, ile z czasu rdzenia 1\nzajmuje liczenie dźwięku (CPU).\n\n**Jak grać:** uruchom ⚡ — gra demo (arpeggio: a-moll, F-dur, C-dur, G-dur). Kliknij schemat i graj na klawiaturze\nkomputera jak w programach muzycznych: **A S D F G H J K** to białe klawisze od C do C, **W E T Y U** — czarne;\n**Z / X** — oktawa niżej / wyżej. Nawigacja: **← →** strony (OSC A, OSC B, FILTR, ENV, LFO, GLOBAL), **↑ ↓**\nparametr, **− / =** jego wartość (przytrzymane przyspieszają), **spacja** — arpeggio. Suwaki $P_1$ i $P_2$ to\nodcięcie i rezonans filtru. Na stronie GLOBAL pierwszy parametr to preset: Supersaw, Wokal Pad, Bas PWM, Sweep\nLead, Organy.\n\nW notatce są cztery układy: **syntezator** (cały), **filtr** (wyjście audio osobno), **duch** (czemu klawisze nie\nsą w matrycy) i **drabinka** (siedem przycisków na jednym pinie)."
+    },
+    {
+      "id": "af6efc46",
+      "type": "schematic",
+      "name": "syntezator",
+      "schematic": {
+        "elements": [
+          {
+            "id": "PICO_1",
+            "kind": "pico",
+            "at": [
+              12,
+              19
+            ],
+            "rotation": 0,
+            "value": null,
+            "text": "// SYNTEZATOR WAVETABLE na Raspberry Pi Pico: dwa oscylatory z tablicami fal (po 16 kształtów, płynnie\n// przechodzących jeden w drugi), unison do 5 głosów z rozstrojeniem, sub i szum, filtr rezonansowy (SVF),\n// dwie obwiednie ADSR, LFO, arpeggiator, przester i echo; 6 głosów naraz. Dźwięk liczy rdzeń 1,\n// 25 000 próbek na sekundę, i wysyła je po SPI1 do przetwornika MCP4822; rdzeń 0 skanuje klawiaturę\n// i rysuje ekran TFT 320×240.\n// Klawisze (do masy, każdy na swoim pinie): C … C2 na GP0–GP9, GP12, GP14, GP15; oktawa niżej GP16, wyżej GP22.\n// Siedem przycisków nawigacji na jednym pinie analogowym (GP28): drabinka rezystorów, każdy daje inne napięcie\n// (układ „drabinka”). Potencjometry: odcięcie GP26, rezonans GP27. DAC: SCK GP10, SDI GP11, CS GP13.\n// TFT: SCK GP18, MOSI GP19, CS GP17, DC GP20, RESET GP21 (podświetlenie wprost z 3V3).\n#include <SPI.h>\n#include <Adafruit_GFX.h>\n#include <Adafruit_ILI9341.h>\n#include <hardware/irq.h>\n#include <hardware/spi.h>\n#include <hardware/sync.h>\n#include <hardware/timer.h>\n\nconst int PIANO_PINS[13] = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 12, 14, 15};  // C, Cis, … H, C2\nconst int OCT_DOWN = 16, OCT_UP = 22;\nconst int POT_CUTOFF = 26, POT_RES = 27, LADDER_PIN = 28;\n// drabinka: rezystor od 3V3 do pinu i kolejne w dół; przycisk k zwiera do masy k-ty węzeł\nconst float LADDER_TOP = 4700, LADDER[7] = {0, 680, 1000, 1200, 1800, 3300, 6800};\n\nconst int RATE = 25000;  // próbek na sekundę: przerwanie co 40 µs\nconst int BLOCK = 32;    // próbek liczonych naraz; obwiednie i LFO zmieniają się co blok (781 razy na s)\nconst int VOICES = 6, MAX_UNISON = 5;\nconst int FRAMES = 16, MIPS = 6, SIZE = 256;  // kształtów w tablicy, poziomów pasma, próbek w okresie\nconst int ECHO_MAX = 10000;                   // 0,4 s echa\n\n// ============================================================ parametry\n\nenum {\n  A_TABLE, A_POS, A_UNISON, A_DETUNE, A_OCT, A_SEMI, A_LEVEL,\n  B_TABLE, B_POS, B_UNISON, B_DETUNE, B_OCT, B_SEMI, B_LEVEL, SUB, NOISE,\n  F_TYPE, F_CUTOFF, F_RES, F_ENV, F_KEY, F_DRIVE,\n  E1_A, E1_D, E1_S, E1_R, E2_A, E2_D, E2_S, E2_R,\n  L_SHAPE, L_RATE, L_POS, L_CUTOFF, L_PITCH,\n  G_PRESET, G_VOLUME, G_ARP, G_TEMPO, G_OCTAVES, D_TIME, D_FEEDBACK, D_MIX,\n  PARAMS\n};\nenum Unit { PCT, SIGNED, COUNT, TABLE, FTYPE, SHAPE, CENTS, TIME, HZ, LFOHZ, ONOFF, PRESET, BPM, ECHO };\nstruct Param {\n  const char *name;\n  int16_t lo, hi;\n  uint8_t unit;\n};\nconst Param PARAM[PARAMS] = {\n  {\"Tablica\", 0, 4, TABLE}, {\"Pozycja\", 0, 100, PCT}, {\"Unison\", 1, MAX_UNISON, COUNT},\n  {\"Rozstroj\", 0, 100, CENTS}, {\"Oktawa\", -2, 2, SIGNED}, {\"Poltony\", -12, 12, SIGNED}, {\"Glosnosc\", 0, 100, PCT},\n  {\"Tablica\", 0, 4, TABLE}, {\"Pozycja\", 0, 100, PCT}, {\"Unison\", 1, MAX_UNISON, COUNT},\n  {\"Rozstroj\", 0, 100, CENTS}, {\"Oktawa\", -2, 2, SIGNED}, {\"Poltony\", -12, 12, SIGNED}, {\"Glosnosc\", 0, 100, PCT},\n  {\"Sub\", 0, 100, PCT}, {\"Szum\", 0, 100, PCT},\n  {\"Typ\", 0, 2, FTYPE}, {\"Odciecie\", 0, 100, HZ}, {\"Rezonans\", 0, 100, PCT}, {\"Obwiednia\", -100, 100, PCT},\n  {\"Sledzenie\", 0, 100, PCT}, {\"Przester\", 0, 100, PCT},\n  {\"Atak 1\", 0, 100, TIME}, {\"Opad 1\", 0, 100, TIME}, {\"Poziom 1\", 0, 100, PCT}, {\"Wybrzm. 1\", 0, 100, TIME},\n  {\"Atak 2\", 0, 100, TIME}, {\"Opad 2\", 0, 100, TIME}, {\"Poziom 2\", 0, 100, PCT}, {\"Wybrzm. 2\", 0, 100, TIME},\n  {\"Ksztalt\", 0, 4, SHAPE}, {\"Szybkosc\", 0, 100, LFOHZ}, {\"> Pozycja\", -100, 100, PCT},\n  {\"> Odciecie\", -100, 100, PCT}, {\"> Wysokosc\", 0, 100, CENTS},\n  {\"Preset\", 0, 4, PRESET}, {\"Glosnosc\", 0, 100, PCT}, {\"Arpeggio\", 0, 1, ONOFF}, {\"Tempo\", 60, 200, BPM},\n  {\"Oktawy arp\", 1, 3, COUNT}, {\"Echo czas\", 0, 100, ECHO}, {\"Echo powt.\", 0, 90, PCT}, {\"Echo mix\", 0, 100, PCT},\n};\nconst char *const TABLES[] = {\"Analog\", \"PWM\", \"Wokal\", \"Sweep\", \"Organy\"};\nconst char *const FILTERS[] = {\"LP\", \"BP\", \"HP\"};\nconst char *const SHAPES[] = {\"sinus\", \"trojkat\", \"pila\", \"prostok.\", \"losowy\"};\nconst char *const PRESETS[] = {\"Supersaw\", \"Wokal Pad\", \"Bas PWM\", \"Sweep Lead\", \"Organy\"};\nconst int16_t PRESET_VALUES[5][PARAMS] = {\n  // A: tablica poz uni rozstr okt pol glos | B: ... | sub szum | filtr: typ odc rez obw sled przest\n  // | env1 ADSR | env2 ADSR | LFO: ksztalt szyb >poz >odc >wys | preset glos arp tempo okt | echo\n  {0, 66, 5, 30, 0, 0, 80, 0, 100, 1, 0, -1, 0, 25, 0, 0, 0, 58, 25, 35, 30, 15,\n   12, 50, 80, 45, 5, 55, 25, 45, 0, 40, 0, 0, 0, 0, 75, 0, 120, 2, 62, 35, 25},\n  {2, 0, 3, 15, 0, 0, 80, 2, 50, 1, 0, 0, 7, 40, 0, 4, 0, 78, 15, 0, 0, 0,\n   55, 60, 90, 65, 0, 50, 100, 60, 1, 30, 60, 0, 0, 1, 80, 0, 100, 1, 72, 45, 35},\n  {1, 30, 2, 8, -1, 0, 90, 1, 80, 1, 0, -2, 0, 45, 60, 0, 0, 30, 55, 60, 50, 40,\n   0, 45, 60, 25, 0, 42, 0, 25, 3, 55, 40, 0, 0, 2, 75, 0, 116, 1, 0, 0, 0},\n  {3, 20, 3, 12, 0, 0, 85, 0, 66, 1, 0, 12, 0, 20, 0, 0, 0, 70, 40, 20, 40, 25,\n   8, 50, 85, 40, 0, 50, 50, 40, 2, 45, 70, 0, 15, 3, 75, 0, 120, 2, 55, 50, 30},\n  {4, 50, 1, 0, 0, 0, 90, 4, 100, 1, 0, 1, 0, 30, 20, 0, 0, 85, 0, 0, 0, 10,\n   5, 0, 100, 30, 0, 0, 100, 30, 0, 62, 0, 0, 8, 4, 70, 0, 120, 1, 0, 0, 0},\n};\nstruct Page {\n  const char *name;\n  int8_t params[10];\n};\nconst Page PAGES[] = {\n  {\"OSC A\", {A_TABLE, A_POS, A_UNISON, A_DETUNE, A_OCT, A_SEMI, A_LEVEL, -1}},\n  {\"OSC B\", {B_TABLE, B_POS, B_UNISON, B_DETUNE, B_OCT, B_SEMI, B_LEVEL, SUB, NOISE, -1}},\n  {\"FILTR\", {F_TYPE, F_CUTOFF, F_RES, F_ENV, F_KEY, F_DRIVE, -1}},\n  {\"ENV\", {E1_A, E1_D, E1_S, E1_R, E2_A, E2_D, E2_S, E2_R, -1}},\n  {\"LFO\", {L_SHAPE, L_RATE, L_POS, L_CUTOFF, L_PITCH, -1}},\n  {\"GLOBAL\", {G_PRESET, G_VOLUME, G_ARP, G_TEMPO, G_OCTAVES, D_TIME, D_FEEDBACK, D_MIX, -1}},\n};\nconst int PAGE_COUNT = sizeof PAGES / sizeof PAGES[0];\n\n// głosy (rdzeń 1)\nenum Stage : uint8_t { IDLE, ATTACK, DECAY, RELEASE };\nstruct Envelope {\n  Stage stage = IDLE;\n  float level = 0;\n};\nstruct Voice {\n  uint8_t note;\n  bool gate;\n  uint32_t age;\n  Envelope amp, filter;\n  uint32_t phase[2][MAX_UNISON], sub;\n  int32_t ic1, ic2;  // filtr: stan jego dwóch „kondensatorów\"\n  int32_t gain;      // głośność w ostatniej próbce (Q14)\n};\nVoice voice[VOICES];\n\n// jeden oscylator głosu na ten blok: z której tablicy, poziomu i dwóch sąsiednich kształtów czyta, przyrosty\nstruct Osc {\n  const int16_t *a, *b;  // kształt pod pozycją i następny\n  int32_t between;       // jak daleko między nimi (0–255)\n  uint32_t step[MAX_UNISON];\n  int count;\n  int32_t gain;\n};\n\nstruct Event {\n  uint8_t note, on;\n};\n\nvolatile int16_t P[PARAMS];        // wartości: pisze rdzeń 0, czyta rdzeń 1\nvolatile uint32_t paramsVersion;  // rośnie przy każdej zmianie: rdzeń 1 przelicza wtedy współczynniki\n\n// co znaczą: czasy obwiedni (ms), odcięcie (oktawy ponad 20 Hz), LFO (Hz), echo (próbki)\nfloat envMs(int v) { return powf(10000.0f, v / 100.0f); }            // 1 ms – 10 s\nfloat cutoffOct(int v) { return v * 9.13f / 100; }                    // 20 Hz – 11 kHz\nfloat cutoffHz(float oct) { return 20 * exp2f(oct); }\nfloat lfoHz(int v) { return 0.05f * powf(400.0f, v / 100.0f); }      // 0,05 – 20 Hz\nint echoSamples(int v) { return 500 + (ECHO_MAX - 501) * v / 100; }  // 20 – 400 ms\n\n// ============================================================ tablice fal\n\n// próbka sinusa (do składania harmonicznych, suboscylatora i LFO): 1024 w okresie\nint16_t SINE[1024];\n// dwa oscylatory: 16 kształtów × 6 poziomów pasma × 256 próbek. Poziom m ma najwyżej 128 >> m harmonicznych:\n// wyższa nuta bierze uboższy poziom, żeby żadna harmoniczna nie przekroczyła połowy częstotliwości\n// próbkowania (inaczej odbiłaby się w dół jako fałszywy ton — aliasing).\nint16_t wave[2][FRAMES][MIPS][SIZE];\nvolatile bool loading[2];   // tablica się przelicza: oscylator milczy\nuint32_t mipAbove[MIPS];  // przyrost fazy, od którego poziom m ma już za dużo harmonicznych\n\nfloat gauss(float x) { return expf(-x * x); }\n\n// amplituda h-tej harmonicznej kształtu f (0–15) tablicy\nfloat harmonic(int table, int f, int h) {\n  float t = f / 15.0f;\n  switch (table) {\n    case 0: {  // Analog: sinus → trójkąt → piła → prostokąt\n      float tri = h % 2 ? ((h / 2) % 2 ? -1.0f : 1.0f) * 0.81f / (h * h) : 0;\n      float saw = (h % 2 ? 1.0f : -1.0f) * 0.64f / h, sq = h % 2 ? 0.81f / h : 0;\n      float s[4] = {h == 1 ? 1.0f : 0, tri, saw, sq};\n      float x = t * 3;\n      int i = min(2, (int)x);\n      return s[i] + (s[i + 1] - s[i]) * (x - i);\n    }\n    case 1: {  // PWM: prostokąt coraz węższy, od 50 % do 5 %\n      float d = 0.5f - 0.45f * t;\n      return sinf(PI * h * d) / h;\n    }\n    case 2: {  // Wokal: piła przez dwa formanty, które wędrują a → e → i → o → u\n      const float F1[5] = {6.6f, 4.8f, 2.5f, 5.2f, 2.7f}, F2[5] = {9.9f, 16.7f, 20.8f, 7.6f, 7.9f};\n      float x = t * 4;\n      int i = min(3, (int)x);\n      float u = x - i, f1 = F1[i] + (F1[i + 1] - F1[i]) * u, f2 = F2[i] + (F2[i + 1] - F2[i]) * u;\n      return (gauss((h - f1) / (0.15f * f1 + 1.2f)) + 0.6f * gauss((h - f2) / (0.12f * f2 + 1.5f)) + 0.04f) / sqrtf(h);\n    }\n    case 3: {  // Sweep: okno harmonicznych przesuwa się w górę\n      float c = 1 + t * 40, w = 1.5f + t * 6;\n      return gauss((h - c) / w) + (h == 1 ? 0.3f : 0);\n    }\n    default: {  // Organy: kolejne „rejestry\" (8', 4', 2 2/3', 2', …) dochodzą jeden po drugim\n      const int BARS[9] = {1, 2, 3, 4, 6, 8, 10, 12, 16};\n      for (int j = 0; j < 9; j++)\n        if (BARS[j] == h) return constrain((f + 1) * 9 / 16.0f - j, 0.0f, 1.0f) / (1 + j * 0.25f);\n      return 0;\n    }\n  }\n}\n\n// tablica ``table`` do oscylatora ``o``: każdy kształt złożony z harmonicznych (synteza addytywna)\nvoid buildTable(int o, int table) {\n  static int32_t sum[SIZE];\n  static float amp[129];\n  loading[o] = true;\n  delay(3);  // rdzeń 1 kończy blok, który mógł jeszcze czytać tę tablicę\n  for (int f = 0; f < FRAMES; f++) {\n    for (int h = 1; h <= 128; h++) amp[h] = harmonic(table, f, h);\n    float scale = 0;\n    for (int m = 0; m < MIPS; m++) {\n      memset(sum, 0, sizeof sum);\n      for (int h = 1; h < (128 >> m); h++) {\n        int a = (int)(amp[h] * 4096);\n        if (!a) continue;\n        for (int i = 0, k = 0; i < SIZE; i++, k += 4 * h) sum[i] += a * SINE[k & 1023];\n      }\n      if (m == 0) {  // wszystkie poziomy tak samo głośno: skala z najbogatszego\n        int peak = 1;\n        for (int i = 0; i < SIZE; i++) peak = max(peak, (int)abs(sum[i]));\n        scale = 30000.0f / peak;\n      }\n      for (int i = 0; i < SIZE; i++) wave[o][f][m][i] = (int16_t)constrain(sum[i] * scale, -32767.0f, 32767.0f);\n    }\n  }\n  loading[o] = false;\n}\n\n// przyrost fazy (32 bity na okres) dla nuty MIDI w 1/16 półtonu: z tablicy najwyższej oktawy, przesunięty\nuint32_t TOP_OCTAVE[192];  // nuty 120–132\nuint32_t increment(int sixteenths) {\n  int k = constrain(sixteenths, 0, 132 * 16 - 1) - 120 * 16, shift = 0;\n  while (k < 0) k += 192, shift++;\n  return TOP_OCTAVE[k] >> shift;\n}\n\nfloat TAN[300];  // filtr: tg(π·f/RATE) dla odcięcia co 1/32 oktawy ponad 20 Hz\n\n// ============================================================ głosy (rdzeń 1)\n\n\n// współczynniki, przeliczane, gdy zmieni się parametr\nstruct Coefs {\n  float attack[2], decay[2], sustain[2], release[2];\n  float lfoStep, k;\n  int echo;\n  int32_t feedback, mix, volume, drive;  // Q15 (32768 = 1); przester: mnożnik z sumy głosów do Q15, Q8\n} co;\nuint32_t seenVersion = ~0u;\nfloat lfoPhase, lfoValue, lfoHeld;\nint32_t lfoQ;  // lfoValue w Q15, dla rachunków na liczbach całkowitych\nuint32_t rnd = 12345;\nuint32_t random32() { return rnd = rnd * 1664525 + 1013904223; }\n\nvoid prepare() {\n  const float block = (float)BLOCK / RATE;\n  for (int e = 0; e < 2; e++) {\n    int base = e ? E2_A : E1_A;\n    co.attack[e] = block * 1000 / envMs(P[base]);\n    co.decay[e] = expf(-4.6f * block * 1000 / envMs(P[base + 1]));\n    co.sustain[e] = P[base + 2] / 100.0f;\n    co.release[e] = expf(-4.6f * block * 1000 / envMs(P[base + 3]));\n  }\n  co.lfoStep = lfoHz(P[L_RATE]) * block;\n  co.k = 2 - 1.97f * P[F_RES] / 100.0f;\n  co.echo = echoSamples(P[D_TIME]);\n  co.feedback = P[D_FEEDBACK] * 32768 / 100;\n  co.mix = P[D_MIX] * 32768 / 100;\n  co.volume = P[G_VOLUME] * 32768 / 100;\n  co.drive = (1 + P[F_DRIVE] * 0.07f) * 32768 * 256 / 60000;\n}\n\nvoid advance(Envelope &e, int which, bool gate) {\n  switch (e.stage) {\n    case ATTACK:\n      e.level += co.attack[which];\n      if (e.level >= 1) e.level = 1, e.stage = DECAY;\n      break;\n    case DECAY:\n      e.level = co.sustain[which] + (e.level - co.sustain[which]) * co.decay[which];\n      break;\n    case RELEASE:\n      e.level *= co.release[which];\n      if (e.level < 0.0005f) e.level = 0, e.stage = IDLE;\n      break;\n    default:\n      break;\n  }\n  if (!gate && e.stage != IDLE) e.stage = RELEASE;\n}\n\nvoid advanceLfo() {\n  lfoPhase += co.lfoStep;\n  if (lfoPhase >= 1) {\n    lfoPhase -= 1;\n    lfoHeld = (int32_t)random32() / 2147483648.0f;\n  }\n  float p = lfoPhase;\n  switch (P[L_SHAPE]) {\n    case 0: lfoValue = SINE[(int)(p * 1024) & 1023] / 32767.0f; break;\n    case 1: lfoValue = p < 0.5f ? 4 * p - 1 : 3 - 4 * p; break;\n    case 2: lfoValue = 2 * p - 1; break;\n    case 3: lfoValue = p < 0.5f ? 1 : -1; break;\n    default: lfoValue = lfoHeld;\n  }\n  lfoQ = lfoValue * 32767;\n}\n\nconst int32_t UNISON_GAIN[MAX_UNISON + 1] = {0, 256, 181, 148, 128, 114};  // 256/√n: unison nie głośniejszy\n\n\nbool setUp(Osc &o, Voice &v, int which, int vibrato) {  // vibrato: w 1/16 półtonu\n  int base = which ? B_TABLE : A_TABLE;\n  if (loading[which] || !P[base + 6]) return false;\n  int32_t pos = P[base + 1] * 32768 / 100 + (which ? 0 : lfoQ * P[L_POS] / 100);  // Q15\n  pos = constrain(pos, 0, 32768) * (FRAMES - 1) >> 7;                             // kształt w 1/256\n  int frame = min(FRAMES - 2, (int)(pos >> 8));\n  o.between = pos - frame * 256;\n  int semis = (v.note + P[base + 4] * 12 + P[base + 5]) * 16 + vibrato;\n  o.count = P[base + 2];\n  for (int k = 0; k < o.count; k++) {  // unison: rozstrojone symetrycznie wokół nuty, w centach\n    int cents = o.count > 1 ? P[base + 3] * (2 * k - (o.count - 1)) / (o.count - 1) : 0;\n    o.step[k] = increment(semis + cents * 16 / 100);\n  }\n  int m = 0;\n  while (m < MIPS - 1 && o.step[o.count / 2] > mipAbove[m]) m++;\n  o.a = wave[which][frame][m];\n  o.b = wave[which][frame + 1][m];\n  o.gain = P[base + 6] * UNISON_GAIN[o.count] / 100;\n  return true;\n}\n\n// próbka okresu w punkcie ``phase``: między dwiema próbkami i między dwoma kształtami, liniowo\ninline int32_t sampleAt(const Osc &o, uint32_t phase) {\n  int i = phase >> 24, j = (i + 1) & (SIZE - 1), fr = (phase >> 10) & 0x3fff;\n  int32_t a = o.a[i] + (((o.a[j] - o.a[i]) * fr) >> 14);\n  if (!o.between) return a;\n  int32_t b = o.b[i] + (((o.b[j] - o.b[i]) * fr) >> 14);\n  return a + (((b - a) * o.between) >> 8);\n}\n\nvoid render(Voice &v, int32_t *mix) {\n  bool gate = v.gate;\n  advance(v.amp, 0, gate);\n  advance(v.filter, 1, gate);\n  int vibrato = lfoQ * P[L_PITCH] * 16 / 100 >> 15;  // P[L_PITCH] centów, w 1/16 półtonu\n  Osc osc[2];\n  bool on[2] = {setUp(osc[0], v, 0, vibrato), setUp(osc[1], v, 1, vibrato)};\n  uint32_t subStep = increment((v.note + P[A_OCT] * 12 - 12) * 16);\n  int32_t sub = P[SUB] * 256 / 100, noise = P[NOISE] * 128 / 100;\n  // filtr (SVF z całkowaniem trapezami, jak w symulatorze obwodów: stabilny dla każdego odcięcia)\n  float oct = cutoffOct(P[F_CUTOFF]) + v.filter.level * P[F_ENV] * 0.06f + lfoValue * P[L_CUTOFF] * 0.03f +\n              (v.note - 60) / 12.0f * P[F_KEY] / 100.0f;\n  float g = TAN[constrain((int)(oct * 32), 0, 299)];\n  float a1 = 1 / (1 + g * (g + co.k)), a2 = g * a1, a3 = g * a2;\n  int32_t A1 = a1 * 8192, A2 = a2 * 8192, A3 = a3 * 8192, K = co.k * 8192;\n  int type = P[F_TYPE];\n  int32_t target = v.amp.level * 16384, gainStep = (target - v.gain) / BLOCK;\n  for (int i = 0; i < BLOCK; i++) {\n    int32_t x = 0;\n    for (int w = 0; w < 2; w++) {\n      if (!on[w]) continue;\n      int32_t s = 0;\n      for (int k = 0; k < osc[w].count; k++) s += sampleAt(osc[w], v.phase[w][k] += osc[w].step[k]);\n      x += (s * osc[w].gain) >> 10;\n    }\n    if (sub) x += (SINE[(v.sub += subStep) >> 22] * sub) >> 9;\n    if (noise) x += ((int32_t)random32() >> 16) * noise >> 8;\n    int32_t v3 = x - v.ic2;\n    int32_t v1 = ((A1 * v.ic1) >> 13) + ((A2 * v3) >> 13);\n    int32_t v2 = v.ic2 + ((A2 * v.ic1) >> 13) + ((A3 * v3) >> 13);\n    v.ic1 = constrain(2 * v1 - v.ic1, -65535, 65535);\n    v.ic2 = constrain(2 * v2 - v.ic2, -65535, 65535);\n    int32_t y = type == 0 ? v2 : type == 1 ? v1 : x - ((K * v1) >> 13) - v2;\n    y = constrain(y, -65535, 65535);\n    mix[i] += (y * (v.gain >> 1)) >> 13;\n    v.gain += gainStep;\n  }\n  v.gain = target;\n}\n\n// ============================================================ nuty: klawisze, arpeggio, demo (rdzeń 1)\n\nEvent events[32];\nvolatile uint32_t eventsIn, eventsOut;  // pisze rdzeń 0, czyta rdzeń 1\nvolatile bool demo = true;              // gra samo, dopóki ktoś nie naciśnie klawisza\n\nvoid sendNote(int note, bool on) {\n  events[eventsIn % 32] = {(uint8_t)note, (uint8_t)on};\n  __dmb();\n  eventsIn++;\n}\n\nuint32_t clock_ = 0;\nVoice &pick(int note) {  // głos dla nuty: ten, który ją gra, wolny, a jak nie ma — najstarszy\n  for (Voice &v : voice)\n    if (v.note == note && v.amp.stage != IDLE) return v;\n  for (Voice &v : voice)\n    if (v.amp.stage == IDLE) return v;\n  Voice *oldest = &voice[0];\n  for (Voice &v : voice)\n    if (v.age < oldest->age) oldest = &v;\n  return *oldest;\n}\n\nvoid noteOn(int note) {\n  Voice &v = pick(note);\n  if (v.amp.stage == IDLE) {\n    for (auto &row : v.phase)\n      for (uint32_t &p : row) p = random32();\n    v.ic1 = v.ic2 = 0;\n  }\n  v.note = note;\n  v.gate = true;\n  v.age = ++clock_;\n  v.amp.stage = v.filter.stage = ATTACK;\n}\n\nvoid noteOff(int note) {\n  for (Voice &v : voice)\n    if (v.note == note) v.gate = false;\n}\n\n// trzymane klawisze (do arpeggia), rosnąco\nuint8_t held[16];\nint heldCount;\nvoid hold(int note, bool on) {\n  int i = 0;\n  while (i < heldCount && held[i] < note) i++;\n  bool there = i < heldCount && held[i] == note;\n  if (on && !there && heldCount < 16) {\n    memmove(held + i + 1, held + i, heldCount - i);\n    held[i] = note, heldCount++;\n  } else if (!on && there) {\n    memmove(held + i, held + i + 1, heldCount - i - 1);\n    heldCount--;\n  }\n}\n\n// demo: a-moll, F-dur, C-dur, G-dur, po takcie każdy, przez arpeggio\nconst uint8_t DEMO[4][3] = {{57, 60, 64}, {53, 57, 60}, {60, 64, 67}, {55, 59, 62}};\nuint32_t arpClock, arpStep, demoChord = ~0u;\nint arpNote = -1;\n\nvoid sequence() {\n  bool arp = P[G_ARP] || demo;\n  if (demo) {\n    uint32_t chord = arpStep / 16 % 4;\n    if (chord != demoChord) {\n      demoChord = chord;\n      heldCount = 3;\n      memcpy(held, DEMO[chord], 3);\n    }\n  }\n  if (!arp) {\n    if (arpNote >= 0) noteOff(arpNote), arpNote = -1;\n    return;\n  }\n  uint32_t step = RATE * 60 / P[G_TEMPO] / 4;  // szesnastka\n  arpClock += BLOCK;\n  if (arpNote >= 0 && arpClock >= step / 2) noteOff(arpNote), arpNote = -1;\n  if (arpClock < step) return;\n  arpClock -= step;\n  if (!heldCount) return;\n  int span = heldCount * P[G_OCTAVES], k = arpStep++ % span;\n  arpNote = held[k % heldCount] + 12 * (k / heldCount);\n  noteOn(arpNote);\n}\n\nvoid takeEvents() {\n  while (eventsOut != eventsIn) {\n    Event e = events[eventsOut % 32];\n    eventsOut++;\n    if (demo) {  // pierwszy klawisz kończy demo\n      demo = false;\n      heldCount = 0;\n      if (arpNote >= 0) noteOff(arpNote), arpNote = -1;\n    }\n    hold(e.note, e.on);\n    if (!P[G_ARP]) e.on ? noteOn(e.note) : noteOff(e.note);\n  }\n}\n\n// ============================================================ wyjście: przerwanie co 40 µs (rdzeń 1)\n\nuint16_t ring[512];  // próbki gotowe do wysłania (20 ms)\nvolatile uint32_t ringIn, ringOut;\nint alarmNum;\nuint32_t nextSample;\nuint16_t lastWord = 0x3000 | 2048;\n\nvoid onSample() {  // następna próbka do DAC: słowo 0011 + 12 bitów = kanał A, wzmocnienie 1×, włączony\n  timer_hw->intr = 1u << alarmNum;\n  nextSample += 1000000 / RATE;\n  timer_hw->alarm[alarmNum] = nextSample;\n  if (ringOut != ringIn) lastWord = ring[ringOut++ % 512];\n  spi_get_hw(spi1)->dr = lastWord;\n}\n\nint16_t echoLine[ECHO_MAX];\nint echoAt;\nint32_t echoLow;\nvolatile int16_t scope[256];  // ostatnie próbki: oscyloskop na ekranie\nvolatile bool scopeWanted;\nvolatile uint32_t busyUs;  // ile z ostatniej sekundy rdzeń 1 liczył (µs): wskaźnik CPU\n\nvoid renderBlock() {\n  static int32_t mix[BLOCK];\n  if (seenVersion != paramsVersion) seenVersion = paramsVersion, prepare();\n  takeEvents();\n  sequence();\n  advanceLfo();\n  memset(mix, 0, sizeof mix);\n  for (Voice &v : voice)\n    if (v.amp.stage != IDLE) render(v, mix);\n  static int scopeAt = 256;\n  if (scopeWanted && scopeAt >= 256) scopeAt = 0, scopeWanted = false;\n  for (int i = 0; i < BLOCK; i++) {  // (na liczbach całkowitych, Q15: 32768 = 1 — RP2040 nie ma FPU)\n    int32_t x = constrain((mix[i] * co.drive) >> 8, -32768, 32768);  // przester: miękkie obcięcie\n    x = (3 * x - ((((x * x) >> 15) * x) >> 15)) >> 1;               // 1,5x − 0,5x³\n    int32_t echo = echoLine[(echoAt + ECHO_MAX - co.echo) % ECHO_MAX];\n    echoLow += ((echo - echoLow) * 11469) >> 15;  // echo coraz ciemniejsze, jak z taśmy\n    echoLine[echoAt] = constrain(x + ((echoLow * co.feedback) >> 15), -32767, 32767);\n    if (++echoAt == ECHO_MAX) echoAt = 0;\n    int32_t out = constrain(((x + ((echo * co.mix) >> 15)) * (co.volume >> 1)) >> 14, -32767, 32767);\n    int code = 2048 + ((out * 2000) >> 15);\n    ring[ringIn % 512] = 0x3000 | code;\n    ringIn++;\n    if (scopeAt < 256) scope[scopeAt++] = code - 2048;\n  }\n}\n\nvolatile bool ready;\nvoid setup1() {\n  while (!ready) delay(1);\n  spi_init(spi1, 20000000);\n  spi_set_format(spi1, 16, SPI_CPOL_0, SPI_CPHA_0, SPI_MSB_FIRST);\n  gpio_set_function(10, GPIO_FUNC_SPI);\n  gpio_set_function(11, GPIO_FUNC_SPI);\n  gpio_set_function(13, GPIO_FUNC_SPI);\n  alarmNum = hardware_alarm_claim_unused(true);\n  irq_set_exclusive_handler(TIMER_IRQ_0 + alarmNum, onSample);\n  irq_set_enabled(TIMER_IRQ_0 + alarmNum, true);\n  timer_hw->inte |= 1u << alarmNum;\n  nextSample = timer_hw->timerawl + 1000;\n  timer_hw->alarm[alarmNum] = nextSample;\n}\n\nvoid loop1() {\n  static uint32_t second = micros(), busy;\n  while (ringIn - ringOut > 512 - BLOCK) __wfi();  // bufor pełny: śpij do następnej próbki\n  uint32_t start = micros();\n  renderBlock();\n  busy += micros() - start;\n  if (micros() - second >= 1000000) busyUs = busy, busy = 0, second += 1000000;\n}\n\n// ============================================================ ekran i klawisze (rdzeń 0)\n\nAdafruit_ILI9341 tft(17, 20, 21);\nconst int W = 320, PANEL_Y = 32, PANEL_H = 116, PARAMS_Y = 152, FOOT_Y = 222;\nGFXcanvas8 panel(W, PANEL_H);  // obraz strony rysowany w pamięci, wysyłany naraz (bez migania)\nGFXcanvas8 wave_(150, 16);    // oscyloskop w stopce\nenum : uint8_t { BG, GRID, DIM, ACCENT, WARM, WHITE, GREEN, FAINT };\nuint16_t PALETTE[8];\nint page, row;\nbool dirtyPanel = true, dirtyParams = true, dirtyHeader = true;\n\nvoid blit(GFXcanvas8 &c, int x, int y) {  // wiersz po wierszu, z palety na kolory\n  static uint16_t line[W];\n  int w = c.width();\n  const uint8_t *px = c.getBuffer();\n  for (int r = 0; r < c.height(); r++) {\n    for (int i = 0; i < w; i++) line[i] = PALETTE[px[r * w + i]];\n    tft.drawRGBBitmap(x, y + r, line, w, 1);\n  }\n}\n\nvoid valueText(int p, char *s) {\n  int v = P[p];\n  switch (PARAM[p].unit) {\n    case PCT: sprintf(s, \"%d%%\", v); break;\n    case SIGNED: sprintf(s, \"%+d\", v); break;\n    case COUNT: sprintf(s, \"%d\", v); break;\n    case TABLE: strcpy(s, TABLES[v]); break;\n    case FTYPE: strcpy(s, FILTERS[v]); break;\n    case SHAPE: strcpy(s, SHAPES[v]); break;\n    case CENTS: sprintf(s, \"%d ct\", v); break;\n    case TIME: {\n      float ms = envMs(v);\n      if (ms < 1000) sprintf(s, \"%d ms\", (int)ms);\n      else sprintf(s, \"%d.%d s\", (int)(ms / 1000), (int)(ms / 100) % 10);\n      break;\n    }\n    case HZ: {\n      int hz = cutoffHz(cutoffOct(v));\n      if (hz < 1000) sprintf(s, \"%d Hz\", hz);\n      else sprintf(s, \"%d.%d kHz\", hz / 1000, hz / 100 % 10);\n      break;\n    }\n    case LFOHZ: {\n      int c = lfoHz(v) * 100;\n      sprintf(s, \"%d.%02d Hz\", c / 100, c % 100);\n      break;\n    }\n    case ONOFF: strcpy(s, v ? \"wl.\" : \"wyl.\"); break;\n    case PRESET: strcpy(s, PRESETS[v]); break;\n    case BPM: sprintf(s, \"%d BPM\", v); break;\n    case ECHO: sprintf(s, \"%d ms\", echoSamples(v) * 1000 / RATE); break;\n  }\n}\n\nint pageSize(int pg) {\n  int n = 0;\n  while (n < 10 && PAGES[pg].params[n] >= 0) n++;\n  return n;\n}\n\nvoid drawHeader() {\n  tft.fillRect(0, 0, W, 30, PALETTE[GRID]);\n  tft.setTextSize(2);\n  tft.setTextColor(PALETTE[WHITE]);\n  tft.setCursor(6, 2);\n  tft.print(PRESETS[P[G_PRESET]]);\n  tft.setTextSize(1);\n  tft.setTextColor(PALETTE[demo ? WARM : DIM]);\n  tft.setCursor(196, 6);\n  tft.print(demo ? \"DEMO\" : P[G_ARP] ? \"ARP\" : \"    \");\n  for (int i = 0; i < PAGE_COUNT; i++) {\n    int x = i * (W / PAGE_COUNT);\n    bool on = i == page;\n    if (on) tft.fillRect(x, 19, W / PAGE_COUNT - 2, 11, PALETTE[ACCENT]);\n    tft.setTextColor(PALETTE[on ? BG : FAINT]);\n    tft.setCursor(x + 6, 21);\n    tft.print(PAGES[i].name);\n  }\n}\n\nvoid drawParams() {\n  int n = pageSize(page);\n  char s[24];\n  for (int k = 0; k < 10; k++) {\n    int x = (k % 2) * 160, y = PARAMS_Y + (k / 2) * 14;\n    bool on = k == row;\n    tft.fillRect(x, y, 158, 13, PALETTE[on ? ACCENT : BG]);\n    if (k >= n) continue;\n    int p = PAGES[page].params[k];\n    tft.setTextColor(PALETTE[on ? BG : FAINT]);\n    tft.setCursor(x + 4, y + 3);\n    tft.print(PARAM[p].name);\n    valueText(p, s);\n    tft.setTextColor(PALETTE[on ? BG : WHITE]);\n    tft.setCursor(x + 154 - 6 * strlen(s), y + 3);\n    tft.print(s);\n  }\n}\n\n// --- obrazy stron\n\nvoid drawWavetable(int o) {  // 16 kształtów jeden za drugim, ten pod pozycją jasny\n  const int base = o ? B_TABLE : A_TABLE;\n  float pos = P[base + 1] / 100.0f * (FRAMES - 1);\n  // od najdalszego: każdy bliższy zasłania to, co za nim, pod swoją linią\n  auto frameAt = [&](float f, uint8_t color, bool solid) {\n    int f0 = min(FRAMES - 2, (int)f);\n    float u = f - f0;\n    int ox = 6 + (int)(f * 4), oy = PANEL_H - 26 - (int)(f * 4);\n    int lastX = -1, lastY = 0;\n    for (int i = 0; i <= 128; i++) {\n      int s = (i * 2) & 255;\n      float y = wave[o][f0][0][s] * (1 - u) + wave[o][f0 + 1][0][s] * u;\n      int px = ox + i * 5 / 4, py = oy - (int)(y * 22 / 32767);\n      if (solid) panel.drawFastVLine(px, py + 1, oy + 24 - py, BG);\n      if (lastX >= 0) panel.drawLine(lastX, lastY, px, py, color);\n      lastX = px, lastY = py;\n    }\n  };\n  for (int f = FRAMES - 1; f >= 0; f--) frameAt(f, DIM, true);\n  frameAt(pos, ACCENT, false);\n  // po prawej: jeden okres, duży\n  panel.drawRect(236, 8, 80, 100, GRID);\n  panel.drawFastHLine(236, 58, 80, GRID);\n  int f0 = min(FRAMES - 2, (int)pos);\n  float u = pos - f0;\n  for (int i = 1; i < 80; i++) {\n    auto at = [&](int k) {\n      int s = k * SIZE / 80;\n      return 58 - (int)((wave[o][f0][0][s] * (1 - u) + wave[o][f0 + 1][0][s] * u) * 46 / 32767);\n    };\n    panel.drawLine(236 + i - 1, at(i - 1), 236 + i, at(i), ACCENT);\n  }\n  panel.setTextColor(FAINT);\n  panel.setCursor(8, 6);\n  panel.print(TABLES[P[base]]);\n  panel.print(\"  ksztalt \");\n  panel.print(pos, 1);\n}\n\nint freqX(float hz) { return 30 + (int)(log2f(hz / 20) / log2f(12500.0f / 20) * 280); }\nint dbY(float db) { return 10 + (int)((18 - db) * 90 / 60); }\n\nvoid drawFilter() {  // charakterystyka filtru (z jego wzoru analogowego) i filtru RC na płytce\n  for (int db = 12; db >= -42; db -= 6) panel.drawFastHLine(30, dbY(db), 280, db ? GRID : DIM);\n  for (float hz : {50.0f, 100.0f, 500.0f, 1000.0f, 5000.0f, 10000.0f}) panel.drawFastVLine(freqX(hz), 10, 90, GRID);\n  panel.setTextColor(FAINT);\n  panel.setCursor(0, dbY(0) - 3);\n  panel.print(\"0dB\");\n  panel.setCursor(freqX(100) - 6, 104), panel.print(\"100\");\n  panel.setCursor(freqX(1000) - 6, 104), panel.print(\"1k\");\n  panel.setCursor(freqX(10000) - 9, 104), panel.print(\"10k\");\n  float fc = cutoffHz(cutoffOct(P[F_CUTOFF])), k = 2 - 1.97f * P[F_RES] / 100.0f;\n  const float rc = 2200 * 10e-9f, load = 2200.0f / 10000;  // R_1, C_1, głośnik 10 kΩ\n  int lastY = 0, lastRc = 0;\n  for (int x = 30; x < 310; x++) {\n    float hz = 20 * powf(12500.0f / 20, (x - 30) / 280.0f), w = hz / fc;\n    float re = 1 - w * w, im = k * w, den = sqrtf(re * re + im * im);\n    float mag = P[F_TYPE] == 0 ? 1 / den : P[F_TYPE] == 1 ? k * w / den : w * w / den;\n    int y = constrain(dbY(20 * log10f(mag + 1e-6f)), 8, 104);\n    float wr = 2 * PI * hz * rc;\n    int yr = constrain(dbY(-10 * log10f((1 + load) * (1 + load) + wr * wr)), 8, 104);\n    if (x > 30) panel.drawLine(x - 1, lastY, x, y, ACCENT), panel.drawLine(x - 1, lastRc, x, yr, (x / 3) % 2 ? WARM : BG);\n    lastY = y, lastRc = yr;\n  }\n  panel.drawFastVLine(freqX(fc), 10, 90, WHITE);\n  panel.setTextColor(WARM);\n  panel.setCursor(200, 2);\n  panel.print(\"- - filtr RC (R1, C1)\");\n}\n\nvoid drawEnvelope(int e, int x0, uint8_t color) {\n  int base = e ? E2_A : E1_A;\n  float a = sqrtf(envMs(P[base])), d = sqrtf(envMs(P[base + 1])), r = sqrtf(envMs(P[base + 3]));\n  float s = P[base + 2] / 100.0f, hold = 25, total = a + d + hold + r;\n  int w = 140, h = 80, y0 = 98;\n  auto X = [&](float t) { return x0 + (int)(t / total * w); };\n  int ys = y0 - (int)(s * h);\n  panel.drawFastHLine(x0, y0, w, GRID);\n  panel.drawLine(X(0), y0, X(a), y0 - h, color);\n  panel.drawLine(X(a), y0 - h, X(a + d), ys, color);\n  panel.drawLine(X(a + d), ys, X(a + d + hold), ys, color);\n  panel.drawLine(X(a + d + hold), ys, X(total), y0, color);\n  panel.setTextColor(color);\n  panel.setCursor(x0, 4);\n  panel.print(e ? \"ENV 2 > filtr\" : \"ENV 1 > glosnosc\");\n}\n\nfloat lfoAt(float p) {\n  switch (P[L_SHAPE]) {\n    case 0: return sinf(2 * PI * p);\n    case 1: return p < 0.5f ? 4 * p - 1 : 3 - 4 * p;\n    case 2: return 2 * p - 1;\n    case 3: return p < 0.5f ? 1 : -1;\n    default: return ((int)(p * 7) * 37 % 11) / 5.0f - 1;\n  }\n}\n\nvoid drawLfo() {\n  panel.drawFastHLine(10, 58, 300, GRID);\n  int lastY = 0;\n  for (int x = 10; x < 310; x++) {\n    int y = 58 - (int)(lfoAt(fmodf((x - 10) / 150.0f, 1)) * 42);\n    if (x > 10) panel.drawLine(x - 1, lastY, x, y, ACCENT);\n    lastY = y;\n  }\n  int x = 10 + (int)(lfoPhase * 150);  // gdzie jest teraz (rdzeń 1 je przesuwa)\n  panel.fillCircle(x, 58 - (int)(lfoValue * 42), 4, WHITE);\n  panel.setTextColor(FAINT);\n  panel.setCursor(10, 2);\n  panel.print(\"LFO: \");\n  panel.print(SHAPES[P[L_SHAPE]]);\n}\n\nvoid drawGlobal() {  // echo: kolejne powtórzenia, coraz cichsze\n  panel.drawFastHLine(10, 100, 300, GRID);\n  float t = echoSamples(P[D_TIME]) / (float)RATE, level = P[D_MIX] / 100.0f;\n  panel.fillRect(10, 20, 4, 80, WHITE);\n  for (int k = 1; k < 20 && level > 0.01f; k++, level *= P[D_FEEDBACK] / 100.0f) {\n    int x = 10 + (int)(k * t / 1.6f * 300);\n    if (x > 306) break;\n    panel.fillRect(x, 100 - (int)(level * 80), 4, (int)(level * 80), ACCENT);\n  }\n  panel.setTextColor(FAINT);\n  panel.setCursor(10, 2);\n  panel.print(\"echo  \");\n  panel.print(echoSamples(P[D_TIME]) * 1000 / RATE);\n  panel.print(\" ms   arpeggio \");\n  panel.print(P[G_ARP] ? \"wl.\" : \"wyl.\");\n}\n\nvoid drawPanel() {\n  panel.fillScreen(BG);\n  switch (page) {\n    case 0: drawWavetable(0); break;\n    case 1: drawWavetable(1); break;\n    case 2: drawFilter(); break;\n    case 3: drawEnvelope(0, 10, GREEN), drawEnvelope(1, 170, WARM); break;\n    case 4: drawLfo(); break;\n    default: drawGlobal();\n  }\n  blit(panel, 0, PANEL_Y);\n}\n\nint octave = 4;\nconst char *const NOTE_NAMES[12] = {\"C\", \"C#\", \"D\", \"D#\", \"E\", \"F\", \"F#\", \"G\", \"G#\", \"A\", \"A#\", \"H\"};\n\nvoid drawFooter() {\n  tft.fillRect(0, FOOT_Y, 165, 18, PALETTE[BG]);\n  tft.setTextColor(PALETTE[FAINT]);\n  tft.setCursor(4, FOOT_Y + 5);\n  tft.print(\"oktawa \");\n  tft.print(octave);\n  tft.print(\"   CPU \");\n  tft.print(busyUs / 10000);\n  tft.print(\"%\");\n}\n\nvoid drawScope() {\n  scopeWanted = true;\n  wave_.fillScreen(BG);\n  wave_.drawFastHLine(0, 8, 150, GRID);\n  int start = 0;  // od przejścia przez zero w górę: przebieg stoi w miejscu\n  for (int i = 1; i < 100; i++)\n    if (scope[i - 1] < 0 && scope[i] >= 0) {\n      start = i;\n      break;\n    }\n  for (int i = 1; i < 150 && start + i < 256; i++)\n    wave_.drawLine(i - 1, 8 - scope[start + i - 1] / 256, i, 8 - scope[start + i] / 256, GREEN);\n  blit(wave_, 168, FOOT_Y + 2);\n}\n\n// --- zmiany\n\nvoid changed(int p) {\n  paramsVersion++;\n  if (p == A_TABLE || p == B_TABLE) buildTable(p == B_TABLE, P[p]);\n  if (p == G_PRESET) {\n    int was[2] = {P[A_TABLE], P[B_TABLE]};\n    for (int i = 0; i < PARAMS; i++)\n      if (i != G_PRESET) P[i] = PRESET_VALUES[P[G_PRESET]][i];\n    paramsVersion++;\n    if (P[A_TABLE] != was[0]) buildTable(0, P[A_TABLE]);\n    if (P[B_TABLE] != was[1]) buildTable(1, P[B_TABLE]);\n    dirtyHeader = true;\n  }\n  if (p == G_ARP) dirtyHeader = true;\n  dirtyParams = dirtyPanel = true;\n}\n\nvoid set(int p, int v) {\n  v = constrain(v, PARAM[p].lo, PARAM[p].hi);\n  if (P[p] == v) return;\n  P[p] = v;\n  changed(p);\n}\n\n// przyciski nawigacji: który (jeśli któryś) z napięcia na GP28 — najbliższy z oczekiwanych progów\n// (dwa naraz dałyby napięcie niższego: przy nawigacji to nie przeszkadza). Wciśnięty: naciśnięcie, a −/+ trzymane\n// powtarzają (coraz szybciej). 6: arpeggio.\nint ladderCode[7];\nbool navWas[7];\nuint32_t navSince[7], navRepeat[7];\n\nint ladderButton() {\n  int v = analogRead(LADDER_PIN), best = -1, gap = 4095 - v;  // (nic: pełne 3,3 V)\n  for (int k = 0; k < 7; k++)\n    if (abs(v - ladderCode[k]) < gap) gap = abs(v - ladderCode[k]), best = k;\n  return best;\n}\n\nvoid readButtons() {\n  uint32_t now = millis();\n  int pressedNow = ladderButton();\n  for (int b = 0; b < 7; b++) {\n    bool down = b == pressedNow;\n    bool press = down && !navWas[b];\n    if (press) navSince[b] = now, navRepeat[b] = now + 350;\n    navWas[b] = down;\n    bool repeat = down && b >= 4 && now >= navRepeat[b];\n    if (repeat) navRepeat[b] = now + (now - navSince[b] > 1500 ? 25 : 70);\n    if (!press && !repeat) continue;\n    int n = pageSize(page);\n    switch (b) {\n      case 0: page = (page + PAGE_COUNT - 1) % PAGE_COUNT, row = min(row, pageSize(page) - 1); break;\n      case 1: page = (page + 1) % PAGE_COUNT, row = min(row, pageSize(page) - 1); break;\n      case 2: row = (row + n - 1) % n; break;\n      case 3: row = (row + 1) % n; break;\n      case 6: set(G_ARP, !P[G_ARP]); break;\n      default: {\n        int p = PAGES[page].params[row];\n        set(p, P[p] + (b == 4 ? -1 : 1));\n      }\n    }\n    if (b < 2) dirtyHeader = dirtyPanel = true;\n    dirtyParams = true;\n  }\n}\n\n// klawisze: każdy na swoim pinie, więc ile ich naraz — tyle nut (w matrycy trzy wciśnięte „w L” zapalają\n// czwarty — układ „duch”)\nbool keyDown[15];\nint keyNote[13];\n\nvoid key(int n, bool down) {\n  if (n < 13) {  // C … C2: nuty\n    if (down) keyNote[n] = 12 * (octave + 1) + n;\n    sendNote(keyNote[n], down);\n  } else if (down && n == 13) octave = max(1, octave - 1), drawFooter();\n  else if (down && n == 14) octave = min(7, octave + 1), drawFooter();\n  if (down && demo) dirtyHeader = true;\n}\n\nvoid scanKeys() {\n  for (int n = 0; n < 15; n++) {\n    bool down = digitalRead(n < 13 ? PIANO_PINS[n] : n == 13 ? OCT_DOWN : OCT_UP) == LOW;\n    if (down != keyDown[n]) keyDown[n] = down, key(n, down);\n  }\n}\n\n// potencjometry: biorą parametr dopiero, gdy się nimi poruszy (inaczej nadpisałyby preset)\nconst int POTS[2] = {POT_CUTOFF, POT_RES}, POT_PARAM[2] = {F_CUTOFF, F_RES};\nint potWas[2];\nvoid readPots() {\n  for (int k = 0; k < 2; k++) {\n    int v = analogRead(POTS[k]);\n    if (abs(v - potWas[k]) < 40) continue;\n    potWas[k] = v;\n    set(POT_PARAM[k], v * 100 / 4095);\n  }\n}\n\nvoid setup() {\n  for (int i = 0; i < 1024; i++) SINE[i] = (int16_t)(sinf(i * 2 * PI / 1024) * 32767);\n  for (int k = 0; k < 192; k++) TOP_OCTAVE[k] = (uint32_t)(440 * exp2f((120 + k / 16.0f - 69) / 12) * 4294967296.0 / RATE);\n  for (int m = 0; m < MIPS; m++) mipAbove[m] = (uint32_t)(12500.0 / (128 >> m) * 4294967296.0 / RATE);\n  for (int i = 0; i < 300; i++) TAN[i] = tanf(PI * min(cutoffHz(i / 32.0f), 0.45f * RATE) / RATE);\n  for (int i = 0; i < PARAMS; i++) P[i] = PRESET_VALUES[0][i];\n  tft.begin();\n  tft.setRotation(1);\n  tft.fillScreen(ILI9341_BLACK);\n  PALETTE[BG] = tft.color565(10, 12, 18), PALETTE[GRID] = tft.color565(36, 40, 54);\n  PALETTE[DIM] = tft.color565(60, 90, 110), PALETTE[ACCENT] = tft.color565(64, 224, 255);\n  PALETTE[WARM] = tft.color565(255, 160, 60), PALETTE[WHITE] = tft.color565(240, 240, 240);\n  PALETTE[GREEN] = tft.color565(110, 230, 120), PALETTE[FAINT] = tft.color565(150, 156, 170);\n  tft.fillScreen(PALETTE[BG]);\n  tft.setTextColor(PALETTE[WHITE]);\n  tft.setCursor(100, 110);\n  tft.print(\"liczenie tablic fal...\");\n  buildTable(0, P[A_TABLE]);\n  buildTable(1, P[B_TABLE]);\n  for (int n = 0; n < 13; n++) pinMode(PIANO_PINS[n], INPUT_PULLUP);\n  pinMode(OCT_DOWN, INPUT_PULLUP);\n  pinMode(OCT_UP, INPUT_PULLUP);\n  float r = 0;\n  for (int k = 0; k < 7; k++) r += LADDER[k], ladderCode[k] = 4095 * r / (LADDER_TOP + r);\n  analogReadResolution(12);\n  delay(5);  // (napięcia z potencjometrów: po pierwszym odczycie obwodu)\n  for (int k = 0; k < 2; k++) potWas[k] = analogRead(POTS[k]);\n  for (int n = 0; n < 15; n++) keyDown[n] = digitalRead(n < 13 ? PIANO_PINS[n] : n == 13 ? OCT_DOWN : OCT_UP) == LOW;\n  panel.setTextWrap(false);\n  tft.fillScreen(PALETTE[BG]);\n  Serial.begin(115200);\n  ready = true;\n}\n\nvoid loop() {\n  static uint32_t lastScope, lastFooter, lastLfo;\n  scanKeys();\n  readButtons();\n  uint32_t ms = millis();\n  static uint32_t lastPots;\n  if (ms - lastPots >= 30) lastPots = ms, readPots();\n  if (dirtyHeader) dirtyHeader = false, drawHeader();\n  if (dirtyParams) dirtyParams = false, drawParams();\n  uint32_t now = millis();\n  if (page == 4 && now - lastLfo > 80) lastLfo = now, dirtyPanel = true;  // LFO: kropka się rusza\n  if (dirtyPanel) dirtyPanel = false, drawPanel();\n  if (now - lastScope > 90) lastScope = now, drawScope();\n  if (now - lastFooter > 1000) lastFooter = now, drawFooter();\n  delay(1);\n}\n"
+          },
+          {
+            "id": "TFT_1",
+            "kind": "ili9341",
+            "at": [
+              28,
+              25
+            ],
+            "rotation": 0,
+            "value": null,
+            "text": null
+          },
+          {
+            "id": "t_TFT_1",
+            "kind": "terminal",
+            "at": [
+              28,
+              33
+            ],
+            "rotation": 0,
+            "value": null,
+            "text": null
+          },
+          {
+            "id": "lbl1",
+            "kind": "label",
+            "at": [
+              28,
+              32
+            ],
+            "rotation": 0,
+            "value": null,
+            "text": "3V3"
+          },
+          {
+            "id": "lbl2",
+            "kind": "label",
+            "at": [
+              9,
+              19
+            ],
+            "rotation": 0,
+            "value": null,
+            "text": "C"
+          },
+          {
+            "id": "lbl3",
+            "kind": "label",
+            "at": [
+              9,
+              20
+            ],
+            "rotation": 0,
+            "value": null,
+            "text": "Cis"
+          },
+          {
+            "id": "lbl4",
+            "kind": "label",
+            "at": [
+              9,
+              21
+            ],
+            "rotation": 0,
+            "value": null,
+            "text": "D"
+          },
+          {
+            "id": "lbl5",
+            "kind": "label",
+            "at": [
+              9,
+              22
+            ],
+            "rotation": 0,
+            "value": null,
+            "text": "Dis"
+          },
+          {
+            "id": "lbl6",
+            "kind": "label",
+            "at": [
+              9,
+              23
+            ],
+            "rotation": 0,
+            "value": null,
+            "text": "E"
+          },
+          {
+            "id": "lbl7",
+            "kind": "label",
+            "at": [
+              9,
+              24
+            ],
+            "rotation": 0,
+            "value": null,
+            "text": "F"
+          },
+          {
+            "id": "lbl8",
+            "kind": "label",
+            "at": [
+              9,
+              25
+            ],
+            "rotation": 0,
+            "value": null,
+            "text": "Fis"
+          },
+          {
+            "id": "lbl9",
+            "kind": "label",
+            "at": [
+              9,
+              26
+            ],
+            "rotation": 0,
+            "value": null,
+            "text": "G"
+          },
+          {
+            "id": "lbl10",
+            "kind": "label",
+            "at": [
+              9,
+              27
+            ],
+            "rotation": 0,
+            "value": null,
+            "text": "Gis"
+          },
+          {
+            "id": "lbl11",
+            "kind": "label",
+            "at": [
+              9,
+              28
+            ],
+            "rotation": 0,
+            "value": null,
+            "text": "A"
+          },
+          {
+            "id": "lbl12",
+            "kind": "label",
+            "at": [
+              9,
+              31
+            ],
+            "rotation": 0,
+            "value": null,
+            "text": "B"
+          },
+          {
+            "id": "lbl13",
+            "kind": "label",
+            "at": [
+              9,
+              33
+            ],
+            "rotation": 0,
+            "value": null,
+            "text": "H"
+          },
+          {
+            "id": "lbl14",
+            "kind": "label",
+            "at": [
+              9,
+              34
+            ],
+            "rotation": 0,
+            "value": null,
+            "text": "C2"
+          },
+          {
+            "id": "lbl15",
+            "kind": "label",
+            "at": [
+              23,
+              34
+            ],
+            "rotation": 0,
+            "value": null,
+            "text": "OKT_DOL"
+          },
+          {
+            "id": "lbl16",
+            "kind": "label",
+            "at": [
+              23,
+              27
+            ],
+            "rotation": 0,
+            "value": null,
+            "text": "OKT_GORA"
+          },
+          {
+            "id": "lbl17",
+            "kind": "label",
+            "at": [
+              9,
+              29
+            ],
+            "rotation": 0,
+            "value": null,
+            "text": "SCK"
+          },
+          {
+            "id": "lbl18",
+            "kind": "label",
+            "at": [
+              9,
+              30
+            ],
+            "rotation": 0,
+            "value": null,
+            "text": "SDI"
+          },
+          {
+            "id": "lbl19",
+            "kind": "label",
+            "at": [
+              9,
+              32
+            ],
+            "rotation": 0,
+            "value": null,
+            "text": "CS"
+          },
+          {
+            "id": "lbl20",
+            "kind": "label",
+            "at": [
+              23,
+              25
+            ],
+            "rotation": 0,
+            "value": null,
+            "text": "ODCIECIE"
+          },
+          {
+            "id": "lbl21",
+            "kind": "label",
+            "at": [
+              23,
+              24
+            ],
+            "rotation": 0,
+            "value": null,
+            "text": "REZONANS"
+          },
+          {
+            "id": "lbl22",
+            "kind": "label",
+            "at": [
+              23,
+              23
+            ],
+            "rotation": 0,
+            "value": null,
+            "text": "PRZYCISKI"
+          },
+          {
+            "id": "lbl23",
+            "kind": "label",
+            "at": [
+              20,
+              20
+            ],
+            "rotation": 0,
+            "value": null,
+            "text": "3V3"
+          },
+          {
+            "id": "gnd24",
+            "kind": "ground",
+            "at": [
+              20,
+              21
+            ],
+            "rotation": 0,
+            "value": null,
+            "text": null
+          },
+          {
+            "id": "B_1",
+            "kind": "button",
+            "at": [
+              4,
+              53
+            ],
+            "rotation": 90,
+            "value": null,
+            "text": "a"
+          },
+          {
+            "id": "lbl25",
+            "kind": "label",
+            "at": [
+              4,
+              51
+            ],
+            "rotation": 0,
+            "value": null,
+            "text": "C"
+          },
+          {
+            "id": "gnd26",
+            "kind": "ground",
+            "at": [
+              4,
+              57
+            ],
+            "rotation": 0,
+            "value": null,
+            "text": null
+          },
+          {
+            "id": "B_2",
+            "kind": "button",
+            "at": [
+              8,
+              53
+            ],
+            "rotation": 90,
+            "value": null,
+            "text": "w"
+          },
+          {
+            "id": "lbl27",
+            "kind": "label",
+            "at": [
+              8,
+              51
+            ],
+            "rotation": 0,
+            "value": null,
+            "text": "Cis"
+          },
+          {
+            "id": "gnd28",
+            "kind": "ground",
+            "at": [
+              8,
+              57
+            ],
+            "rotation": 0,
+            "value": null,
+            "text": null
+          },
+          {
+            "id": "B_3",
+            "kind": "button",
+            "at": [
+              12,
+              53
+            ],
+            "rotation": 90,
+            "value": null,
+            "text": "s"
+          },
+          {
+            "id": "lbl29",
+            "kind": "label",
+            "at": [
+              12,
+              51
+            ],
+            "rotation": 0,
+            "value": null,
+            "text": "D"
+          },
+          {
+            "id": "gnd30",
+            "kind": "ground",
+            "at": [
+              12,
+              57
+            ],
+            "rotation": 0,
+            "value": null,
+            "text": null
+          },
+          {
+            "id": "B_4",
+            "kind": "button",
+            "at": [
+              16,
+              53
+            ],
+            "rotation": 90,
+            "value": null,
+            "text": "e"
+          },
+          {
+            "id": "lbl31",
+            "kind": "label",
+            "at": [
+              16,
+              51
+            ],
+            "rotation": 0,
+            "value": null,
+            "text": "Dis"
+          },
+          {
+            "id": "gnd32",
+            "kind": "ground",
+            "at": [
+              16,
+              57
+            ],
+            "rotation": 0,
+            "value": null,
+            "text": null
+          },
+          {
+            "id": "B_5",
+            "kind": "button",
+            "at": [
+              20,
+              53
+            ],
+            "rotation": 90,
+            "value": null,
+            "text": "d"
+          },
+          {
+            "id": "lbl33",
+            "kind": "label",
+            "at": [
+              20,
+              51
+            ],
+            "rotation": 0,
+            "value": null,
+            "text": "E"
+          },
+          {
+            "id": "gnd34",
+            "kind": "ground",
+            "at": [
+              20,
+              57
+            ],
+            "rotation": 0,
+            "value": null,
+            "text": null
+          },
+          {
+            "id": "B_6",
+            "kind": "button",
+            "at": [
+              24,
+              53
+            ],
+            "rotation": 90,
+            "value": null,
+            "text": "f"
+          },
+          {
+            "id": "lbl35",
+            "kind": "label",
+            "at": [
+              24,
+              51
+            ],
+            "rotation": 0,
+            "value": null,
+            "text": "F"
+          },
+          {
+            "id": "gnd36",
+            "kind": "ground",
+            "at": [
+              24,
+              57
+            ],
+            "rotation": 0,
+            "value": null,
+            "text": null
+          },
+          {
+            "id": "B_7",
+            "kind": "button",
+            "at": [
+              28,
+              53
+            ],
+            "rotation": 90,
+            "value": null,
+            "text": "t"
+          },
+          {
+            "id": "lbl37",
+            "kind": "label",
+            "at": [
+              28,
+              51
+            ],
+            "rotation": 0,
+            "value": null,
+            "text": "Fis"
+          },
+          {
+            "id": "gnd38",
+            "kind": "ground",
+            "at": [
+              28,
+              57
+            ],
+            "rotation": 0,
+            "value": null,
+            "text": null
+          },
+          {
+            "id": "B_8",
+            "kind": "button",
+            "at": [
+              32,
+              53
+            ],
+            "rotation": 90,
+            "value": null,
+            "text": "g"
+          },
+          {
+            "id": "lbl39",
+            "kind": "label",
+            "at": [
+              32,
+              51
+            ],
+            "rotation": 0,
+            "value": null,
+            "text": "G"
+          },
+          {
+            "id": "gnd40",
+            "kind": "ground",
+            "at": [
+              32,
+              57
+            ],
+            "rotation": 0,
+            "value": null,
+            "text": null
+          },
+          {
+            "id": "B_9",
+            "kind": "button",
+            "at": [
+              36,
+              53
+            ],
+            "rotation": 90,
+            "value": null,
+            "text": "y"
+          },
+          {
+            "id": "lbl41",
+            "kind": "label",
+            "at": [
+              36,
+              51
+            ],
+            "rotation": 0,
+            "value": null,
+            "text": "Gis"
+          },
+          {
+            "id": "gnd42",
+            "kind": "ground",
+            "at": [
+              36,
+              57
+            ],
+            "rotation": 0,
+            "value": null,
+            "text": null
+          },
+          {
+            "id": "B_10",
+            "kind": "button",
+            "at": [
+              40,
+              53
+            ],
+            "rotation": 90,
+            "value": null,
+            "text": "h"
+          },
+          {
+            "id": "lbl43",
+            "kind": "label",
+            "at": [
+              40,
+              51
+            ],
+            "rotation": 0,
+            "value": null,
+            "text": "A"
+          },
+          {
+            "id": "gnd44",
+            "kind": "ground",
+            "at": [
+              40,
+              57
+            ],
+            "rotation": 0,
+            "value": null,
+            "text": null
+          },
+          {
+            "id": "B_11",
+            "kind": "button",
+            "at": [
+              44,
+              53
+            ],
+            "rotation": 90,
+            "value": null,
+            "text": "u"
+          },
+          {
+            "id": "lbl45",
+            "kind": "label",
+            "at": [
+              44,
+              51
+            ],
+            "rotation": 0,
+            "value": null,
+            "text": "B"
+          },
+          {
+            "id": "gnd46",
+            "kind": "ground",
+            "at": [
+              44,
+              57
+            ],
+            "rotation": 0,
+            "value": null,
+            "text": null
+          },
+          {
+            "id": "B_12",
+            "kind": "button",
+            "at": [
+              48,
+              53
+            ],
+            "rotation": 90,
+            "value": null,
+            "text": "j"
+          },
+          {
+            "id": "lbl47",
+            "kind": "label",
+            "at": [
+              48,
+              51
+            ],
+            "rotation": 0,
+            "value": null,
+            "text": "H"
+          },
+          {
+            "id": "gnd48",
+            "kind": "ground",
+            "at": [
+              48,
+              57
+            ],
+            "rotation": 0,
+            "value": null,
+            "text": null
+          },
+          {
+            "id": "B_13",
+            "kind": "button",
+            "at": [
+              52,
+              53
+            ],
+            "rotation": 90,
+            "value": null,
+            "text": "k"
+          },
+          {
+            "id": "lbl49",
+            "kind": "label",
+            "at": [
+              52,
+              51
+            ],
+            "rotation": 0,
+            "value": null,
+            "text": "C2"
+          },
+          {
+            "id": "gnd50",
+            "kind": "ground",
+            "at": [
+              52,
+              57
+            ],
+            "rotation": 0,
+            "value": null,
+            "text": null
+          },
+          {
+            "id": "B_14",
+            "kind": "button",
+            "at": [
+              56,
+              53
+            ],
+            "rotation": 90,
+            "value": null,
+            "text": "z"
+          },
+          {
+            "id": "lbl51",
+            "kind": "label",
+            "at": [
+              56,
+              51
+            ],
+            "rotation": 0,
+            "value": null,
+            "text": "OKT_DOL"
+          },
+          {
+            "id": "gnd52",
+            "kind": "ground",
+            "at": [
+              56,
+              57
+            ],
+            "rotation": 0,
+            "value": null,
+            "text": null
+          },
+          {
+            "id": "B_15",
+            "kind": "button",
+            "at": [
+              60,
+              53
+            ],
+            "rotation": 90,
+            "value": null,
+            "text": "x"
+          },
+          {
+            "id": "lbl53",
+            "kind": "label",
+            "at": [
+              60,
+              51
+            ],
+            "rotation": 0,
+            "value": null,
+            "text": "OKT_GORA"
+          },
+          {
+            "id": "gnd54",
+            "kind": "ground",
+            "at": [
+              60,
+              57
+            ],
+            "rotation": 0,
+            "value": null,
+            "text": null
+          },
+          {
+            "id": "P_1",
+            "kind": "potentiometer",
+            "at": [
+              26,
+              11
+            ],
+            "rotation": 0,
+            "value": "10k",
+            "text": "0.75"
+          },
+          {
+            "id": "lbl55",
+            "kind": "label",
+            "at": [
+              28,
+              7
+            ],
+            "rotation": 0,
+            "value": null,
+            "text": "ODCIECIE"
+          },
+          {
+            "id": "gnd56",
+            "kind": "ground",
+            "at": [
+              26,
+              11
+            ],
+            "rotation": 0,
+            "value": null,
+            "text": null
+          },
+          {
+            "id": "lbl57",
+            "kind": "label",
+            "at": [
+              30,
+              11
+            ],
+            "rotation": 0,
+            "value": null,
+            "text": "3V3"
+          },
+          {
+            "id": "P_2",
+            "kind": "potentiometer",
+            "at": [
+              32,
+              11
+            ],
+            "rotation": 0,
+            "value": "10k",
+            "text": "0.3"
+          },
+          {
+            "id": "lbl58",
+            "kind": "label",
+            "at": [
+              34,
+              7
+            ],
+            "rotation": 0,
+            "value": null,
+            "text": "REZONANS"
+          },
+          {
+            "id": "gnd59",
+            "kind": "ground",
+            "at": [
+              32,
+              11
+            ],
+            "rotation": 0,
+            "value": null,
+            "text": null
+          },
+          {
+            "id": "lbl60",
+            "kind": "label",
+            "at": [
+              36,
+              11
+            ],
+            "rotation": 0,
+            "value": null,
+            "text": "3V3"
+          },
+          {
+            "id": "lbl61",
+            "kind": "label",
+            "at": [
+              56,
+              9
+            ],
+            "rotation": 0,
+            "value": null,
+            "text": "3V3"
+          },
+          {
+            "id": "R_G",
+            "kind": "resistor",
+            "at": [
+              56,
+              9
+            ],
+            "rotation": 90,
+            "value": "4.7k",
+            "text": null
+          },
+          {
+            "id": "lbl62",
+            "kind": "label",
+            "at": [
+              59,
+              13
+            ],
+            "rotation": 0,
+            "value": null,
+            "text": "PRZYCISKI"
+          },
+          {
+            "id": "B_N0",
+            "kind": "button",
+            "at": [
+              56,
+              15
+            ],
+            "rotation": 0,
+            "value": null,
+            "text": "ArrowLeft"
+          },
+          {
+            "id": "gnd63",
+            "kind": "ground",
+            "at": [
+              60,
+              15
+            ],
+            "rotation": 0,
+            "value": null,
+            "text": null
+          },
+          {
+            "id": "R_L1",
+            "kind": "resistor",
+            "at": [
+              56,
+              17
+            ],
+            "rotation": 90,
+            "value": "680",
+            "text": null
+          },
+          {
+            "id": "B_N1",
+            "kind": "button",
+            "at": [
+              56,
+              21
+            ],
+            "rotation": 0,
+            "value": null,
+            "text": "ArrowRight"
+          },
+          {
+            "id": "gnd64",
+            "kind": "ground",
+            "at": [
+              60,
+              21
+            ],
+            "rotation": 0,
+            "value": null,
+            "text": null
+          },
+          {
+            "id": "R_L2",
+            "kind": "resistor",
+            "at": [
+              56,
+              23
+            ],
+            "rotation": 90,
+            "value": "1k",
+            "text": null
+          },
+          {
+            "id": "B_N2",
+            "kind": "button",
+            "at": [
+              56,
+              27
+            ],
+            "rotation": 0,
+            "value": null,
+            "text": "ArrowUp"
+          },
+          {
+            "id": "gnd65",
+            "kind": "ground",
+            "at": [
+              60,
+              27
+            ],
+            "rotation": 0,
+            "value": null,
+            "text": null
+          },
+          {
+            "id": "R_L3",
+            "kind": "resistor",
+            "at": [
+              56,
+              29
+            ],
+            "rotation": 90,
+            "value": "1.2k",
+            "text": null
+          },
+          {
+            "id": "B_N3",
+            "kind": "button",
+            "at": [
+              56,
+              33
+            ],
+            "rotation": 0,
+            "value": null,
+            "text": "ArrowDown"
+          },
+          {
+            "id": "gnd66",
+            "kind": "ground",
+            "at": [
+              60,
+              33
+            ],
+            "rotation": 0,
+            "value": null,
+            "text": null
+          },
+          {
+            "id": "R_L4",
+            "kind": "resistor",
+            "at": [
+              56,
+              35
+            ],
+            "rotation": 90,
+            "value": "1.8k",
+            "text": null
+          },
+          {
+            "id": "B_N4",
+            "kind": "button",
+            "at": [
+              56,
+              39
+            ],
+            "rotation": 0,
+            "value": null,
+            "text": "-"
+          },
+          {
+            "id": "gnd67",
+            "kind": "ground",
+            "at": [
+              60,
+              39
+            ],
+            "rotation": 0,
+            "value": null,
+            "text": null
+          },
+          {
+            "id": "R_L5",
+            "kind": "resistor",
+            "at": [
+              56,
+              41
+            ],
+            "rotation": 90,
+            "value": "3.3k",
+            "text": null
+          },
+          {
+            "id": "B_N5",
+            "kind": "button",
+            "at": [
+              56,
+              45
+            ],
+            "rotation": 0,
+            "value": null,
+            "text": "="
+          },
+          {
+            "id": "gnd68",
+            "kind": "ground",
+            "at": [
+              60,
+              45
+            ],
+            "rotation": 0,
+            "value": null,
+            "text": null
+          },
+          {
+            "id": "R_L6",
+            "kind": "resistor",
+            "at": [
+              56,
+              47
+            ],
+            "rotation": 90,
+            "value": "6.8k",
+            "text": null
+          },
+          {
+            "id": "B_N6",
+            "kind": "button",
+            "at": [
+              56,
+              51
+            ],
+            "rotation": 0,
+            "value": null,
+            "text": "Space"
+          },
+          {
+            "id": "gnd69",
+            "kind": "ground",
+            "at": [
+              60,
+              51
+            ],
+            "rotation": 0,
+            "value": null,
+            "text": null
+          },
+          {
+            "id": "DAC_1",
+            "kind": "mcp4822",
+            "at": [
+              26,
+              41
+            ],
+            "rotation": 0,
+            "value": null,
+            "text": null
+          },
+          {
+            "id": "lbl70",
+            "kind": "label",
+            "at": [
+              23,
+              41
+            ],
+            "rotation": 0,
+            "value": null,
+            "text": "3V3"
+          },
+          {
+            "id": "lbl71",
+            "kind": "label",
+            "at": [
+              23,
+              42
+            ],
+            "rotation": 0,
+            "value": null,
+            "text": "CS"
+          },
+          {
+            "id": "lbl72",
+            "kind": "label",
+            "at": [
+              23,
+              43
+            ],
+            "rotation": 0,
+            "value": null,
+            "text": "SCK"
+          },
+          {
+            "id": "lbl73",
+            "kind": "label",
+            "at": [
+              23,
+              44
+            ],
+            "rotation": 0,
+            "value": null,
+            "text": "SDI"
+          },
+          {
+            "id": "gnd74",
+            "kind": "ground",
+            "at": [
+              24,
+              48
+            ],
+            "rotation": 0,
+            "value": null,
+            "text": null
+          },
+          {
+            "id": "t_DAC_1",
+            "kind": "terminal",
+            "at": [
+              34,
+              42
+            ],
+            "rotation": 0,
+            "value": null,
+            "text": null
+          },
+          {
+            "id": "R_1",
+            "kind": "resistor",
+            "at": [
+              34,
+              41
+            ],
+            "rotation": 0,
+            "value": "2.2k",
+            "text": null
+          },
+          {
+            "id": "C_1",
+            "kind": "capacitor",
+            "at": [
+              40,
+              41
+            ],
+            "rotation": 90,
+            "value": "10n",
+            "text": null
+          },
+          {
+            "id": "gnd75",
+            "kind": "ground",
+            "at": [
+              40,
+              45
+            ],
+            "rotation": 0,
+            "value": null,
+            "text": null
+          },
+          {
+            "id": "LS_1",
+            "kind": "speaker",
+            "at": [
+              42,
+              41
+            ],
+            "rotation": 0,
+            "value": null,
+            "text": null
+          },
+          {
+            "id": "gnd76",
+            "kind": "ground",
+            "at": [
+              46,
+              45
+            ],
+            "rotation": 0,
+            "value": null,
+            "text": null
+          },
+          {
+            "id": "lbl77",
+            "kind": "label",
+            "at": [
+              40,
+              41
+            ],
+            "rotation": 0,
+            "value": null,
+            "text": "AUDIO"
+          }
+        ],
+        "wires": [
+          {
+            "points": [
+              [
+                12,
+                19
+              ],
+              [
+                9,
+                19
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                12,
+                20
+              ],
+              [
+                9,
+                20
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                12,
+                21
+              ],
+              [
+                9,
+                21
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                12,
+                22
+              ],
+              [
+                9,
+                22
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                12,
+                23
+              ],
+              [
+                9,
+                23
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                12,
+                24
+              ],
+              [
+                9,
+                24
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                12,
+                25
+              ],
+              [
+                9,
+                25
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                12,
+                26
+              ],
+              [
+                9,
+                26
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                12,
+                27
+              ],
+              [
+                9,
+                27
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                12,
+                28
+              ],
+              [
+                9,
+                28
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                12,
+                31
+              ],
+              [
+                9,
+                31
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                12,
+                33
+              ],
+              [
+                9,
+                33
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                12,
+                34
+              ],
+              [
+                9,
+                34
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                20,
+                34
+              ],
+              [
+                23,
+                34
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                20,
+                27
+              ],
+              [
+                23,
+                27
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                12,
+                29
+              ],
+              [
+                9,
+                29
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                12,
+                30
+              ],
+              [
+                9,
+                30
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                12,
+                32
+              ],
+              [
+                9,
+                32
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                20,
+                25
+              ],
+              [
+                23,
+                25
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                20,
+                24
+              ],
+              [
+                23,
+                24
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                20,
+                23
+              ],
+              [
+                23,
+                23
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                28,
+                28
+              ],
+              [
+                20,
+                28
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                28,
+                29
+              ],
+              [
+                20,
+                29
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                28,
+                30
+              ],
+              [
+                20,
+                30
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                28,
+                31
+              ],
+              [
+                20,
+                31
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                28,
+                25
+              ],
+              [
+                28,
+                20
+              ],
+              [
+                20,
+                20
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                28,
+                26
+              ],
+              [
+                22,
+                26
+              ],
+              [
+                22,
+                21
+              ],
+              [
+                20,
+                21
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                28,
+                27
+              ],
+              [
+                24,
+                27
+              ],
+              [
+                24,
+                33
+              ],
+              [
+                20,
+                33
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                4,
+                53
+              ],
+              [
+                4,
+                51
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                8,
+                53
+              ],
+              [
+                8,
+                51
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                12,
+                53
+              ],
+              [
+                12,
+                51
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                16,
+                53
+              ],
+              [
+                16,
+                51
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                20,
+                53
+              ],
+              [
+                20,
+                51
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                24,
+                53
+              ],
+              [
+                24,
+                51
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                28,
+                53
+              ],
+              [
+                28,
+                51
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                32,
+                53
+              ],
+              [
+                32,
+                51
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                36,
+                53
+              ],
+              [
+                36,
+                51
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                40,
+                53
+              ],
+              [
+                40,
+                51
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                44,
+                53
+              ],
+              [
+                44,
+                51
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                48,
+                53
+              ],
+              [
+                48,
+                51
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                52,
+                53
+              ],
+              [
+                52,
+                51
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                56,
+                53
+              ],
+              [
+                56,
+                51
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                60,
+                53
+              ],
+              [
+                60,
+                51
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                28,
+                9
+              ],
+              [
+                28,
+                7
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                34,
+                9
+              ],
+              [
+                34,
+                7
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                56,
+                13
+              ],
+              [
+                59,
+                13
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                56,
+                13
+              ],
+              [
+                56,
+                15
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                56,
+                15
+              ],
+              [
+                56,
+                17
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                56,
+                21
+              ],
+              [
+                56,
+                23
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                56,
+                27
+              ],
+              [
+                56,
+                29
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                56,
+                33
+              ],
+              [
+                56,
+                35
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                56,
+                39
+              ],
+              [
+                56,
+                41
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                56,
+                45
+              ],
+              [
+                56,
+                47
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                26,
+                41
+              ],
+              [
+                23,
+                41
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                26,
+                42
+              ],
+              [
+                23,
+                42
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                26,
+                43
+              ],
+              [
+                23,
+                43
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                26,
+                44
+              ],
+              [
+                23,
+                44
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                26,
+                45
+              ],
+              [
+                24,
+                45
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                24,
+                45
+              ],
+              [
+                24,
+                46
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                26,
+                46
+              ],
+              [
+                24,
+                46
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                24,
+                46
+              ],
+              [
+                24,
+                48
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                38,
+                41
+              ],
+              [
+                40,
+                41
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                40,
+                41
+              ],
+              [
+                42,
+                41
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                46,
+                41
+              ],
+              [
+                46,
+                45
+              ]
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "a8c95348",
+      "type": "markdown",
+      "source": "## Tablica fal\n\nKształt to jeden okres fali, 256 próbek, złożony z harmonicznych (synteza addytywna): piła to suma\n$\\sin(hx)/h$, prostokąt — same nieparzyste, trójkąt — nieparzyste z $1/h^2$. Tablica **Analog** przechodzi od\nsinusa przez trójkąt i piłę do prostokąta, **PWM** to coraz węższy prostokąt, **Wokal** — piła przez dwa\nformanty, które wędrują a → e → i → o → u, **Sweep** — okno harmonicznych przesuwane w górę, **Organy** —\ndochodzące po kolei rejestry piszczałek. *Pozycja* wybiera dwa sąsiednie kształty i miesza je.\n\nOscylator to licznik fazy (DDS, jak w groovebox-ie z Arduino): co próbkę rośnie o\n$\\Delta = f \\cdot 2^{32} / f_s$, a jego 8 najwyższych bitów to numer próbki w okresie.\n\n**Aliasing.** Próbkując 25 000 razy na sekundę, nie da się zagrać niczego powyżej 12,5 kHz (połowa:\n*częstotliwość Nyquista*) — wyższa harmoniczna „odbija się” w dół jako fałszywy, nieharmoniczny ton. Dlatego\nkażdy kształt jest zapisany sześć razy, z coraz mniejszą liczbą harmonicznych, a nuta bierze najbogatszą wersję,\nktórej harmoniczne mieszczą się poniżej 12,5 kHz:"
+    },
+    {
+      "id": "2c1872f6",
+      "type": "code",
+      "source": "fs = 25_000  # próbek na sekundę\nfor poziom in range(6):\n    harmoniczne = 128 >> poziom\n    print(f\"poziom {poziom}: {harmoniczne:3} harmonicznych — dla nut do {fs / 2 / harmoniczne:5.0f} Hz\")\n\n# licznik fazy: 32 bity na okres, co próbkę o tyle w górę\nfor nuta, f in ((\"A2\", 110), (\"A4\", 440), (\"A6\", 1760)):\n    print(f\"{nuta}: przyrost {round(f * 2**32 / fs):>10}\")",
+      "outputs": [
+        {
+          "type": "stream",
+          "data": "poziom 0: 128 harmonicznych — dla nut do    98 Hz\npoziom 1:  64 harmonicznych — dla nut do   195 Hz\npoziom 2:  32 harmonicznych — dla nut do   391 Hz\npoziom 3:  16 harmonicznych — dla nut do   781 Hz\npoziom 4:   8 harmonicznych — dla nut do  1562 Hz\npoziom 5:   4 harmonicznych — dla nut do  3125 Hz\nA2: przyrost   18897856\nA4: przyrost   75591424\nA6: przyrost  302365698\n"
+        }
+      ]
+    },
+    {
+      "id": "91dfa12d",
+      "type": "markdown",
+      "source": "## Od liczb do napięcia\n\nMCP4822 dostaje 16-bitowe słowo: kanał, wzmocnienie, włączenie i 12 bitów kodu, a na wyjściu daje\n$U = \\frac{\\text{kod}}{4096} \\cdot 2{,}048\\ \\text{V}$. Między próbkami napięcie stoi — to schodki, a schodki\nco 40 µs mają w widmie kopie dźwięku wokół 25 kHz, 50 kHz… Wygładza je filtr dolnoprzepustowy $R_1 C_1$. Ten sam\nfiltr osobno — z sinusem na wejściu i głośnikiem (10 kΩ) jako obciążeniem:"
+    },
+    {
+      "id": "0271a9ce",
+      "type": "schematic",
+      "name": "filtr",
+      "schematic": {
+        "elements": [
+          {
+            "id": "E_1",
+            "kind": "sine_source",
+            "at": [
+              4,
+              11
+            ],
+            "rotation": 270,
+            "value": "1",
+            "text": "1k"
+          },
+          {
+            "id": "R_1",
+            "kind": "resistor",
+            "at": [
+              6,
+              7
+            ],
+            "rotation": 0,
+            "value": "2.2k",
+            "text": null
+          },
+          {
+            "id": "C_1",
+            "kind": "capacitor",
+            "at": [
+              12,
+              7
+            ],
+            "rotation": 90,
+            "value": "10n",
+            "text": null
+          },
+          {
+            "id": "LS_1",
+            "kind": "speaker",
+            "at": [
+              16,
+              7
+            ],
+            "rotation": 90,
+            "value": null,
+            "text": null
+          },
+          {
+            "id": "gnd1",
+            "kind": "ground",
+            "at": [
+              4,
+              11
+            ],
+            "rotation": 0,
+            "value": null,
+            "text": null
+          },
+          {
+            "id": "gnd2",
+            "kind": "ground",
+            "at": [
+              12,
+              11
+            ],
+            "rotation": 0,
+            "value": null,
+            "text": null
+          },
+          {
+            "id": "gnd3",
+            "kind": "ground",
+            "at": [
+              16,
+              11
+            ],
+            "rotation": 0,
+            "value": null,
+            "text": null
+          },
+          {
+            "id": "lbl4",
+            "kind": "label",
+            "at": [
+              4,
+              7
+            ],
+            "rotation": 0,
+            "value": null,
+            "text": "we"
+          },
+          {
+            "id": "lbl5",
+            "kind": "label",
+            "at": [
+              12,
+              7
+            ],
+            "rotation": 0,
+            "value": null,
+            "text": "wy"
+          }
+        ],
+        "wires": [
+          {
+            "points": [
+              [
+                4,
+                7
+              ],
+              [
+                6,
+                7
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                10,
+                7
+              ],
+              [
+                12,
+                7
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                12,
+                7
+              ],
+              [
+                16,
+                7
+              ]
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "63aee099",
+      "type": "code",
+      "source": "import math\nfrom electro.values import parse\n\nR, C = (float(parse(filtr.values[filtr[e]])) for e in (\"R_1\", \"C_1\"))\nprint(f\"częstotliwość graniczna filtru: {1 / (2 * math.pi * R * C):.0f} Hz\")\nbode(filtr.circuit, filtr.values, \"V_wy\")",
+      "outputs": [
+        {
+          "type": "stream",
+          "data": "częstotliwość graniczna filtru: 7234 Hz\n"
+        },
+        {
+          "type": "svg",
+          "data": "<svg xmlns=\"http://www.w3.org/2000/svg\" class=\"bp1\" width=\"640\" height=\"432\" viewBox=\"0 0 640 432\" font-family=\"ui-sans-serif,system-ui,sans-serif\" font-size=\"11\"><style>.bp1 .s0{stroke:#2a78d6}.bp1 .k0{fill:#2a78d6}.bp1 .s1{stroke:#eb6834}.bp1 .k1{fill:#eb6834}.bp1 .s2{stroke:#1baf7a}.bp1 .k2{fill:#1baf7a}.bp1 .s3{stroke:#eda100}.bp1 .k3{fill:#eda100}.bp1 .s4{stroke:#e87ba4}.bp1 .k4{fill:#e87ba4}.bp1 .s5{stroke:#008300}.bp1 .k5{fill:#008300}:root[data-theme=\"dark\"] .bp1 .s0{stroke:#3987e5}:root[data-theme=\"dark\"] .bp1 .k0{fill:#3987e5}:root[data-theme=\"dark\"] .bp1 .s1{stroke:#d95926}:root[data-theme=\"dark\"] .bp1 .k1{fill:#d95926}:root[data-theme=\"dark\"] .bp1 .s2{stroke:#199e70}:root[data-theme=\"dark\"] .bp1 .k2{fill:#199e70}:root[data-theme=\"dark\"] .bp1 .s3{stroke:#c98500}:root[data-theme=\"dark\"] .bp1 .k3{fill:#c98500}:root[data-theme=\"dark\"] .bp1 .s4{stroke:#d55181}:root[data-theme=\"dark\"] .bp1 .k4{fill:#d55181}:root[data-theme=\"dark\"] .bp1 .s5{stroke:#008300}:root[data-theme=\"dark\"] .bp1 .k5{fill:#008300}.bp1 text{fill:currentColor}.bp1 .muted{opacity:.62}.bp1 .grid{stroke:currentColor;opacity:.12;stroke-width:1}.bp1 .axis{stroke:currentColor;opacity:.35;stroke-width:1}.bp1 .line{fill:none;stroke-width:2;stroke-linejoin:round;stroke-linecap:round}.bp1 .sub{font-size:8px}</style><text x=\"56\" y=\"14\">V<tspan class=\"sub\" dy=\"3\">wy</tspan> / E<tspan class=\"sub\" dy=\"3\">1</tspan></text><line class=\"grid\" x1=\"52\" x2=\"564\" y1=\"176.0\" y2=\"176.0\"/><text class=\"muted\" x=\"46\" y=\"179.5\" text-anchor=\"end\">−50</text><line class=\"grid\" x1=\"52\" x2=\"564\" y1=\"146.0\" y2=\"146.0\"/><text class=\"muted\" x=\"46\" y=\"149.5\" text-anchor=\"end\">−40</text><line class=\"grid\" x1=\"52\" x2=\"564\" y1=\"116.0\" y2=\"116.0\"/><text class=\"muted\" x=\"46\" y=\"119.5\" text-anchor=\"end\">−30</text><line class=\"grid\" x1=\"52\" x2=\"564\" y1=\"86.0\" y2=\"86.0\"/><text class=\"muted\" x=\"46\" y=\"89.5\" text-anchor=\"end\">−20</text><line class=\"grid\" x1=\"52\" x2=\"564\" y1=\"56.0\" y2=\"56.0\"/><text class=\"muted\" x=\"46\" y=\"59.5\" text-anchor=\"end\">−10</text><line class=\"grid\" x1=\"52\" x2=\"564\" y1=\"26.0\" y2=\"26.0\"/><text class=\"muted\" x=\"46\" y=\"29.5\" text-anchor=\"end\">0</text><line class=\"grid\" x1=\"52.0\" x2=\"52.0\" y1=\"26\" y2=\"176\"/><text class=\"muted\" x=\"52.0\" y=\"191\" text-anchor=\"middle\">10</text><line class=\"grid\" x1=\"154.4\" x2=\"154.4\" y1=\"26\" y2=\"176\"/><text class=\"muted\" x=\"154.4\" y=\"191\" text-anchor=\"middle\">100</text><line class=\"grid\" x1=\"256.8\" x2=\"256.8\" y1=\"26\" y2=\"176\"/><text class=\"muted\" x=\"256.8\" y=\"191\" text-anchor=\"middle\">1k</text><line class=\"grid\" x1=\"359.2\" x2=\"359.2\" y1=\"26\" y2=\"176\"/><text class=\"muted\" x=\"359.2\" y=\"191\" text-anchor=\"middle\">10k</text><line class=\"grid\" x1=\"461.6\" x2=\"461.6\" y1=\"26\" y2=\"176\"/><text class=\"muted\" x=\"461.6\" y=\"191\" text-anchor=\"middle\">100k</text><line class=\"grid\" x1=\"564.0\" x2=\"564.0\" y1=\"26\" y2=\"176\"/><text class=\"muted\" x=\"564.0\" y=\"191\" text-anchor=\"middle\">1M</text><text class=\"muted\" x=\"46\" y=\"18\" text-anchor=\"end\">dB</text><line class=\"axis\" x1=\"353.6\" x2=\"353.6\" y1=\"26\" y2=\"176\" stroke-dasharray=\"4 3\"/><text x=\"357.6\" y=\"170\">f<tspan class=\"sub\" dy=\"3\">g</tspan><tspan dy=\"-3\"> = 8.82kHz</tspan></text><polyline class=\"line s0\" points=\"52.0,31.2 54.6,31.2 57.1,31.2 59.7,31.2 62.3,31.2 64.9,31.2 67.4,31.2 70.0,31.2 72.6,31.2 75.2,31.2 77.7,31.2 80.3,31.2 82.9,31.2 85.4,31.2 88.0,31.2 90.6,31.2 93.2,31.2 95.7,31.2 98.3,31.2 100.9,31.2 103.5,31.2 106.0,31.2 108.6,31.2 111.2,31.2 113.7,31.2 116.3,31.2 118.9,31.2 121.5,31.2 124.0,31.2 126.6,31.2 129.2,31.2 131.8,31.2 134.3,31.2 136.9,31.2 139.5,31.2 142.1,31.2 144.6,31.2 147.2,31.2 149.8,31.2 152.3,31.2 154.9,31.2 157.5,31.2 160.1,31.2 162.6,31.2 165.2,31.2 167.8,31.2 170.4,31.2 172.9,31.2 175.5,31.2 178.1,31.2 180.6,31.2 183.2,31.2 185.8,31.2 188.4,31.2 190.9,31.2 193.5,31.2 196.1,31.2 198.7,31.2 201.2,31.2 203.8,31.2 206.4,31.2 208.9,31.2 211.5,31.2 214.1,31.2 216.7,31.2 219.2,31.2 221.8,31.2 224.4,31.2 227.0,31.2 229.5,31.2 232.1,31.2 234.7,31.2 237.2,31.3 239.8,31.3 242.4,31.3 245.0,31.3 247.5,31.3 250.1,31.3 252.7,31.3 255.3,31.3 257.8,31.4 260.4,31.4 263.0,31.4 265.5,31.4 268.1,31.5 270.7,31.5 273.3,31.5 275.8,31.6 278.4,31.6 281.0,31.7 283.6,31.7 286.1,31.8 288.7,31.9 291.3,31.9 293.8,32.0 296.4,32.1 299.0,32.3 301.6,32.4 304.1,32.5 306.7,32.7 309.3,32.8 311.9,33.0 314.4,33.2 317.0,33.5 319.6,33.7 322.2,34.0 324.7,34.3 327.3,34.7 329.9,35.0 332.4,35.4 335.0,35.9 337.6,36.3 340.2,36.9 342.7,37.4 345.3,38.0 347.9,38.6 350.5,39.3 353.0,40.0 355.6,40.8 358.2,41.6 360.7,42.5 363.3,43.4 365.9,44.3 368.5,45.3 371.0,46.3 373.6,47.3 376.2,48.4 378.8,49.5 381.3,50.7 383.9,51.9 386.5,53.1 389.0,54.3 391.6,55.6 394.2,56.9 396.8,58.2 399.3,59.5 401.9,60.9 404.5,62.2 407.1,63.6 409.6,65.0 412.2,66.4 414.8,67.8 417.3,69.2 419.9,70.7 422.5,72.1 425.1,73.5 427.6,75.0 430.2,76.5 432.8,77.9 435.4,79.4 437.9,80.9 440.5,82.3 443.1,83.8 445.6,85.3 448.2,86.8 450.8,88.3 453.4,89.8 455.9,91.2 458.5,92.7 461.1,94.2 463.7,95.7 466.2,97.2 468.8,98.7 471.4,100.2 473.9,101.7 476.5,103.2 479.1,104.7 481.7,106.2 484.2,107.7 486.8,109.2 489.4,110.7 492.0,112.3 494.5,113.8 497.1,115.3 499.7,116.8 502.3,118.3 504.8,119.8 507.4,121.3 510.0,122.8 512.5,124.3 515.1,125.8 517.7,127.3 520.3,128.8 522.8,130.3 525.4,131.8 528.0,133.3 530.6,134.8 533.1,136.3 535.7,137.9 538.3,139.4 540.8,140.9 543.4,142.4 546.0,143.9 548.6,145.4 551.1,146.9 553.7,148.4 556.3,149.9 558.9,151.4 561.4,152.9 564.0,154.4\"><title>V_wy</title></polyline><line class=\"axis\" x1=\"52\" x2=\"564\" y1=\"176\" y2=\"176\"/><text class=\"muted\" x=\"580\" y=\"191\">f [Hz]</text><line class=\"grid\" x1=\"52\" x2=\"564\" y1=\"374.0\" y2=\"374.0\"/><text class=\"muted\" x=\"46\" y=\"377.5\" text-anchor=\"end\">−90</text><line class=\"grid\" x1=\"52\" x2=\"564\" y1=\"299.0\" y2=\"299.0\"/><text class=\"muted\" x=\"46\" y=\"302.5\" text-anchor=\"end\">−45</text><line class=\"grid\" x1=\"52\" x2=\"564\" y1=\"224.0\" y2=\"224.0\"/><text class=\"muted\" x=\"46\" y=\"227.5\" text-anchor=\"end\">0</text><line class=\"grid\" x1=\"52.0\" x2=\"52.0\" y1=\"224\" y2=\"374\"/><text class=\"muted\" x=\"52.0\" y=\"389\" text-anchor=\"middle\">10</text><line class=\"grid\" x1=\"154.4\" x2=\"154.4\" y1=\"224\" y2=\"374\"/><text class=\"muted\" x=\"154.4\" y=\"389\" text-anchor=\"middle\">100</text><line class=\"grid\" x1=\"256.8\" x2=\"256.8\" y1=\"224\" y2=\"374\"/><text class=\"muted\" x=\"256.8\" y=\"389\" text-anchor=\"middle\">1k</text><line class=\"grid\" x1=\"359.2\" x2=\"359.2\" y1=\"224\" y2=\"374\"/><text class=\"muted\" x=\"359.2\" y=\"389\" text-anchor=\"middle\">10k</text><line class=\"grid\" x1=\"461.6\" x2=\"461.6\" y1=\"224\" y2=\"374\"/><text class=\"muted\" x=\"461.6\" y=\"389\" text-anchor=\"middle\">100k</text><line class=\"grid\" x1=\"564.0\" x2=\"564.0\" y1=\"224\" y2=\"374\"/><text class=\"muted\" x=\"564.0\" y=\"389\" text-anchor=\"middle\">1M</text><text class=\"muted\" x=\"46\" y=\"216\" text-anchor=\"end\">°</text><polyline class=\"line s0\" points=\"52.0,224.1 54.6,224.1 57.1,224.1 59.7,224.1 62.3,224.1 64.9,224.1 67.4,224.2 70.0,224.2 72.6,224.2 75.2,224.2 77.7,224.2 80.3,224.2 82.9,224.2 85.4,224.2 88.0,224.2 90.6,224.3 93.2,224.3 95.7,224.3 98.3,224.3 100.9,224.3 103.5,224.3 106.0,224.4 108.6,224.4 111.2,224.4 113.7,224.4 116.3,224.5 118.9,224.5 121.5,224.5 124.0,224.5 126.6,224.6 129.2,224.6 131.8,224.7 134.3,224.7 136.9,224.7 139.5,224.8 142.1,224.8 144.6,224.9 147.2,224.9 149.8,225.0 152.3,225.0 154.9,225.1 157.5,225.2 160.1,225.2 162.6,225.3 165.2,225.4 167.8,225.5 170.4,225.5 172.9,225.6 175.5,225.7 178.1,225.8 180.6,226.0 183.2,226.1 185.8,226.2 188.4,226.3 190.9,226.5 193.5,226.6 196.1,226.8 198.7,226.9 201.2,227.1 203.8,227.3 206.4,227.5 208.9,227.7 211.5,227.9 214.1,228.1 216.7,228.4 219.2,228.6 221.8,228.9 224.4,229.2 227.0,229.5 229.5,229.9 232.1,230.2 234.7,230.6 237.2,231.0 239.8,231.4 242.4,231.8 245.0,232.3 247.5,232.8 250.1,233.3 252.7,233.8 255.3,234.4 257.8,235.0 260.4,235.7 263.0,236.4 265.5,237.1 268.1,237.9 270.7,238.7 273.3,239.5 275.8,240.4 278.4,241.4 281.0,242.4 283.6,243.5 286.1,244.6 288.7,245.8 291.3,247.0 293.8,248.3 296.4,249.7 299.0,251.2 301.6,252.7 304.1,254.3 306.7,256.0 309.3,257.7 311.9,259.6 314.4,261.5 317.0,263.5 319.6,265.6 322.2,267.7 324.7,269.9 327.3,272.2 329.9,274.6 332.4,277.1 335.0,279.6 337.6,282.1 340.2,284.7 342.7,287.4 345.3,290.1 347.9,292.8 350.5,295.6 353.0,298.3 355.6,301.1 358.2,303.9 360.7,306.6 363.3,309.3 365.9,312.0 368.5,314.6 371.0,317.2 373.6,319.7 376.2,322.2 378.8,324.6 381.3,327.0 383.9,329.2 386.5,331.4 389.0,333.5 391.6,335.6 394.2,337.5 396.8,339.4 399.3,341.2 401.9,342.9 404.5,344.5 407.1,346.1 409.6,347.6 412.2,349.0 414.8,350.3 417.3,351.6 419.9,352.8 422.5,354.0 425.1,355.1 427.6,356.1 430.2,357.1 432.8,358.0 435.4,358.9 437.9,359.8 440.5,360.5 443.1,361.3 445.6,362.0 448.2,362.7 450.8,363.3 453.4,363.9 455.9,364.5 458.5,365.0 461.1,365.5 463.7,366.0 466.2,366.4 468.8,366.8 471.4,367.2 473.9,367.6 476.5,368.0 479.1,368.3 481.7,368.6 484.2,368.9 486.8,369.2 489.4,369.5 492.0,369.7 494.5,370.0 497.1,370.2 499.7,370.4 502.3,370.6 504.8,370.8 507.4,371.0 510.0,371.2 512.5,371.3 515.1,371.5 517.7,371.6 520.3,371.7 522.8,371.9 525.4,372.0 528.0,372.1 530.6,372.2 533.1,372.3 535.7,372.4 538.3,372.5 540.8,372.6 543.4,372.7 546.0,372.7 548.6,372.8 551.1,372.9 553.7,372.9 556.3,373.0 558.9,373.1 561.4,373.1 564.0,373.2\"><title>V_wy</title></polyline><line class=\"axis\" x1=\"52\" x2=\"564\" y1=\"374\" y2=\"374\"/><text class=\"muted\" x=\"580\" y=\"389\">f [Hz]</text></svg>"
+        }
+      ]
+    },
+    {
+      "id": "a8234165",
+      "type": "markdown",
+      "source": "Na stronie FILTR syntezator rysuje ten filtr przerywaną linią obok swojego. Zmień $C_1$ na głównym schemacie na\n100 nF i posłuchaj — dźwięk ściemnieje, bo granica spadnie dziesięć razy.\n\n## Dlaczego każdy klawisz ma swój pin\n\nSzesnaście klawiszy w matrycy 4×4 zajęłoby tylko osiem pinów: program ściąga do masy jeden wiersz naraz i czyta\nkolumny podciągnięte do 3,3 V. Ale gdy trzy wciśnięte klawisze tworzą literę L, prąd płynie naokoło przez\ntrzeci i „zapala” czwarty róg prostokąta (*ghosting*). Tu skanowany jest wiersz W1 (do masy), wciśnięte są\n$S_1$, $S_2$ i $S_3$ — a $S_4$ nie:"
+    },
+    {
+      "id": "d8b04495",
+      "type": "schematic",
+      "name": "duch",
+      "schematic": {
+        "elements": [
+          {
+            "id": "lbl1",
+            "kind": "label",
+            "at": [
+              4,
+              7
+            ],
+            "rotation": 0,
+            "value": null,
+            "text": "W0"
+          },
+          {
+            "id": "S_1",
+            "kind": "switch",
+            "at": [
+              7,
+              7
+            ],
+            "rotation": 90,
+            "value": null,
+            "text": "closed"
+          },
+          {
+            "id": "S_2",
+            "kind": "switch",
+            "at": [
+              13,
+              7
+            ],
+            "rotation": 90,
+            "value": null,
+            "text": "closed"
+          },
+          {
+            "id": "lbl2",
+            "kind": "label",
+            "at": [
+              4,
+              12
+            ],
+            "rotation": 0,
+            "value": null,
+            "text": "W1"
+          },
+          {
+            "id": "S_3",
+            "kind": "switch",
+            "at": [
+              7,
+              12
+            ],
+            "rotation": 90,
+            "value": null,
+            "text": "closed"
+          },
+          {
+            "id": "S_4",
+            "kind": "switch",
+            "at": [
+              13,
+              12
+            ],
+            "rotation": 90,
+            "value": null,
+            "text": "open"
+          },
+          {
+            "id": "lbl3",
+            "kind": "label",
+            "at": [
+              11,
+              18
+            ],
+            "rotation": 0,
+            "value": null,
+            "text": "K0"
+          },
+          {
+            "id": "lbl4",
+            "kind": "label",
+            "at": [
+              17,
+              18
+            ],
+            "rotation": 0,
+            "value": null,
+            "text": "K1"
+          },
+          {
+            "id": "gnd5",
+            "kind": "ground",
+            "at": [
+              4,
+              12
+            ],
+            "rotation": 0,
+            "value": null,
+            "text": null
+          },
+          {
+            "id": "R_1",
+            "kind": "resistor",
+            "at": [
+              11,
+              18
+            ],
+            "rotation": 90,
+            "value": "50k",
+            "text": null
+          },
+          {
+            "id": "lbl6",
+            "kind": "label",
+            "at": [
+              11,
+              22
+            ],
+            "rotation": 0,
+            "value": null,
+            "text": "3V3"
+          },
+          {
+            "id": "R_2",
+            "kind": "resistor",
+            "at": [
+              17,
+              18
+            ],
+            "rotation": 90,
+            "value": "50k",
+            "text": null
+          },
+          {
+            "id": "lbl7",
+            "kind": "label",
+            "at": [
+              17,
+              22
+            ],
+            "rotation": 0,
+            "value": null,
+            "text": "3V3"
+          },
+          {
+            "id": "E_1",
+            "kind": "voltage_source",
+            "at": [
+              23,
+              26
+            ],
+            "rotation": 270,
+            "value": "3.3",
+            "text": null
+          },
+          {
+            "id": "lbl8",
+            "kind": "label",
+            "at": [
+              23,
+              22
+            ],
+            "rotation": 0,
+            "value": null,
+            "text": "3V3"
+          },
+          {
+            "id": "gnd9",
+            "kind": "ground",
+            "at": [
+              23,
+              26
+            ],
+            "rotation": 0,
+            "value": null,
+            "text": null
+          }
+        ],
+        "wires": [
+          {
+            "points": [
+              [
+                7,
+                7
+              ],
+              [
+                4,
+                7
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                7,
+                11
+              ],
+              [
+                11,
+                11
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                7,
+                7
+              ],
+              [
+                13,
+                7
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                13,
+                11
+              ],
+              [
+                17,
+                11
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                7,
+                12
+              ],
+              [
+                4,
+                12
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                7,
+                16
+              ],
+              [
+                11,
+                16
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                7,
+                12
+              ],
+              [
+                13,
+                12
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                13,
+                16
+              ],
+              [
+                17,
+                16
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                11,
+                11
+              ],
+              [
+                11,
+                16
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                11,
+                16
+              ],
+              [
+                11,
+                18
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                17,
+                11
+              ],
+              [
+                17,
+                16
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                17,
+                16
+              ],
+              [
+                17,
+                18
+              ]
+            ]
+          }
+        ]
+      },
+      "results": {
+        "S_1": {
+          "value": "",
+          "solved": false,
+          "U": "0 V",
+          "I": "66 µA",
+          "P": "0 W",
+          "reversed": false
+        },
+        "S_2": {
+          "value": "",
+          "solved": false,
+          "U": "0 V",
+          "I": "66 µA",
+          "P": "0 W",
+          "reversed": true
+        },
+        "S_3": {
+          "value": "",
+          "solved": false,
+          "U": "0 V",
+          "I": "132 µA",
+          "P": "0 W",
+          "reversed": true
+        },
+        "S_4": {
+          "value": "",
+          "solved": false,
+          "U": "0 V",
+          "I": "0 A",
+          "P": "0 W",
+          "reversed": false
+        },
+        "R_1": {
+          "value": "50 kΩ",
+          "solved": false,
+          "U": "3.3 V",
+          "I": "66 µA",
+          "P": "217.8 µW",
+          "reversed": true
+        },
+        "R_2": {
+          "value": "50 kΩ",
+          "solved": false,
+          "U": "3.3 V",
+          "I": "66 µA",
+          "P": "217.8 µW",
+          "reversed": true
+        },
+        "E_1": {
+          "value": "3.3 V",
+          "solved": false,
+          "U": "3.3 V",
+          "I": "132 µA",
+          "P": "435.6 µW",
+          "reversed": false
+        },
+        "lbl1": {
+          "value": "0 V",
+          "solved": true,
+          "U": null,
+          "I": null,
+          "P": null,
+          "reversed": false
+        },
+        "lbl2": {
+          "value": "0 V",
+          "solved": true,
+          "U": null,
+          "I": null,
+          "P": null,
+          "reversed": false
+        },
+        "lbl3": {
+          "value": "0 V",
+          "solved": true,
+          "U": null,
+          "I": null,
+          "P": null,
+          "reversed": false
+        },
+        "lbl4": {
+          "value": "0 V",
+          "solved": true,
+          "U": null,
+          "I": null,
+          "P": null,
+          "reversed": false
+        },
+        "lbl6": {
+          "value": "3.3 V",
+          "solved": true,
+          "U": null,
+          "I": null,
+          "P": null,
+          "reversed": false
+        },
+        "lbl7": {
+          "value": "3.3 V",
+          "solved": true,
+          "U": null,
+          "I": null,
+          "P": null,
+          "reversed": false
+        },
+        "lbl8": {
+          "value": "3.3 V",
+          "solved": true,
+          "U": null,
+          "I": null,
+          "P": null,
+          "reversed": false
+        }
+      },
+      "problems": [],
+      "found": {},
+      "stale": false
+    },
+    {
+      "id": "c76b69ab",
+      "type": "markdown",
+      "source": "Kolumna K1 ma 0 V, więc program uznałby $S_4$ za wciśnięty — w klawiaturze muzycznej akord C–E–G dostałby\ndodatkowe D#. Pomogłaby dioda przy każdym klawiszu (prąd nie przejdzie wstecz przez $S_2$), ale szesnaście diod to\nszesnaście elementów nieliniowych, które symulator musi liczyć co próbkę. Ten syntezator ma więc każdy klawisz na\nosobnym pinie: 15 pinów, za to dowolne akordy.\n\n## Siedem przycisków na jednym pinie\n\nNa nawigację pinów już zabrakło. Przyciski ←, →, ↑, ↓, −, + i arpeggio wiszą na jednym wejściu analogowym (GP28)\nprzez **drabinkę rezystorów**: $R_G$ podciąga je do 3,3 V, a każdy przycisk zwiera do masy inny węzeł łańcucha —\nkażdy daje więc inny dzielnik napięcia. Tu wciśnięty jest ↑:"
+    },
+    {
+      "id": "05ae7e3c",
+      "type": "schematic",
+      "name": "drabinka",
+      "schematic": {
+        "elements": [
+          {
+            "id": "lbl1",
+            "kind": "label",
+            "at": [
+              14,
+              7
+            ],
+            "rotation": 0,
+            "value": null,
+            "text": "3V3"
+          },
+          {
+            "id": "R_G",
+            "kind": "resistor",
+            "at": [
+              14,
+              7
+            ],
+            "rotation": 90,
+            "value": "4.7k",
+            "text": null
+          },
+          {
+            "id": "lbl2",
+            "kind": "label",
+            "at": [
+              17,
+              11
+            ],
+            "rotation": 0,
+            "value": null,
+            "text": "PRZYCISKI"
+          },
+          {
+            "id": "S_1",
+            "kind": "switch",
+            "at": [
+              14,
+              13
+            ],
+            "rotation": 0,
+            "value": null,
+            "text": "open"
+          },
+          {
+            "id": "gnd3",
+            "kind": "ground",
+            "at": [
+              18,
+              13
+            ],
+            "rotation": 0,
+            "value": null,
+            "text": null
+          },
+          {
+            "id": "R_L1",
+            "kind": "resistor",
+            "at": [
+              14,
+              15
+            ],
+            "rotation": 90,
+            "value": "680",
+            "text": null
+          },
+          {
+            "id": "S_2",
+            "kind": "switch",
+            "at": [
+              14,
+              19
+            ],
+            "rotation": 0,
+            "value": null,
+            "text": "open"
+          },
+          {
+            "id": "gnd4",
+            "kind": "ground",
+            "at": [
+              18,
+              19
+            ],
+            "rotation": 0,
+            "value": null,
+            "text": null
+          },
+          {
+            "id": "R_L2",
+            "kind": "resistor",
+            "at": [
+              14,
+              21
+            ],
+            "rotation": 90,
+            "value": "1k",
+            "text": null
+          },
+          {
+            "id": "S_3",
+            "kind": "switch",
+            "at": [
+              14,
+              25
+            ],
+            "rotation": 0,
+            "value": null,
+            "text": "closed"
+          },
+          {
+            "id": "gnd5",
+            "kind": "ground",
+            "at": [
+              18,
+              25
+            ],
+            "rotation": 0,
+            "value": null,
+            "text": null
+          },
+          {
+            "id": "R_L3",
+            "kind": "resistor",
+            "at": [
+              14,
+              27
+            ],
+            "rotation": 90,
+            "value": "1.2k",
+            "text": null
+          },
+          {
+            "id": "S_4",
+            "kind": "switch",
+            "at": [
+              14,
+              31
+            ],
+            "rotation": 0,
+            "value": null,
+            "text": "open"
+          },
+          {
+            "id": "gnd6",
+            "kind": "ground",
+            "at": [
+              18,
+              31
+            ],
+            "rotation": 0,
+            "value": null,
+            "text": null
+          },
+          {
+            "id": "R_L4",
+            "kind": "resistor",
+            "at": [
+              14,
+              33
+            ],
+            "rotation": 90,
+            "value": "1.8k",
+            "text": null
+          },
+          {
+            "id": "S_5",
+            "kind": "switch",
+            "at": [
+              14,
+              37
+            ],
+            "rotation": 0,
+            "value": null,
+            "text": "open"
+          },
+          {
+            "id": "gnd7",
+            "kind": "ground",
+            "at": [
+              18,
+              37
+            ],
+            "rotation": 0,
+            "value": null,
+            "text": null
+          },
+          {
+            "id": "R_L5",
+            "kind": "resistor",
+            "at": [
+              14,
+              39
+            ],
+            "rotation": 90,
+            "value": "3.3k",
+            "text": null
+          },
+          {
+            "id": "S_6",
+            "kind": "switch",
+            "at": [
+              14,
+              43
+            ],
+            "rotation": 0,
+            "value": null,
+            "text": "open"
+          },
+          {
+            "id": "gnd8",
+            "kind": "ground",
+            "at": [
+              18,
+              43
+            ],
+            "rotation": 0,
+            "value": null,
+            "text": null
+          },
+          {
+            "id": "R_L6",
+            "kind": "resistor",
+            "at": [
+              14,
+              45
+            ],
+            "rotation": 90,
+            "value": "6.8k",
+            "text": null
+          },
+          {
+            "id": "S_7",
+            "kind": "switch",
+            "at": [
+              14,
+              49
+            ],
+            "rotation": 0,
+            "value": null,
+            "text": "open"
+          },
+          {
+            "id": "gnd9",
+            "kind": "ground",
+            "at": [
+              18,
+              49
+            ],
+            "rotation": 0,
+            "value": null,
+            "text": null
+          },
+          {
+            "id": "E_1",
+            "kind": "voltage_source",
+            "at": [
+              4,
+              11
+            ],
+            "rotation": 270,
+            "value": "3.3",
+            "text": null
+          },
+          {
+            "id": "lbl10",
+            "kind": "label",
+            "at": [
+              4,
+              7
+            ],
+            "rotation": 0,
+            "value": null,
+            "text": "3V3"
+          },
+          {
+            "id": "gnd11",
+            "kind": "ground",
+            "at": [
+              4,
+              11
+            ],
+            "rotation": 0,
+            "value": null,
+            "text": null
+          }
+        ],
+        "wires": [
+          {
+            "points": [
+              [
+                14,
+                11
+              ],
+              [
+                17,
+                11
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                14,
+                11
+              ],
+              [
+                14,
+                13
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                14,
+                13
+              ],
+              [
+                14,
+                15
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                14,
+                19
+              ],
+              [
+                14,
+                21
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                14,
+                25
+              ],
+              [
+                14,
+                27
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                14,
+                31
+              ],
+              [
+                14,
+                33
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                14,
+                37
+              ],
+              [
+                14,
+                39
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                14,
+                43
+              ],
+              [
+                14,
+                45
+              ]
+            ]
+          }
+        ]
+      },
+      "results": {
+        "R_G": {
+          "value": "4.7 kΩ",
+          "solved": false,
+          "U": "2.431 V",
+          "I": "517.2 µA",
+          "P": "1.257 mW",
+          "reversed": false
+        },
+        "S_1": {
+          "value": "",
+          "solved": false,
+          "U": "869 mV",
+          "I": "0 A",
+          "P": "0 W",
+          "reversed": false
+        },
+        "R_L1": {
+          "value": "680 Ω",
+          "solved": false,
+          "U": "351.7 mV",
+          "I": "517.2 µA",
+          "P": "181.9 µW",
+          "reversed": false
+        },
+        "S_2": {
+          "value": "",
+          "solved": false,
+          "U": "517.2 mV",
+          "I": "0 A",
+          "P": "0 W",
+          "reversed": false
+        },
+        "R_L2": {
+          "value": "1 kΩ",
+          "solved": false,
+          "U": "517.2 mV",
+          "I": "517.2 µA",
+          "P": "267.5 µW",
+          "reversed": false
+        },
+        "S_3": {
+          "value": "",
+          "solved": false,
+          "U": "0 V",
+          "I": "517.2 µA",
+          "P": "0 W",
+          "reversed": false
+        },
+        "R_L3": {
+          "value": "1.2 kΩ",
+          "solved": false,
+          "U": "0 V",
+          "I": "0 A",
+          "P": "0 W",
+          "reversed": false
+        },
+        "S_4": {
+          "value": "",
+          "solved": false,
+          "U": "0 V",
+          "I": "0 A",
+          "P": "0 W",
+          "reversed": false
+        },
+        "R_L4": {
+          "value": "1.8 kΩ",
+          "solved": false,
+          "U": "0 V",
+          "I": "0 A",
+          "P": "0 W",
+          "reversed": false
+        },
+        "S_5": {
+          "value": "",
+          "solved": false,
+          "U": "0 V",
+          "I": "0 A",
+          "P": "0 W",
+          "reversed": false
+        },
+        "R_L5": {
+          "value": "3.3 kΩ",
+          "solved": false,
+          "U": "0 V",
+          "I": "0 A",
+          "P": "0 W",
+          "reversed": false
+        },
+        "S_6": {
+          "value": "",
+          "solved": false,
+          "U": "0 V",
+          "I": "0 A",
+          "P": "0 W",
+          "reversed": false
+        },
+        "R_L6": {
+          "value": "6.8 kΩ",
+          "solved": false,
+          "U": "0 V",
+          "I": "0 A",
+          "P": "0 W",
+          "reversed": false
+        },
+        "S_7": {
+          "value": "",
+          "solved": false,
+          "U": "0 V",
+          "I": "0 A",
+          "P": "0 W",
+          "reversed": false
+        },
+        "E_1": {
+          "value": "3.3 V",
+          "solved": false,
+          "U": "3.3 V",
+          "I": "517.2 µA",
+          "P": "1.707 mW",
+          "reversed": false
+        },
+        "lbl1": {
+          "value": "3.3 V",
+          "solved": true,
+          "U": null,
+          "I": null,
+          "P": null,
+          "reversed": false
+        },
+        "lbl2": {
+          "value": "869 mV",
+          "solved": true,
+          "U": null,
+          "I": null,
+          "P": null,
+          "reversed": false
+        },
+        "lbl10": {
+          "value": "3.3 V",
+          "solved": true,
+          "U": null,
+          "I": null,
+          "P": null,
+          "reversed": false
+        }
+      },
+      "problems": [],
+      "found": {},
+      "stale": false
+    },
+    {
+      "id": "611e42a1",
+      "type": "code",
+      "source": "# napięcie na GP28 dla każdego przycisku: ten sam układ, wciśnięty po kolei każdy\nprzyciski = [\"←\", \"→\", \"↑\", \"↓\", \"−\", \"+\", \"arpeggio\"]\nwezel = drabinka.points[\"PRZYCISKI\"]\nfor k, nazwa in enumerate(przyciski):\n    dane = dict(drabinka.values)\n    for j in range(len(przyciski)):\n        dane[drabinka[f\"S_{j + 1}\"]] = {\"closed\": int(j == k)}\n    u = float(drabinka.circuit.final(dane)(V(wezel)))\n    print(f\"{nazwa:>9}: {u:4.2f} V, analogRead = {round(u / 3.3 * 4095):4}\")",
+      "outputs": [
+        {
+          "type": "stream",
+          "data": "        ←: 0.00 V, analogRead =    0\n        →: 0.42 V, analogRead =  518\n        ↑: 0.87 V, analogRead = 1078\n        ↓: 1.25 V, analogRead = 1556\n        −: 1.65 V, analogRead = 2043\n        +: 2.08 V, analogRead = 2577\n arpeggio: 2.50 V, analogRead = 3107\n"
+        }
+      ]
+    },
+    {
+      "id": "3860cd20",
+      "type": "markdown",
+      "source": "Program zna te napięcia (liczy je z tych samych rezystorów) i bierze najbliższe zmierzonemu. Dwa przyciski\nnaraz dają napięcie tego, który jest wyżej w drabince — przy nawigacji to nie szkodzi.\n\n## Filtr w programie\n\nFiltr syntezatora to **SVF** (*state variable filter*): cyfrowy odpowiednik dwóch integratorów — dwóch\nkondensatorów — w pętli. Liczony jest metodą trapezów, tą samą, którą symulator liczy kondensatory w obwodach;\ndlatego jest stabilny przy każdym odcięciu (prostszy wzór, „z podręcznika”, przy wysokich odcięciach wpada w\noscylacje). Współczynniki zależą od $g = \\operatorname{tg}(\\pi f_c / f_s)$ i tłumienia $k$ (im mniejsze, tym\nsilniejszy rezonans); co próbkę jest kilka mnożeń. Ten sam rachunek w Pythonie, odcięcie 2 kHz:"
+    },
+    {
+      "id": "259dd45f",
+      "type": "code",
+      "source": "import math\n\n# ten sam filtr, co w szkicu (render), na liczbach zmiennoprzecinkowych\nfs, odciecie, rezonans = 25_000, 2000, 0.3\ng = math.tan(math.pi * odciecie / fs)\nk = 2 - 1.97 * rezonans\na1 = 1 / (1 + g * (g + k))\na2, a3 = g * a1, g * g * a1\n\n\ndef wzmocnienie(f, probek=4000):\n    \"\"\"Sinus o częstotliwości f przez filtr: jak duży wychodzi (dolnoprzepustowe wyjście v2).\"\"\"\n    ic1 = ic2 = szczyt = 0.0\n    for i in range(probek):\n        v3 = math.sin(2 * math.pi * f * i / fs) - ic2\n        v1 = a1 * ic1 + a2 * v3\n        v2 = ic2 + a2 * ic1 + a3 * v3\n        ic1, ic2 = 2 * v1 - ic1, 2 * v2 - ic2\n        if i > probek // 2:\n            szczyt = max(szczyt, abs(v2))\n    return szczyt\n\n\nfor f in (250, 500, 1000, 2000, 4000, 8000):\n    print(f\"{f:5} Hz: {20 * math.log10(wzmocnienie(f)):6.1f} dB\")",
+      "outputs": [
+        {
+          "type": "stream",
+          "data": "  250 Hz:   -0.0 dB\n  500 Hz:   -0.0 dB\n 1000 Hz:   -0.2 dB\n 2000 Hz:   -3.0 dB\n 4000 Hz:  -13.4 dB\n 8000 Hz:  -31.5 dB\n"
+        }
+      ]
+    }
+  ]
+}

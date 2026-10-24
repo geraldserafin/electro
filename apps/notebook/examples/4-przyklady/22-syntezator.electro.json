@@ -1,0 +1,853 @@
+{
+  "format": "electro-notebook",
+  "version": 2,
+  "id": "0345cd163838aaf6",
+  "title": "Syntezator z sekwencerem",
+  "created": "2026-10-01T00:00:00Z",
+  "modified": "2026-10-01T00:00:00Z",
+  "settings": {
+    "codeInPdf": true
+  },
+  "cells": [
+    {
+      "id": "7c938386",
+      "type": "markdown",
+      "source": "# Syntezator z sekwencerem\n\nMały *groovebox*: trzy głosy — **bas** ($BZ_1$, D8), **melodia** ($BZ_2$, D9) i **perkusja** ($BZ_3$, D10)\n— i sekwencer na 16 kroków, jak w automatach perkusyjnych z lat 80. Na OLED-zie każda ścieżka to rząd\nkratek: im wyższy słupek, tym wyższa nuta; pasek u góry pokazuje grany krok. Uruchom ⚡ — gra od razu:\na-moll, F-dur, G-dur.\n\n**Jak grać:** kliknij schemat. **←/→** — kratka, **↑/↓** — nuta o półton (na perkusji: stopa → werbel →\nhi-hat), **spacja** — nuta wł./wył., **T** — następna ścieżka, **Enter** — start/stop. $P_1$ to tempo\n(60–200 BPM), $P_2$ — długość nut: od krótkich *staccato* do granych przez cały krok *legato*.\n\n**Skąd dźwięk?** `tone()` gra tylko jeden dźwięk naraz, więc szkic liczy go sam: przerwanie Timer1\nprzychodzi 20 000 razy na sekundę i każdemu głosowi dodaje do 16-bitowego licznika fazy jego przyrost.\nNajwyższy bit licznika to fala prostokątna na pinie — tak działa synteza **DDS** (*direct digital\nsynthesis*), ta sama co w generatorach funkcyjnych. Częstotliwość to przyrost razy 20 000 / 65 536, więc\nprzyrost około 1442 daje 440 Hz. Perkusja to inne sztuczki: stopa to ton opadający ze 150 do 40 Hz, a werbel i\nhi-hat — szum z rejestru przesuwnego ze sprzężeniem (LFSR), który co próbkę wypluwa pseudolosowy bit.\n\nSekwencer też chodzi w przerwaniu: co `stepLength` próbek przechodzi do następnego kroku. Dlatego rytm\nsię nie rozjeżdża, choć odświeżenie ekranu zajmuje pętli ponad 20 ms. Dioda **L** na płytce miga na\nkażdą ćwierćnutę."
+    },
+    {
+      "id": "463c735b",
+      "type": "schematic",
+      "name": "syntezator",
+      "schematic": {
+        "elements": [
+          {
+            "id": "ARD_1",
+            "kind": "arduino",
+            "at": [
+              7,
+              23
+            ],
+            "rotation": 0,
+            "value": null,
+            "text": "// SYNTEZATOR Z SEKWENCEREM: trzy głosy — bas (D8), melodia (D9), perkusja (D10) — i 16 kroków na OLED-zie.\n// Dźwięk liczy przerwanie Timer1, 20 000 razy na sekundę: każdy głos to licznik fazy (DDS), a jego\n// najwyższy bit to fala prostokątna na pinie. Sekwencer też chodzi w przerwaniu, więc rytm się nie\n// rozjeżdża, gdy rysuje się ekran. Przyciski do masy: ← D2, → D3, ↑ D4, ↓ D5, nuta wł./wył. D6,\n// ścieżka D7, start/stop D12. Potencjometry: A0 tempo, A1 długość nut. Dioda L (D13) miga na każdą ćwierćnutę.\n#include <Wire.h>\n#include <Adafruit_GFX.h>\n#include <Adafruit_SSD1306.h>\n\nAdafruit_SSD1306 oled(128, 64, &Wire, -1);\n\nconst byte LEFT = 2, RIGHT = 3, UP = 4, DOWN = 5, TOGGLE = 6, TRACK = 7, PLAY = 12;\nconst long RATE = 20000;  // próbek na sekundę\nconst byte STEPS = 16, TRACKS = 3, BASS = 0, LEAD = 1, DRUMS = 2;\nconst byte KICK = 1, SNARE = 2, HAT = 3;  // perkusja: stopa, werbel, hi-hat\nconst char *const TRACK_NAMES[] = {\"BAS\", \"MELODIA\", \"PERKUSJA\"};\nconst char *const DRUM_NAMES[] = {\"-\", \"BD\", \"SD\", \"HH\"};  // bass drum, snare drum, hi-hat\n\n// nuty jako numery MIDI (60 = C4, 69 = A4 = 440 Hz), 0 = pauza: a-moll, F-dur, G-dur\nbyte song[TRACKS][STEPS] = {\n  {45, 0, 57, 45, 0, 45, 57, 0, 41, 0, 53, 41, 43, 0, 55, 43},\n  {69, 72, 76, 81, 76, 72, 69, 72, 65, 69, 72, 77, 67, 71, 74, 79},\n  {KICK, 0, HAT, 0, SNARE, 0, HAT, 0, KICK, 0, HAT, KICK, SNARE, 0, HAT, HAT},\n};\nbyte spare[TRACKS] = {45, 69, KICK};  // co wstawić w pustą kratkę: ostatnia zdjęta nuta\n\n// o ile rośnie licznik fazy co próbkę dla nut MIDI 120–131 (f · 65536 / RATE); niższa oktawa: połowa\nconst uint16_t TOP_OCTAVE[12] PROGMEM = {27433, 29065, 30793, 32624, 34564, 36619,\n                                         38797, 41104, 43548, 46137, 48881, 51787};\nuint16_t increment(byte note) { return pgm_read_word(&TOP_OCTAVE[note % 12]) >> (10 - note / 12); }\n\n// --- to, co dzieli przerwanie z pętlą\nvolatile uint16_t stepLength = 2500;  // próbek na krok (szesnastkę)\nvolatile uint16_t gateLength = 1800;  // ile próbek brzmi nuta\nvolatile byte step = STEPS - 1;       // grany krok\nvolatile bool playing = true;\n\n// --- stan głosów: tylko przerwanie\nuint16_t phase[2], rise[2], left[2];  // bas i melodia: faza, przyrost, ile próbek jeszcze\nuint16_t drumPhase, drumRise, drumLeft, noise = 1;\nbyte drum, noiseBit;\nuint16_t sample, beat;\n\nvoid startStep() {\n  step = (step + 1) % STEPS;\n  for (byte v = BASS; v <= LEAD; v++) {\n    byte note = song[v][step];\n    rise[v] = note ? increment(note) : 0;\n    left[v] = note ? gateLength : 0;\n  }\n  drum = song[DRUMS][step];\n  drumLeft = drum == KICK ? 2400 : drum == SNARE ? 1600 : drum == HAT ? 500 : 0;\n  drumRise = increment(50);  // stopa zaczyna od ~150 Hz i opada\n  beat = step % 4 == 0 ? stepLength / 2 : 0;\n}\n\nISR(TIMER1_COMPA_vect) {\n  if (playing && ++sample >= stepLength) {\n    sample = 0;\n    startStep();\n  }\n  byte out = 0;\n  for (byte v = BASS; v <= LEAD; v++)\n    if (left[v]) {\n      left[v]--;\n      phase[v] += rise[v];\n      if (phase[v] & 0x8000) out |= bit(v);  // D8 = PB0, D9 = PB1\n    }\n  if (drumLeft) {\n    drumLeft--;\n    if (drum == KICK) {\n      if ((drumLeft & 127) == 0) drumRise -= drumRise >> 4;  // co 6,4 ms o 6 % niżej: do ~40 Hz\n      drumPhase += drumRise;\n      if (drumPhase & 0x8000) out |= bit(2);\n    } else {  // szum: rejestr przesuwny ze sprzężeniem (LFSR), losowe bity; werbel co drugą próbkę, niżej\n      if (drum == HAT || (drumLeft & 1)) {\n        noiseBit = noise & 1;\n        noise >>= 1;\n        if (noiseBit) noise ^= 0xB400;\n      }\n      if (noiseBit) out |= bit(2);\n    }\n  }\n  if (beat) {\n    beat--;\n    out |= bit(5);  // D13 = PB5\n  }\n  PORTB = (PORTB & ~(bit(0) | bit(1) | bit(2) | bit(5))) | out;\n}\n\n// --- pętla: przyciski, potencjometry, ekran\nbyte track = LEAD, cursor = 0;\nbyte held[7];  // stan przycisków z poprzedniego obiegu\nbool changed = true;  // ekran do narysowania od nowa\nconst byte KEYS[7] = {LEFT, RIGHT, UP, DOWN, TOGGLE, TRACK, PLAY};\n\nbool pressed(byte k) {  // właśnie wciśnięty (zbocze), nie trzymany\n  bool now = digitalRead(KEYS[k]) == LOW, was = held[k];\n  held[k] = now;\n  if (now && !was) changed = true;\n  return now && !was;\n}\n\nvoid edit(int by) {\n  byte &cell = song[track][cursor];\n  if (track == DRUMS) cell = (cell + 4 + by) % 4;\n  else cell = constrain((cell ? cell : spare[track]) + by, 24, 96);\n}\n\nvoid printNote(byte note) {\n  const char *const NAMES[] = {\"C\", \"C#\", \"D\", \"D#\", \"E\", \"F\", \"F#\", \"G\", \"G#\", \"A\", \"A#\", \"H\"};\n  oled.print(NAMES[note % 12]);\n  oled.print(note / 12 - 1);\n}\n\nvoid draw(int bpm) {\n  oled.clearDisplay();\n  oled.setCursor(0, 0);\n  oled.print(bpm);\n  oled.print(playing ? \" BPM\" : \" stop\");\n  oled.setCursor(50, 0);\n  oled.print(TRACK_NAMES[track]);\n  oled.setCursor(104, 0);\n  byte cell = song[track][cursor];\n  if (track == DRUMS) oled.print(DRUM_NAMES[cell]);\n  else if (cell) printNote(cell);\n  else oled.print(\"-\");\n  oled.fillRect(step * 8, 9, 7, 2, SSD1306_WHITE);  // grany krok\n  for (byte t = 0; t < TRACKS; t++) {\n    int top = 12 + t * 17;\n    for (byte s = 0; s < STEPS; s++) {\n      byte cell = song[t][s];\n      int low = t == BASS ? 33 : 57;  // słupek: półton to pół piksela, od A1 (bas) i od A3 (melodia)\n      int h = t == DRUMS ? (cell == KICK ? 14 : cell == SNARE ? 9 : cell == HAT ? 4 : 0)\n                         : cell ? constrain((cell - low) / 2 + 2, 1, 15) : 0;\n      if (h) oled.fillRect(s * 8, top + 15 - h, 7, h, SSD1306_WHITE);\n      else oled.drawPixel(s * 8 + 3, top + 15, SSD1306_WHITE);\n    }\n    if (t == track) oled.fillRect(cursor * 8, top, 7, 16, SSD1306_INVERSE);\n  }\n  oled.display();\n}\n\nvoid setup() {\n  for (byte k = 0; k < 7; k++) pinMode(KEYS[k], INPUT_PULLUP);\n  DDRB |= bit(0) | bit(1) | bit(2) | bit(5);  // D8, D9, D10, D13: wyjścia\n  oled.begin(SSD1306_SWITCHCAPVCC, 0x3C);\n  Wire.setClock(400000);\n  oled.setTextColor(SSD1306_WHITE);\n  cli();\n  TCCR1A = 0;\n  TCCR1B = bit(WGM12) | bit(CS10);  // tryb CTC, bez dzielnika: 16 MHz\n  OCR1A = F_CPU / RATE - 1;         // przerwanie co 800 taktów\n  TIMSK1 = bit(OCIE1A);\n  sei();\n}\n\nbyte shown = 255;\nint shownBpm;\n\nvoid loop() {\n  int bpm = map(analogRead(A0), 0, 1023, 60, 200);\n  int gate = map(analogRead(A1), 0, 1023, 10, 100);  // % kroku\n  uint16_t length = RATE * 60 / bpm / 4;\n  noInterrupts();\n  stepLength = length;\n  gateLength = (uint32_t)length * gate / 100;\n  interrupts();\n  if (pressed(0)) cursor = (cursor + STEPS - 1) % STEPS;\n  if (pressed(1)) cursor = (cursor + 1) % STEPS;\n  if (pressed(2)) edit(+1);\n  if (pressed(3)) edit(-1);\n  if (pressed(4)) {\n    byte &cell = song[track][cursor];\n    if (cell) spare[track] = cell;\n    cell = cell ? 0 : spare[track];\n  }\n  if (pressed(5)) track = (track + 1) % TRACKS;\n  if (pressed(6)) playing = !playing;\n  if (changed || step != shown || abs(bpm - shownBpm) > 1) {\n    shown = step;\n    shownBpm = bpm;\n    changed = false;\n    draw(bpm);\n  }\n}\n"
+          },
+          {
+            "id": "OLED_1",
+            "kind": "ssd1306",
+            "at": [
+              29,
+              9
+            ],
+            "rotation": 0,
+            "value": null,
+            "text": "0x3C"
+          },
+          {
+            "id": "BZ_1",
+            "kind": "passive_buzzer",
+            "at": [
+              29,
+              27
+            ],
+            "rotation": 0,
+            "value": null,
+            "text": null
+          },
+          {
+            "id": "B_1",
+            "kind": "button",
+            "at": [
+              22,
+              13
+            ],
+            "rotation": 90,
+            "value": null,
+            "text": "ArrowLeft"
+          },
+          {
+            "id": "B_2",
+            "kind": "button",
+            "at": [
+              19,
+              13
+            ],
+            "rotation": 90,
+            "value": null,
+            "text": "ArrowRight"
+          },
+          {
+            "id": "B_3",
+            "kind": "button",
+            "at": [
+              16,
+              13
+            ],
+            "rotation": 90,
+            "value": null,
+            "text": "ArrowUp"
+          },
+          {
+            "id": "B_4",
+            "kind": "button",
+            "at": [
+              13,
+              13
+            ],
+            "rotation": 90,
+            "value": null,
+            "text": "ArrowDown"
+          },
+          {
+            "id": "B_5",
+            "kind": "button",
+            "at": [
+              10,
+              13
+            ],
+            "rotation": 90,
+            "value": null,
+            "text": "Space"
+          },
+          {
+            "id": "B_6",
+            "kind": "button",
+            "at": [
+              7,
+              13
+            ],
+            "rotation": 90,
+            "value": null,
+            "text": "t"
+          },
+          {
+            "id": "B_7",
+            "kind": "button",
+            "at": [
+              4,
+              13
+            ],
+            "rotation": 90,
+            "value": null,
+            "text": "Enter"
+          },
+          {
+            "id": "BZ_2",
+            "kind": "passive_buzzer",
+            "at": [
+              29,
+              31
+            ],
+            "rotation": 0,
+            "value": null,
+            "text": null
+          },
+          {
+            "id": "BZ_3",
+            "kind": "passive_buzzer",
+            "at": [
+              29,
+              35
+            ],
+            "rotation": 0,
+            "value": null,
+            "text": null
+          },
+          {
+            "id": "P_1",
+            "kind": "potentiometer",
+            "at": [
+              15,
+              37
+            ],
+            "rotation": 0,
+            "value": "10k",
+            "text": "0.43"
+          },
+          {
+            "id": "P_2",
+            "kind": "potentiometer",
+            "at": [
+              23,
+              37
+            ],
+            "rotation": 0,
+            "value": "10k",
+            "text": "0.7"
+          }
+        ],
+        "wires": [
+          {
+            "points": [
+              [
+                17,
+                35
+              ],
+              [
+                16,
+                35
+              ],
+              [
+                16,
+                31
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                22,
+                17
+              ],
+              [
+                21,
+                17
+              ],
+              [
+                21,
+                23
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                19,
+                17
+              ],
+              [
+                20,
+                17
+              ],
+              [
+                20,
+                23
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                16,
+                17
+              ],
+              [
+                16,
+                22
+              ],
+              [
+                19,
+                22
+              ],
+              [
+                19,
+                23
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                13,
+                17
+              ],
+              [
+                13,
+                21
+              ],
+              [
+                18,
+                21
+              ],
+              [
+                18,
+                23
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                4,
+                17
+              ],
+              [
+                4,
+                22
+              ],
+              [
+                10,
+                22
+              ],
+              [
+                10,
+                23
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                25,
+                35
+              ],
+              [
+                25,
+                34
+              ],
+              [
+                17,
+                34
+              ],
+              [
+                17,
+                31
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                10,
+                17
+              ],
+              [
+                10,
+                20
+              ],
+              [
+                17,
+                20
+              ],
+              [
+                17,
+                23
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                7,
+                17
+              ],
+              [
+                7,
+                19
+              ],
+              [
+                15,
+                19
+              ],
+              [
+                15,
+                23
+              ],
+              [
+                16,
+                23
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                29,
+                27
+              ],
+              [
+                29,
+                18
+              ],
+              [
+                14,
+                18
+              ],
+              [
+                14,
+                23
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                29,
+                31
+              ],
+              [
+                29,
+                32
+              ],
+              [
+                7,
+                32
+              ],
+              [
+                7,
+                21
+              ],
+              [
+                11,
+                21
+              ],
+              [
+                11,
+                22
+              ],
+              [
+                13,
+                22
+              ],
+              [
+                13,
+                23
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                29,
+                35
+              ],
+              [
+                29,
+                33
+              ],
+              [
+                6,
+                33
+              ],
+              [
+                6,
+                18
+              ],
+              [
+                12,
+                18
+              ],
+              [
+                12,
+                23
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                31,
+                9
+              ],
+              [
+                31,
+                8
+              ],
+              [
+                24,
+                8
+              ],
+              [
+                24,
+                23
+              ],
+              [
+                25,
+                23
+              ],
+              [
+                25,
+                31
+              ],
+              [
+                21,
+                31
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                32,
+                9
+              ],
+              [
+                37,
+                9
+              ],
+              [
+                37,
+                38
+              ],
+              [
+                20,
+                38
+              ],
+              [
+                20,
+                31
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                19,
+                37
+              ],
+              [
+                19,
+                38
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                19,
+                38
+              ],
+              [
+                10,
+                38
+              ],
+              [
+                10,
+                31
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                27,
+                37
+              ],
+              [
+                27,
+                39
+              ],
+              [
+                19,
+                39
+              ],
+              [
+                19,
+                38
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                30,
+                9
+              ],
+              [
+                30,
+                7
+              ],
+              [
+                23,
+                7
+              ],
+              [
+                23,
+                22
+              ],
+              [
+                27,
+                22
+              ],
+              [
+                27,
+                37
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                15,
+                37
+              ],
+              [
+                15,
+                34
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                15,
+                34
+              ],
+              [
+                15,
+                31
+              ],
+              [
+                12,
+                31
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                13,
+                13
+              ],
+              [
+                13,
+                12
+              ],
+              [
+                10,
+                12
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                10,
+                13
+              ],
+              [
+                10,
+                12
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                23,
+                37
+              ],
+              [
+                23,
+                40
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                23,
+                40
+              ],
+              [
+                15,
+                40
+              ],
+              [
+                15,
+                37
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                16,
+                13
+              ],
+              [
+                13,
+                13
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                10,
+                12
+              ],
+              [
+                7,
+                12
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                7,
+                13
+              ],
+              [
+                7,
+                12
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                33,
+                27
+              ],
+              [
+                33,
+                31
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                19,
+                13
+              ],
+              [
+                16,
+                13
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                33,
+                31
+              ],
+              [
+                34,
+                31
+              ],
+              [
+                34,
+                35
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                34,
+                35
+              ],
+              [
+                34,
+                40
+              ],
+              [
+                23,
+                40
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                33,
+                35
+              ],
+              [
+                34,
+                35
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                7,
+                12
+              ],
+              [
+                5,
+                12
+              ],
+              [
+                5,
+                13
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                5,
+                13
+              ],
+              [
+                5,
+                34
+              ],
+              [
+                15,
+                34
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                4,
+                13
+              ],
+              [
+                5,
+                13
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                22,
+                13
+              ],
+              [
+                19,
+                13
+              ]
+            ]
+          },
+          {
+            "points": [
+              [
+                29,
+                9
+              ],
+              [
+                22,
+                9
+              ],
+              [
+                22,
+                13
+              ]
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "d87e8b55",
+      "type": "code",
+      "source": "# przyrost licznika fazy dla nuty: f · 2^16 / częstotliwość próbkowania\nPROBKI = 20_000\nnazwy = [\"C\", \"C#\", \"D\", \"D#\", \"E\", \"F\", \"F#\", \"G\", \"G#\", \"A\", \"A#\", \"H\"]\nfor midi in (45, 57, 69, 72, 76, 81):\n    f = 440 * 2 ** ((midi - 69) / 12)\n    przyrost = round(f * 2**16 / PROBKI)\n    print(f\"{nazwy[midi % 12]}{midi // 12 - 1:<3} {f:7.1f} Hz  przyrost {przyrost:5}  gra {przyrost * PROBKI / 2**16:7.1f} Hz\")",
+      "outputs": [
+        {
+          "type": "stream",
+          "data": "A2     110.0 Hz  przyrost   360  gra   109.9 Hz\nA3     220.0 Hz  przyrost   721  gra   220.0 Hz\nA4     440.0 Hz  przyrost  1442  gra   440.1 Hz\nC5     523.3 Hz  przyrost  1715  gra   523.4 Hz\nE5     659.3 Hz  przyrost  2160  gra   659.2 Hz\nA5     880.0 Hz  przyrost  2884  gra   880.1 Hz\n"
+        }
+      ]
+    },
+    {
+      "id": "7275ff16",
+      "type": "code",
+      "source": "# jeden krok to szesnastka: przy 120 BPM ćwierćnuta trwa pół sekundy, krok — 125 ms\nfor bpm in (60, 120, 200):\n    krok = PROBKI * 60 // bpm // 4\n    print(f\"{bpm:3} BPM: krok {krok} próbek = {krok / PROBKI * 1000:.0f} ms\")",
+      "outputs": [
+        {
+          "type": "stream",
+          "data": " 60 BPM: krok 5000 próbek = 250 ms\n120 BPM: krok 2500 próbek = 125 ms\n200 BPM: krok 1500 próbek = 75 ms\n"
+        }
+      ]
+    }
+  ]
+}
