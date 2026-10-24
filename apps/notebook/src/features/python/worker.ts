@@ -19,7 +19,8 @@ type Request =
   | { id: number; type: "sweep"; problem: string; element: string; lo: string; hi: string }
   | { id: number; type: "spread"; problem: string; tol: number }
   | { id: number; type: "taskValues"; problem: string; steps: string }
-  | { id: number; type: "reset" };
+  | { id: number; type: "reset" }
+  | { id: number; type: "file"; name: string; bytes: Uint8Array }; // a note's file, into the working directory
 
 interface Kernel {
   run(code: string, problems: string, units: string, apart?: boolean): string;
@@ -116,6 +117,11 @@ self.onmessage = async (event: MessageEvent<Request>) => {
     }
     if (!kernel) throw new Error("The kernel was not started (init first).");
     const k = await kernel;
+    if (request.type === "file") {
+      pyodide!.FS.writeFile(request.name, request.bytes); // (the working directory: /home/pyodide)
+      self.postMessage({ id: request.id, ok: true, result: null });
+      return;
+    }
     const result =
       request.type === "run"
         ? await run(k, request)

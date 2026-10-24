@@ -28,6 +28,22 @@ export function Outputs({ outputs }: { outputs: Output[] }) {
             );
           case "markdown":
             return <Markdown key={i} source={o.data} />;
+          case "audio":
+            return (
+              <audio key={i} data-output="audio" controls src={`data:audio/wav;base64,${o.data}`} className="w-full" />
+            );
+          case "file":
+            return (
+              <a
+                key={i}
+                data-output="file"
+                download={o.name}
+                href={`data:application/octet-stream;base64,${o.data}`}
+                className="justify-self-start px-2.5 py-1 rounded-md border border-line text-[14px] font-mono hover:bg-hover"
+              >
+                ⤓ {o.name}
+              </a>
+            );
           case "solution":
             return <Solution key={i} steps={o.data} />;
           case "error":

@@ -1,6 +1,7 @@
 // The page's handle on the Python worker: every call is a message and a promise.
 
 import { type Progress, report } from "@/features/downloads/store";
+import { bytesOf } from "@/features/files/files";
 import { bodeSvg, histogramSvg, traceSvg } from "@/features/plots/svg";
 import { writeCode } from "@/features/schematic/code";
 import { drawingFromCode } from "@/features/schematic/fromCode";
@@ -10,7 +11,7 @@ import { withParts } from "@/features/schematic/parts";
 import { elementsOf, problemOf, solveData } from "@/features/schematic/problem";
 import type { LiveCircuit } from "@/features/simulation/engine";
 import type { Failure } from "@/shared/model/issues";
-import type { ElementResult, Output, Problem, SchematicData, SymbolStandard } from "@/shared/model/types";
+import type { ElementResult, NoteFile, Output, Problem, SchematicData, SymbolStandard } from "@/shared/model/types";
 import { given, shown } from "./outputs";
 
 type Reply = { id: number; ok: true; result: unknown } | { id: number; ok: false; error: string };
@@ -20,6 +21,8 @@ class Kernel {
   private pending = new Map<number, { resolve: (v: unknown) => void; reject: (e: Error) => void }>();
   private nextId = 1;
   readonly ready: Promise<void>;
+  private files: readonly NoteFile[] = [];
+  private placed = new Map<string, string>(); // each file in Python's working directory: its name → its id
 
   constructor() {
     this.worker.onmessage = (event: MessageEvent<Reply | { progress: Progress }>) => {
@@ -44,6 +47,20 @@ class Kernel {
     });
   }
 
+  /** The note's files: in Python's working directory when a cell runs next. */
+  setFiles(files: readonly NoteFile[]) {
+    this.files = files;
+  }
+
+  /** Each of the note's files not there yet (or changed) into Python's working directory. */
+  private async place() {
+    for (const f of this.files) {
+      if (this.placed.get(f.name) === f.id) continue;
+      await this.call("file", { name: f.name, bytes: await bytesOf(f) });
+      this.placed.set(f.name, f.id);
+    }
+  }
+
   /** A code cell, the schematic cells' problems as its variables; what it shows drawn with `standard`'s
    *  symbols (the note's). */
   async run(
@@ -51,6 +68,7 @@ class Kernel {
     schematics: Record<string, SchematicData>,
     standard: SymbolStandard = "iec",
   ): Promise<Output[]> {
+    await this.place();
     const text = (await this.call("run", { code, ...given(schematics, library) })) as string;
     return shown(JSON.parse(text), libraryFor(standard));
   }

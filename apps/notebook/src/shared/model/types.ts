@@ -69,6 +69,8 @@ export type SymbolStandard = "iec" | "ieee";
 
 export type Output =
   | { type: "text" | "stream" | "svg" | "markdown"; data: string }
+  | { type: "audio"; data: string } // audio(...): a WAV, base64
+  | { type: "file"; name: string; data: string } // download(name): a file Python wrote, base64
   | ({ type: "error" | "warning" } & Failure)
   | ({ type: "issue"; kind: "error" | "warning" } & Failure) // display(err): an issue shown on purpose
   | { type: "solution"; data: Steps } // steps(sol)
@@ -131,6 +133,14 @@ export type Plot = { svg: string; stale?: boolean };
 export type SchematicView = "schematic" | "code";
 
 /** A notebook file (*.electro.json), version 2 — see format.ts. */
+/** A file attached to a note: in its Python's working directory under ``name`` (the bytes kept once by their
+ *  SHA-256, ``id``, as a board's uploaded program is: features/vault). */
+export interface NoteFile {
+  name: string;
+  id: string;
+  size: number;
+}
+
 export interface Notebook {
   format: "electro-notebook";
   version: 2;
@@ -140,5 +150,6 @@ export interface Notebook {
   modified: string;
   settings: { codeInPdf: boolean; [key: string]: unknown };
   cells: Cell[];
+  files?: NoteFile[]; // what is attached to it
   [key: string]: unknown; // keys a newer version wrote: kept as they are
 }

@@ -6,7 +6,7 @@
 import { type DragEvent, type KeyboardEvent, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { cn } from "@/shared/lib/cn";
-import type { Cell } from "@/shared/model/types";
+import type { Cell, NoteFile } from "@/shared/model/types";
 import { ArrowUp, Close, Gear, NewChat, Paperclip, Sparkle } from "@/shared/ui/icons";
 import { Markdown } from "@/shared/ui/Markdown";
 import { type Doing, turn } from "./agent";
@@ -48,12 +48,14 @@ export function AiChat({
   open,
   onClose,
   cells,
+  noteFiles,
   setCells,
   at,
 }: {
   open: boolean;
   onClose: () => void;
   cells: () => Cell[]; // the note's cells now
+  noteFiles: () => readonly NoteFile[]; // its files now
   setCells: (cells: Cell[]) => void;
   at: () => number; // where new cells go
 }) {
@@ -120,6 +122,7 @@ export function AiChat({
         pictures: all,
         history,
         cells: before,
+        files: noteFiles(),
         at: at(),
         language: i18n.language,
         onCells: setCells,

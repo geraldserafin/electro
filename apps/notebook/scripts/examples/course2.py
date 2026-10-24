@@ -87,6 +87,20 @@ plt.ylabel("u [V]")
 Czego nie ma w Pyodide, a jest w PyPI jako czysty Python, doinstalujesz linią `%pip install` na początku
 komórki — na przykład `%pip install pint` (jednostki fizyczne). Instalacja trwa do przeładowania strony; po
 nim komórka z `%pip` przy **Uruchom wszystko** zainstaluje pakiet znowu.
+## Pliki
+
+Plik — nagranie, pomiary z oscyloskopu, zdjęcie — dodajesz do notatki w panelu bocznym (**Pliki → Dodaj plik**)
+albo upuszczasz na notatkę. Zostaje przy niej, a Python otwiera go po nazwie:
+
+```python
+from scipy.io import wavfile
+
+fs, x = wavfile.read("klarnet.wav")
+audio(x, fs)             # odtwarzacz pod komórką
+```
+
+`audio(próbki, fs)` gra sygnał (albo `audio("plik.wav")` — plik), a `download("wynik.wav")` daje do pobrania
+plik zapisany w Pythonie (sam znika po przeładowaniu strony).
 """)
     L.md("""
 ## Schemat

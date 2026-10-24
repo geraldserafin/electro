@@ -1,5 +1,7 @@
 // The note's sidebar, under the app's islands: the title, and the sections under it — a note in parts:
-// the title its start (what comes before the first part), then the parts, each its sections under it.
+// the title its start (what comes before the first part), then the parts, each its sections under it;
+// at the bottom the note's files.
+import type { ReactNode } from "react";
 import type { Part } from "@/shared/model/parts";
 import type { Cell } from "@/shared/model/types";
 import type { Spot } from "./cellList";
@@ -22,6 +24,7 @@ export function Sidebar({
   onRemove,
   onMovePart,
   onClose,
+  files,
 }: {
   open: boolean;
   onClose: () => void;
@@ -36,6 +39,7 @@ export function Sidebar({
   onAddPart: () => void; // a new chapter, at the note's end
   onRemove: (page: number) => void;
   onMovePart: (page: number, before: number) => void;
+  files: ReactNode; // the note's files (Files)
 }) {
   // where it covers the note (a phone): gone once it took the reader somewhere
   const went = () => matchMedia(NARROW).matches && onClose();
@@ -69,6 +73,7 @@ export function Sidebar({
         </div>
         <Outline cells={cells} onMove={onMove} onGo={went} />
         {editing && <AddPart onAdd={onAddPart} />}
+        {files}
       </aside>
     );
   return (
@@ -100,6 +105,7 @@ export function Sidebar({
         </PartList>
         {editing && <AddPart onAdd={onAddPart} />}
       </div>
+      {files}
     </aside>
   );
 }

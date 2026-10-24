@@ -82,6 +82,10 @@ export function toTypst(
         const svg = parseSvg(o.data);
         return svg ? image(svg, false) : "";
       }
+      case "audio": // (nothing to hear on paper)
+        return "";
+      case "file":
+        return `#output(${str(o.name)})`;
       case "task": // on paper: the prompt and a line to write the answer on
         return md(`${o.prompt}\n\n$${o.tex} =$ \\_\\_\\_\\_\\_\\_\\_\\_ ${o.unit}`);
       default:

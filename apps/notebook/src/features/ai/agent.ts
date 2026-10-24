@@ -12,7 +12,7 @@ import { library } from "@/features/schematic/library";
 import { pictureOf } from "@/features/schematic/picture";
 import { newCell } from "@/shared/model/cells";
 import type { Failure } from "@/shared/model/issues";
-import type { Cell, Output, SchematicData } from "@/shared/model/types";
+import type { Cell, NoteFile, Output, SchematicData } from "@/shared/model/types";
 import { textOf } from "./attachments";
 import { type AiMessage, type AiTool, type AiToolCall, complete, type Progress } from "./client";
 import { CIRCUIT_FORMAT, jsonOf } from "./protocol";
@@ -49,8 +49,10 @@ THE APP. A note is a list of cells: text (Markdown, formulas in $...$ LaTeX), ci
 - A code cell is Python with the "electro" library (elements by name, joined: E, R = VoltageSource("E"),
   Resistor("R_1"); (~(E >> R)).final({E: 12, R: 10})(I(R)) …), every circuit cell a variable by its name
   (uklad.final(), uklad.simulate(until=0.01), uklad["R_1"]), and helpers: plot(trace, "V_wy"), bode(circuit,
-  values), steps(solution). numpy, scipy, matplotlib (a figure shows under the cell), pandas… load as they are
-  imported; a line "%pip install name" installs a pure-Python package from PyPI. All cells share one Python, in
+  values), steps(solution), audio(samples, rate) or audio("file.wav") (a player under the cell), download("x")
+  (a file Python wrote, to save). numpy, scipy, matplotlib (a figure shows under the cell), pandas… load as they
+  are imported; a line "%pip install name" installs a pure-Python package from PyPI. The note's files (below)
+  are in Python's working directory by their names: scipy.io.wavfile.read("klarnet.wav"). All cells share one Python, in
   the order they ran. Write code cells when asked (write_code), and run each one you write (run_code): what it
   printed comes back — an error you mend and run again. A number from code you ran counts as the solver's.
 You help with whatever the user asks: you answer questions, explain, help solve problems — step by step,
@@ -81,6 +83,8 @@ and mended there on its own — what it says of it is final; tell the user of on
 Write in {LANGUAGE}, unless the document's own text is in another.
 
 THE PICTURES (attached in this conversation, by number): {PICTURES}
+
+THE NOTE'S FILES: {FILES}
 
 THE NOTE NOW (cells in order, by id; new cells go after {AT} unless said otherwise):
 {NOTE}`;
@@ -385,6 +389,7 @@ export async function turn({
   pictures,
   history,
   cells: start,
+  files = [],
   at,
   language,
   onCells,
@@ -396,6 +401,7 @@ export async function turn({
   pictures: string[]; // every picture of the conversation
   history: AiMessage[];
   cells: Cell[];
+  files?: readonly NoteFile[]; // what is attached to the note
   at: number;
   language: string;
   onCells: (cells: Cell[]) => void;
@@ -667,6 +673,7 @@ export async function turn({
     role: "system",
     content: SYSTEM.replace("{LANGUAGE}", language === "en" ? "English" : "Polish")
       .replace("{PICTURES}", pictures.length ? `1–${pictures.length}` : "none")
+      .replace("{FILES}", files.length ? files.map((f) => `${f.name} (${f.size} bytes)`).join(", ") : "none")
       .replace("{AT}", at > 0 && start[at - 1] ? `cell ${start[at - 1]!.id}` : "the start")
       .replace("{NOTE}", await describe(start)),
   };

@@ -10,12 +10,13 @@ import { ExportDialog, PdfContext, type PdfSettings, pdfOf, warmUpWhenIdle } fro
 import { kernel, usePython } from "@/features/python";
 import { libraryFor, PdfDrawing } from "@/features/schematic";
 import { SettingsMenu, SymbolsChoice } from "@/features/settings";
+import { carriesFiles } from "@/features/simulation/FirmwareFile";
 import { useTitle } from "@/shared/hooks/useTitle";
 import { cn } from "@/shared/lib/cn";
 import { newCell } from "@/shared/model/cells";
 import { copyOf } from "@/shared/model/format";
 import { partMark, partsOf } from "@/shared/model/parts";
-import type { Cell, CellType, Notebook as NotebookData, SymbolStandard } from "@/shared/model/types";
+import type { Cell, CellType, Notebook as NotebookData, NoteFile, SymbolStandard } from "@/shared/model/types";
 import { IslandButton, IslandLink, Islands } from "@/shared/ui/Island";
 import { Back, Export, Notes, OutlineIcon, RunAll, ShareIcon } from "@/shared/ui/icons";
 import { MenuItem } from "@/shared/ui/Menu";
@@ -25,6 +26,7 @@ import { freeName, moveRange, moveSection } from "./cellList";
 import { CodeCell } from "./cells/CodeCell";
 import { MarkdownCell } from "./cells/MarkdownCell";
 import { SchematicCell } from "./cells/SchematicCell";
+import { Files, useAttach } from "./Files";
 import { column } from "./layout";
 import { Pager } from "./Parts";
 import { Sidebar } from "./Sidebar";
@@ -45,6 +47,7 @@ const Code = memo(CodeCell, sameButCallbacks);
 const Schematic = memo(SchematicCell, sameButCallbacks);
 /** This browser's choice: a note in chapters as one long page, not a page a chapter. */
 const WHOLE = "electro.wholeNote";
+const NO_FILES: NoteFile[] = [];
 
 /**
  * ``initial``/``revision``: the note as read from the server; ``reload``: read it again (after a
@@ -103,6 +106,14 @@ export function Notebook({
   const setTitle = (title: string) => setNotebook({ ...latest.current, title });
 
   const setCells = (fn: (cells: Cell[]) => Cell[]) => setNotebook((nb) => ({ ...nb, cells: fn(nb.cells) }));
+  // its files: in Python's working directory when a cell runs (kernel.setFiles)
+  const files = notebook.files ?? NO_FILES;
+  useEffect(() => kernel.setFiles(files), [files]);
+  const setFiles = useCallback(
+    (fn: (files: NoteFile[]) => NoteFile[]) => setNotebook((nb) => ({ ...nb, files: fn(nb.files ?? []) })),
+    [],
+  );
+  const { attach, problem } = useAttach(setFiles);
   const update = (id: string, patch: Partial<Cell>) =>
     setCells((cells) => cells.map((c) => (c.id === id ? ({ ...c, ...patch } as Cell) : c)));
   // its chapters: pages, the one shown (a cell worked on elsewhere brings its chapter up); one long page
@@ -189,6 +200,15 @@ export function Notebook({
       onPointerDownCapture={(e) => {
         if (!(e.target as Element).closest("[data-cell], [data-keep-focus]")) setFocused(null);
       }}
+      // files dropped on the note (not on a board: its program) are attached to it
+      onDragOver={(e) => {
+        if (!readOnly && !embed && carriesFiles(e)) e.preventDefault();
+      }}
+      onDrop={(e) => {
+        if (readOnly || embed || e.defaultPrevented || !carriesFiles(e)) return;
+        e.preventDefault();
+        void attach(Array.from(e.dataTransfer.files));
+      }}
     >
       {/* left: the way back, and the sidebar's switch (the note's title and its sections);
           right: run, PDF, the settings (theme, language) */}
@@ -237,6 +257,15 @@ export function Notebook({
             setCells((cells) => moveRange(cells, p.start, p.end - p.start, parts[before]?.start ?? cells.length));
           }}
           onClose={() => setOutline(false)}
+          files={
+            <Files
+              files={files}
+              editing={!readOnly}
+              problem={problem}
+              onAdd={(list) => void attach(list)}
+              onRemove={(name) => setFiles((all) => all.filter((f) => f.name !== name))}
+            />
+          }
         />
       )}
       <Islands side="right">
@@ -313,6 +342,7 @@ export function Notebook({
             open={chat}
             onClose={() => setChat(false)}
             cells={() => latest.current.cells}
+            noteFiles={() => latest.current.files ?? NO_FILES}
             setCells={(cells) => setCells(() => cells)}
             at={() => {
               const now = latest.current.cells;

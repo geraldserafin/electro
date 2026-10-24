@@ -4,7 +4,7 @@ problem as a variable named after it, and helpers that show things.
 The value of a cell's last expression is shown, and whatever it gives ``display``: a circuit or a schematic
 as a drawing (``schematic``), a solution as its answers (``steps``: its worked steps), plots (``plot``, ``bode``,
 ``spread``), a task to answer (``task``), an error caught on purpose, math, else its text; matplotlib's figures
-as pictures (``figures``). All as data: the page draws and says them (``Output`` in ``shared/model/types.ts``)."""
+as pictures (``figures``); a sound to play (``audio``), a file to save (``download``). All as data: the page draws and says them (``Output`` in ``shared/model/types.ts``)."""
 
 from __future__ import annotations
 
@@ -20,7 +20,7 @@ import sympy as sp
 from electro import Circuit, Element, Node, Solution, Trace
 from electro.quantities import Current, Parameter, Power, Quantity, Voltage
 
-from . import figures, plots
+from . import figures, media, plots
 from . import task as tasks
 from .code_view import PRELUDE, variable
 from .drawing import Drawing, from_drawing, to_drawing
@@ -128,6 +128,23 @@ def task(circuit: Element, values: Mapping, find: str | Quantity, prompt: str = 
     return tasks.task(circuit, values, find, prompt, tol=tol, units=units)
 
 
+def audio(data, rate: int | None = None) -> None:
+    """A player under the cell, where it is called: a WAV file by its name, or samples at ``rate`` a second
+    (``media.audio``)."""
+    _show(media.audio(data, rate))
+
+
+def download(name: str) -> None:
+    """A file Python wrote, to be saved from under the cell (where it is called)."""
+    _show(media.download(name))
+
+
+def _show(output: dict) -> None:
+    """Among the outputs of the cell running now, at once (as ``plt.show()`` puts a figure)."""
+    if figures.outputs is not None:
+        figures.outputs.append(output)
+
+
 def to_output(obj: object) -> dict:
     if isinstance(obj, Circuit | Drawing):
         obj = schematic(obj)
@@ -152,7 +169,16 @@ def to_output(obj: object) -> dict:
     return {"type": "text", "data": repr(obj)}
 
 
-HELPERS = {"steps": steps, "schematic": schematic, "plot": plot, "bode": bode, "spread": spread, "task": task}
+HELPERS = {
+    "steps": steps,
+    "schematic": schematic,
+    "plot": plot,
+    "bode": bode,
+    "spread": spread,
+    "task": task,
+    "audio": audio,
+    "download": download,
+}
 
 
 def reset() -> None:

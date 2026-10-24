@@ -7,7 +7,7 @@ import io
 import sys
 
 outputs: list[dict] | None = None
-"""Where the cell running now puts what it shows (``cells.run``)."""
+"""Where the cell running now puts what it shows (``cells.run``): its figures, its sounds (``cells.audio``)."""
 
 
 def take() -> None:
