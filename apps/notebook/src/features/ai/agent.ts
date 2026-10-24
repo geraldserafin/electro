@@ -1,7 +1,8 @@
 // The assistant as an agent: the conversation, the note and what was attached (pictures, a PDF's
 // pages) go to the model with tools — to read the note, write text into it, draw a circuit (the solver
-// checks it; drawn from a picture, the drawing comes back beside the picture's, to compare), look at
-// a picture closer, work quantities out with the solver, remove cells — and it does with them whatever
+// checks it; drawn from a picture, the drawing comes back beside the picture's, to compare), write code and
+// run it (what it prints comes back: an error it mends), look at a picture closer, work quantities out with
+// the solver, remove cells — and it does with them whatever
 // is asked: a note from a PDF, an answer about it, help with a problem, a change to the note. What a
 // tool finds wrong goes back to it as the tool's result: it mends that itself. No tasks: a note is for
 // notes (a test's tasks are its author's).
@@ -11,7 +12,7 @@ import { library } from "@/features/schematic/library";
 import { pictureOf } from "@/features/schematic/picture";
 import { newCell } from "@/shared/model/cells";
 import type { Failure } from "@/shared/model/issues";
-import type { Cell, SchematicData } from "@/shared/model/types";
+import type { Cell, Output, SchematicData } from "@/shared/model/types";
 import { textOf } from "./attachments";
 import { type AiMessage, type AiTool, type AiToolCall, complete, type Progress } from "./client";
 import { CIRCUIT_FORMAT, jsonOf } from "./protocol";
@@ -46,7 +47,12 @@ THE APP. A note is a list of cells: text (Markdown, formulas in $...$ LaTeX), ci
   the run button. Also AC (sine sources: phasors), Bode plots, a sweep of a value, a live simulation in time
   (switches, LEDs, transistors, logic, Arduino) — the user's to run.
 - A code cell is Python with the "electro" library (elements by name, joined: E, R = VoltageSource("E"),
-  Resistor("R_1"); (~(E >> R)).final({E: 12, R: 10})(I(R)) …). You do not write code cells.
+  Resistor("R_1"); (~(E >> R)).final({E: 12, R: 10})(I(R)) …), every circuit cell a variable by its name
+  (uklad.final(), uklad.simulate(until=0.01), uklad["R_1"]), and helpers: plot(trace, "V_wy"), bode(circuit,
+  values), steps(solution). numpy, scipy, matplotlib (a figure shows under the cell), pandas… load as they are
+  imported; a line "%pip install name" installs a pure-Python package from PyPI. All cells share one Python, in
+  the order they ran. Write code cells when asked (write_code), and run each one you write (run_code): what it
+  printed comes back — an error you mend and run again. A number from code you ran counts as the solver's.
 You help with whatever the user asks: you answer questions, explain, help solve problems — step by step,
 every number from the solve tool (the circuit's currents and voltages, which it knows; never a number you
 worked out yourself) — and you write and change the note when asked to: a note from a photo or a PDF, a
@@ -153,6 +159,32 @@ it is checked against that part of the picture, and mended, before it comes back
           ...where,
         },
         required: ["name", "elements", "wires"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "write_code",
+      description: "Writes a code cell (Python) into the note, or rewrites one. It does not run: run it with run_code.",
+      parameters: {
+        type: "object",
+        properties: { source: { type: "string", description: "the Python code" }, ...where },
+        required: ["source"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "run_code",
+      description: `Runs a code cell as its ▶ does, in the note's Python (what the cells that ran before defined is
+there): what it printed, its last value, its errors (with the line) come back, and stay under the cell; a figure or
+a plot comes back as "(a picture)".`,
+      parameters: {
+        type: "object",
+        properties: { cell: { type: "string", description: "the code cell's id" } },
+        required: ["cell"],
       },
     },
   },
@@ -281,6 +313,29 @@ async function rasterize(svg: string): Promise<string> {
 }
 
 // ------------------------------------------------------------------ the note
+
+/** What a code cell showed, as the model reads it: its text, its errors; a picture as words. */
+function heard(outputs: Output[]): string {
+  if (!outputs.length) return "ok: it ran, showing nothing";
+  const each = (o: Output): string => {
+    switch (o.type) {
+      case "text":
+      case "stream":
+      case "markdown":
+        return cut(o.data, 2000);
+      case "error":
+      case "warning":
+        return `${o.type}${o.line ? ` (line ${o.line})` : ""}: ${said(o)}`;
+      case "issue":
+        return `${o.kind}: ${said(o)}`;
+      case "svg":
+        return "(a picture)";
+      default:
+        return `(${o.type})`;
+    }
+  };
+  return `it ran; it showed:\n${outputs.map(each).join("\n")}`;
+}
 
 /** The note as the model reads it: each cell's id, kind and what is in it (a circuit as a netlist). */
 async function describe(cells: Cell[]): Promise<string> {
@@ -552,6 +607,26 @@ export async function turn({
         const theirs = fits(source!.box) ? await crop(url, source!.box) : url;
         return () =>
           mend({ id, name, theirs, data: { elements, wires }, schematic, why: "why" in got ? got.why : [], step });
+      }
+      case "write_code": {
+        const source = String(args.source ?? "").trim();
+        if (!source) return "error: no code";
+        const cell = { ...newCell("code"), type: "code", source } as Cell;
+        const wrong = put(cell, place);
+        if (wrong) return `error: ${wrong}`;
+        return `ok: cell ${place.replace ?? cell.id} (not run yet)`;
+      }
+      case "run_code": {
+        const cell = cells.find((c) => c.id === args.cell);
+        if (cell?.type !== "code") return `error: no code cell ${String(args.cell)} in the note`;
+        const schematics = Object.fromEntries(
+          cells.flatMap((c) => (c.type === "schematic" ? [[c.name, c.schematic] as const] : [])),
+        );
+        const outputs: Output[] = await kernel
+          .run(cell.source, schematics)
+          .catch((e: unknown) => [{ type: "error" as const, data: String(e) }]);
+        set(cells.map((c) => (c.id === cell.id ? { ...c, outputs } : c)));
+        return heard(outputs);
       }
       case "look": {
         const url = pictures[Number(args.picture) - 1];
