@@ -4,7 +4,7 @@ dt)`` gives the next frame, and ``simulate`` runs frame after frame from rest (t
 Φ has letters for what it learns only while it runs: the step's length ``dt``, the time, how a change is read
 (θ), what was a step before (``memory``: each letter and its value after a step) and what is set from
 outside (an element's ``inputs``). Every point has a tiny conductance to ground, so a floating point never
-makes the equations singular. Any quantity can be read of a frame (``at``); the page gets what it reads
+makes the equations singular; a piece with no ground in it stands on one of its points. Any quantity can be read of a frame (``at``); the page gets what it reads
 compiled (``to_json``)."""
 
 from __future__ import annotations
@@ -220,9 +220,13 @@ def _potentials(circuit: Circuit) -> set[sp.Symbol]:
 
 
 def _equations(laws: Laws, read: Callable, circuit: Circuit) -> list[sp.Expr]:
-    """The laws at a step, and a reference potential where nothing fixes how high a piece's stand."""
-    said = [read(q.expr) for q in laws.equations]
-    return said + [q.expr for q in references(said, _potentials(circuit))]
+    """The laws at a step. A piece no ground is in (an Arduino's circuit drawn without one) stands on one of its
+    points, at 0 V instead of Kirchhoff there: the leak alone would hold it up by 10⁻¹² S against amperes, and
+    Newton would not settle on it. (Found on the laws without the leak: with it nothing floats.)"""
+    lifted = references([read(q.expr) for q in circuit.closed().equations], _potentials(circuit))
+    grounds = {q.expr for q in lifted}
+    kept = [q for q in laws.equations if q.origin.what != "kcl" or q.origin.subject.potential not in grounds]
+    return [read(q.expr) for q in kept] + list(grounds)
 
 
 def _all_given(equations: list[sp.Expr], circuit: Circuit) -> None:
