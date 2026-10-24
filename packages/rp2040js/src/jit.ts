@@ -426,10 +426,10 @@ function translateOne(opcode: number, opcode2: number, pc: number, before: numbe
   // ADD (register)
   if (opcode >> 8 === 0b01000100) {
     const Rm = (opcode >> 3) & 0xf, Rdn = ((opcode & 0x80) >> 4) | (opcode & 7);
-    const left = Rdn === 15 ? hex(next + 2) : `R[${Rdn}]`;
-    if (Rdn === 15) return { code: `R[15] = (${left} + ${r(Rm)}) & ~0x1;`, cycles: 2, ends: true };
-    if (Rdn === 13) return op(`R[13] = (${left} + ${r(Rm)}) & ~0x3;`);
-    return op(`R[${Rdn}] = ${left} + ${r(Rm)};`);
+    const left = Rdn === 15 ? hex(next + 2) : `R[${Rdn}]`, right = Rm === 15 ? hex(next + 2) : `R[${Rm}]`;
+    if (Rdn === 15) return { code: `R[15] = (${left} + ${right}) & ~0x1;`, cycles: 2, ends: true };
+    if (Rdn === 13) return op(`R[13] = (${left} + ${right}) & ~0x3;`);
+    return op(`R[${Rdn}] = ${left} + ${right};`);
   }
   // ADR
   if (opcode >> 11 === 0b10100) {

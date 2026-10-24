@@ -689,7 +689,7 @@ export class CortexM0Core implements ICpuCore {
       const Rm = (opcode >> 3) & 0xf;
       const Rdn = ((opcode & 0x80) >> 4) | (opcode & 0x7);
       const leftValue = Rdn === pcRegister ? this.PC + 2 : this.registers[Rdn];
-      const rightValue = this.registers[Rm];
+      const rightValue = Rm === pcRegister ? this.PC + 2 : this.registers[Rm]; // (ours) the PC read as Rm too: +4
       const result = leftValue + rightValue;
       if (Rdn !== spRegister && Rdn !== pcRegister) {
         this.registers[Rdn] = result;
